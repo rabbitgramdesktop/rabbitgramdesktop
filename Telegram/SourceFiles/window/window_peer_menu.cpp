@@ -40,10 +40,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/peers/edit_contact_box.h"
 #include "calls/calls_instance.h"
 #include "inline_bots/bot_attach_web_view.h" // InlineBots::PeerType.
-#include "ui/boxes/report_box_graphics.h"
 #include "ui/toast/toast.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
+#include "ui/widgets/chat_filters_tabs_strip.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
@@ -1452,9 +1452,9 @@ void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
 	addInfo();
 	addViewAsTopics();
+	addManageChat();
 	addStoryArchive();
 	addSupportInfo();
-	addManageChat();
 	addBoostChat();
 	addCreatePoll();
 	addThemeEdit();
@@ -2086,7 +2086,77 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 	const auto state = [&] {
 		auto controller = std::make_unique<Controller>(session);
 		const auto controllerRaw = controller.get();
-		auto box = Box<ListBox>(std::move(controller), nullptr);
+		auto init = [=](not_null<PeerListBox*> box) {
+			box->setSpecialTabMode(true);
+			auto applyFilter = [=](FilterId id) {
+				box->scrollToY(0);
+				auto &filters = session->data().chatsFilters();
+				const auto &list = filters.list();
+				if (list.size() <= 1) {
+					return;
+				}
+				const auto pinned = filters.chatsList(id)->pinned()->order();
+				box->peerListSortRows([&](
+						const PeerListRow &r1,
+						const PeerListRow &r2) {
+					const auto it1 = ranges::find_if(pinned, [&](
+							const Dialogs::Key &k) {
+						return k.peer() == r1.peer();
+					});
+					const auto it2 = ranges::find_if(pinned, [&](
+							const Dialogs::Key &k) {
+						return k.peer() == r2.peer();
+					});
+					if (it1 == pinned.end() && it2 != pinned.end()) {
+						return false;
+					} else if (it2 == pinned.end() && it1 != pinned.end()) {
+						return true;
+					} else if (it1 != pinned.end() && it2 != pinned.end()) {
+						return it1 < it2;
+					}
+					const auto history1 = session->data().history(r1.peer());
+					const auto history2 = session->data().history(r2.peer());
+					const auto date1 = history1->lastMessage()
+						? history1->lastMessage()->date()
+						: TimeId(0);
+					const auto date2 = history2->lastMessage()
+						? history2->lastMessage()->date()
+						: TimeId(0);
+					return date1 > date2;
+				});
+				const auto filter = ranges::find(
+					list,
+					id,
+					&Data::ChatFilter::id);
+				if (filter == list.end()) {
+					return;
+				}
+				box->peerListPartitionRows([&](const PeerListRow &row) {
+					const auto rowPtr = const_cast<PeerListRow*>(&row);
+					if (!filter->id()) {
+						box->peerListSetRowHidden(rowPtr, false);
+					} else {
+						const auto result = filter->contains(
+							session->data().history(row.peer()));
+						box->peerListSetRowHidden(rowPtr, !result);
+					}
+					return false;
+				});
+				box->peerListRefreshRows();
+			};
+			const auto chatsFilters = Ui::AddChatFiltersTabsStrip(
+				box,
+				session,
+				std::move(applyFilter));
+			chatsFilters->lower();
+			chatsFilters->heightValue() | rpl::start_with_next([box](int h) {
+				box->setAddedTopScrollSkip(h);
+			}, box->lifetime());
+			box->multiSelectHeightValue() | rpl::start_with_next([=](int h) {
+				chatsFilters->moveToLeft(0, h);
+			}, chatsFilters->lifetime());
+		};
+		auto box = Box<ListBox>(std::move(controller), std::move(init));
 		const auto boxRaw = box.data();
 		boxRaw->setForwardOptions({
 			.sendersCount = sendersCount,
@@ -2758,6 +2828,53 @@ bool FillVideoChatMenu(
 			&st::menuIconStartStreamWith);
 	}
 	return has || manager;
+}
+
+void FillSenderUserpicMenu(
+		not_null<SessionController*> controller,
+		not_null<PeerData*> peer,
+		Ui::InputField *fieldForMention,
+		Dialogs::Key searchInEntry,
+		const PeerMenuCallback &addAction) {
+	const auto group = (peer->isChat() || peer->isMegagroup());
+	const auto channel = peer->isChannel();
+	const auto viewProfileText = group
+		? tr::lng_context_view_group(tr::now)
+		: channel
+		? tr::lng_context_view_channel(tr::now)
+		: tr::lng_context_view_profile(tr::now);
+	addAction(viewProfileText, [=] {
+		controller->showPeerInfo(peer, Window::SectionShow::Way::Forward);
+	}, channel ? &st::menuIconInfo : &st::menuIconProfile);
+
+	const auto showHistoryText = group
+		? tr::lng_context_open_group(tr::now)
+		: channel
+		? tr::lng_context_open_channel(tr::now)
+		: tr::lng_profile_send_message(tr::now);
+	addAction(showHistoryText, [=] {
+		controller->showPeerHistory(peer, Window::SectionShow::Way::Forward);
+	}, channel ? &st::menuIconChannel : &st::menuIconChatBubble);
+
+	const auto username = peer->username();
+	const auto mention = !username.isEmpty() || peer->isUser();
+	if (const auto guard = mention ? fieldForMention : nullptr) {
+		addAction(tr::lng_context_mention(tr::now), crl::guard(guard, [=] {
+			if (!username.isEmpty()) {
+				fieldForMention->insertTag('@' + username);
+			} else {
+				fieldForMention->insertTag(
+					peer->shortName(),
+					PrepareMentionTag(peer->asUser()));
+			}
+		}), &st::menuIconUsername);
+	}
+
+	if (searchInEntry) {
+		addAction(tr::lng_context_search_from(tr::now), [=] {
+			controller->searchInChat(searchInEntry, peer);
+		}, &st::menuIconSearch);
+	}
 }
 
 bool IsUnreadThread(not_null<Data::Thread*> thread) {

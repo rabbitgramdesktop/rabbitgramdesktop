@@ -1,3 +1,24 @@
+5.7.3 beta (13.11.24)
+
+- Option to show folders above the chats list.
+- Folders on top of recipients list box.
+
+5.7.2 (05.11.24)
+
+- Fix recompressed video playback cutoff.
+- Fix video message recroding on macOS.
+
+5.7.1 (01.11.24)
+
+- Fix occasional redundant newlines before message timestamp.
+- Remove playback speed change on settings button click.
+- Fix video playback settings button on hidpi screens.
+- Fix return from Picture-in-Picture to media viewer.
+- Fix video quality auto-switching in Picture-in-Picture.
+- Add message link to channel stars transaction information.
+- Fix GIF playback in media viewer.
+- Fix several possible crashes.
+
 5.7 (31.10.24)
 
 - Sending video messages.

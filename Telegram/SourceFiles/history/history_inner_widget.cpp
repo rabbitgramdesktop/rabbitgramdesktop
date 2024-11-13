@@ -12,12 +12,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "core/file_utilities.h"
 #include "core/click_handler_types.h"
+#include "core/phone_click_handler.h"
 #include "history/history_item_helpers.h"
 #include "history/view/controls/history_view_forward_panel.h"
 #include "history/view/controls/history_view_draft_options.h"
 #include "boxes/moderate_messages_box.h"
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_web_page.h"
+#include "history/view/reactions/history_view_reactions.h"
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_about_view.h"
@@ -155,7 +157,11 @@ public:
 			not_null<const Element*> view) override {
 		return (Element::Moused() == view);
 	}
-	HistoryView::SelectionModeResult elementInSelectionMode() override {
+	HistoryView::SelectionModeResult elementInSelectionMode(
+			const Element *view) override {
+		if (view && view->data()->isSponsored()) {
+			return HistoryView::SelectionModeResult();
+		}
 		return _widget
 			? _widget->inSelectionMode()
 			: HistoryView::SelectionModeResult();
@@ -2203,10 +2209,15 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	const auto leaderOrSelf = groupLeaderOrSelf(_dragStateItem);
 	const auto hasWhoReactedItem = leaderOrSelf
 		&& Api::WhoReactedExists(leaderOrSelf, Api::WhoReactedList::All);
-	const auto clickedReaction = link
-		? link->property(
-			kReactionsCountEmojiProperty).value<Data::ReactionId>()
-		: Data::ReactionId();
+	using namespace HistoryView::Reactions;
+	const auto clickedReaction = ReactionIdOfLink(link);
+	const auto linkPhoneNumber = link
+		? link->property(kPhoneNumberLinkProperty).toString()
+		: QString();
+	const auto linkUserpicPeerId = (link && _dragStateUserpic)
+		? link->property(kPeerLinkPeerIdProperty).toULongLong()
+		: 0;
+	const auto session = &this->session();
 	_whoReactedMenuLifetime.destroy();
 	if (!clickedReaction.empty()
 		&& leaderOrSelf
@@ -2221,9 +2232,22 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_whoReactedMenuLifetime);
 		e->accept();
 		return;
+	} else if (!linkPhoneNumber.isEmpty()) {
+		PhoneClickHandler(session, linkPhoneNumber).onClick(
+			prepareClickContext(
+				Qt::LeftButton,
+				_dragStateItem ? _dragStateItem->fullId() : FullMsgId()));
+		return;
 	}
 	_menu = base::make_unique_q<Ui::PopupMenu>(this, st::popupMenuWithIcons);
-	const auto session = &this->session();
+	if (linkUserpicPeerId) {
+		_widget->fillSenderUserpicMenu(
+			_menu.get(),
+			session->data().peer(PeerId(linkUserpicPeerId)));
+		_menu->popup(e->globalPos());
+		e->accept();
+		return;
+	}
 	const auto controller = _controller;
 	const auto addItemActions = [&](
 			HistoryItem *item,
@@ -2908,9 +2932,6 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			HistoryView::EmojiPacksSource::Message,
 			_controller);
 		const auto added = (_menu->actions().size() > wasAmount);
-		if (!added && !_menu->empty()) {
-			_menu->addSeparator();
-		}
 		HistoryView::AddSelectRestrictionAction(
 			_menu,
 			textItem ? textItem : _dragStateItem,
@@ -3942,6 +3963,7 @@ void HistoryInner::mouseActionUpdate() {
 
 	TextState dragState;
 	ClickHandlerHost *lnkhost = nullptr;
+	auto dragStateUserpic = false;
 	auto selectingText = (item == _mouseActionItem)
 		&& (view == Element::Hovered())
 		&& !_selected.empty()
@@ -4037,6 +4059,7 @@ void HistoryInner::mouseActionUpdate() {
 						// stop enumeration if we've found a userpic under the cursor
 						if (point.y() >= userpicTop && point.y() < userpicTop + st::msgPhotoSize) {
 							dragState = TextState(nullptr, view->fromPhotoLink());
+							dragStateUserpic = true;
 							_dragStateItem = nullptr;
 							lnkhost = view;
 							return false;
@@ -4048,6 +4071,7 @@ void HistoryInner::mouseActionUpdate() {
 		}
 	}
 	auto lnkChanged = ClickHandler::setActive(dragState.link, lnkhost);
+	_dragStateUserpic = dragStateUserpic;
 	if (lnkChanged || dragState.cursor != _mouseCursorState) {
 		Ui::Tooltip::Hide();
 	}
@@ -4668,6 +4692,11 @@ QString HistoryInner::tooltipText() const {
 			}
 		}
 	} else if (const auto lnk = ClickHandler::getActive()) {
+		using namespace HistoryView::Reactions;
+		const auto count = ReactionCountOfLink(_dragStateItem, lnk);
+		if (count.count && count.shortened) {
+			return Lang::FormatCountDecimal(count.count);
+		}
 		return lnk->tooltip();
 	} else if (const auto view = Element::Moused()) {
 		StateRequest request;

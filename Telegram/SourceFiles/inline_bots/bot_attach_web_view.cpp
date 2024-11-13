@@ -18,6 +18,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/timer_rpl.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/share_box.h"
+#include "chat_helpers/tabbed_panel.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/local_url_handlers.h"
@@ -2045,9 +2046,6 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		not_null<PeerData*> peer,
 		Fn<Api::SendAction()> actionFactory,
 		Fn<void(bool)> attach) {
-	if (!Data::CanSend(peer, ChatRestriction::SendInline)) {
-		return nullptr;
-	}
 	auto result = std::make_unique<Ui::DropdownMenu>(
 		parent,
 		st::dropdownMenuWithIcons);
@@ -2102,8 +2100,10 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 			ChooseAndSendLocation(controller, config, actionFactory());
 		}, &st::menuIconAddress);
 	}
+	const auto addBots = Data::CanSend(peer, ChatRestriction::SendInline);
 	for (const auto &bot : bots->attachBots()) {
-		if (!bot.inAttachMenu
+		if (!addBots
+			|| !bot.inAttachMenu
 			|| !PeerMatchesTypes(peer, bot.user, bot.types)) {
 			continue;
 		}
@@ -2134,7 +2134,11 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		}, action->lifetime());
 		raw->addAction(std::move(action));
 	}
-	if (raw->actions().size() <= minimal) {
+	const auto actions = raw->actions().size();
+	const auto onclick = ChatHelpers::ShowPanelOnClick();
+	if (!actions) {
+		return nullptr;
+	} else if (actions <= minimal && !onclick) {
 		return nullptr;
 	}
 	return result;

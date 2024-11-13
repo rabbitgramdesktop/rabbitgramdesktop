@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/emoji_config.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/chat/choose_theme_controller.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/inner_dropdown.h"
 #include "ui/widgets/dropdown_menu.h"
@@ -422,8 +423,16 @@ HistoryWidget::HistoryWidget(
 	initTabbedSelector();
 
 	_attachToggle->setClickedCallback([=] {
+		const auto toggle = _attachBotsMenu && _attachBotsMenu->isHidden();
 		base::call_delayed(st::historyAttach.ripple.hideDuration, this, [=] {
-			chooseAttach();
+			if (_attachBotsMenu && toggle) {
+				_attachBotsMenu->showAnimated();
+			} else {
+				chooseAttach();
+				if (_attachBotsMenu) {
+					_attachBotsMenu->hideAnimated();
+				}
+			}
 		});
 	});
 
@@ -2583,6 +2592,8 @@ void HistoryWidget::showHistory(
 					}
 				}));
 			checkState();
+		} else {
+			requestSponsoredMessageBar();
 		}
 	} else {
 		_chooseForReport = nullptr;
@@ -2620,7 +2631,7 @@ void HistoryWidget::setHistory(History *history) {
 	if (was && !now) {
 		_attachToggle->removeEventFilter(_attachBotsMenu.get());
 		_attachBotsMenu->hideFast();
-	} else if (now && !was) {
+	} else if (now && !was && !ChatHelpers::ShowPanelOnClick()) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 
@@ -2708,7 +2719,9 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	}
 	_attachBotsMenu->setOrigin(
 		Ui::PanelAnimation::Origin::BottomLeft);
-	_attachToggle->installEventFilter(_attachBotsMenu.get());
+	if (!ChatHelpers::ShowPanelOnClick()) {
+		_attachToggle->installEventFilter(_attachBotsMenu.get());
+	}
 	_attachBotsMenu->heightValue(
 	) | rpl::start_with_next([=] {
 		moveFieldControls();
@@ -4530,7 +4543,6 @@ void HistoryWidget::showFinished() {
 	_showAnimation = nullptr;
 	doneShow();
 	synteticScrollToY(_scroll->scrollTop());
-	requestSponsoredMessageBar();
 }
 
 void HistoryWidget::doneShow() {
@@ -5125,7 +5137,10 @@ bool HistoryWidget::updateCmdStartShown() {
 	return commandsChanged || buttonChanged || textChanged;
 }
 
-bool HistoryWidget::searchInChatEmbedded(Dialogs::Key chat, QString query) {
+bool HistoryWidget::searchInChatEmbedded(
+		QString query,
+		Dialogs::Key chat,
+		PeerData *searchFrom) {
 	const auto peer = chat.peer(); // windows todo
 	if (!peer || Window::SeparateId(peer) != controller()->windowId()) {
 		return false;
@@ -8079,6 +8094,18 @@ void HistoryWidget::editMessage(
 	saveDraft();
 
 	setInnerFocus();
+}
+
+void HistoryWidget::fillSenderUserpicMenu(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<PeerData*> peer) {
+	const auto inGroup = _peer && (_peer->isChat() || _peer->isMegagroup());
+	Window::FillSenderUserpicMenu(
+		controller(),
+		peer,
+		(inGroup && _canSendTexts) ? _field.data() : nullptr,
+		inGroup ? _peer->owner().history(_peer) : Dialogs::Key(),
+		Ui::Menu::CreateAddActionCallback(menu));
 }
 
 void HistoryWidget::hidePinnedMessage() {
