@@ -22,6 +22,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_menu_icons.h"
 #include <QLocale>
 
+#include <QtCore/QLocale>
+
 namespace Lang {
 namespace {
 
