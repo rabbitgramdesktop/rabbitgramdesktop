@@ -1,14 +1,14 @@
 #define MyAppShortName "rabbitGram"
 #define MyAppName "rabbitGram Desktop"
 #define MyAppPublisher "xmdnx"
-#define MyAppVersion "5.7.3"
+#define MyAppVersion "5.8"
 #define MyAppURL "https://t.me/rabbitGramUpdates"
 #define ReleasePath "C:\Users\xmdn\source\repos\rtgdesktopdev\out\Release"
 #define MyAppExeName "rabbitGram.exe"
 #define MyAppId "4356CE01-4137-4C55-9F8B-FB4EEBB6EC0C"
 #define CurrentYear GetDateTimeString('yyyy','','')
 #define MyBuildTarget "win64"
-#define MyAppVersionFull "5.7.3-14112024-beta"
+#define MyAppVersionFull "5.8-21112024"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
