@@ -240,7 +240,7 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 						labelLeft
 							+ _unreadSkip
 							+ section.label.maxWidth(),
-						_st.labelTop,
+						_st.labelTop - 2,
 						it->second.cache);
 				}
 			}
@@ -260,11 +260,6 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 		index++;
 		return true;
 	};
-	enumerateSections(drawSection);
-	if (raisedIndex >= 0) {
-		index = raisedIndex;
-		drawSection(*_sections[raisedIndex].section);
-	}
 	if (_st.barSnapToLabel) {
 		const auto drawRect = [&](QRect rect, bool active) {
 			const auto &bar = active ? _barActive : _bar;
@@ -273,19 +268,24 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 			} else {
 				p.fillRect(rect, active ? _st.barFgActive : _st.barFg);
 			}
-		};
+			};
 		const auto add = _st.barStroke / 2;
 		const auto from = std::max(range.left - add, 0);
 		const auto till = std::min(range.left + range.width + add, width());
-		if (from < till) {
+				if (from < till) {
 			drawRect(
 				myrtlrect(
 					from,
 					_st.barTop,
-					till - from,
+					till - from - 3,
 					_st.barStroke).translated(activeHorizontalShift, 0),
 				true);
 		}
+	}
+	enumerateSections(drawSection);
+	if (raisedIndex >= 0) {
+		index = raisedIndex;
+		drawSection(*_sections[raisedIndex].section);
 	}
 }
 

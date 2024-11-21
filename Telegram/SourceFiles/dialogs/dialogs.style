@@ -673,15 +673,16 @@ recentPeersSpecialName: PeerListItem(recentPeersItem) {
 }
 
 dialogsSearchTabs: SettingsSlider(defaultSettingsSlider) {
-	height: 33px;
-	barTop: 30px;
+	height: 36px;
+	barTop: 3px;
 	barSkip: 0px;
-	barStroke: 6px;
-	barRadius: 2px;
+	barStroke: 27px;
+	barRadius: 6px;
 	barFg: transparent;
+	barFgActive: sideBarBgActive;
 	barSnapToLabel: true;
 	strictSkip: 18px;
-	labelTop: 7px;
+	labelTop: 9px;
 	labelStyle: semiboldTextStyle;
 	labelFg: windowSubTextFg;
 	labelFgActive: lightButtonFg;
