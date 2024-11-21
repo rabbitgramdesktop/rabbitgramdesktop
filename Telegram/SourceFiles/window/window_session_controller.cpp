@@ -572,7 +572,8 @@ void SessionNavigation::showPeerByLinkResolved(
 		const auto controller = parentController();
 		if (const auto forum = peer->forum()) {
 			if (controller->windowId().hasChatsList()
-				&& !controller->adaptive().isOneColumn()) {
+				&& !controller->adaptive().isOneColumn()
+				&& controller->shownForum().current() != forum) {
 				controller->showForum(forum);
 			}
 		}
@@ -1865,6 +1866,10 @@ bool SessionController::switchInlineQuery(
 		int(textWithTags.text.size()),
 		Ui::kQFixedMax
 	};
+	if (to.currentReplyTo.messageId.msg == to.currentReplyTo.topicRootId
+		&& to.currentReplyTo.quote.empty()) {
+		to.currentReplyTo.messageId.msg = MsgId();
+	}
 	auto draft = std::make_unique<Data::Draft>(
 		textWithTags,
 		to.currentReplyTo,

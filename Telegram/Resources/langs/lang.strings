@@ -298,6 +298,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_error_nocopy_group" = "Sorry, copying from this group is disabled by admins.";
 "lng_error_nocopy_channel" = "Sorry, copying from this channel is disabled by admins.";
 "lng_error_nocopy_story" = "Sorry, the creator of this story disabled copying.";
+"lng_error_schedule_limit" = "Sorry, you can't schedule more than 100 messages.";
 "lng_sure_add_admin_invite" = "This user is not a member of this group. Add them to the group and promote them to admin?";
 "lng_sure_add_admin_invite_channel" = "This user is not a subscriber of this channel. Add them to the channel and promote them to admin?";
 "lng_sure_add_admin_unremove" = "This user is currently restricted or removed. Are you sure you want to promote them?";
@@ -2444,6 +2445,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_box_out_media#other" = "Do you want to unlock {media} in {chat} for **{count} Stars**?";
 "lng_credits_box_out_media_user#one" = "Do you want to unlock {media} from {user} for **{count} Star**?";
 "lng_credits_box_out_media_user#other" = "Do you want to unlock {media} from {user} for **{count} Stars**?";
+"lng_credits_box_out_subscription_bot#one" = "Do you want to subscribe to **{title}** in **{recipient}** for **{count}** star per month?";
+"lng_credits_box_out_subscription_bot#other" = "Do you want to subscribe to **{title}** in **{recipient}** for **{count}** stars per month?";
+"lng_credits_box_out_subscription_business#one" = "Do you want to subscribe to **{title}** from **{recipient}** for **{count}** star per month?";
+"lng_credits_box_out_subscription_business#other" = "Do you want to subscribe to **{title}** from **{recipient}** for **{count}** stars per month?";
+"lng_credits_box_out_subscription_confirm#one" = "Subscribe for {emoji} {count} / month";
+"lng_credits_box_out_subscription_confirm#other" = "Subscribe for {emoji} {count} / month";
 "lng_credits_box_out_photo" = "a photo";
 "lng_credits_box_out_photos#one" = "{count} photo";
 "lng_credits_box_out_photos#other" = "{count} photos";
@@ -2504,6 +2511,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_subscriber_subtitle" = "appx. {total} per month";
 
 "lng_credits_subscription_row_to" = "Subscription";
+"lng_credits_subscription_row_to_bot" = "Bot";
+"lng_credits_subscription_row_to_business" = "Business";
 "lng_credits_subscription_row_from" = "Subscribed";
 
 "lng_credits_subscription_row_next_on" = "Renews";
@@ -2514,13 +2523,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_subscription_on_about" = "If you cancel now, you will still be able to access your subscription until {date}.";
 
 "lng_credits_subscription_off_button" = "Renew Subscription";
+"lng_credits_subscription_off_rejoin_button" = "Subscribe again";
 "lng_credits_subscription_off_about" = "You have canceled your subscription.";
+"lng_credits_subscription_off_by_bot_about" = "{bot} has canceled your subscription.";
 
 "lng_credits_subscription_status_on" = "renews on {date}";
 "lng_credits_subscription_status_off" = "expires on {date}";
 "lng_credits_subscription_status_none" = "expired on {date}";
 "lng_credits_subscription_status_off_right" = "canceled";
 "lng_credits_subscription_status_none_right" = "expired";
+"lng_credits_subscription_status_off_by_bot_right" = "canceled\nby bot";
 
 "lng_credits_small_balance_title#one" = "{count} Star Needed";
 "lng_credits_small_balance_title#other" = "{count} Stars Needed";

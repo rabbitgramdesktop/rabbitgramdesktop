@@ -641,12 +641,13 @@ void ConfirmEmojiStatusBox(
 		done(true);
 	});
 	box->addButton(tr::lng_cancel(), [=] {
-		const auto was = *set;
 		box->closeBox();
-		if (!was) {
+	});
+	box->boxClosing() | rpl::start_with_next([=] {
+		if (!*set) {
 			done(false);
 		}
-	});
+	}, box->lifetime());
 }
 
 class BotAction final : public Ui::Menu::ItemBase {
@@ -1372,7 +1373,7 @@ void WebViewInstance::show(ShowArgs &&args) {
 			: attached->inMainMenu
 			? Button::RemoveFromMainMenu
 			: Button::RemoveFromMenu);
-	const auto allowClipboardRead = v::is<WebViewSourceAttachMenu>(_source)
+	const auto allowClipboardRead = v::is<WebViewSourceMainMenu>(_source)
 		|| v::is<WebViewSourceAttachMenu>(_source)
 		|| (attached != end(bots)
 			&& (attached->inAttachMenu || attached->inMainMenu));
