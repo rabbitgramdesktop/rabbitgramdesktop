@@ -728,7 +728,7 @@ bool Notification::checkLastInput(
 		std::optional<crl::time> lastInputTime) {
 	if (!_waitingForInput) return true;
 
-	if (RabbitSettings::JsonSettings::GetBool("auto_hide_notifications") 
+	if (RabbitSettings::hideNotificationsAutomatically()
 			&& (crl::now() - _started > kAutoHideInterval) 
 			&& !hasReplyingNotifications) {
 		startHiding();

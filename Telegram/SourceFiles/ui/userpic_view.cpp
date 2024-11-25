@@ -45,8 +45,8 @@ void ValidateUserpicCache(
 	view.forum = forumValue;
 	view.paletteVersion = version;
 
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
-	if (forum && !RabbitSettings::JsonSettings::GetBool("general_roundness")) radius *= Ui::ForumUserpicRadiusMultiplier();
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
+	if (forum && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
 
 	if (cloud) {
 		view.cached = cloud->scaled(

@@ -531,7 +531,7 @@ void List::paint(
 			if (!fullUnreadCount) {
 				p.setPen(QPen(gradient, line));
 				p.setBrush(Qt::NoBrush);
-				auto radius = outer.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+				auto radius = outer.height() * RabbitSettings::userpicRoundness() / 100.;
 				p.drawRoundedRect(outer, radius, radius);
 			} else {
 				validateSegments(itemFull, gradient, line, true);
@@ -573,7 +573,7 @@ void List::paint(
 			p.setCompositionMode(QPainter::CompositionMode_Source);
 			p.setPen(Qt::NoPen);
 			p.setBrush(st::transparent);
-			auto radius = rect.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+			auto radius = rect.height() * RabbitSettings::userpicRoundness() / 100.;
 			p.drawRoundedRect(rect, radius, radius);
 			p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 		}

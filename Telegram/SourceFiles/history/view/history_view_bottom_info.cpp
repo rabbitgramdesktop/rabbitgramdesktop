@@ -416,7 +416,7 @@ void BottomInfo::layoutDateText() {
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
 	const auto date = edited + QLocale().toString(
 		_data.date.time(),
-		RabbitSettings::JsonSettings::GetBool("show_seconds")
+		RabbitSettings::showSeconds()
 			? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 			: QLocale::system().timeFormat(QLocale::ShortFormat));
 	const auto afterAuthor = prefix + date;

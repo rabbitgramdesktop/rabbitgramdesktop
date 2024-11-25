@@ -40,7 +40,7 @@ void GenerateUserpicsInRow(
 	const auto single = st.size;
 	const auto shift = st.shift;
 	const auto width = single + (limit - 1) * (single - shift);
-	const auto radius = single * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+	const auto radius = single * RabbitSettings::userpicRoundness() / 100.;
 
 	const auto ratio = style::DevicePixelRatio();
 	if (result.width() != width * ratio) {

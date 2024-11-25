@@ -251,9 +251,8 @@ auto GenerateCodes() {
 		Ui::Toast::Show(now ? "Testing chat theme colors!" : "Not testing..");
 	});
 	codes.emplace(u"rtgspoof"_q, [](SessionController* window) {
-		RabbitSettings::JsonSettings::Set("spoof_webview_as_android", !RabbitSettings::JsonSettings::GetBool("spoof_webview_as_android"));
-		RabbitSettings::JsonSettings::Write();
-		Ui::Toast::Show(RabbitSettings::JsonSettings::GetBool("spoof_webview_as_android")
+		RabbitSettings::setSpoofWebviewAsAndroid(!RabbitSettings::spoofWebviewAsAndroid());
+		Ui::Toast::Show(RabbitSettings::spoofWebviewAsAndroid()
 			? "Spoofing webview as Android"
 			: "Spoofing webview as TDesktop");
 		});

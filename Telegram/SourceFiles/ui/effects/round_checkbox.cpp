@@ -417,7 +417,7 @@ void RoundImageCheckbox::paint(Painter &p, int x, int y, int outerWidth) const {
 				segments ? _segments.front().width : _st.selectWidth);
 			p.setPen(pen);
 			if (!radius) {
-				auto customRadius = outline.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+				auto customRadius = outline.height() * RabbitSettings::userpicRoundness() / 100.;
 				p.drawRoundedRect(outline, customRadius, customRadius);
 			} else {
 				p.drawRoundedRect(outline, *radius, *radius);

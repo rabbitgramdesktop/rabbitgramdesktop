@@ -47,7 +47,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
 }) | rpl::start_with_next([](bool enabled) { \
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
-	RabbitSettings::JsonSettings::Write(); \
 }, container->lifetime());
 
 namespace Settings {
@@ -87,16 +86,15 @@ namespace Settings {
 		const auto updateStickerSize = [=](int value) {
 			updateStickerSizeLabel(value);
 			chatPreview->repaint();
-			RabbitSettings::JsonSettings::Set("sticker_size", value);
-			RabbitSettings::JsonSettings::Write();
+			RabbitSettings::setStickerSize(value);
 		};
 		stickerSizeSlider->resize(st::settingsAudioVolumeSlider.seekSize);
 		stickerSizeSlider->setPseudoDiscrete(
 			193,
 			[](int val) { return val + 64; },
-			RabbitSettings::JsonSettings::GetInt("sticker_size"),
+			RabbitSettings::stickerSize(),
 			updateStickerSize);
-		updateStickerSizeLabel(RabbitSettings::JsonSettings::GetInt("sticker_size"));
+		updateStickerSizeLabel(RabbitSettings::stickerSize());
 		
 		AddButtonWithIcon(
 			container,
@@ -104,13 +102,12 @@ namespace Settings {
 			st::settingsButton,
 			IconDescriptor{ &st::menuIconReschedule }
 		)->toggleOn(
-			rpl::single(RabbitSettings::JsonSettings::GetBool("show_actions_time"))
+			rpl::single(RabbitSettings::showActionsTime())
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::JsonSettings::GetBool("show_actions_time"));
+			return (enabled != RabbitSettings::showActionsTime());
 		}) | rpl::start_with_next([](bool enabled) {
-			RabbitSettings::JsonSettings::Set("show_actions_time", enabled);
-			RabbitSettings::JsonSettings::Write();
+			RabbitSettings::setShowActionsTime(enabled);
 		}, container->lifetime());
 
 		SettingsMenuJsonSwitch(rtg_show_seconds, show_seconds);

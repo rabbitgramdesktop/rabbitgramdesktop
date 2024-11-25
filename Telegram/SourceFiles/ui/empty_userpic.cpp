@@ -327,7 +327,7 @@ void EmptyUserpic::paintCircle(
 		int outerWidth,
 		int size) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});
@@ -341,7 +341,7 @@ void EmptyUserpic::paintRounded(
 		int size,
 		int radius) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});
@@ -354,7 +354,7 @@ void EmptyUserpic::paintSquare(
 		int outerWidth,
 		int size) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});
@@ -388,7 +388,7 @@ void EmptyUserpic::PaintSavedMessages(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(std::move(bg));
 	p.setPen(Qt::NoPen);
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
 	p.drawRoundedRect(x, y, size, size, 
 		radius, radius);
 
@@ -429,7 +429,7 @@ void EmptyUserpic::PaintRepliesMessages(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
 	p.drawRoundedRect(x, y, size, size, 
 		radius, radius);
 

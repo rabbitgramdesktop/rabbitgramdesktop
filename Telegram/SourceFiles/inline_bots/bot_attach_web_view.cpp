@@ -812,7 +812,7 @@ void BotAction::handleKeyPress(not_null<QKeyEvent*> e) {
 }
 
 QString WebviewPlatform() {
-	return RabbitSettings::JsonSettings::GetBool("spoof_webview_as_android") ? "android" : "tdesktop";
+	return RabbitSettings::spoofWebviewAsAndroid() ? "android" : "tdesktop";
 }
 
 } // namespace

@@ -3176,7 +3176,7 @@ TextForMimeData HistoryInner::getSelectedText() const {
 			.time = QString(", [%1]\n").arg(
 				QLocale().toString(
 					ItemDateTime(item), 
-					RabbitSettings::JsonSettings::GetBool("show_seconds")
+					RabbitSettings::showSeconds()
 						? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 						: QLocale::system().timeFormat(QLocale::ShortFormat))),
 			.unwrapped = std::move(unwrapped),

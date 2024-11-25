@@ -724,7 +724,7 @@ void MainMenu::setupMenu() {
 			std::move(descriptor));
 	};
 	if (!_controller->session().supportMode()) {
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_create_group")) {
+		if (RabbitSettings::sidebarCreateGroup()) {
 			AddMyChannelsBox(addAction(
 				tr::lng_create_group_title(),
 				{ &st::menuIconGroups }
@@ -735,7 +735,7 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_create_channel")) {
+		if (RabbitSettings::sidebarCreateChannel()) {
 			AddMyChannelsBox(addAction(
 				tr::lng_create_channel_title(),
 				{ &st::menuIconChannel }
@@ -746,7 +746,7 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_stories")) {
+		if (RabbitSettings::sidebarStories()) {
 			const auto wrap = _menu->add(
 				object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
 					_menu,
@@ -777,11 +777,11 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_bots")) {
+		if (RabbitSettings::sidebarBots()) {
 			SetupMenuBots(_menu, controller);
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_contacts")) {
+		if (RabbitSettings::sidebarContacts()) {
 			addAction(
 				tr::lng_menu_contacts(),
 				{ &st::menuIconProfile }
@@ -790,7 +790,7 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_calls")) {
+		if (RabbitSettings::sidebarCalls()) {
 			addAction(
 				tr::lng_menu_calls(),
 				{ &st::menuIconPhone }
@@ -799,7 +799,7 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_saved_messages")) {
+		if (RabbitSettings::sidebarSavedMessages()) {
 			addAction(
 				tr::lng_saved_messages(),
 				{ &st::menuIconSavedMessages }
@@ -838,7 +838,7 @@ void MainMenu::setupMenu() {
 		controller->showSettings();
 	});
 
-	if (RabbitSettings::JsonSettings::GetBool("sidebar_night_mode")) {
+	if (RabbitSettings::sidebarNightMode()) {
 		_nightThemeToggle = addAction(
 			tr::lng_menu_night_mode(),
 			{ &st::menuIconNightMode }

@@ -407,8 +407,8 @@ void PeerData::paintUserpic(
 		size * ratio,
 		isForum());
 
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
-	if (isForum() && !RabbitSettings::JsonSettings::GetBool("general_roundness")) radius *= .5;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
+	if (isForum() && !RabbitSettings::generalRoundness()) radius *= .5;
 
 	p.save();
 	auto hq = PainterHighQualityEnabler(p);

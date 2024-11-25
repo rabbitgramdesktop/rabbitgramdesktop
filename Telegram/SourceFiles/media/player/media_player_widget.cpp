@@ -701,7 +701,7 @@ void Widget::handleSongChange() {
 				const auto date = parsed.date();
 				const auto time = QLocale().toString(
 					parsed.time(), 
-					RabbitSettings::JsonSettings::GetBool("show_seconds")
+					RabbitSettings::showSeconds()
 						? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 						: QLocale::system().timeFormat(QLocale::ShortFormat));
 				const auto today = QDateTime::currentDateTime().date();

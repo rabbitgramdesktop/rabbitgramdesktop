@@ -920,7 +920,7 @@ void Poll::paintRecentVoters(
 			p.setPen(pen);
 			p.setBrush(Qt::NoBrush);
 			PainterHighQualityEnabler hq(p);
-			auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+			auto radius = size * RabbitSettings::userpicRoundness() / 100.;
 			p.drawRoundedRect(x, y, size, size, radius, radius);
 		};
 		if (usesBubblePattern(context)) {

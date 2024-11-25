@@ -145,7 +145,7 @@ bool Sticker::webpagePart() const {
 }
 
 void Sticker::initSize(int customSize) {
-	if (!customSize) customSize = RabbitSettings::JsonSettings::GetInt("sticker_size");
+	if (!customSize) customSize = RabbitSettings::stickerSize();
 
 	if (customSize > 0) {
 		const auto original = Size(_data);
@@ -192,7 +192,7 @@ bool Sticker::readyToDrawAnimationFrame() {
 }
 
 QSize Sticker::Size() {
-	const auto currentStickerHeight = RabbitSettings::JsonSettings::GetInt("sticker_size");
+	const auto currentStickerHeight = RabbitSettings::stickerSize();
 	const auto maxHeight = int(st::maxStickerSize / 256.0 * currentStickerHeight);
 	return { maxHeight, maxHeight };
 }
@@ -219,7 +219,7 @@ QSize Sticker::MessageEffectSize() {
 }
 
 QSize Sticker::EmojiSize() {
-	const auto currentStickerHeight = RabbitSettings::JsonSettings::GetInt("sticker_size");
+	const auto currentStickerHeight = RabbitSettings::stickerSize();
 	const auto maxHeight = int(st::maxStickerSize / 256.0 * currentStickerHeight / 2);
 	const auto side = std::min(maxHeight, kMaxEmojiSizeFixed);
 	return { side, side };
@@ -236,7 +236,7 @@ void Sticker::draw(
 	}
 	
 	auto radius = []() -> qreal {
-		switch (RabbitSettings::JsonSettings::GetInt("sticker_shape")) {
+		switch (RabbitSettings::stickerShape()) {
 			case 1: return st::bubbleRadiusSmall;
 			case 2: return st::bubbleRadiusLarge;
 			default: return 0;
@@ -315,7 +315,7 @@ void Sticker::paintAnimationFrame(
 	const auto size = prepared.size() / style::DevicePixelRatio();
 
 	auto radius = []() -> qreal {
-		switch (RabbitSettings::JsonSettings::GetInt("sticker_shape")) {
+		switch (RabbitSettings::stickerShape()) {
 		case 1: return st::bubbleRadiusSmall;
 		case 2: return st::bubbleRadiusLarge;
 		default: return 0;
@@ -392,7 +392,7 @@ bool Sticker::paintPixmap(
 	}
 
 	auto radius = []() -> qreal {
-		switch (RabbitSettings::JsonSettings::GetInt("sticker_shape")) {
+		switch (RabbitSettings::stickerShape()) {
 		case 1: return st::bubbleRadiusSmall;
 		case 2: return st::bubbleRadiusLarge;
 		default: return 0;

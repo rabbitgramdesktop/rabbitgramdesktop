@@ -16,7 +16,7 @@ static QImage LAST_LOADED_NO_MARGIN;
 namespace RabbitAssets {
 
 void loadAppIco() {
-    auto appIcon = RabbitSettings::JsonSettings::GetString("app_icon");
+    auto appIcon = RabbitSettings::appIcon();
 
 	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	QString tempIconPath = appDataPath + "/rabbitGram.ico";
@@ -32,7 +32,7 @@ void loadAppIco() {
 }
 
 void loadIcons() {
-    auto appIcon = RabbitSettings::JsonSettings::GetString("app_icon");
+    auto appIcon = RabbitSettings::appIcon();
 	if (LAST_LOADED_NAME != appIcon) {
 		LAST_LOADED_NAME = appIcon;
 

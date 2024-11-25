@@ -771,21 +771,25 @@ rpl::producer<QString> EventsWithPending(const QString &key, uint64 accountId, b
 void Set(const QString &key, QVariant value, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->set(key, value, accountId, isTestAccount);
+	Write();
 }
 
 void SetAfterRestart(const QString &key, QVariant value, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->setAfterRestart(key, value, accountId, isTestAccount);
+	Write();
 }
 
 void Reset(const QString &key, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->reset(key, accountId, isTestAccount);
+	Write();
 }
 
 void ResetAfterRestart(const QString &key, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->resetAfterRestart(key, accountId, isTestAccount);
+	Write();
 }
 
 } // namespace JsonSettings

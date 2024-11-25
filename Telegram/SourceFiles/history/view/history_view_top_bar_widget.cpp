@@ -1098,7 +1098,7 @@ void TopBarWidget::updateControlsVisibility() {
 	_cancelChoose->setVisible(_chooseForReportReason.has_value());
 	if (_info) {
 		_info->setVisible(!_chooseForReportReason
-			&& (isOneColumn || RabbitSettings::JsonSettings::GetBool("userpic_in_top_bar") || !_primaryWindow));
+			&& (isOneColumn || RabbitSettings::showUserpicInTopBar() || !_primaryWindow));
 	}
 	if (_unreadBadge) {
 		_unreadBadge->setVisible(!_chooseForReportReason

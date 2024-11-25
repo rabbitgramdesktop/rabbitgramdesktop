@@ -50,7 +50,7 @@ Call::Call(
 	_text = Data::MediaCall::Text(item, _reason, _video);
 	_status = QLocale().toString(
 		parent->dateTime().time(),
-		RabbitSettings::JsonSettings::GetBool("show_seconds")
+		RabbitSettings::showSeconds()
 			? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 			: QLocale::system().timeFormat(QLocale::ShortFormat));
 	if (_duration) {

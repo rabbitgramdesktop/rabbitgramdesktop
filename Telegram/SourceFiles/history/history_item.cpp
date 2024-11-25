@@ -1153,7 +1153,7 @@ QString GenerateServiceTime(TimeId date) {
 	if (date > 0)
 	{
 		auto lastTime = base::unixtime::parse(date);
-		auto format = RabbitSettings::JsonSettings::GetBool("show_seconds")
+		auto format = RabbitSettings::showSeconds
 			? QLocale().toString(lastTime.time(), QLocale::LongFormat).remove(" t")
 			: QLocale().toString(lastTime.time(), QLocale::ShortFormat);
 		return QString(" (%1)").arg(format);
@@ -1166,7 +1166,7 @@ void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	_flags &= ~MessageFlag::HasTextLinks;
 	const auto data = Get<HistoryServiceData>();
 	const auto had = !_text.empty();
-	if (RabbitSettings::JsonSettings::GetBool("show_actions_time")) prepared.text.text += GenerateServiceTime(date());
+	if (RabbitSettings::showActionsTime()) prepared.text.text += GenerateServiceTime(date());
 	_text = std::move(prepared.text);
 	data->textLinks = std::move(prepared.links);
 	if (had) {
@@ -5914,7 +5914,7 @@ PreparedServiceText HistoryItem::prepareCallScheduledText(
 	};
 	const auto time = QLocale().toString(
 		scheduled.time(),
-		RabbitSettings::JsonSettings::GetBool("show_seconds")
+		RabbitSettings::showSeconds()
 		? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 		: QLocale::system().timeFormat(QLocale::ShortFormat));
 	const auto prepareGeneric = [&] {

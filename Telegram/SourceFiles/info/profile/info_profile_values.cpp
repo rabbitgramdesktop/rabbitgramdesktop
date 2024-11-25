@@ -130,7 +130,7 @@ rpl::producer<TextWithEntities> PhoneValue(not_null<UserData*> user) {
 			user,
 			UpdateFlag::PhoneNumber) | rpl::to_empty
 	) | rpl::map([=] {
-		return (RabbitSettings::JsonSettings::GetBool("streamer_mode") && user->isSelf())
+		return (RabbitSettings::streamerMode() && user->isSelf())
 				? ktr("rtg_phone_hidden")
 				: Ui::FormatPhone(user->phone());
 	}) | Ui::Text::ToWithEntities();

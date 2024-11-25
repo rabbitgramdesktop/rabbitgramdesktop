@@ -632,7 +632,7 @@ void InlineList::paintSingleBg(
 		float64 opacity) const {
 	p.setOpacity(opacity);
 	if (!areTags()) {
-		const auto radius = RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100. * fill.height();
+		const auto radius = RabbitSettings::userpicRoundness() / 100. * fill.height();
 		p.setBrush(color);
 		p.drawRoundedRect(fill, radius, radius);
 		return;

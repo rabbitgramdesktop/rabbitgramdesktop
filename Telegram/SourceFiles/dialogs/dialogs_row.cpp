@@ -521,9 +521,9 @@ void Row::PaintCornerBadgeFrame(
 		size
 	).marginsRemoved({ shrink, shrink, shrink, shrink });
 
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
 	auto callOrOnline = (peer->isChannel() && Data::ChannelHasActiveCall(peer->asChannel())) || online;
-	auto drawRect = RabbitSettings::JsonSettings::GetBool("general_roundness");
+	auto drawRect = RabbitSettings::generalRoundness();
 
 	if (!callOrOnline || (callOrOnline & drawRect)) {
 		q.drawRoundedRect(badgeRect, radius, radius);

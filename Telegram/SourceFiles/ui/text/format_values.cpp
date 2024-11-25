@@ -501,7 +501,7 @@ QString FormatDialogsDate(const QDateTime &lastTime) {
 
 	if ((lastDate == nowDate)
 		|| (std::abs(lastTime.secsTo(now)) < kRecentlyInSeconds)) {
-		return RabbitSettings::JsonSettings::GetBool("show_seconds")
+		return RabbitSettings::showSeconds()
 			? QLocale().toString(lastTime.time(), QLocale::LongFormat).remove(" t")
 			: QLocale().toString(lastTime.time(), QLocale::ShortFormat);
 	} else if (std::abs(lastDate.daysTo(nowDate)) < 7) {

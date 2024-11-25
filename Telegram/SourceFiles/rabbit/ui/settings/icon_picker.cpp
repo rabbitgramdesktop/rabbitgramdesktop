@@ -118,7 +118,7 @@ void IconPicker::paintEvent(QPaintEvent *e) {
 }
 
 void IconPicker::mousePressEvent(QMouseEvent *e) {
-    auto appIcon = RabbitSettings::JsonSettings::GetString("app_icon");
+    auto appIcon = RabbitSettings::appIcon();
 	auto changed = false;
 
 	auto x = e->pos().x();
@@ -149,7 +149,7 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 						anim::easeOutCubic
 					);
  
-                    RabbitSettings::JsonSettings::Set("app_icon", iconName);
+                    RabbitSettings::setAppIcon(iconName);
 					changed = true;
 					break;
 				}
@@ -158,7 +158,6 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 	}
 
 	if (changed) {
-		RabbitSettings::JsonSettings::Write();
 		applyIcon();
 
 		repaint();

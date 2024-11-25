@@ -735,7 +735,7 @@ void SetupAccountsWrap(
 			const auto rect = QRectF(shift, shift, diameter, diameter);
 			auto hq = PainterHighQualityEnabler(p);
 			auto pen = st::windowBgActive->p; // The same as '+' in add.
-			auto radius = rect.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+			auto radius = rect.height() * RabbitSettings::userpicRoundness() / 100.;
 			pen.setWidthF(line);
 			p.setPen(pen);
 			p.setBrush(Qt::NoBrush);
