@@ -117,7 +117,7 @@ namespace Settings {
 	void RabbitChats::SetupStickerShape(not_null<Ui::VerticalLayout *> container) {
 		Ui::AddSubsectionTitle(container, rktr("rtg_chats_sticker_shape"));
 
-		const auto stickerShapePicker = container->add(
+		container->add(
 			object_ptr<StickerShapePicker>(container),
 			st::defaultSubsectionTitlePadding);
 	}
