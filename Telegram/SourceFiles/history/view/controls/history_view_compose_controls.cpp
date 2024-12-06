@@ -1960,7 +1960,7 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 			if (const auto item = _history->owner().message(editingId)) {
 				const auto media = item->media();
 				_canReplaceMedia = item->allowsEditMedia();
-				if (media) {
+				if (media && media->allowsEditMedia()) {
 					_canAddMedia = false;
 				} else {
 					_canAddMedia = base::take(_canReplaceMedia);
@@ -3265,7 +3265,10 @@ void ComposeControls::updateInlineBotQuery() {
 			_inlineLookingUpBot = true;
 			const auto username = _inlineBotUsername;
 			_inlineBotResolveRequestId = api.request(
-				MTPcontacts_ResolveUsername(MTP_string(username))
+				MTPcontacts_ResolveUsername(
+					MTP_flags(0),
+					MTP_string(username),
+					MTP_string())
 			).done([=](const MTPcontacts_ResolvedPeer &result) {
 				Expects(result.type() == mtpc_contacts_resolvedPeer);
 

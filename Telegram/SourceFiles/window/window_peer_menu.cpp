@@ -642,7 +642,10 @@ void Filler::addStoryArchive() {
 void Filler::addToggleFolder() {
 	const auto controller = _controller;
 	const auto history = _request.key.history();
-	if (_topic || !history || !history->owner().chatsFilters().has()) {
+	if (_topic
+		|| !history
+		|| !history->owner().chatsFilters().has()
+		|| !history->inChatList()) {
 		return;
 	}
 	_addAction(PeerMenuCallback::Args{
@@ -1486,6 +1489,7 @@ void Filler::fillProfileActions() {
 	addViewDiscussion();
 	addGoToFirstMessage();
 	addExportChat();
+	addToggleFolder();
 	addBlockUser();
 	addReport();
 	addLeaveChat();
@@ -2264,7 +2268,6 @@ QPointer<Ui::BoxContent> ShowForwardMessagesBox(
 		auto init = [=](not_null<ListBox*> box) {
 			controllerRaw->setSearchNoResultsText(
 				tr::lng_bot_chats_not_found(tr::now));
-			box->setSpecialTabMode(true);
 			const auto chatsFilters = Ui::AddChatFiltersTabsStrip(
 				box,
 				session,

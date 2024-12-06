@@ -323,30 +323,26 @@ HistoryWidget::HistoryWidget(
 		_list->onParentGeometryChanged();
 	}), lifetime());
 
-	const auto weak = Ui::MakeWeak(this);
 	_scroll->addContentRequests(
 	) | rpl::start_with_next([=] {
 		if (_history && _history->loadedAtBottom()) {
 			using Result = Data::SponsoredMessages::AppendResult;
 			const auto tryToAppend = [=] {
-				const auto r = session().sponsoredMessages().append(_history);
-				if (r == Result::Appended) {
+				const auto sponsored = &session().sponsoredMessages();
+				const auto result = sponsored->append(_history);
+				if (result == Result::Appended) {
 					_scroll->contentAdded();
 				}
-				return r;
+				return result;
 			};
-			if (tryToAppend() == Result::MediaLoading) {
-				const auto sharedLifetime = std::make_shared<rpl::lifetime>();
+			if (tryToAppend() == Result::MediaLoading
+				&& !_historySponsoredPreloading) {
 				session().downloaderTaskFinished(
 				) | rpl::start_with_next([=] {
-					if (const auto strong = weak.data()) {
-						if (tryToAppend() != Result::MediaLoading) {
-							sharedLifetime->destroy();
-						}
-					} else {
-						sharedLifetime->destroy();
+					if (tryToAppend() != Result::MediaLoading) {
+						_historySponsoredPreloading.destroy();
 					}
-				}, *sharedLifetime);
+				}, _historySponsoredPreloading);
 			}
 		}
 	}, lifetime());
@@ -1575,7 +1571,10 @@ void HistoryWidget::updateInlineBotQuery() {
 			_inlineLookingUpBot = true;
 			const auto username = _inlineBotUsername;
 			_inlineBotResolveRequestId = _api.request(
-				MTPcontacts_ResolveUsername(MTP_string(username))
+				MTPcontacts_ResolveUsername(
+					MTP_flags(0),
+					MTP_string(username),
+					MTP_string())
 			).done([=](const MTPcontacts_ResolvedPeer &result) {
 				const auto &data = result.data();
 				const auto resolvedBot = [&]() -> UserData* {
@@ -2635,6 +2634,7 @@ void HistoryWidget::setHistory(History *history) {
 		unregisterDraftSources();
 		clearAllLoadRequests();
 		clearSupportPreloadRequest();
+		_historySponsoredPreloading.destroy();
 		const auto wasHistory = base::take(_history);
 		const auto wasMigrated = base::take(_migrated);
 		unloadHeavyViewParts(wasHistory);
@@ -7894,7 +7894,15 @@ void HistoryWidget::clearFieldText(
 
 void HistoryWidget::replyToMessage(FullReplyTo id) {
 	if (const auto item = session().data().message(id.messageId)) {
-		replyToMessage(item, id.quote, id.quoteOffset);
+		if (CanSendReply(item) && !base::IsCtrlPressed()) {
+			replyToMessage(item, id.quote, id.quoteOffset);
+		} else if (item->allowsForward()) {
+			const auto show = controller()->uiShow();
+			HistoryView::Controls::ShowReplyToChatBox(show, id);
+		} else {
+			controller()->showToast(
+				tr::lng_error_cant_reply_other(tr::now));
+		}
 	}
 }
 
@@ -8557,7 +8565,7 @@ void HistoryWidget::updateReplyEditTexts(bool force) {
 			_mediaEditManager.start(_replyEditMsg);
 		}
 		_canReplaceMedia = _editMsgId && _replyEditMsg->allowsEditMedia();
-		if (editMedia) {
+		if (editMedia && editMedia->allowsEditMedia()) {
 			_canAddMedia = false;
 		} else {
 			_canAddMedia = base::take(_canReplaceMedia);
