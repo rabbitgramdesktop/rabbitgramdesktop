@@ -1153,7 +1153,7 @@ QString GenerateServiceTime(TimeId date) {
 	if (date > 0)
 	{
 		auto lastTime = base::unixtime::parse(date);
-		auto format = RabbitSettings::showSeconds
+		auto format = RabbitSettings::showSeconds()
 			? QLocale().toString(lastTime.time(), QLocale::LongFormat).remove(" t")
 			: QLocale().toString(lastTime.time(), QLocale::ShortFormat);
 		return QString(" (%1)").arg(format);
