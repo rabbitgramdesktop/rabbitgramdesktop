@@ -113,6 +113,34 @@ namespace Settings {
 
 		AddButtonWithIcon(
 			container,
+			tr::lng_menu_my_profile(),
+			st::settingsButton,
+			IconDescriptor{ &st::menuIconProfile }
+		)->toggleOn(
+			rpl::single(RabbitSettings::sidebarMyProfile())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != RabbitSettings::sidebarMyProfile());
+		}) | rpl::start_with_next([](bool enabled) {
+			RabbitSettings::setSidebarMyProfile(enabled);
+		}, container->lifetime());
+
+		AddButtonWithIcon(
+			container,
+			tr::lng_filters_type_bots(),
+			st::settingsButton,
+			IconDescriptor{ &st::menuIconBots }
+		)->toggleOn(
+			rpl::single(RabbitSettings::sidebarBots())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != RabbitSettings::sidebarBots());
+		}) | rpl::start_with_next([](bool enabled) {
+			RabbitSettings::setSidebarBots(enabled);
+		}, container->lifetime());
+
+		AddButtonWithIcon(
+			container,
 			tr::lng_create_group_title(),
 			st::settingsButton,
 			IconDescriptor{ &st::menuIconGroups }
@@ -137,34 +165,6 @@ namespace Settings {
 			return (enabled != RabbitSettings::sidebarCreateChannel());
 		}) | rpl::start_with_next([](bool enabled) {
 			RabbitSettings::setSidebarCreateChannel(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_menu_my_stories(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconStoriesSavedSection }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarStories())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarStories());
-		}) | rpl::start_with_next([](bool enabled) {
-			RabbitSettings::setSidebarStories(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_filters_type_bots(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconBots }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarBots())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarBots());
-		}) | rpl::start_with_next([](bool enabled) {
-			RabbitSettings::setSidebarBots(enabled);
 		}, container->lifetime());
 
 		AddButtonWithIcon(

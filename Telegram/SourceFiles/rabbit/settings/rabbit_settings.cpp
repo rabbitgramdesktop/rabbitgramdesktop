@@ -221,16 +221,16 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap {
 		.type = SettingType::BoolSetting,
 		.defaultValue = false, }},
 	//     Sidebar
+	{ "sidebar_my_profile", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
+	{ "sidebar_bots", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
 	{ "sidebar_create_group", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = true, }},
 	{ "sidebar_create_channel", {
-		.type = SettingType::BoolSetting,
-		.defaultValue = true, }},
-	{ "sidebar_stories", {
-		.type = SettingType::BoolSetting,
-		.defaultValue = true, }},
-	{ "sidebar_bots", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = true, }},
 	{ "sidebar_contacts", {

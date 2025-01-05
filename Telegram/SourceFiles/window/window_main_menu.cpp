@@ -724,6 +724,33 @@ void MainMenu::setupMenu() {
 			std::move(descriptor));
 	};
 	if (!_controller->session().supportMode()) {
+		bool addSkip = false;
+		
+		if (RabbitSettings::sidebarMyProfile()) {
+			_menu->add(
+				CreateButtonWithIcon(
+					_menu,
+					tr::lng_menu_my_profile(),
+					st::mainMenuButton,
+					{ &st::menuIconProfile })
+			)->setClickedCallback([=] {
+				controller->showSection(
+					Info::Stories::Make(controller->session().user()));
+			});
+			addSkip = true;
+		}
+
+		if (RabbitSettings::sidebarBots()) {
+			SetupMenuBots(_menu, controller);
+			addSkip = true;
+		}
+
+		if (addSkip) {
+			_menu->add(
+				object_ptr<Ui::PlainShadow>(_menu),
+				{ 0, st::mainMenuSkip, 0, st::mainMenuSkip });
+		}
+
 		if (RabbitSettings::sidebarCreateGroup()) {
 			AddMyChannelsBox(addAction(
 				tr::lng_create_group_title(),
@@ -746,45 +773,10 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::sidebarStories()) {
-			const auto wrap = _menu->add(
-				object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
-					_menu,
-					CreateButtonWithIcon(
-						_menu,
-						tr::lng_menu_my_stories(),
-						st::mainMenuButton,
-						IconDescriptor{ &st::menuIconStoriesSavedSection })));
-			const auto selfId = controller->session().userPeerId();
-			const auto stories = &controller->session().data().stories();
-			if (stories->archiveCount(selfId) > 0) {
-				wrap->toggle(true, anim::type::instant);
-			} else {
-				wrap->toggle(false, anim::type::instant);
-				if (!stories->archiveCountKnown(selfId)) {
-					stories->archiveLoadMore(selfId);
-					wrap->toggleOn(stories->archiveChanged(
-					) | rpl::filter(
-						rpl::mappers::_1 == selfId
-					) | rpl::map([=] {
-						return stories->archiveCount(selfId) > 0;
-					}) | rpl::filter(rpl::mappers::_1) | rpl::take(1));
-				}
-			}
-			wrap->entity()->setClickedCallback([=] {
-				controller->showSection(
-					Info::Stories::Make(controller->session().user()));
-			});
-		}
-
-		if (RabbitSettings::sidebarBots()) {
-			SetupMenuBots(_menu, controller);
-		}
-
 		if (RabbitSettings::sidebarContacts()) {
 			addAction(
 				tr::lng_menu_contacts(),
-				{ &st::menuIconProfile }
+				{ &st::menuIconUserShow }
 			)->setClickedCallback([=] {
 				controller->show(PrepareContactsBox(controller));
 			});

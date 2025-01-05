@@ -131,10 +131,10 @@ inline bool showUserpicInTopBar() { return JsonSettings::GetBool("userpic_in_top
 inline QString appIcon() { return JsonSettings::GetString("app_icon"); }
 inline int userpicRoundness() { return JsonSettings::GetInt("userpic_roundness"); }
 inline bool generalRoundness() { return JsonSettings::GetBool("general_roundness"); }
+inline bool sidebarMyProfile() { return JsonSettings::GetBool("sidebar_my_profile"); }
+inline bool sidebarBots() { return JsonSettings::GetBool("sidebar_bots"); }
 inline bool sidebarCreateGroup() { return JsonSettings::GetBool("sidebar_create_group"); }
 inline bool sidebarCreateChannel() { return JsonSettings::GetBool("sidebar_create_channel"); }
-inline bool sidebarStories() { return JsonSettings::GetBool("sidebar_stories"); }
-inline bool sidebarBots() { return JsonSettings::GetBool("sidebar_bots"); }
 inline bool sidebarContacts() { return JsonSettings::GetBool("sidebar_contacts"); }
 inline bool sidebarCalls() { return JsonSettings::GetBool("sidebar_calls"); }
 inline bool sidebarSavedMessages() { return JsonSettings::GetBool("sidebar_saved_messages"); }
@@ -153,10 +153,10 @@ inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set("userpic_in_t
 inline void setAppIcon(QString value) { JsonSettings::Set("app_icon", value); }
 inline void setUserpicRoundness(int value) { JsonSettings::Set("userpic_roundness", value); }
 inline void setGeneralRoundness(bool value) { JsonSettings::Set("general_roundness", value); }
+inline void setSidebarMyProfile(bool value) { JsonSettings::Set("sidebar_my_profile", value); }
+inline void setSidebarBots(bool value) { JsonSettings::Set("sidebar_bots", value); }
 inline void setSidebarCreateGroup(bool value) { JsonSettings::Set("sidebar_create_group", value); }
 inline void setSidebarCreateChannel(bool value) { JsonSettings::Set("sidebar_create_channel", value); }
-inline void setSidebarStories(bool value) { JsonSettings::Set("sidebar_stories", value); }
-inline void setSidebarBots(bool value) { JsonSettings::Set("sidebar_bots", value); }
 inline void setSidebarContacts(bool value) { JsonSettings::Set("side__bar_contacts", value); }
 inline void setSidebarCalls(bool value) { JsonSettings::Set("sidebar_calls", value); }
 inline void setSidebarSavedMessages(bool value) { JsonSettings::Set("sidebar_saved_messages", value); }
