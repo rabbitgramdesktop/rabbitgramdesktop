@@ -46,6 +46,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/empty_userpic.h"
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
+#include "ui/unread_badge.h"
 #include "ui/ui_utility.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
@@ -1258,6 +1259,15 @@ void PeerData::setStoriesHidden(bool hidden) {
 	} else {
 		Unexpected("PeerData::setStoriesHidden for non-user/non-channel.");
 	}
+}
+
+Ui::BotVerifyDetails *PeerData::botVerifyDetails() const {
+	if (const auto user = asUser()) {
+		return user->botVerifyDetails();
+	} else if (const auto channel = asChannel()) {
+		return channel->botVerifyDetails();
+	}
+	return nullptr;
 }
 
 Data::Forum *PeerData::forum() const {

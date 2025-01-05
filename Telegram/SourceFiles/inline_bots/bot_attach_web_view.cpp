@@ -350,7 +350,7 @@ WebViewContext ResolveContext(
 		WebViewContext context) {
 	if (!context.dialogsEntryState.key) {
 		if (const auto strong = context.controller.get()) {
-			context.dialogsEntryState = strong->currentDialogsEntryState();
+			context.dialogsEntryState = strong->dialogsEntryStateCurrent();
 		}
 	}
 	if (!context.action) {
@@ -385,7 +385,7 @@ void FillBotUsepic(
 		bot->owner().customEmojiManager().registerInternalEmoji(
 			st::topicButtonArrow,
 			st::channelEarnLearnArrowMargins,
-			false));
+			true));
 	auto aboutLabel = Ui::CreateLabelWithCustomEmoji(
 		box->verticalLayout(),
 		tr::lng_allow_bot_webview_details(
