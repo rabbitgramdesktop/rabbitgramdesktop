@@ -327,6 +327,11 @@ topicButtonArrowSkip: 8px;
 topicButtonArrowPosition: point(3px, 3px);
 topicButtonArrow: icon{{ "dialogs/dialogs_topic_arrow", historyReplyIconFg }};
 
+textMoreIconEmoji: IconEmoji {
+	icon: topicButtonArrow;
+	padding: margins(-2px, 5px, 0px, 0px);
+}
+
 msgBotKbIconPadding: 4px;
 msgBotKbUrlIcon: icon {{ "inline_button_url", msgBotKbIconFg }};
 msgBotKbSwitchPmIcon: icon {{ "inline_button_switch", msgBotKbIconFg }};
@@ -686,6 +691,7 @@ historyVideoCancelSelected: icon {{ "player/playlist_cancel", historyFileThumbIc
 historyVideoDownload: icon {{ "player/playlist_download", historyFileThumbIconFg }};
 historyVideoDownloadSelected: icon {{ "player/playlist_download", historyFileThumbIconFgSelected }};
 historyVideoRadialLine: msgFileRadialLine;
+historyVideoTimestampProgressLine: 4px;
 
 historyAudioDownloadSize: 20px;
 historyAudioRadialLine: 2px;
@@ -911,15 +917,19 @@ searchInChatPeerList: PeerList(defaultPeerList) {
 }
 searchInChatTagsPadding: margins(6px, 0px, 6px, 0px);
 
+msgServiceGiftPreview: 172px;
 msgServiceGiftBoxSize: size(236px, 231px); // Plus msgServiceGiftBoxTopSkip.
 msgServiceGiftBoxRadius: 20px;
 msgServiceGiftBoxTopSkip: 4px;
 msgServiceGiftBoxButtonHeight: 32px;
 msgServiceGiftBoxButtonPadding: margins(2px, 0px, 2px, 0px);
 msgServiceGiftBoxButtonMargins: margins(0px, 13px, 0px, 17px);
-msgServiceGiftBoxTitlePadding: margins(0px, 5px, 0px, 2px);
+msgServiceGiftBoxTitlePadding: margins(0px, 20px, 0px, 6px);
 msgServiceGiftBoxStickerTop: -19px;
 msgServiceGiftBoxStickerSize: 140px;
+msgServiceStarGiftBoxWidth: 224px;
+msgServiceStarGiftStickerTop: 24px;
+msgServiceStarGiftStickerSize: 100px;
 
 historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
@@ -1183,6 +1193,7 @@ botEmojiStatusName: FlatLabel(defaultFlatLabel) {
 	maxHeight: 20px;
 }
 botEmojiStatusEmoji: FlatLabel(botEmojiStatusName) {
+	margin: margins(4px, 4px, 4px, 4px);
 	textFg: profileVerifiedCheckBg;
 }
 
@@ -1207,13 +1218,30 @@ botDownloadCancel: IconButton {
 }
 chatUniqueGiftBorder: 4px;
 
-chatUniqueStickerPadding: margins(10px, 12px, 10px, 8px);
+chatUniqueStickerPadding: margins(10px, 30px, 10px, 9px);
+chatUniquePreviewPadding: margins(10px, 30px, 10px, 32px);
 chatUniqueTitle: TextStyle(defaultTextStyle) {
 	font: font(16px semibold);
 }
-chatUniqueTitlePadding: margins(12px, 4px, 12px, 2px);
+chatUniqueTitlePadding: margins(12px, 12px, 12px, 2px);
 chatUniqueTextPadding: margins(12px, 2px, 12px, 8px);
-chatUniqueTableSkip: 10px;
-chatUniqueTableAtBottomPadding: margins(12px, 2px, 12px, 20px);
+chatUniqueTableSkip: 9px;
 chatUniqueRowSkip: 4px;
 chatUniqueButtonPadding: margins(12px, 4px, 12px, 16px);
+
+markupWebview: icon {{ "chat/markup_webview", windowFg }};
+
+newPeerTitleMargin: margins(11px, 16px, 11px, 6px);
+newPeerSubtitleMargin: margins(11px, 0px, 11px, 16px);
+newPeerNonOfficial: IconEmoji {
+	icon: icon{{ "chat/mini_info_alert", windowFg }};
+	padding: margins(0px, 2px, 0px, 0px);
+}
+newPeerUserpics: GroupCallUserpics {
+	size: 16px;
+	shift: 5px;
+	stroke: 1px;
+	align: align(left);
+}
+newPeerUserpicsPadding: margins(0px, 3px, 0px, 0px);
+newPeerWidth: 320px;

@@ -428,10 +428,10 @@ void FieldHeader::init() {
 void FieldHeader::updateShownMessageText() {
 	Expects(_shownMessage != nullptr);
 
-	const auto context = Core::MarkedTextContext{
+	const auto context = Core::TextContext({
 		.session = &_data->session(),
-		.customEmojiRepaint = [=] { customEmojiRepaint(); },
-	};
+		.repaint = [=] { customEmojiRepaint(); },
+	});
 	const auto reply = replyingToMessage();
 	_shownMessageText.setMarkedText(
 		st::messageTextStyle,
@@ -464,11 +464,10 @@ void FieldHeader::setShownMessage(HistoryItem *item) {
 			tr::lng_edit_message(tr::now),
 			Ui::NameTextOptions());
 	} else if (item) {
-		const auto context = Core::MarkedTextContext{
+		const auto context = Core::TextContext({
 			.session = &_history->session(),
-			.customEmojiRepaint = [] {},
 			.customEmojiLoopLimit = 1,
-		};
+		});
 		const auto replyTo = _replyTo.current();
 		const auto quote = replyTo && !replyTo.quote.empty();
 		_shownMessageName.setMarkedText(
@@ -1035,13 +1034,15 @@ void ComposeControls::setAutocompleteBoundingRect(QRect rect) {
 rpl::producer<int> ComposeControls::height() const {
 	using namespace rpl::mappers;
 	return rpl::conditional(
-		_writeRestriction.value() | rpl::map(!_1),
+		rpl::combine(
+			_writeRestriction.value(),
+			_hidden.value()) | rpl::map(!_1 && !_2),
 		_wrap->heightValue(),
 		rpl::single(_st.attach.height));
 }
 
 int ComposeControls::heightCurrent() const {
-	return _writeRestriction.current()
+	return (_writeRestriction.current() || _hidden.current())
 		? _st.attach.height
 		: _wrap->height();
 }
@@ -1712,6 +1713,9 @@ void ComposeControls::initFieldAutocomplete() {
 }
 
 void ComposeControls::updateFieldPlaceholder() {
+	_voiceRecordBar->setPauseInsteadSend(_history
+		&& _history->peer->starsPerMessageChecked() > 0);
+
 	if (!isEditingMessage() && _isInlineBot) {
 		_field->setPlaceholder(
 			rpl::single(_inlineBot->botInfo->inlinePlaceholder.mid(1)),
@@ -1720,13 +1724,20 @@ void ComposeControls::updateFieldPlaceholder() {
 	}
 
 	_field->setPlaceholder([&] {
+		const auto peer = _history ? _history->peer.get() : nullptr;
 		if (_fieldCustomPlaceholder) {
 			return rpl::duplicate(_fieldCustomPlaceholder);
 		} else if (isEditingMessage()) {
 			return tr::lng_edit_message_text();
-		} else if (!_history) {
+		} else if (!peer) {
 			return tr::lng_message_ph();
-		} else if (const auto channel = _history->peer->asChannel()) {
+		} else if (const auto stars = peer->starsPerMessageChecked()) {
+			return tr::lng_message_paid_ph(
+				lt_amount,
+				tr::lng_prize_credits_amount(
+					lt_count,
+					rpl::single(stars * 1.)));
+		} else if (const auto channel = peer->asChannel()) {
 			if (channel->isBroadcast()) {
 				return session().data().notifySettings().silentPosts(channel)
 					? tr::lng_broadcast_silent_ph()
@@ -2155,6 +2166,10 @@ void ComposeControls::initSendButton() {
 		_recordAvailability = value;
 		updateSendButtonType();
 	}, _send->lifetime());
+
+	_send->widthValue() | rpl::skip(1) | rpl::start_with_next([=] {
+		updateControlsGeometry(_wrap->size());
+	}, _send->lifetime());
 }
 
 void ComposeControls::initSendAsButton(not_null<PeerData*> peer) {
@@ -2222,7 +2237,7 @@ void SetupRestrictionView(
 		not_null<Ui::RpWidget*> widget,
 		not_null<const style::ComposeControls*> st,
 		std::shared_ptr<ChatHelpers::Show> show,
-		const QString &name,
+		not_null<PeerData*> peer,
 		rpl::producer<Controls::WriteRestriction> restriction,
 		Fn<void(QPainter &p, QRect clip)> paintBackground) {
 	struct State {
@@ -2234,7 +2249,9 @@ void SetupRestrictionView(
 	};
 	const auto state = widget->lifetime().make_state<State>();
 	state->updateGeometries = [=] {
-		if (!state->label) {
+		if (!state->label && state->button) {
+			state->button->setGeometry(widget->rect());
+		} else if (!state->label) {
 			return;
 		} else if (state->button) {
 			const auto available = widget->width()
@@ -2307,14 +2324,23 @@ void SetupRestrictionView(
 	) | rpl::distinct_until_changed(
 	) | rpl::start_with_next([=](Controls::WriteRestriction value) {
 		using Type = Controls::WriteRestriction::Type;
-		if (value.type == Type::Rights) {
+		if (const auto lifting = value.boostsToLift) {
+			state->button = std::make_unique<Ui::FlatButton>(
+				widget,
+				tr::lng_restricted_boost_group(tr::now),
+				st::historyComposeButton);
+			state->button->setClickedCallback([=] {
+				const auto window = show->resolveWindow();
+				window->resolveBoostState(peer->asChannel(), lifting);
+			});
+		} else if (value.type == Type::Rights) {
 			state->icon = nullptr;
 			state->unlock = nullptr;
 			state->button = nullptr;
 			state->label = makeLabel(value.text, st->restrictionLabel);
 		} else if (value.type == Type::PremiumRequired) {
 			state->icon = makeIcon();
-			state->unlock = makeUnlock(value.button, name);
+			state->unlock = makeUnlock(value.button, peer->shortName());
 			state->button = std::make_unique<Ui::AbstractButton>(widget);
 			state->button->setClickedCallback([=] {
 				::Settings::ShowPremiumPromoToast(
@@ -2322,7 +2348,7 @@ void SetupRestrictionView(
 					tr::lng_send_non_premium_message_toast(
 						tr::now,
 						lt_user,
-						TextWithEntities{ name },
+						TextWithEntities{ peer->shortName() },
 						lt_link,
 						Ui::Text::Link(
 							Ui::Text::Bold(
@@ -2373,7 +2399,7 @@ void ComposeControls::initWriteRestriction() {
 		_writeRestricted.get(),
 		&_st,
 		_show,
-		_history->peer->shortName(),
+		_history->peer,
 		_writeRestriction.value(),
 		background);
 
@@ -2405,7 +2431,7 @@ void ComposeControls::initVoiceRecordBar() {
 	}, _wrap->lifetime());
 
 	_voiceRecordBar->setStartRecordingFilter([=] {
-		const auto error = [&]() -> std::optional<QString> {
+		const auto error = [&]() -> Data::SendError {
 			const auto peer = _history ? _history->peer.get() : nullptr;
 			if (peer) {
 				if (const auto error = Data::RestrictionError(
@@ -2414,10 +2440,10 @@ void ComposeControls::initVoiceRecordBar() {
 					return error;
 				}
 			}
-			return std::nullopt;
+			return {};
 		}();
 		if (error) {
-			_show->showToast(*error);
+			Data::ShowSendErrorToast(_show, _history->peer, error);
 			return true;
 		} else if (_showSlowmodeError && _showSlowmodeError()) {
 			return true;
@@ -2530,14 +2556,18 @@ SendMenu::Details ComposeControls::sendButtonMenuDetails() const {
 void ComposeControls::updateSendButtonType() {
 	using Type = Ui::SendButton::Type;
 	const auto type = computeSendButtonType();
-	_send->setType(type);
-
 	const auto delay = [&] {
 		return (type != Type::Cancel && type != Type::Save)
 			? _slowmodeSecondsLeft.current()
 			: 0;
 	}();
-	_send->setSlowmodeDelay(delay);
+	const auto peer = _history ? _history->peer.get() : nullptr;
+	const auto stars = peer ? peer->starsPerMessageChecked() : 0;
+	_send->setState({
+		.type = type,
+		.slowmodeDelay = delay,
+		.starsToSend = stars,
+	});
 	_send->setDisabled(_sendDisabledBySlowmode.current()
 		&& (type == Type::Send
 			|| type == Type::Record
@@ -3107,6 +3137,7 @@ void ComposeControls::initWebpageProcess() {
 		| Data::PeerUpdate::Flag::Notifications
 		| Data::PeerUpdate::Flag::MessagesTTL
 		| Data::PeerUpdate::Flag::FullInfo
+		| Data::PeerUpdate::Flag::StarsPerMessage
 	) | rpl::filter([peer = _history->peer](const Data::PeerUpdate &update) {
 		return (update.peer.get() == peer);
 	}) | rpl::map([](const Data::PeerUpdate &update) {
@@ -3121,6 +3152,9 @@ void ComposeControls::initWebpageProcess() {
 		}
 		if (flags & Data::PeerUpdate::Flag::MessagesTTL) {
 			updateMessagesTTLShown();
+		}
+		if (flags & Data::PeerUpdate::Flag::StarsPerMessage) {
+			updateFieldPlaceholder();
 		}
 		if (flags & Data::PeerUpdate::Flag::FullInfo) {
 			if (updateBotCommandShown()) {

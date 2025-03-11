@@ -175,11 +175,11 @@ void ShowFiltersListMenu(
 			icon);
 		action->setEnabled(i < premiumFrom);
 		if (!title.text.empty()) {
-			const auto context = Core::MarkedTextContext{
+			const auto context = Core::TextContext({
 				.session = session,
-				.customEmojiRepaint = [raw = item.get()] { raw->update(); },
+				.repaint = [raw = item.get()] { raw->update(); },
 				.customEmojiLoopLimit = title.isStatic ? -1 : 0,
-			};
+			});
 			item->setMarkedText(title.text, QString(), context);
 		}
 		state->menu->addAction(std::move(item));
@@ -237,14 +237,8 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			) | rpl::start_with_next([=](
 					const Dialogs::UnreadState &state,
 					bool includeMuted) {
-				const auto chats = state.chatsTopic
-					? (state.chats - state.chatsTopic + state.forums)
-					: state.chats;
-				const auto chatsMuted = state.chatsTopicMuted
-					? (state.chatsMuted
-						- state.chatsTopicMuted
-						+ state.forumsMuted)
-					: state.chatsMuted;
+				const auto chats = state.chats;
+				const auto chatsMuted = state.chatsMuted;
 				const auto muted = (chatsMuted + state.marksMuted);
 				const auto count = (chats + state.marks)
 					- (includeMuted ? 0 : muted);
@@ -350,10 +344,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		if ((list.size() <= 1 && !slider->width()) || state->ignoreRefresh) {
 			return;
 		}
-		const auto context = Core::MarkedTextContext{
-			.session = session,
-			.customEmojiRepaint = [=] { slider->update(); },
-		};
+		const auto context = Core::TextContext({ .session = session });
 		const auto paused = [=] {
 			return On(PowerSaving::kEmojiChat)
 				|| controller->isGifPausedAtLeastFor(pauseLevel);

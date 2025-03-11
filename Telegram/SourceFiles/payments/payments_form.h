@@ -153,7 +153,7 @@ struct InvoicePremiumGiftCode {
 
 	QString currency;
 	QString storeProduct;
-	std::optional<uint64> creditsAmount;
+	std::optional<uint64> giveawayCredits;
 	uint64 randomId = 0;
 	uint64 amount = 0;
 	int storeQuantity = 0;
@@ -177,7 +177,7 @@ struct InvoiceStarGift {
 	uint64 giftId = 0;
 	uint64 randomId = 0;
 	TextWithEntities message;
-	not_null<UserData*> user;
+	not_null<PeerData*> recipient;
 	int limitedCount = 0;
 	bool anonymous = false;
 	bool upgraded = false;
@@ -286,6 +286,8 @@ struct FormUpdate : std::variant<
 	const InvoicePremiumGiftCode &invoice);
 [[nodiscard]] MTPinputStorePaymentPurpose InvoiceCreditsGiveawayToTL(
 	const InvoicePremiumGiftCode &invoice);
+
+[[nodiscard]] bool IsPremiumForStarsInvoice(const InvoiceId &id);
 
 class Form final : public base::has_weak_ptr {
 public:

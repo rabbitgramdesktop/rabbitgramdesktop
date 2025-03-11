@@ -23,6 +23,10 @@ enum class UnarchiveOnNewMessage {
 	AnyUnmuted,
 };
 
+[[nodiscard]] PeerId ParsePaidReactionShownPeer(
+	not_null<Main::Session*> session,
+	const MTPPaidReactionPrivacy &value);
+
 class GlobalPrivacy final {
 public:
 	explicit GlobalPrivacy(not_null<ApiWrap*> api);
@@ -45,23 +49,28 @@ public:
 	[[nodiscard]] bool hideReadTimeCurrent() const;
 	[[nodiscard]] rpl::producer<bool> hideReadTime() const;
 
-	void updateNewRequirePremium(bool value);
 	[[nodiscard]] bool newRequirePremiumCurrent() const;
 	[[nodiscard]] rpl::producer<bool> newRequirePremium() const;
 
-	void loadPaidReactionAnonymous();
-	void updatePaidReactionAnonymous(bool value);
-	[[nodiscard]] bool paidReactionAnonymousCurrent() const;
-	[[nodiscard]] rpl::producer<bool> paidReactionAnonymous() const;
+	[[nodiscard]] int newChargeStarsCurrent() const;
+	[[nodiscard]] rpl::producer<int> newChargeStars() const;
+
+	void updateMessagesPrivacy(bool requirePremium, int chargeStars);
+
+	void loadPaidReactionShownPeer();
+	void updatePaidReactionShownPeer(PeerId shownPeer);
+	[[nodiscard]] PeerId paidReactionShownPeerCurrent() const;
+	[[nodiscard]] rpl::producer<PeerId> paidReactionShownPeer() const;
 
 private:
-	void apply(const MTPGlobalPrivacySettings &data);
+	void apply(const MTPGlobalPrivacySettings &settings);
 
 	void update(
 		bool archiveAndMute,
 		UnarchiveOnNewMessage unarchiveOnNewMessage,
 		bool hideReadTime,
-		bool newRequirePremium);
+		bool newRequirePremium,
+		int newChargeStars);
 
 	const not_null<Main::Session*> _session;
 	MTP::Sender _api;
@@ -72,9 +81,10 @@ private:
 	rpl::variable<bool> _showArchiveAndMute = false;
 	rpl::variable<bool> _hideReadTime = false;
 	rpl::variable<bool> _newRequirePremium = false;
-	rpl::variable<bool> _paidReactionAnonymous = false;
+	rpl::variable<int> _newChargeStars = 0;
+	rpl::variable<PeerId> _paidReactionShownPeer = false;
 	std::vector<Fn<void()>> _callbacks;
-	bool _paidReactionAnonymousLoaded = false;
+	bool _paidReactionShownPeerLoaded = false;
 
 };
 

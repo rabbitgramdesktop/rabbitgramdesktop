@@ -42,6 +42,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_credits.h"
 #include "styles/style_settings.h"
 #include "base/qt/qt_common_adapters.h"
 
@@ -123,9 +124,9 @@ constexpr auto kLinkProtocols = {
 void EditLinkBox(
 		not_null<Ui::GenericBox*> box,
 		std::shared_ptr<Main::SessionShow> show,
-		const QString &startText,
+		const TextWithTags &startText,
 		const QString &startLink,
-		Fn<void(QString, QString)> callback,
+		Fn<void(TextWithTags, QString)> callback,
 		const style::InputField *fieldStyle,
 		Fn<QString(QString)> validate) {
 	Expects(callback != nullptr);
@@ -137,6 +138,7 @@ void EditLinkBox(
 		object_ptr<Ui::InputField>(
 			content,
 			fieldSt,
+			Ui::InputField::Mode::SingleLine,
 			tr::lng_formatting_link_text(),
 			startText),
 		st::markdownLinkFieldPadding);
@@ -181,9 +183,9 @@ void EditLinkBox(
 	url->move(placeholder->pos());
 
 	const auto submit = [=] {
-		const auto linkText = text->getLastText();
+		const auto linkText = text->getTextWithTags();
 		const auto linkUrl = validate(url->getLastText());
-		if (linkText.isEmpty()) {
+		if (linkText.text.isEmpty()) {
 			text->showError();
 			return;
 		} else if (linkUrl.isEmpty()) {
@@ -222,7 +224,7 @@ void EditLinkBox(
 	box->setWidth(st::boxWidth);
 
 	box->setFocusCallback([=] {
-		if (startText.isEmpty()) {
+		if (startText.text.isEmpty()) {
 			text->setFocusFast();
 		} else {
 			if (!url->empty()) {
@@ -383,7 +385,7 @@ bool EditTextChanged(
 
 Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
-	QString text,
+	TextWithTags text,
 	QString link,
 	EditLinkAction action)> DefaultEditLinkCallback(
 		std::shared_ptr<Main::SessionShow> show,
@@ -392,14 +394,14 @@ Fn<bool(
 	const auto weak = Ui::MakeWeak(field);
 	return [=](
 			EditLinkSelection selection,
-			QString text,
+			TextWithTags text,
 			QString link,
 			EditLinkAction action) {
 		if (action == EditLinkAction::Check) {
 			return Ui::InputField::IsValidMarkdownLink(link)
 				&& !TextUtilities::IsMentionLink(link);
 		}
-		auto callback = [=](const QString &text, const QString &link) {
+		auto callback = [=](const TextWithTags &text, const QString &link) {
 			if (const auto strong = weak.data()) {
 				strong->commitMarkdownLinkEdit(selection, text, link);
 			}
@@ -431,12 +433,9 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 	const auto session = args.session;
 	field->setTagMimeProcessor(
 		FieldTagMimeProcessor(session, args.allowPremiumEmoji));
-	field->setCustomTextContext([=](Fn<void()> repaint) {
-		return std::any(Core::MarkedTextContext{
-			.session = session,
-			.customEmojiRepaint = std::move(repaint),
-		});
-	}, [paused] {
+	field->setCustomTextContext(Core::TextContext({
+		.session = session
+	}), [paused] {
 		return On(PowerSaving::kEmojiChat) || paused();
 	}, [paused] {
 		return On(PowerSaving::kChatSpoiler) || paused();
@@ -470,7 +469,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 
 [[nodiscard]] Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
-	QString text,
+	TextWithTags text,
 	QString link,
 	EditLinkAction action)> FactcheckEditLinkCallback(
 		std::shared_ptr<Main::SessionShow> show,
@@ -478,7 +477,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 	const auto weak = Ui::MakeWeak(field);
 	return [=](
 			EditLinkSelection selection,
-			QString text,
+			TextWithTags text,
 			QString link,
 			EditLinkAction action) {
 		const auto validate = [=](QString url) {
@@ -493,7 +492,7 @@ void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args) {
 		if (action == EditLinkAction::Check) {
 			return IsGoodFactcheckUrl(link);
 		}
-		auto callback = [=](const QString &text, const QString &link) {
+		auto callback = [=](const TextWithTags &text, const QString &link) {
 			if (const auto strong = weak.data()) {
 				strong->commitMarkdownLinkEdit(selection, text, link);
 			}
@@ -1278,4 +1277,27 @@ void SelectTextInFieldWithMargins(
 	field->setTextCursor(textCursor);
 	textCursor.setPosition(selection.to, QTextCursor::KeepAnchor);
 	field->setTextCursor(textCursor);
+}
+
+TextWithEntities PaidSendButtonText(tr::now_t, int stars) {
+	return Ui::Text::IconEmoji(&st::starIconEmoji).append(
+		Lang::FormatCountToShort(stars).string);
+}
+
+rpl::producer<TextWithEntities> PaidSendButtonText(
+		rpl::producer<int> stars,
+		rpl::producer<QString> fallback) {
+	if (fallback) {
+		return rpl::combine(
+			std::move(fallback),
+			std::move(stars)
+		) | rpl::map([=](QString zero, int count) {
+			return count
+				? PaidSendButtonText(tr::now, count)
+				: TextWithEntities{ zero };
+		});
+	}
+	return std::move(stars) | rpl::map([=](int count) {
+		return PaidSendButtonText(tr::now, count);
+	});
 }

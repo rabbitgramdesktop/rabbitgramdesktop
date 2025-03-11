@@ -580,26 +580,25 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			nameleft += skip + st::dialogsChatTypeSkip;
 			namewidth -= skip + st::dialogsChatTypeSkip;
 		}
-		const auto badgeWidth = _titleBadge.drawGetWidth(
-			p,
-			QRect(
+		const auto badgeWidth = _titleBadge.drawGetWidth(p, {
+			.peer = namePeer,
+			.rectForName = QRect(
 				nameleft,
 				nametop,
 				namewidth,
 				st::msgNameStyle.font->height),
-			_title.maxWidth(),
-			width(),
-			{
-				.peer = namePeer,
-				.verified = &st::dialogsVerifiedIcon,
-				.premium = &st::dialogsPremiumIcon.icon,
-				.scam = &st::attentionButtonFg,
-				.premiumFg = &st::dialogsVerifiedIconBg,
-				.customEmojiRepaint = [=] { update(); },
-				.now = now,
-				.paused = _controller->isGifPausedAtLeastFor(
-					Window::GifPauseReason::Any),
-			});
+			.nameWidth = _title.maxWidth(),
+			.outerWidth = width(),
+			.verified = &st::dialogsVerifiedIcon,
+			.premium = &st::dialogsPremiumIcon.icon,
+			.scam = &st::attentionButtonFg,
+			.premiumFg = &st::dialogsVerifiedIconBg,
+			.customEmojiRepaint = [=] { update(); },
+			.now = now,
+			.bothVerifyAndStatus = true,
+			.paused = _controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Any),
+		});
 		namewidth -= badgeWidth;
 
 		p.setPen(st::dialogsNameFg);
@@ -939,8 +938,7 @@ int TopBarWidget::countSelectedButtonsTop(float64 selectedShown) {
 
 void TopBarWidget::updateSearchVisibility() {
 	const auto searchAllowedMode = (_activeChat.section == Section::History)
-		|| (_activeChat.section == Section::Replies
-			&& _activeChat.key.topic())
+		|| (_activeChat.section == Section::Replies)
 		|| (_activeChat.section == Section::SavedSublist
 			&& _activeChat.key.sublist());
 	_search->setVisible(searchAllowedMode && !_chooseForReportReason);
@@ -1182,6 +1180,7 @@ void TopBarWidget::updateControlsVisibility() {
 			if (const auto user = peer->asUser()) {
 				return !user->isSelf()
 					&& !user->isBot()
+					&& !user->isInaccessible()
 					&& !peer->isServiceUser();
 			}
 		}

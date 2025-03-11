@@ -261,7 +261,7 @@ bool GenerateDesktopFile(
 		-1,
 		GLib::KeyFileFlags::KEEP_COMMENTS_
 			| GLib::KeyFileFlags::KEEP_TRANSLATIONS_);
-	
+
 	if (!loaded) {
 		if (!silent) {
 			LOG(("App Error: %1").arg(loaded.error().message_().c_str()));
@@ -535,7 +535,13 @@ QString SingleInstanceLocalServerName(const QString &hash) {
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 std::optional<bool> IsDarkMode() {
-	return std::nullopt;
+	auto result = base::Platform::XDP::ReadSetting(
+		"org.freedesktop.appearance",
+		"color-scheme");
+
+	return result.has_value()
+		? std::make_optional(result->get_uint32() == 1)
+		: std::nullopt;
 }
 #endif // Qt < 6.5.0
 
@@ -591,10 +597,6 @@ bool SkipTaskbarSupported() {
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
 	return false;
-}
-
-bool RunInBackground() {
-	return true;
 }
 
 QString ExecutablePathForShortcuts() {

@@ -37,12 +37,31 @@ constexpr auto kGiftsPerRow = 3;
 
 } // namespace
 
+std::strong_ordering operator<=>(const GiftBadge &a, const GiftBadge &b) {
+	const auto result1 = (a.text <=> b.text);
+	if (result1 != std::strong_ordering::equal) {
+		return result1;
+	}
+	const auto result2 = (a.bg1.rgb() <=> b.bg1.rgb());
+	if (result2 != std::strong_ordering::equal) {
+		return result2;
+	}
+	const auto result3 = (a.bg2.rgb() <=> b.bg2.rgb());
+	if (result3 != std::strong_ordering::equal) {
+		return result3;
+	}
+	const auto result4 = (a.fg.rgb() <=> b.fg.rgb());
+	if (result4 != std::strong_ordering::equal) {
+		return result4;
+	}
+	return a.gradient <=> b.gradient;
+}
+
 GiftButton::GiftButton(
 	QWidget *parent,
 	not_null<GiftButtonDelegate*> delegate)
 : AbstractButton(parent)
-, _delegate(delegate)
-, _stars(this, true, Ui::Premium::MiniStars::Type::SlowStars) {
+, _delegate(delegate) {
 }
 
 GiftButton::~GiftButton() {
@@ -55,23 +74,22 @@ void GiftButton::unsubscribe() {
 	}
 }
 
-void GiftButton::setDescriptor(const GiftDescriptor &descriptor) {
+void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 	if (_descriptor == descriptor) {
 		return;
 	}
 	auto player = base::take(_player);
+	const auto starsType = Ui::Premium::MiniStars::Type::SlowStars;
 	_mediaLifetime.destroy();
 	_descriptor = descriptor;
 	unsubscribe();
 	v::match(descriptor, [&](const GiftTypePremium &data) {
 		const auto months = data.months;
-		const auto years = (months % 12) ? 0 : months / 12;
 		_text = Ui::Text::String(st::giftBoxGiftHeight / 4);
 		_text.setMarkedText(
 			st::defaultTextStyle,
-			Ui::Text::Bold(years
-				? tr::lng_years(tr::now, lt_count, years)
-				: tr::lng_months(tr::now, lt_count, months)
+			Ui::Text::Bold(
+				tr::lng_months(tr::now, lt_count, months)
 			).append('\n').append(
 				tr::lng_gift_premium_label(tr::now)
 			));
@@ -81,8 +99,23 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor) {
 				data.cost,
 				data.currency,
 				true));
+		if (const auto stars = data.stars) {
+			const auto starsText = Lang::FormatCountDecimal(stars);
+			_byStars.setMarkedText(
+				st::giftBoxByStarsStyle,
+				tr::lng_gift_premium_by_stars(
+					tr::now,
+					lt_amount,
+					_delegate->ministar().append(' ' + starsText),
+					Ui::Text::WithEntities),
+				kMarkupTextOptions,
+				_delegate->textContext());
+		}
 		_userpic = nullptr;
-		_stars.setColorOverride(QGradientStops{
+		if (!_stars) {
+			_stars.emplace(this, true, starsType);
+		}
+		_stars->setColorOverride(QGradientStops{
 			{ 0., anim::with_alpha(st::windowActiveTextFg->c, .3) },
 			{ 1., st::windowActiveTextFg->c },
 		});
@@ -91,32 +124,38 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor) {
 		const auto soldOut = data.info.limitedCount
 			&& !data.userpic
 			&& !data.info.limitedLeft;
-		_price.setMarkedText(
-			st::semiboldTextStyle,
-			(unique
-				? tr::lng_gift_price_unique(tr::now, Ui::Text::WithEntities)
-				: _delegate->star().append(
-					' ' + QString::number(data.info.stars))),
-			kMarkupTextOptions,
-			_delegate->textContext());
 		_userpic = !data.userpic
 			? nullptr
 			: data.from
 			? Ui::MakeUserpicThumbnail(data.from)
 			: Ui::MakeHiddenAuthorThumbnail();
+		if (mode == Mode::Minimal) {
+			_price = {};
+			_stars.reset();
+			return;
+		}
+		_price.setMarkedText(
+			st::semiboldTextStyle,
+			(unique
+				? tr::lng_gift_price_unique(tr::now, Ui::Text::WithEntities)
+				: _delegate->star().append(
+					' ' + Lang::FormatCountDecimal(data.info.stars))),
+			kMarkupTextOptions,
+			_delegate->textContext());
+		if (!_stars) {
+			_stars.emplace(this, true, starsType);
+		}
 		if (unique) {
 			const auto white = QColor(255, 255, 255);
-			_stars.setColorOverride(QGradientStops{
+			_stars->setColorOverride(QGradientStops{
 				{ 0., anim::with_alpha(white, .3) },
 				{ 1., white },
 			});
 		} else if (soldOut) {
-			_stars.setColorOverride(QGradientStops{
-				{ 0., Qt::transparent },
-				{ 1., Qt::transparent },
-			});
+			_stars.reset();
 		} else {
-			_stars.setColorOverride(Ui::Premium::CreditsIconGradientStops());
+			_stars->setColorOverride(
+				Ui::Premium::CreditsIconGradientStops());
 		}
 	});
 	_delegate->sticker(
@@ -124,7 +163,16 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor) {
 	) | rpl::start_with_next([=](not_null<DocumentData*> document) {
 		setDocument(document);
 	}, lifetime());
+	_patterned = false;
+	_uniqueBackgroundCache = QImage();
+	_uniquePatternEmoji = nullptr;
+	_uniquePatternCache.clear();
 
+	if (mode != Mode::Full) {
+		_button = QRect();
+		_small = true;
+		return;
+	}
 	const auto buttonw = _price.maxWidth();
 	const auto buttonh = st::semiboldFont->height;
 	const auto inner = QRect(
@@ -132,14 +180,16 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor) {
 		QSize(buttonw, buttonh)
 	).marginsAdded(st::giftBoxButtonPadding);
 	const auto skipy = _delegate->buttonSize().height()
-		- st::giftBoxButtonBottom
+		- (_byStars.isEmpty()
+			? st::giftBoxButtonBottom
+			: st::giftBoxButtonBottomByStars)
 		- inner.height();
 	const auto skipx = (width() - inner.width()) / 2;
 	const auto outer = (width() - 2 * skipx);
 	_button = QRect(skipx, skipy, outer, inner.height());
-	{
+	if (_stars) {
 		const auto padding = _button.height() / 2;
-		_stars.setCenter(_button - QMargins(padding, 0, padding, 0));
+		_stars->setCenter(_button - QMargins(padding, 0, padding, 0));
 	}
 }
 
@@ -193,9 +243,17 @@ void GiftButton::setGeometry(QRect inner, QMargins extend) {
 void GiftButton::resizeEvent(QResizeEvent *e) {
 	if (!_button.isEmpty()) {
 		_button.moveLeft((width() - _button.width()) / 2);
-		const auto padding = _button.height() / 2;
-		_stars.setCenter(_button - QMargins(padding, 0, padding, 0));
+		if (_stars) {
+			const auto padding = _button.height() / 2;
+			_stars->setCenter(_button - QMargins(padding, 0, padding, 0));
+		}
 	}
+}
+
+void GiftButton::contextMenuEvent(QContextMenuEvent *e) {
+	_contextMenuRequests.fire_copy((e->reason() == QContextMenuEvent::Mouse)
+		? e->globalPos()
+		: QCursor::pos());
 }
 
 void GiftButton::cacheUniqueBackground(
@@ -236,11 +294,11 @@ void GiftButton::cacheUniqueBackground(
 	if (!_patterned && _uniquePatternEmoji->ready()) {
 		_patterned = true;
 		auto p = QPainter(&_uniqueBackgroundCache);
-		p.setOpacity(0.5);
 		p.setClipRect(inner);
 		const auto skip = inner.width() / 3;
 		Ui::PaintPoints(
 			p,
+			Ui::PatternPointsSmall(),
 			_uniquePatternCache,
 			_uniquePatternEmoji.get(),
 			*unique,
@@ -311,9 +369,13 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		p.drawImage(
 			QRect(
 				(width - size.width()) / 2,
-				(_text.isEmpty()
+				(_small
+					? st::giftBoxSmallStickerTop
+					: _text.isEmpty()
 					? st::giftBoxStickerStarTop
-					: st::giftBoxStickerTop),
+					: _byStars.isEmpty()
+					? st::giftBoxStickerTop
+					: st::giftBoxStickerTopByStars),
 				size.width(),
 				size.height()),
 			frame);
@@ -321,9 +383,13 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	if (hidden) {
 		const auto topleft = QPoint(
 			(width - st::giftBoxStickerSize.width()) / 2,
-			(_text.isEmpty()
+			(_small
+				? st::giftBoxSmallStickerTop
+				: _text.isEmpty()
 				? st::giftBoxStickerStarTop
-				: st::giftBoxStickerTop));
+				: _byStars.isEmpty()
+				? st::giftBoxStickerTop
+				: st::giftBoxStickerTopByStars));
 		_delegate->hiddenMark()->paint(
 			p,
 			frame,
@@ -338,107 +404,158 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	const auto singlew = width - _extend.left() - _extend.right();
 	const auto font = st::semiboldFont;
 	p.setFont(font);
-	const auto text = v::match(_descriptor, [&](GiftTypePremium data) {
+
+	const auto badge = v::match(_descriptor, [&](GiftTypePremium data) {
 		if (data.discountPercent > 0) {
 			p.setBrush(st::attentionButtonFg);
 			const auto kMinus = QChar(0x2212);
-			return kMinus + QString::number(data.discountPercent) + '%';
+			return GiftBadge{
+				.text = kMinus + QString::number(data.discountPercent) + '%',
+				.bg1 = st::premiumButtonBg3->c,
+				.bg2 = st::premiumButtonBg2->c,
+				.fg = st::windowBg->c,
+				.gradient = true,
+				.small = true,
+			};
 		}
-		return QString();
+		return GiftBadge();
 	}, [&](const GiftTypeStars &data) {
 		if (const auto count = data.info.limitedCount) {
 			const auto soldOut = !data.userpic && !data.info.limitedLeft;
-			p.setBrush(unique
-				? QBrush(unique->backdrop.patternColor)
-				: soldOut
-				? st::attentionButtonFg
-				: st::windowActiveTextFg);
-			return soldOut
-				? tr::lng_gift_stars_sold_out(tr::now)
-				: !data.userpic
-				? tr::lng_gift_stars_limited(tr::now)
-				: (count == 1)
-				? tr::lng_gift_limited_of_one(tr::now)
-				: tr::lng_gift_limited_of_count(
-					tr::now,
-					lt_amount,
-					((count % 1000)
-						? Lang::FormatCountDecimal(count)
-						: Lang::FormatCountToShort(count).string));
+			return GiftBadge{
+				.text = (soldOut
+					? tr::lng_gift_stars_sold_out(tr::now)
+					: (!data.userpic && !data.info.unique)
+					? tr::lng_gift_stars_limited(tr::now)
+					: (count == 1)
+					? tr::lng_gift_limited_of_one(tr::now)
+					: tr::lng_gift_limited_of_count(
+						tr::now,
+						lt_amount,
+						(((count % 1000) && (count < 10'000))
+							? Lang::FormatCountDecimal(count)
+							: Lang::FormatCountToShort(count).string))),
+				.bg1 = (unique
+					? unique->backdrop.edgeColor
+					: soldOut
+					? st::attentionButtonFg->c
+					: st::windowActiveTextFg->c),
+				.bg2 = (unique
+					? unique->backdrop.patternColor
+					: QColor(0, 0, 0, 0)),
+				.fg = unique ? QColor(255, 255, 255) : st::windowBg->c,
+				.small = true,
+			};
 		}
-		return QString();
+		return GiftBadge();
 	});
-	if (!text.isEmpty()) {
-		p.setPen(Qt::NoPen);
-		const auto twidth = font->width(text);
-		const auto pos = position + QPoint(singlew - twidth, font->height);
-		p.save();
-		const auto rubberOut = _extend.top();
+
+	if (badge) {
+		const auto rubberOut = st::lineWidth;
 		const auto inner = rect().marginsRemoved(_extend);
 		p.setClipRect(inner.marginsAdded(
 			{ rubberOut, rubberOut, rubberOut, rubberOut }));
-		p.translate(pos);
-		p.rotate(45.);
-		p.translate(-pos);
-		p.drawRect(-5 * twidth, position.y(), twidth * 12, font->height);
-		p.setPen(unique ? QPen(QColor(255, 255, 255)) : st::windowBg);
-		p.drawText(pos - QPoint(0, font->descent), text);
-		p.restore();
+
+		const auto cached = _delegate->cachedBadge(badge);
+		const auto width = cached.width() / cached.devicePixelRatio();
+		p.drawImage(
+			position.x() + singlew + rubberOut - width,
+			position.y() - rubberOut,
+			cached);
 	}
-	p.setBrush(unique
-		? QBrush(QColor(255, 255, 255, .2 * 255))
-		: premium
-		? st::lightButtonBgOver
-		: st::creditsBg3);
-	p.setPen(Qt::NoPen);
-	if (!unique && !premium) {
-		p.setOpacity(0.12);
-	}
-	const auto geometry = _button;
-	const auto radius = geometry.height() / 2.;
-	p.drawRoundedRect(geometry, radius, radius);
-	if (!premium) {
-		p.setOpacity(1.);
-	}
-	if (unique) {
-		_stars.paint(p);
-	} else {
-		auto clipPath = QPainterPath();
-		clipPath.addRoundedRect(geometry, radius, radius);
-		p.setClipPath(clipPath);
-		_stars.paint(p);
-		p.setClipping(false);
+
+	v::match(_descriptor, [](const GiftTypePremium &) {
+	}, [&](const GiftTypeStars &data) {
+		if (unique && data.pinned) {
+			auto hq = PainterHighQualityEnabler(p);
+			const auto &icon = st::giftBoxPinIcon;
+			const auto skip = st::giftBoxUserpicSkip;
+			const auto add = (st::giftBoxUserpicSize - icon.width()) / 2;
+			p.setPen(Qt::NoPen);
+			p.setBrush(unique->backdrop.patternColor);
+			const auto rect = QRect(
+				QPoint(_extend.left() + skip, _extend.top() + skip),
+				QSize(icon.width() + 2 * add, icon.height() + 2 * add));
+			p.drawEllipse(rect);
+			icon.paintInCenter(p, rect);
+		}
+	});
+
+	if (!_button.isEmpty()) {
+		p.setBrush(unique
+			? QBrush(QColor(255, 255, 255, .2 * 255))
+			: premium
+			? st::lightButtonBgOver
+			: st::creditsBg3);
+		p.setPen(Qt::NoPen);
+		if (!unique && !premium) {
+			p.setOpacity(0.12);
+		}
+		const auto geometry = _button;
+		const auto radius = geometry.height() / 2.;
+		p.drawRoundedRect(geometry, radius, radius);
+		if (!premium) {
+			p.setOpacity(1.);
+		}
+		if (_stars) {
+			if (unique) {
+				_stars->paint(p);
+			} else {
+				auto clipPath = QPainterPath();
+				clipPath.addRoundedRect(geometry, radius, radius);
+				p.setClipPath(clipPath);
+				_stars->paint(p);
+				p.setClipping(false);
+			}
+		}
 	}
 
 	if (!_text.isEmpty()) {
 		p.setPen(st::windowFg);
 		_text.draw(p, {
-			.position = (position
-				+ QPoint(0, st::giftBoxPremiumTextTop)),
+			.position = (position + QPoint(0, _byStars.isEmpty()
+				? st::giftBoxPremiumTextTop
+				: st::giftBoxPremiumTextTopByStars)),
 			.availableWidth = singlew,
 			.align = style::al_top,
 		});
 	}
 
-	const auto padding = st::giftBoxButtonPadding;
-	p.setPen(unique
-		? QPen(QColor(255, 255, 255))
-		: premium
-		? st::windowActiveTextFg
-		: st::creditsFg);
-	_price.draw(p, {
-		.position = (geometry.topLeft()
-			+ QPoint(padding.left(), padding.top())),
-		.availableWidth = _price.maxWidth(),
-	});
+	if (!_button.isEmpty()) {
+		const auto padding = st::giftBoxButtonPadding;
+		p.setPen(unique
+			? QPen(QColor(255, 255, 255))
+			: premium
+			? st::windowActiveTextFg
+			: st::creditsFg);
+		_price.draw(p, {
+			.position = (_button.topLeft()
+				+ QPoint(padding.left(), padding.top())),
+			.availableWidth = _price.maxWidth(),
+		});
+
+		if (!_byStars.isEmpty()) {
+			p.setPen(st::creditsFg);
+			_byStars.draw(p, {
+				.position = QPoint(
+					position.x(),
+					_button.y() + _button.height() + st::giftBoxByStarsSkip),
+				.availableWidth = singlew,
+				.align = style::al_top,
+			});
+		}
+	}
 }
 
-Delegate::Delegate(not_null<Window::SessionController*> window)
+Delegate::Delegate(
+	not_null<Window::SessionController*> window,
+	GiftButtonMode mode)
 : _window(window)
 , _hiddenMark(std::make_unique<StickerPremiumMark>(
 	&window->session(),
 	st::giftBoxHiddenMark,
-	RectPart::Center)) {
+	RectPart::Center))
+, _mode(mode) {
 }
 
 Delegate::Delegate(Delegate &&other) = default;
@@ -450,11 +567,14 @@ TextWithEntities Delegate::star() {
 	return owner->customEmojiManager().creditsEmoji();
 }
 
-std::any Delegate::textContext() {
-	return Core::MarkedTextContext{
-		.session = &_window->session(),
-		.customEmojiRepaint = [] {},
-	};
+TextWithEntities Delegate::ministar() {
+	const auto owner = &_window->session().data();
+	const auto top = st::giftBoxByStarsStarTop;
+	return owner->customEmojiManager().ministarEmoji({ 0, top, 0, 0 });
+}
+
+Ui::Text::MarkedContext Delegate::textContext() {
+	return Core::TextContext({ .session = &_window->session() });
 }
 
 QSize Delegate::buttonSize() {
@@ -466,7 +586,10 @@ QSize Delegate::buttonSize() {
 	const auto available = width - padding.left() - padding.right();
 	const auto singlew = (available - 2 * st::giftBoxGiftSkip.x())
 		/ kGiftsPerRow;
-	_single = QSize(singlew, st::giftBoxGiftHeight);
+	const auto minimal = (_mode == GiftButtonMode::Minimal);
+	_single = QSize(
+		singlew,
+		minimal ? st::giftBoxGiftSmall : st::giftBoxGiftHeight);
 	return _single;
 }
 
@@ -542,6 +665,15 @@ not_null<StickerPremiumMark*> Delegate::hiddenMark() {
 	return _hiddenMark.get();
 }
 
+QImage Delegate::cachedBadge(const GiftBadge &badge) {
+	auto &image = _badges[badge];
+	if (image.isNull()) {
+		const auto &extend = buttonExtend();
+		image = ValidateRotatedBadge(badge, extend.top());
+	}
+	return image;
+}
+
 DocumentData *LookupGiftSticker(
 		not_null<Main::Session*> session,
 		const GiftDescriptor &descriptor) {
@@ -577,7 +709,79 @@ rpl::producer<not_null<DocumentData*>> GiftStickerValue(
 	}, [&](GiftTypeStars data) {
 		return rpl::single(data.info.document) | rpl::type_erased();
 	});
+}
 
+QImage ValidateRotatedBadge(const GiftBadge &badge, int added) {
+	const auto &font = badge.small
+		? st::giftBoxGiftBadgeFont
+		: st::semiboldFont;
+	const auto twidth = font->width(badge.text) + 2 * added;
+	const auto skip = int(std::ceil(twidth / M_SQRT2));
+	const auto ratio = style::DevicePixelRatio();
+	const auto multiplier = ratio * 3;
+	const auto size = (twidth + font->height * 2);
+	const auto textpos = QPoint(size - skip, added);
+	auto image = QImage(
+		QSize(size, size) * multiplier,
+		QImage::Format_ARGB32_Premultiplied);
+	image.fill(Qt::transparent);
+	image.setDevicePixelRatio(multiplier);
+	{
+		auto p = QPainter(&image);
+		auto hq = PainterHighQualityEnabler(p);
+		p.translate(textpos);
+		p.rotate(45.);
+		p.setFont(font);
+		p.setPen(badge.fg);
+		p.drawText(QPoint(added, font->ascent), badge.text);
+	}
+
+	auto scaled = image.scaled(
+		QSize(size, size) * ratio,
+		Qt::IgnoreAspectRatio,
+		Qt::SmoothTransformation);
+	scaled.setDevicePixelRatio(ratio);
+
+	auto result = QImage(
+		QSize(size, size) * ratio,
+		QImage::Format_ARGB32_Premultiplied);
+	result.setDevicePixelRatio(ratio);
+	result.fill(Qt::transparent);
+	{
+		auto p = QPainter(&result);
+		auto hq = PainterHighQualityEnabler(p);
+		p.setPen(Qt::NoPen);
+
+		p.save();
+		p.translate(textpos);
+		p.rotate(45.);
+		const auto rect = QRect(-5 * twidth, 0, twidth * 12, font->height);
+		if (badge.gradient) {
+			const auto skip = font->height / M_SQRT2;
+			auto gradient = QLinearGradient(
+				QPointF(-twidth - skip, 0),
+				QPointF(twidth + skip, 0));
+			gradient.setStops({
+				{ 0., badge.bg1 },
+				{ 1., badge.bg2 },
+			});
+			p.setBrush(gradient);
+			p.drawRect(rect);
+		} else {
+			p.setBrush(badge.bg1);
+			p.drawRect(rect);
+			if (badge.bg2.alpha() > 0) {
+				p.setOpacity(0.5);
+				p.setBrush(badge.bg2);
+				p.drawRect(rect);
+				p.setOpacity(1.);
+			}
+		}
+		p.restore();
+
+		p.drawImage(0, 0, scaled);
+	}
+	return result;
 }
 
 } // namespace Info::PeerGifts

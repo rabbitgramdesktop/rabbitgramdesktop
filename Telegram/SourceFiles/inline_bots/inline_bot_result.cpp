@@ -53,7 +53,7 @@ Result::Result(not_null<Main::Session*> session, const Creator &creator)
 , _type(creator.type) {
 }
 
-std::unique_ptr<Result> Result::Create(
+std::shared_ptr<Result> Result::Create(
 		not_null<Main::Session*> session,
 		uint64 queryId,
 		const MTPBotInlineResult &data) {
@@ -84,7 +84,7 @@ std::unique_ptr<Result> Result::Create(
 		return nullptr;
 	}
 
-	auto result = std::make_unique<Result>(
+	auto result = std::make_shared<Result>(
 		session,
 		Creator{ queryId, type });
 	const auto message = data.match([&](const MTPDbotInlineResult &data) {
@@ -394,13 +394,9 @@ not_null<HistoryItem*> Result::makeMessage(
 	return sendData->makeMessage(this, history, std::move(fields));
 }
 
-QString Result::getErrorOnSend(not_null<History*> history) const {
-	const auto specific = sendData->getErrorOnSend(this, history);
-	return !specific.isEmpty()
-		? specific
-		: Data::RestrictionError(
-			history->peer,
-			ChatRestriction::SendInline).value_or(QString());
+Data::SendError Result::getErrorOnSend(not_null<History*> history) const {
+	return sendData->getErrorOnSend(this, history).value_or(
+		Data::RestrictionError(history->peer, ChatRestriction::SendInline));
 }
 
 std::optional<Data::LocationPoint> Result::getLocationPoint() const {

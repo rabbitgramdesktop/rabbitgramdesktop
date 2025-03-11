@@ -25,6 +25,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/boxes/edit_birthday_box.h"
 #include "ui/integration.h"
 #include "payments/payments_non_panel_process.h"
+#include "boxes/peers/edit_peer_info_box.h"
 #include "boxes/share_box.h"
 #include "boxes/connection_box.h"
 #include "boxes/gift_premium_box.h"
@@ -61,12 +62,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "settings/settings_privacy_security.h"
 #include "settings/settings_chat.h"
 #include "settings/settings_premium.h"
+#include "storage/storage_account.h"
 #include "mainwidget.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "info/info_controller.h"
+#include "info/info_memento.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -598,6 +602,8 @@ bool ResolveUsernameOrPhone(
 	const auto threadParam = params.value(u"thread"_q);
 	const auto threadId = topicId ? topicId : threadParam.toInt();
 	const auto gameParam = params.value(u"game"_q);
+	const auto videot = params.value(u"t"_q);
+
 	if (!gameParam.isEmpty() && validDomain(gameParam)) {
 		startToken = gameParam;
 		resolveType = ResolveType::ShareGame;
@@ -614,6 +620,9 @@ bool ResolveUsernameOrPhone(
 		.phone = phone,
 		.messageId = post,
 		.storyId = storyId,
+		.videoTimestamp = (!videot.isEmpty()
+			? ParseVideoTimestamp(videot)
+			: std::optional<TimeId>()),
 		.text = params.value(u"text"_q),
 		.repliesInfo = commentId
 			? Window::RepliesByLinkInfo{
@@ -777,8 +786,8 @@ bool OpenMediaTimestamp(
 	if (!controller) {
 		return false;
 	}
-	const auto time = match->captured(2).toInt();
-	if (time < 0) {
+	const auto position = match->captured(2).toInt();
+	if (position < 0) {
 		return false;
 	}
 	const auto base = match->captured(1);
@@ -791,7 +800,7 @@ bool OpenMediaTimestamp(
 		const auto session = &controller->session();
 		const auto document = session->data().document(documentId);
 		const auto context = session->data().message(itemId);
-		const auto timeMs = time * crl::time(1000);
+		const auto time = position * crl::time(1000);
 		if (document->isVideoFile()) {
 			controller->window().openInMediaView(Media::View::OpenRequest(
 				controller,
@@ -799,11 +808,9 @@ bool OpenMediaTimestamp(
 				context,
 				context ? context->topicRootId() : MsgId(0),
 				false,
-				timeMs));
+				time));
 		} else if (document->isSong() || document->isVoiceMessage()) {
-			session->settings().setMediaLastPlaybackPosition(
-				documentId,
-				timeMs);
+			session->local().setMediaLastPlaybackPosition(documentId, time);
 			Media::Player::instance()->play({ document, itemId });
 		}
 		return true;
@@ -1007,6 +1014,45 @@ bool CopyUsername(
 	const auto username = match->captured(1);
 	TextUtilities::SetClipboardText({ '@' + username });
 	controller->showToast(tr::lng_username_text_copied(tr::now));
+	return true;
+}
+
+bool EditPaidMessagesFee(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto peerId = PeerId(match->captured(1).toULongLong());
+	if (const auto id = peerToChannel(peerId)) {
+		const auto channel = controller->session().data().channelLoaded(id);
+		if (channel && channel->canEditPermissions()) {
+			ShowEditChatPermissions(controller, channel);
+		}
+	} else {
+		controller->show(Box(EditMessagesPrivacyBox, controller));
+	}
+	return true;
+}
+
+bool ShowCommonGroups(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto peerId = PeerId(match->captured(1).toULongLong());
+	if (const auto id = peerToUser(peerId)) {
+		const auto user = controller->session().data().userLoaded(id);
+		if (user) {
+			controller->showSection(
+				std::make_shared<Info::Memento>(
+					user,
+					Info::Section::Type::CommonGroups));
+		}
+	}
 	return true;
 }
 
@@ -1344,6 +1390,21 @@ bool ResolveChatLink(
 	return true;
 }
 
+bool ResolveUniqueGift(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto slug = match->captured(1);
+	if (slug.isEmpty()) {
+		return false;
+	}
+	ResolveAndShowUniqueGift(controller->uiShow(), slug);
+	return true;
+}
+
 } // namespace
 
 const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
@@ -1437,6 +1498,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveTopUp
 		},
 		{
+			u"^nft/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
+			ResolveUniqueGift
+		},
+		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
 			HandleUnknown
 		},
@@ -1493,6 +1558,14 @@ const std::vector<LocalUrlHandler> &InternalUrlHandlers() {
 		{
 			u"^username_regular/([a-zA-Z0-9\\-\\_\\.]+)@([0-9]+)$"_q,
 			CopyUsername,
+		},
+		{
+			u"^edit_paid_messages_fee/([0-9]+)$"_q,
+			EditPaidMessagesFee,
+		},
+		{
+			u"^common_groups/([0-9]+)$"_q,
+			ShowCommonGroups,
 		},
 		{
 			u"^stars_examples$"_q,
@@ -1585,6 +1658,9 @@ QString TryConvertUrlToLocal(QString url) {
 		} else if (const auto chatlinkMatch = regex_match(u"^m/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto slug = chatlinkMatch->captured(1);
 			return u"tg://message?slug="_q + slug;
+		} else if (const auto nftMatch = regex_match(u"^nft/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
+			const auto slug = nftMatch->captured(1);
+			return u"tg://nft?slug="_q + slug;
 		} else if (const auto privateMatch = regex_match(u"^"
 			"c/(\\-?\\d+)"
 			"("
@@ -1676,6 +1752,63 @@ bool StartUrlRequiresActivate(const QString &url) {
 	return Core::App().passcodeLocked()
 		? true
 		: !InternalPassportLink(url);
+}
+
+void ResolveAndShowUniqueGift(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug,
+		::Settings::CreditsEntryBoxStyleOverrides st) {
+	struct Request {
+		base::weak_ptr<Main::Session> weak;
+		QString slug;
+		mtpRequestId id = 0;
+	};
+	static auto request = Request();
+
+	const auto session = &show->session();
+	if (request.weak.get() == session && request.slug == slug) {
+		return;
+	} else if (const auto strong = request.weak.get()) {
+		strong->api().request(request.id).cancel();
+	}
+	request.weak = session;
+	request.slug = slug;
+	const auto clear = [=] {
+		if (request.weak.get() == session && request.slug == slug) {
+			request = {};
+		}
+	};
+	request.id = session->api().request(
+		MTPpayments_GetUniqueStarGift(MTP_string(slug))
+	).done([=](const MTPpayments_UniqueStarGift &result) {
+		clear();
+
+		const auto &data = result.data();
+		session->data().processUsers(data.vusers());
+		if (const auto gift = Api::FromTL(session, data.vgift())) {
+			using namespace ::Settings;
+			show->show(Box(GlobalStarGiftBox, show, *gift, st));
+		}
+	}).fail([=](const MTP::Error &error) {
+		clear();
+		show->showToast(u"Error: "_q + error.type());
+	}).send();
+}
+
+void ResolveAndShowUniqueGift(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug) {
+	ResolveAndShowUniqueGift(std::move(show), slug, {});
+}
+
+TimeId ParseVideoTimestamp(QStringView value) {
+	const auto kExp = u"^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$"_q;
+	const auto m = QRegularExpression(kExp).match(value);
+	return m.hasMatch()
+		? (m.capturedView(1).toInt() * 3600
+			+ m.capturedView(2).toInt() * 60
+			+ m.capturedView(3).toInt())
+		: value.toInt();
 }
 
 } // namespace Core

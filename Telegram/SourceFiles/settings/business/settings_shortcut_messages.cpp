@@ -223,10 +223,10 @@ private:
 		not_null<PhotoData*> photo,
 		Api::SendOptions options);
 	void sendInlineResult(
-		not_null<InlineBots::Result*> result,
+		std::shared_ptr<InlineBots::Result> result,
 		not_null<UserData*> bot);
 	void sendInlineResult(
-		not_null<InlineBots::Result*> result,
+		std::shared_ptr<InlineBots::Result> result,
 		not_null<UserData*> bot,
 		Api::SendOptions options,
 		std::optional<MsgId> localMessageId);
@@ -1534,21 +1534,19 @@ bool ShortcutMessages::sendExistingPhoto(
 }
 
 void ShortcutMessages::sendInlineResult(
-		not_null<InlineBots::Result*> result,
+		std::shared_ptr<InlineBots::Result> result,
 		not_null<UserData*> bot) {
 	if (showPremiumRequired()) {
 		return;
-	}
-	const auto errorText = result->getErrorOnSend(_history);
-	if (!errorText.isEmpty()) {
-		_controller->showToast(errorText);
+	} else if (const auto error = result->getErrorOnSend(_history)) {
+		Data::ShowSendErrorToast(_controller, _history->peer, error);
 		return;
 	}
-	sendInlineResult(result, bot, {}, std::nullopt);
+	sendInlineResult(std::move(result), bot, {}, std::nullopt);
 }
 
 void ShortcutMessages::sendInlineResult(
-		not_null<InlineBots::Result*> result,
+		std::shared_ptr<InlineBots::Result> result,
 		not_null<UserData*> bot,
 		Api::SendOptions options,
 		std::optional<MsgId> localMessageId) {
@@ -1557,7 +1555,11 @@ void ShortcutMessages::sendInlineResult(
 	}
 	auto action = prepareSendAction(options);
 	action.generateLocal = true;
-	_session->api().sendInlineResult(bot, result, action, localMessageId);
+	_session->api().sendInlineResult(
+		bot,
+		result.get(),
+		action,
+		localMessageId);
 
 	_composeControls->clear();
 	//_saveDraftText = true;

@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mainwindow.h"
 #include "data/data_session.h"
 #include "data/data_cloud_themes.h"
+#include "history/history_item_components.h"
 #include "main/main_session.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -30,9 +31,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_session_controller.h"
 #include "media/audio/media_audio_track.h"
 #include "settings/settings_folders.h"
+#include "storage/storage_account.h"
 #include "api/api_updates.h"
 #include "base/qt/qt_common_adapters.h"
 #include "base/custom_app_icon.h"
+#include "base/options.h"
 #include "boxes/abstract_box.h" // Ui::show().
 
 #include <zlib.h>
@@ -166,6 +169,15 @@ auto GenerateCodes() {
 	codes.emplace(u"registertg"_q, [](SessionController *window) {
 		Core::Application::RegisterUrlScheme();
 		Ui::Toast::Show("Forced custom scheme register.");
+	});
+	codes.emplace(u"numberbuttons"_q, [](SessionController *window) {
+		using namespace base::options;
+		auto &option = lookup<bool>(kOptionFastButtonsMode);
+		const auto now = !option.value();
+		option.set(now);
+		Ui::Toast::Show(now
+			? u"Fast buttons mode enabled."_q
+			: u"Fast buttons mode disabled."_q);
 	});
 
 	auto audioFilters = u"Audio files (*.wav *.mp3);;"_q + FileDialog::AllFilesFilter();

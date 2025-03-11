@@ -178,6 +178,7 @@ private:
 
 	bool updateBottomInfo();
 
+	void initPaidInformation();
 	void initLogEntryOriginal();
 	void initPsa();
 	void fromNameUpdated(int width) const;
@@ -300,6 +301,7 @@ private:
 
 	void refreshRightBadge();
 	void validateFromNameText(PeerData *from) const;
+	void ensureFromNameStatusLink(not_null<PeerData*> peer) const;
 
 	mutable std::unique_ptr<RightAction> _rightAction;
 	mutable ClickHandlerPtr _fastReplyLink;

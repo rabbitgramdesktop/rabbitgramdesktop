@@ -121,7 +121,7 @@ public:
 	void setItemsRevealHeight(int revealHeight);
 	void changeItemsRevealHeight(int revealHeight);
 	void checkActivation();
-	void recountHistoryGeometry();
+	void recountHistoryGeometry(bool initial = false);
 	void updateSize();
 	void setShownPinned(HistoryItem *item);
 
@@ -220,6 +220,9 @@ public:
 	[[nodiscard]] ClickContext prepareClickContext(
 		Qt::MouseButton button,
 		FullMsgId itemId) const;
+
+	[[nodiscard]] auto sendIntroSticker() const
+		-> rpl::producer<not_null<DocumentData*>>;
 
 	[[nodiscard]] static auto DelegateMixin()
 	-> std::unique_ptr<HistoryMainElementDelegateMixin>;
@@ -466,6 +469,7 @@ private:
 	std::unique_ptr<HistoryView::AboutView> _aboutView;
 	std::unique_ptr<HistoryView::EmptyPainter> _emptyPainter;
 	std::unique_ptr<HistoryView::TranslateTracker> _translateTracker;
+	rpl::event_stream<not_null<DocumentData*>> _sendIntroSticker;
 
 	mutable History *_curHistory = nullptr;
 	mutable int _curBlock = 0;
@@ -499,6 +503,7 @@ private:
 	HistoryItem *_dragStateItem = nullptr;
 	CursorState _mouseCursorState = CursorState();
 	uint16 _mouseTextSymbol = 0;
+	bool _mouseActive = false;
 	bool _dragStateUserpic = false;
 	bool _pressWasInactive = false;
 	bool _recountedAfterPendingResizedItems = false;

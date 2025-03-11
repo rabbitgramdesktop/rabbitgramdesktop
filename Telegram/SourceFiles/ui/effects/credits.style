@@ -62,8 +62,13 @@ creditsBoxButtonLabel: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
 }
 
-starIconSmall: icon{{ "payments/small_star", windowFg }};
-starIconSmallPadding: margins(0px, -3px, 0px, 0px);
+starIconEmoji: IconEmoji {
+	icon: icon{{ "payments/premium_emoji", creditsBg1 }};
+	padding: margins(4px, 1px, 4px, 0px);
+}
+starIconEmojiColored: IconEmoji(starIconEmoji) {
+	useIconColor: true;
+}
 
 creditsHistoryEntryTypeAds: icon {{ "folders/folders_channels", premiumButtonFg }};
 
@@ -80,7 +85,7 @@ creditsGiftBox: Box(defaultBox) {
 }
 
 giftBox: Box(defaultBox) {
-	buttonPadding: margins(22px, 11px, 22px, 22px);
+	buttonPadding: margins(22px, 11px, 22px, 12px);
 	buttonHeight: 42px;
 	button: RoundButton(defaultActiveButton) {
 		height: 42px;
@@ -88,6 +93,10 @@ giftBox: Box(defaultBox) {
 		style: semiboldTextStyle;
 	}
 }
+giftLimitedBox: Box(giftBox) {
+	buttonPadding: margins(22px, 48px, 22px, 12px);
+}
+giftLimitedPadding: margins(8px, 4px, 8px, 4px);
 giftBoxSubtitle: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: boxTitleFont;
@@ -109,14 +118,23 @@ giftBoxTabStyle: semiboldTextStyle;
 giftBoxTabFg: windowSubTextFg;
 giftBoxTabFgActive: windowBoldFg;
 giftBoxTabBgActive: windowBgRipple;
-giftBoxPadding: margins(20px, 4px, 20px, 24px);
+giftBoxPadding: margins(11px, 4px, 11px, 24px);
 giftBoxGiftSkip: point(10px, 8px);
 giftBoxGiftHeight: 164px;
+giftBoxGiftSmall: 108px;
 giftBoxGiftRadius: 12px;
+giftBoxGiftBadgeFont: font(10px semibold);
+giftBoxByStarsStyle: TextStyle(defaultTextStyle) {
+	font: font(10px);
+}
+giftBoxByStarsSkip: 2px;
+giftBoxByStarsStarTop: 3px;
 giftBoxPremiumIconSize: 64px;
 giftBoxPremiumIconTop: 10px;
 giftBoxPremiumTextTop: 84px;
+giftBoxPremiumTextTopByStars: 78px;
 giftBoxButtonBottom: 12px;
+giftBoxButtonBottomByStars: 18px;
 giftBoxButtonPadding: margins(8px, 4px, 8px, 4px);
 giftBoxPreviewStickerPadding: margins(10px, 12px, 10px, 16px);
 giftBoxPreviewTitlePadding: margins(12px, 4px, 12px, 4px);
@@ -124,6 +142,8 @@ giftBoxPreviewTextPadding: margins(12px, 4px, 12px, 4px);
 giftBoxButtonMargin: margins(12px, 8px, 12px, 12px);
 giftBoxStickerTop: 0px;
 giftBoxStickerStarTop: 24px;
+giftBoxSmallStickerTop: 16px;
+giftBoxStickerTopByStars: -4px;
 giftBoxStickerSize: size(80px, 80px);
 giftBoxUserpicSize: 24px;
 giftBoxUserpicSkip: 2px;
@@ -157,6 +177,8 @@ giftListAbout: FlatLabel(defaultFlatLabel) {
 giftListAboutMargin: margins(12px, 24px, 12px, 24px);
 giftBoxEmojiToggleTop: 7px;
 giftBoxLimitTop: 28px;
+giftBoxLockMargins: margins(-2px, 1px, 0px, 0px);
+giftBoxPinIcon: icon {{ "dialogs/dialogs_pinned", premiumButtonFg }};
 
 creditsHistoryEntriesList: PeerList(defaultPeerList) {
 	padding: margins(
@@ -185,6 +207,8 @@ uniqueGiftSubtitle: FlatLabel(defaultFlatLabel) {
 	align: align(top);
 }
 uniqueGiftSubtitleTop: 170px;
+uniqueGiftUserpicTop: 48px;
+uniqueGiftUserpicSize: 80px;
 uniqueGiftBottom: 20px;
 uniqueCloseButton: IconButton(boxTitleClose) {
 	icon: icon {{ "box_button_close", videoPlayIconFg }};
@@ -193,6 +217,38 @@ uniqueCloseButton: IconButton(boxTitleClose) {
 		color: shadowFg;
 	}
 }
+uniqueMenuButton: IconButton(uniqueCloseButton) {
+	width: 40px;
+	rippleAreaPosition: point(0px, 4px);
+
+	icon: icon {{ "title_menu_dots", videoPlayIconFg }};
+	iconOver: icon {{ "title_menu_dots", videoPlayIconFg }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
 upgradeGiftBox: Box(giftBox) {
 	buttonPadding: margins(22px, 3px, 22px, 22px);
+}
+upgradeGiftSubtext: FlatLabel(boxDividerLabel) {
+	minWidth: 200px;
+}
+darkUpgradeGiftTitle: FlatLabel(uniqueGiftTitle) {
+	textFg: groupCallMembersFg;
+}
+darkUpgradeGiftSubtitle: FlatLabel(uniqueGiftSubtitle) {
+	textFg: groupCallMembersFg;
+}
+darkUpgradeGiftBox: Box(upgradeGiftBox) {
+	bg: groupCallMembersBg;
+	title: darkUpgradeGiftTitle;
+	titleAdditionalFg: groupCallMemberNotJoinedStatus;
+}
+darkUpgradeGiftRadiant: icon{{ "menu/unique", groupCallMembersFg }};
+darkUpgradeGiftProof: icon{{ "menu/factcheck", groupCallMembersFg }};
+darkUpgradeGiftInfoTitle: FlatLabel(defaultFlatLabel) {
+	textFg: groupCallMembersFg;
+}
+darkUpgradeGiftInfoAbout: FlatLabel(upgradeGiftSubtext) {
+	textFg: groupCallMemberNotJoinedStatus;
 }

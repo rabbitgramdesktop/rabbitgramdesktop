@@ -1752,7 +1752,8 @@ void InitFieldAutocomplete(
 			&& peer->isUser()
 			&& !peer->asUser()->isBot()
 			&& (!shortcutMessages
-				|| shortcutMessages->shortcuts().list.empty())) {
+				|| shortcutMessages->shortcuts().list.empty()
+				|| peer->starsPerMessageChecked() != 0)) {
 			parsed = {};
 		}
 		raw->showFiltered(peer, parsed.query, parsed.fromStart);

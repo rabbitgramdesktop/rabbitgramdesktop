@@ -71,14 +71,16 @@ auto MediaGenericPart::stickerTakePlayer(
 
 MediaGeneric::MediaGeneric(
 	not_null<Element*> parent,
-	Fn<void(Fn<void(std::unique_ptr<Part>)>)> generate,
+	Fn<void(
+		not_null<MediaGeneric*>,
+		Fn<void(std::unique_ptr<Part>)>)> generate,
 	MediaGenericDescriptor &&descriptor)
 : Media(parent)
 , _paintBg(std::move(descriptor.paintBg))
 , _maxWidthCap(descriptor.maxWidth)
 , _service(descriptor.service)
 , _hideServiceText(descriptor.hideServiceText) {
-	generate([&](std::unique_ptr<Part> part) {
+	generate(this, [&](std::unique_ptr<Part> part) {
 		_entries.push_back({
 			.object = std::move(part),
 		});
@@ -125,7 +127,7 @@ void MediaGeneric::draw(Painter &p, const PaintContext &context) const {
 	if (outer < st::msgPadding.left() + st::msgPadding.right() + 1) {
 		return;
 	} else if (_paintBg) {
-		_paintBg(p, context);
+		_paintBg(p, context, this);
 	} else if (_service) {
 		PainterHighQualityEnabler hq(p);
 		const auto radius = st::msgServiceGiftBoxRadius;
@@ -234,7 +236,7 @@ MediaGenericTextPart::MediaGenericTextPart(
 	QMargins margins,
 	const style::TextStyle &st,
 	const base::flat_map<uint16, ClickHandlerPtr> &links,
-	const std::any &context)
+	const Ui::Text::MarkedContext &context)
 : _text(st::msgMinWidth)
 , _margins(margins) {
 	_text.setMarkedText(
@@ -302,7 +304,7 @@ QSize MediaGenericTextPart::countCurrentSize(int newWidth) {
 	const auto size = CountOptimalTextSize(
 		_text,
 		st::msgMinWidth,
-		newWidth - skip);
+		std::max(st::msgMinWidth, newWidth - skip));
 	return {
 		size.width() + skip,
 		_margins.top() + size.height() + _margins.bottom(),
@@ -562,7 +564,7 @@ void StickerWithBadgePart::paintBadge(
 void StickerWithBadgePart::validateBadge(
 		const PaintContext &context) const {
 	const auto stm = context.messageStyle();
-	const auto &badgeFg = stm->historyFileRadialFg->c;
+	const auto &badgeFg = st::premiumButtonFg->c;
 	const auto &badgeBorder = stm->msgBg->c;
 	if (!_badge.isNull()
 		&& _badgeFg == badgeFg

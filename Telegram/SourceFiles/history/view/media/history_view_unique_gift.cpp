@@ -15,10 +15,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_star_gift.h"
 #include "history/view/media/history_view_media_generic.h"
+#include "history/view/media/history_view_premium_gift.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_element.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "info/peer_gifts/info_peer_gifts_common.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/settings_credits_graphics.h"
@@ -36,60 +38,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace HistoryView {
 namespace {
-
-class TextPartColored final : public MediaGenericTextPart {
-public:
-	TextPartColored(
-		TextWithEntities text,
-		QMargins margins,
-		QColor color,
-		const style::TextStyle &st = st::defaultTextStyle,
-		const base::flat_map<uint16, ClickHandlerPtr> &links = {},
-		const std::any &context = {});
-
-private:
-	void setupPen(
-		Painter &p,
-		not_null<const MediaGeneric*> owner,
-		const PaintContext &context) const override;
-
-	QColor _color;
-
-};
-
-class AttributeTable final : public MediaGenericPart {
-public:
-	struct Entry {
-		QString label;
-		QString value;
-	};
-
-	AttributeTable(
-		std::vector<Entry> entries,
-		QMargins margins,
-		QColor labelColor);
-
-	void draw(
-		Painter &p,
-		not_null<const MediaGeneric*> owner,
-		const PaintContext &context,
-		int outerWidth) const override;
-
-	QSize countOptimalSize() override;
-	QSize countCurrentSize(int newWidth) override;
-
-private:
-	struct Part {
-		Ui::Text::String label;
-		Ui::Text::String value;
-	};
-
-	std::vector<Part> _parts;
-	QMargins _margins;
-	QColor _labelColor;
-	int _valueLeft = 0;
-
-};
 
 class ButtonPart final : public MediaGenericPart {
 public:
@@ -268,37 +216,261 @@ QSize ButtonPart::countCurrentSize(int newWidth) {
 	return optimalSize();
 }
 
+} // namespace
+
+auto GenerateUniqueGiftMedia(
+	not_null<Element*> parent,
+	Element *replacing,
+	std::shared_ptr<Data::UniqueGift> gift)
+-> Fn<void(
+		not_null<MediaGeneric*>,
+		Fn<void(std::unique_ptr<MediaGenericPart>)>)> {
+	return [=](
+			not_null<MediaGeneric*> media,
+			Fn<void(std::unique_ptr<MediaGenericPart>)> push) {
+		auto pushText = [&](
+				TextWithEntities text,
+				const style::TextStyle &st,
+				QColor color,
+				QMargins margins) {
+			if (text.empty()) {
+				return;
+			}
+			push(std::make_unique<TextPartColored>(
+				std::move(text),
+				margins,
+				[color](const auto&) { return color; },
+				st));
+		};
+
+		const auto item = parent->data();
+		const auto itemMedia = item->media();
+		const auto fields = itemMedia ? itemMedia->gift() : nullptr;
+		const auto upgrade = fields && fields->upgrade;
+		const auto outgoing = upgrade ? !item->out() : item->out();
+
+		const auto white = QColor(255, 255, 255);
+		const auto sticker = [=] {
+			using Tag = ChatHelpers::StickerLottieSize;
+			return StickerInBubblePart::Data{
+				.sticker = gift->model.document,
+				.size = st::chatIntroStickerSize,
+				.cacheTag = Tag::ChatIntroHelloSticker,
+			};
+		};
+		push(std::make_unique<StickerInBubblePart>(
+			parent,
+			replacing,
+			sticker,
+			st::chatUniqueStickerPadding));
+		const auto peer = parent->history()->peer;
+		pushText(
+			Ui::Text::Bold(peer->isSelf()
+				? tr::lng_action_gift_self_subtitle(tr::now)
+				: peer->isServiceUser()
+				? tr::lng_gift_link_label_gift(tr::now)
+				: (outgoing
+					? tr::lng_action_gift_sent_subtitle
+					: tr::lng_action_gift_got_subtitle)(
+						tr::now,
+						lt_user,
+						peer->shortName())),
+			st::chatUniqueTitle,
+			white,
+			st::chatUniqueTitlePadding);
+		pushText(
+			Ui::Text::Bold(Data::UniqueGiftName(*gift)),
+			st::defaultTextStyle,
+			gift->backdrop.textColor,
+			st::chatUniqueTextPadding);
+
+		const auto name = [](const Data::UniqueGiftAttribute &value) {
+			return Ui::Text::Bold(value.name);
+		};
+		auto attributes = std::vector<AttributeTable::Entry>{
+			{ tr::lng_gift_unique_model(tr::now), name(gift->model) },
+			{ tr::lng_gift_unique_backdrop(tr::now), name(gift->backdrop) },
+			{ tr::lng_gift_unique_symbol(tr::now), name(gift->pattern) },
+		};
+		push(std::make_unique<AttributeTable>(
+			std::move(attributes),
+			st::chatUniqueTextPadding,
+			[c = gift->backdrop.textColor](const auto&) { return c; },
+			[](const auto&) { return QColor(255, 255, 255); }));
+
+		auto link = OpenStarGiftLink(parent->data());
+		push(std::make_unique<ButtonPart>(
+			tr::lng_sticker_premium_view(tr::now),
+			st::chatUniqueButtonPadding,
+			[=] { parent->repaint(); },
+			std::move(link),
+			anim::with_alpha(gift->backdrop.patternColor, 0.75)));
+	};
+}
+
+auto UniqueGiftBg(
+	not_null<Element*> view,
+	std::shared_ptr<Data::UniqueGift> gift)
+-> Fn<void(
+		Painter&,
+		const Ui::ChatPaintContext&,
+		not_null<const MediaGeneric*>)> {
+	struct State {
+		QImage bg;
+		base::flat_map<float64, QImage> cache;
+		std::unique_ptr<Ui::Text::CustomEmoji> pattern;
+		QImage badgeCache;
+		Info::PeerGifts::GiftBadge badgeKey;
+	};
+	const auto state = std::make_shared<State>();
+	state->pattern = view->history()->owner().customEmojiManager().create(
+		gift->pattern.document,
+		[=] { view->repaint(); },
+		Data::CustomEmojiSizeTag::Large);
+	[[maybe_unused]] const auto preload = state->pattern->ready();
+
+	return [=](
+			Painter &p,
+			const Ui::ChatPaintContext &context,
+			not_null<const MediaGeneric*> media) {
+		auto hq = PainterHighQualityEnabler(p);
+		p.setPen(Qt::NoPen);
+		const auto webpreview = (media.get() != view->media());
+		const auto thickness = webpreview ? 0 : st::chatUniqueGiftBorder * 2;
+		const auto radius = webpreview
+			? st::roundRadiusLarge
+			: (st::msgServiceGiftBoxRadius - thickness);
+		const auto full = QRect(0, 0, media->width(), media->height());
+		const auto inner = full.marginsRemoved(
+			{ thickness, thickness, thickness, thickness });
+		if (!webpreview) {
+			auto pen = context.st->msgServiceBg()->p;
+			pen.setWidthF(thickness);
+			p.setPen(pen);
+			p.setBrush(Qt::transparent);
+			p.drawRoundedRect(inner, radius, radius);
+		}
+		auto gradient = QRadialGradient(inner.center(), inner.height() / 2);
+		gradient.setStops({
+			{ 0., gift->backdrop.centerColor },
+			{ 1., gift->backdrop.edgeColor },
+		});
+		p.setBrush(gradient);
+		p.setPen(Qt::NoPen);
+		p.drawRoundedRect(inner, radius, radius);
+
+		const auto width = media->width();
+		const auto shift = width / 12;
+		const auto doubled = width + 2 * shift;
+		const auto top = (webpreview ? 2 : 1) * (-shift);
+		const auto outer = QRect(-shift, top, doubled, doubled);
+		p.setClipRect(inner);
+		Ui::PaintPoints(
+			p,
+			Ui::PatternPoints(),
+			state->cache,
+			state->pattern.get(),
+			*gift,
+			outer);
+		p.setClipping(false);
+
+		const auto add = webpreview ? 0 : style::ConvertScale(2);
+		p.setClipRect(
+			inner.x() - add,
+			inner.y() - add,
+			inner.width() + 2 * add,
+			inner.height() + 2 * add);
+		auto badge = Info::PeerGifts::GiftBadge{
+			.text = tr::lng_gift_collectible_tag(tr::now),
+			.bg1 = gift->backdrop.edgeColor,
+			.bg2 = gift->backdrop.patternColor,
+			.fg = gift->backdrop.textColor,
+		};
+		if (state->badgeCache.isNull() || state->badgeKey != badge) {
+			state->badgeKey = badge;
+			state->badgeCache = ValidateRotatedBadge(badge, add);
+		}
+		const auto badgeRatio = state->badgeCache.devicePixelRatio();
+		const auto badgeWidth = state->badgeCache.width() / badgeRatio;
+		p.drawImage(
+			inner.x() + inner.width() + add - badgeWidth,
+			inner.y() - add,
+			state->badgeCache);
+		p.setClipping(false);
+	};
+}
+
+auto GenerateUniqueGiftPreview(
+	not_null<Element*> parent,
+	Element *replacing,
+	std::shared_ptr<Data::UniqueGift> gift)
+-> Fn<void(
+		not_null<MediaGeneric*>,
+		Fn<void(std::unique_ptr<MediaGenericPart>)>)> {
+	return [=](
+			not_null<MediaGeneric*> media,
+			Fn<void(std::unique_ptr<MediaGenericPart>)> push) {
+		const auto sticker = [=] {
+			using Tag = ChatHelpers::StickerLottieSize;
+			return StickerInBubblePart::Data{
+				.sticker = gift->model.document,
+				.size = st::chatIntroStickerSize,
+				.cacheTag = Tag::ChatIntroHelloSticker,
+			};
+		};
+		push(std::make_unique<StickerInBubblePart>(
+			parent,
+			replacing,
+			sticker,
+			st::chatUniquePreviewPadding));
+	};
+}
+
+std::unique_ptr<MediaGenericPart> MakeGenericButtonPart(
+		const QString &text,
+		QMargins margins,
+		Fn<void()> repaint,
+		ClickHandlerPtr link,
+		QColor bg) {
+	return std::make_unique<ButtonPart>(text, margins, repaint, link, bg);
+}
+
 TextPartColored::TextPartColored(
 	TextWithEntities text,
 	QMargins margins,
-	QColor color,
+	Fn<QColor(const PaintContext &)> color,
 	const style::TextStyle &st,
 	const base::flat_map<uint16, ClickHandlerPtr> &links,
-	const std::any &context)
+	const Ui::Text::MarkedContext &context)
 : MediaGenericTextPart(text, margins, st, links, context)
-, _color(color) {
+, _color(std::move(color)) {
 }
 
 void TextPartColored::setupPen(
 		Painter &p,
 		not_null<const MediaGeneric*> owner,
 		const PaintContext &context) const {
-	p.setPen(_color);
+	p.setPen(_color(context));
 }
 
 AttributeTable::AttributeTable(
 	std::vector<Entry> entries,
 	QMargins margins,
-	QColor labelColor)
+	Fn<QColor(const PaintContext &)> labelColor,
+	Fn<QColor(const PaintContext &)> valueColor,
+	const Ui::Text::MarkedContext &context)
 : _margins(margins)
-, _labelColor(labelColor) {
+, _labelColor(std::move(labelColor))
+, _valueColor(std::move(valueColor)) {
 	for (const auto &entry : entries) {
 		_parts.emplace_back();
 		auto &part = _parts.back();
 		part.label.setText(st::defaultTextStyle, entry.label);
 		part.value.setMarkedText(
 			st::defaultTextStyle,
-			Ui::Text::Bold(entry.value));
+			entry.value,
+			kMarkupTextOptions,
+			context);
 	}
 }
 
@@ -330,14 +502,33 @@ void AttributeTable::draw(
 	};
 	const auto forLabel = labelRight - _margins.left();
 	const auto forValue = width() - _valueLeft - _margins.right();
-	const auto white = QColor(255, 255, 255);
 	for (const auto &part : _parts) {
-		p.setPen(_labelColor);
+		p.setPen(_labelColor(context));
 		paint(part.label, _margins.left(), forLabel, style::al_topright);
-		p.setPen(white);
+		p.setPen(_valueColor(context));
 		paint(part.value, _valueLeft, forValue, style::al_topleft);
 		top += st::normalFont->height + st::chatUniqueRowSkip;
 	}
+}
+
+TextState AttributeTable::textState(
+		QPoint point,
+		StateRequest request,
+		int outerWidth) const {
+	auto top = _margins.top();
+	for (const auto &part : _parts) {
+		const auto height = st::normalFont->height + st::chatUniqueRowSkip;
+		if (point.y() >= top && point.y() < top + height) {
+			point -= QPoint((outerWidth - width()) / 2 + _valueLeft, top);
+			auto result = TextState();
+			auto forText = request.forText();
+			forText.align = style::al_topleft;
+			result.link = part.value.getState(point, width(), forText).link;
+			return result;
+		}
+		top += height;
+	}
+	return {};
 }
 
 QSize AttributeTable::countOptimalSize() {
@@ -375,195 +566,6 @@ QSize AttributeTable::countCurrentSize(int newWidth) {
 			+ skip;
 	}
 	return { newWidth, minHeight() };
-}
-
-}; // namespace
-
-auto GenerateUniqueGiftMedia(
-	not_null<Element*> parent,
-	Element *replacing,
-	not_null<Data::UniqueGift*> gift)
--> Fn<void(Fn<void(std::unique_ptr<MediaGenericPart>)>)> {
-	return [=](Fn<void(std::unique_ptr<MediaGenericPart>)> push) {
-		auto pushText = [&](
-				TextWithEntities text,
-				const style::TextStyle &st,
-				QColor color,
-				QMargins margins) {
-			if (text.empty()) {
-				return;
-			}
-			push(std::make_unique<TextPartColored>(
-				std::move(text),
-				margins,
-				color,
-				st));
-		};
-
-		const auto item = parent->data();
-		const auto media = item->media();
-		const auto fields = media ? media->gift() : nullptr;
-		const auto upgrade = fields && fields->upgrade;
-		const auto outgoing = upgrade ? !item->out() : item->out();
-
-		const auto white = QColor(255, 255, 255);
-		const auto sticker = [=] {
-			using Tag = ChatHelpers::StickerLottieSize;
-			return StickerInBubblePart::Data{
-				.sticker = gift->model.document,
-				.size = st::chatIntroStickerSize,
-				.cacheTag = Tag::ChatIntroHelloSticker,
-			};
-		};
-		push(std::make_unique<StickerInBubblePart>(
-			parent,
-			replacing,
-			sticker,
-			st::chatUniqueStickerPadding));
-		const auto peer = parent->history()->peer;
-		pushText(
-			Ui::Text::Bold(peer->isSelf()
-				? tr::lng_action_gift_self_subtitle(tr::now)
-				: (outgoing
-					? tr::lng_action_gift_sent_subtitle
-					: tr::lng_action_gift_got_subtitle)(
-						tr::now,
-						lt_user,
-						peer->shortName())),
-			st::chatUniqueTitle,
-			white,
-			st::chatUniqueTitlePadding);
-		pushText(
-			Ui::Text::Bold(Data::UniqueGiftName(*gift)),
-			st::defaultTextStyle,
-			gift->backdrop.textColor,
-			st::chatUniqueTextPadding);
-
-		const auto withButton = !outgoing || item->history()->peer->isSelf();
-
-		auto attributes = std::vector<AttributeTable::Entry>{
-			{ tr::lng_gift_unique_model(tr::now), gift->model.name },
-			{ tr::lng_gift_unique_backdrop(tr::now), gift->backdrop.name },
-			{ tr::lng_gift_unique_symbol(tr::now), gift->pattern.name },
-		};
-		push(std::make_unique<AttributeTable>(
-			std::move(attributes),
-			(withButton
-				? st::chatUniqueTextPadding
-				: st::chatUniqueTableAtBottomPadding),
-			gift->backdrop.textColor));
-
-		if (withButton) {
-			const auto itemId = parent->data()->fullId();
-			auto link = std::make_shared<LambdaClickHandler>([=](
-					ClickContext context) {
-				const auto my = context.other.value<ClickHandlerContext>();
-				if (const auto controller = my.sessionWindow.get()) {
-					const auto owner = &controller->session().data();
-					if (const auto item = owner->message(itemId)) {
-						if (const auto media = item->media()) {
-							if (const auto gift = media->gift()) {
-								controller->show(Box(
-									Settings::StarGiftViewBox,
-									controller,
-									*gift,
-									item));
-							}
-						}
-					}
-				}
-			});
-			push(std::make_unique<ButtonPart>(
-				tr::lng_sticker_premium_view(tr::now),
-				st::chatUniqueButtonPadding,
-				[=] { parent->repaint(); },
-				std::move(link),
-				anim::with_alpha(gift->backdrop.patternColor, 0.75)));
-		}
-	};
-}
-
-Fn<void(Painter&, const Ui::ChatPaintContext &)> UniqueGiftBg(
-		not_null<Element*> view,
-		not_null<Data::UniqueGift*> gift) {
-	struct State {
-		QImage bg;
-		base::flat_map<float64, QImage> cache;
-		std::unique_ptr<Ui::Text::CustomEmoji> pattern;
-	};
-	const auto state = std::make_shared<State>();
-	state->pattern = view->history()->owner().customEmojiManager().create(
-		gift->pattern.document,
-		[=] { view->repaint(); },
-		Data::CustomEmojiSizeTag::Large);
-	[[maybe_unused]] const auto preload = state->pattern->ready();
-
-	return [=](Painter &p, const Ui::ChatPaintContext &context) {
-		auto hq = PainterHighQualityEnabler(p);
-		p.setPen(Qt::NoPen);
-		const auto thickness = st::chatUniqueGiftBorder * 2;
-		auto pen = context.st->msgServiceBg()->p;
-		pen.setWidthF(thickness);
-		p.setPen(pen);
-		p.setBrush(Qt::transparent);
-		const auto radius = st::msgServiceGiftBoxRadius - thickness;
-		const auto media = view->media();
-		const auto full = QRect(0, 0, media->width(), media->height());
-		const auto inner = full.marginsRemoved(
-			{ thickness, thickness, thickness, thickness });
-		p.drawRoundedRect(inner, radius, radius);
-		auto gradient = QRadialGradient(
-			inner.center(),
-			inner.height() / 2);
-		gradient.setStops({
-			{ 0., gift->backdrop.centerColor },
-			{ 1., gift->backdrop.edgeColor },
-		});
-		p.setBrush(gradient);
-		p.setPen(Qt::NoPen);
-		p.drawRoundedRect(inner, radius, radius);
-
-		const auto width = media->width();
-		const auto shift = width / 12;
-		const auto doubled = width + 2 * shift;
-		const auto outer = QRect(-shift, -shift, doubled, doubled);
-		p.setClipRect(inner);
-		Ui::PaintPoints(p, state->cache, state->pattern.get(), *gift, outer);
-		p.setClipping(false);
-
-		p.save();
-		p.translate(inner.topLeft());
-		const auto tag = tr::lng_gift_limited_of_one(tr::now);
-		const auto font = st::semiboldFont;
-		p.setFont(font);
-		p.setPen(Qt::NoPen);
-		const auto twidth = font->width(tag);
-		const auto pos = QPoint(inner.width() - twidth, font->height);
-		const auto add = style::ConvertScale(2);
-		p.setClipRect(
-			-add,
-			-add,
-			inner.width() + 2 * add,
-			inner.height() + 2 * add);
-		p.translate(pos);
-		p.rotate(45.);
-		p.translate(-pos);
-		p.setPen(Qt::NoPen);
-		p.setBrush(gift->backdrop.patternColor);
-		p.drawRect(-5 * twidth, 0, twidth * 12, font->height);
-		p.setPen(gift->backdrop.textColor);
-		p.drawText(pos - QPoint(0, font->descent), tag);
-		p.restore();
-	};
-}
-
-std::unique_ptr<MediaGenericPart> MakeGenericButtonPart(
-		const QString &text,
-		QMargins margins,
-		Fn<void()> repaint,
-		ClickHandlerPtr link,
-		QColor bg) {
-	return std::make_unique<ButtonPart>(text, margins, repaint, link, bg);
 }
 
 } // namespace HistoryView

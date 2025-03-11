@@ -14,6 +14,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_peer_bot_commands.h"
 #include "data/data_user_names.h"
 
+class ChannelData;
+
 struct ChannelLocation {
 	QString address;
 	Data::LocationPoint point;
@@ -69,6 +71,8 @@ enum class ChannelDataFlag : uint64 {
 	PaidMediaAllowed = (1ULL << 33),
 	CanViewCreditsRevenue = (1ULL << 34),
 	SignatureProfiles = (1ULL << 35),
+	StargiftsAvailable = (1ULL << 36),
+	PaidMessagesAvailable = (1ULL << 37),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
 using ChannelDataFlags = base::flags<ChannelDataFlag>;
@@ -149,6 +153,9 @@ private:
 	ChannelLocation _location;
 	Data::ChatBotCommands _botCommands;
 	std::unique_ptr<Data::Forum> _forum;
+	int _starsPerMessage = 0;
+
+	friend class ChannelData;
 
 };
 
@@ -252,6 +259,12 @@ public:
 	}
 	[[nodiscard]] bool viewForumAsMessages() const {
 		return flags() & Flag::ViewAsMessages;
+	}
+	[[nodiscard]] bool stargiftsAvailable() const {
+		return flags() & Flag::StargiftsAvailable;
+	}
+	[[nodiscard]] bool paidMessagesAvailable() const {
+		return flags() & Flag::PaidMessagesAvailable;
 	}
 
 	[[nodiscard]] static ChatRestrictionsInfo KickedRestrictedRights(
@@ -452,6 +465,12 @@ public:
 	[[nodiscard]] TimeId slowmodeLastMessage() const;
 	void growSlowmodeLastMessage(TimeId when);
 
+	void setStarsPerMessage(int stars);
+	[[nodiscard]] int starsPerMessage() const;
+
+	[[nodiscard]] int peerGiftsCount() const;
+	void setPeerGiftsCount(int count);
+
 	[[nodiscard]] int boostsApplied() const;
 	[[nodiscard]] int boostsUnrestrict() const;
 	[[nodiscard]] bool unrestrictedByBoosts() const;
@@ -522,6 +541,7 @@ private:
 		std::vector<Data::UnavailableReason> &&reasons) override;
 
 	Flags _flags = ChannelDataFlags(Flag::Forbidden);
+	int _peerGiftsCount = 0;
 
 	PtsWaiter _ptsWaiter;
 

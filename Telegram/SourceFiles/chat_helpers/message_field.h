@@ -19,6 +19,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <QtGui/QClipboard>
 
+namespace tr {
+struct now_t;
+} // namespace tr
+
 namespace Main {
 class Session;
 class SessionShow;
@@ -46,7 +50,7 @@ class Show;
 
 Fn<bool(
 	Ui::InputField::EditLinkSelection selection,
-	QString text,
+	TextWithTags text,
 	QString link,
 	Ui::InputField::EditLinkAction action)> DefaultEditLinkCallback(
 		std::shared_ptr<Main::SessionShow> show,
@@ -169,3 +173,8 @@ private:
 void SelectTextInFieldWithMargins(
 	not_null<Ui::InputField*> field,
 	const TextSelection &selection);
+
+[[nodiscard]] TextWithEntities PaidSendButtonText(tr::now_t, int stars);
+[[nodiscard]] rpl::producer<TextWithEntities> PaidSendButtonText(
+	rpl::producer<int> stars,
+	rpl::producer<QString> fallback = nullptr);

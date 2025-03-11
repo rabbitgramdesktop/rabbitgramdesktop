@@ -57,6 +57,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/about_sponsored_box.h"
 #include "boxes/delete_messages_box.h"
 #include "boxes/report_messages_box.h"
+#include "boxes/star_gift_box.h" // ShowStarGiftBox
 #include "boxes/sticker_set_box.h"
 #include "boxes/translate_box.h"
 #include "chat_helpers/message_field.h"
@@ -1578,6 +1579,7 @@ void HistoryInner::mouseMoveEvent(QMouseEvent *e) {
 		mouseReleaseEvent(e);
 	}
 	if (reallyMoved) {
+		_mouseActive = true;
 		lastGlobalPosition = e->globalPos();
 		if (!buttonsPressed || (_scrollDateLink && ClickHandler::getPressed() == _scrollDateLink)) {
 			keepScrollDateForNow();
@@ -1624,6 +1626,7 @@ void HistoryInner::mousePressEvent(QMouseEvent *e) {
 		e->accept();
 		return; // ignore mouse press, that was hiding context menu
 	}
+	_mouseActive = true;
 	mouseActionStart(e->globalPos(), e->button());
 }
 
@@ -2776,10 +2779,34 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						_menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
 							QGuiApplication::clipboard()->setText(phone);
 						}, &st::menuIconCopy);
+					} else if (const auto gift = media->gift()) {
+						const auto peer = item->history()->peer;
+						const auto user = peer->asUser();
+						if (!user
+							|| (!user->isInaccessible()
+								&& !user->isNotificationsUser())) {
+							const auto controller = _controller;
+							const auto starGiftUpgrade = gift->upgrade
+								&& (gift->type == Data::GiftType::StarGift);
+							const auto isGift = gift->slug.isEmpty()
+								|| !gift->channel;
+							const auto out = item->out();
+							const auto outgoingGift = isGift
+								&& (starGiftUpgrade ? !out : out);
+							if (outgoingGift) {
+								_menu->addAction(
+									tr::lng_context_gift_send(tr::now),
+									[=] {
+										Ui::ShowStarGiftBox(controller, peer);
+									},
+									&st::menuIconGiftPremium);
+							}
+						}
 					}
 				}
 				if (!item->isService() && view && actionText.isEmpty()) {
-					if (!hasCopyRestriction(item)
+					const auto hasRestriction = hasCopyRestriction(item);
+					if (!hasRestriction
 						&& (view->hasVisibleText() || mediaHasTextForCopy)) {
 						_menu->addAction(
 							tr::lng_context_copy_text(tr::now),
@@ -2788,6 +2815,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					}
 					if ((!item->translation() || !_history->translatedTo())
 						&& (view->hasVisibleText() || mediaHasTextForCopy)) {
+						const auto peer = item->history()->peer;
+						const auto itemId = item->id;
 						const auto translate = mediaHasTextForCopy
 							? (HistoryView::TransribedText(item)
 								.append('\n')
@@ -2798,12 +2827,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							_menu->addAction(tr::lng_context_translate(tr::now), [=] {
 								_controller->show(Box(
 									Ui::TranslateBox,
-									item->history()->peer,
-									mediaHasTextForCopy
-										? MsgId()
-										: item->fullId().msg,
+									peer,
+									mediaHasTextForCopy ? MsgId() : itemId,
 									translate,
-									hasCopyRestriction(item)));
+									hasRestriction));
 							}, &st::menuIconTranslate);
 						}
 					}
@@ -3258,7 +3285,7 @@ void HistoryInner::checkActivation() {
 	session().data().histories().readInboxTill(view->data());
 }
 
-void HistoryInner::recountHistoryGeometry() {
+void HistoryInner::recountHistoryGeometry(bool initial) {
 	_contentWidth = _scroll->width();
 
 	if (_history->hasPendingResizedItems()
@@ -3316,7 +3343,7 @@ void HistoryInner::recountHistoryGeometry() {
 	}
 
 	auto historyPaddingTopDelta = (newHistoryPaddingTop - oldHistoryPaddingTop);
-	if (historyPaddingTopDelta != 0) {
+	if (!initial && historyPaddingTopDelta != 0) {
 		if (_history->scrollTopItem) {
 			_history->scrollTopOffset += historyPaddingTopDelta;
 		} else if (_migrated && _migrated->scrollTopItem) {
@@ -3511,6 +3538,7 @@ void HistoryInner::setShownPinned(HistoryItem *item) {
 }
 
 void HistoryInner::enterEventHook(QEnterEvent *e) {
+	_mouseActive = true;
 	mouseActionUpdate(QCursor::pos());
 	return TWidget::enterEventHook(e);
 }
@@ -3527,6 +3555,7 @@ void HistoryInner::leaveEventHook(QEvent *e) {
 		_cursor = style::cur_default;
 		setCursor(_cursor);
 	}
+	_mouseActive = false;
 	return TWidget::leaveEventHook(e);
 }
 
@@ -3877,7 +3906,8 @@ auto HistoryInner::reactionButtonParameters(
 }
 
 void HistoryInner::mouseActionUpdate() {
-	if (hasPendingResizedItems()) {
+	if (hasPendingResizedItems()
+		|| (!_mouseActive && !window()->isActiveWindow())) {
 		return;
 	}
 
@@ -4323,6 +4353,12 @@ void HistoryInner::refreshAboutView(bool force) {
 			_aboutView = std::make_unique<HistoryView::AboutView>(
 				_history,
 				_history->delegateMixin()->delegate());
+			_aboutView->refreshRequests() | rpl::start_with_next([=] {
+				updateBotInfo();
+			}, _aboutView->lifetime());
+			_aboutView->sendIntroSticker() | rpl::start_to_stream(
+				_sendIntroSticker,
+				_aboutView->lifetime());
 		}
 	};
 	if (const auto user = _peer->asUser()) {
@@ -4331,15 +4367,17 @@ void HistoryInner::refreshAboutView(bool force) {
 			if (!info->inited) {
 				session().api().requestFullPeer(user);
 			}
-		} else if (user->meRequiresPremiumToWrite()
-			&& !user->session().premium()
-			&& !historyHeight()) {
+		} else if (!user->isContact()
+			&& !user->phoneCountryCode().isEmpty()) {
 			refresh();
 		} else if (!historyHeight()) {
-			if (!user->isFullLoaded()) {
-				session().api().requestFullPeer(user);
-			} else {
+			if (user->starsPerMessage() > 0
+				|| (user->requiresPremiumToWrite()
+					&& !user->session().premium())
+				|| user->isFullLoaded()) {
 				refresh();
+			} else {
+				session().api().requestFullPeer(user);
 			}
 		}
 	}
@@ -4750,6 +4788,11 @@ ClickContext HistoryInner::prepareClickContext(
 		button,
 		QVariant::fromValue(prepareClickHandlerContext(itemId)),
 	};
+}
+
+auto HistoryInner::sendIntroSticker() const
+-> rpl::producer<not_null<DocumentData*>> {
+	return _sendIntroSticker.events();
 }
 
 auto HistoryInner::DelegateMixin()

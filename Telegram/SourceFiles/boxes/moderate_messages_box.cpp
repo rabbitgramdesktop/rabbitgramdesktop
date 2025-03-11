@@ -72,6 +72,16 @@ ModerateOptions CalculateModerateOptions(const HistoryItemsList &items) {
 		if (peer != item->history()->peer) {
 			return {};
 		}
+		{
+			const auto author = item->author();
+			if (author == peer) {
+				return {};
+			} else if (const auto channel = author->asChannel()) {
+				if (channel->linkedChat() == peer) {
+					return {};
+				}
+			}
+		}
 		if (!item->suggestBanReport()) {
 			result.allCanBan = false;
 		}
@@ -443,10 +453,7 @@ void CreateModerateMessagesBox(
 		) | rpl::start_with_next([=](const TextWithEntities &text) {
 			raw->setMarkedText(
 				Ui::Text::Link(text, u"internal:"_q),
-				Core::MarkedTextContext{
-					.session = session,
-					.customEmojiRepaint = [=] { raw->update(); },
-				});
+				Core::TextContext({ .session = session }));
 		}, label->lifetime());
 
 		Ui::AddSkip(inner);

@@ -100,6 +100,7 @@ public:
 	[[nodiscard]] uint64 coloredSetId() const;
 
 	[[nodiscard]] TextWithEntities creditsEmoji(QMargins padding = {});
+	[[nodiscard]] TextWithEntities ministarEmoji(QMargins padding = {});
 
 private:
 	static constexpr auto kSizeCount = int(SizeTag::kCount);
@@ -222,5 +223,9 @@ void InsertCustomEmoji(
 
 [[nodiscard]] Ui::Text::CustomEmojiFactory ReactedMenuFactory(
 	not_null<Main::Session*> session);
+
+[[nodiscard]] QString CollectibleCustomEmojiId(
+	Data::EmojiStatusCollectible &data);
+[[nodiscard]] QString EmojiStatusCustomId(const EmojiStatusId &id);
 
 } // namespace Data
