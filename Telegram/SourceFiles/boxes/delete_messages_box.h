@@ -9,6 +9,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/layers/box_content.h"
 
+enum class PaidPostType : uchar;
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -56,8 +58,10 @@ private:
 	void deleteAndClear();
 	[[nodiscard]] PeerData *checkFromSinglePeer() const;
 	[[nodiscard]] bool hasScheduledMessages() const;
+	[[nodiscard]] bool hasSavedMusicMessages() const;
 	[[nodiscard]] std::optional<RevokeConfig> revokeText(
 		not_null<PeerData*> peer) const;
+	[[nodiscard]] PaidPostType paidPostType() const;
 
 	const not_null<Main::Session*> _session;
 
@@ -72,6 +76,7 @@ private:
 	bool _moderateDeleteAll = false;
 
 	bool _revokeForBot = false;
+	bool _revokeJustClearForChannel = false;
 
 	object_ptr<Ui::FlatLabel> _text = { nullptr };
 	object_ptr<Ui::Checkbox> _revoke = { nullptr };
@@ -82,6 +87,7 @@ private:
 	object_ptr<Ui::LinkButton> _autoDeleteSettings = { nullptr };
 
 	int _fullHeight = 0;
+	bool _confirmedDeletePaidSuggestedPosts = false;
 
 	Fn<void()> _deleteConfirmedCallback;
 

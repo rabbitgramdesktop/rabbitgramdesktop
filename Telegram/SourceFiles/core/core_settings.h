@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "core/core_settings_proxy.h"
 #include "media/media_common.h"
+#include "dialogs/ui/dialogs_quick_action.h"
 #include "window/themes/window_themes_embedded.h"
 #include "ui/chat/attach/attach_send_files_way.h"
 #include "base/flags.h"
@@ -946,6 +947,16 @@ public:
 	[[nodiscard]] static PlaybackSpeed DeserializePlaybackSpeed(
 		qint32 speed);
 
+	[[nodiscard]] Dialogs::Ui::QuickDialogAction quickDialogAction() const;
+	void setQuickDialogAction(Dialogs::Ui::QuickDialogAction);
+
+	[[nodiscard]] ushort notificationsVolume() const {
+		return _notificationsVolume;
+	}
+	void setNotificationsVolume(ushort value) {
+		_notificationsVolume = value;
+	}
+
 	void resetOnLastLogout();
 
 private:
@@ -1085,6 +1096,11 @@ private:
 	bool _dialogsWidthSetToZeroWithoutChat = false;
 
 	bool _recordVideoMessages = false;
+
+	Dialogs::Ui::QuickDialogAction _quickDialogAction
+		= Dialogs::Ui::QuickDialogAction::Disabled;
+
+	ushort _notificationsVolume = 100;
 
 	QByteArray _photoEditorBrush;
 

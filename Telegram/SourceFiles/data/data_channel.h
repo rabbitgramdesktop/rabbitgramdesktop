@@ -16,6 +16,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 class ChannelData;
 
+namespace Data {
+class Forum;
+class SavedMessages;
+} // namespace Data
+
 struct ChannelLocation {
 	QString address;
 	Data::LocationPoint point;
@@ -73,6 +78,13 @@ enum class ChannelDataFlag : uint64 {
 	SignatureProfiles = (1ULL << 35),
 	StargiftsAvailable = (1ULL << 36),
 	PaidMessagesAvailable = (1ULL << 37),
+	AutoTranslation = (1ULL << 38),
+	Monoforum = (1ULL << 39),
+	MonoforumAdmin = (1ULL << 40),
+	MonoforumDisabled = (1ULL << 41),
+	ForumTabs = (1ULL << 42),
+	HasStarsPerMessage = (1ULL << 43),
+	StarsPerMessageKnown = (1ULL << 44),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
 using ChannelDataFlags = base::flags<ChannelDataFlag>;
@@ -117,6 +129,10 @@ public:
 	[[nodiscard]] Data::Forum *forum() const;
 	[[nodiscard]] std::unique_ptr<Data::Forum> takeForumData();
 
+	void ensureMonoforum(not_null<ChannelData*> that);
+	[[nodiscard]] Data::SavedMessages *monoforum() const;
+	[[nodiscard]] std::unique_ptr<Data::SavedMessages> takeMonoforumData();
+
 	std::deque<not_null<UserData*>> lastParticipants;
 	base::flat_map<not_null<UserData*>, Admin> lastAdmins;
 	base::flat_map<not_null<UserData*>, Restricted> lastRestricted;
@@ -153,7 +169,7 @@ private:
 	ChannelLocation _location;
 	Data::ChatBotCommands _botCommands;
 	std::unique_ptr<Data::Forum> _forum;
-	int _starsPerMessage = 0;
+	std::unique_ptr<Data::SavedMessages> _monoforum;
 
 	friend class ChannelData;
 
@@ -266,6 +282,13 @@ public:
 	[[nodiscard]] bool paidMessagesAvailable() const {
 		return flags() & Flag::PaidMessagesAvailable;
 	}
+	[[nodiscard]] bool hasStarsPerMessage() const {
+		return flags() & Flag::HasStarsPerMessage;
+	}
+	[[nodiscard]] bool starsPerMessageKnown() const {
+		return flags() & Flag::StarsPerMessageKnown;
+	}
+	[[nodiscard]] bool useSubsectionTabs() const;
 
 	[[nodiscard]] static ChatRestrictionsInfo KickedRestrictedRights(
 		not_null<PeerData*> participant);
@@ -300,6 +323,9 @@ public:
 	[[nodiscard]] bool isForum() const {
 		return flags() & Flag::Forum;
 	}
+	[[nodiscard]] bool isMonoforum() const {
+		return flags() & Flag::Monoforum;
+	}
 	[[nodiscard]] bool hasUsername() const {
 		return flags() & Flag::Username;
 	}
@@ -320,6 +346,9 @@ public:
 	}
 	[[nodiscard]] bool antiSpamMode() const {
 		return flags() & Flag::AntiSpam;
+	}
+	[[nodiscard]] bool autoTranslation() const {
+		return flags() & Flag::AutoTranslation;
 	}
 
 	[[nodiscard]] auto adminRights() const {
@@ -377,11 +406,13 @@ public:
 	[[nodiscard]] bool canEditStories() const;
 	[[nodiscard]] bool canDeleteStories() const;
 	[[nodiscard]] bool canPostPaidMedia() const;
+	[[nodiscard]] bool canAccessMonoforum() const;
 	[[nodiscard]] bool hiddenPreHistory() const;
 	[[nodiscard]] bool canViewMembers() const;
 	[[nodiscard]] bool canViewAdmins() const;
 	[[nodiscard]] bool canViewBanned() const;
 	[[nodiscard]] bool canEditSignatures() const;
+	[[nodiscard]] bool canEditAutoTranslate() const;
 	[[nodiscard]] bool canEditStickers() const;
 	[[nodiscard]] bool canEditEmoji() const;
 	[[nodiscard]] bool canDelete() const;
@@ -404,9 +435,13 @@ public:
 	void setLocation(const MTPChannelLocation &data);
 	[[nodiscard]] const ChannelLocation *getLocation() const;
 
-	void setLinkedChat(ChannelData *linked);
-	[[nodiscard]] ChannelData *linkedChat() const;
-	[[nodiscard]] bool linkedChatKnown() const;
+	void setDiscussionLink(ChannelData *link);
+	[[nodiscard]] ChannelData *discussionLink() const;
+	[[nodiscard]] bool discussionLinkKnown() const;
+
+	void setMonoforumLink(ChannelData *link);
+	[[nodiscard]] ChannelData *monoforumLink() const;
+	[[nodiscard]] bool monoforumDisabled() const;
 
 	void ptsInit(int32 pts) {
 		_ptsWaiter.init(pts);
@@ -467,6 +502,7 @@ public:
 
 	void setStarsPerMessage(int stars);
 	[[nodiscard]] int starsPerMessage() const;
+	[[nodiscard]] int commonStarsPerMessage() const;
 
 	[[nodiscard]] int peerGiftsCount() const;
 	void setPeerGiftsCount(int count);
@@ -505,6 +541,9 @@ public:
 	[[nodiscard]] Data::Forum *forum() const {
 		return mgInfo ? mgInfo->forum() : nullptr;
 	}
+	[[nodiscard]] Data::SavedMessages *monoforum() const {
+		return mgInfo ? mgInfo->monoforum() : nullptr;
+	}
 
 	void processTopics(const MTPVector<MTPForumTopic> &topics);
 
@@ -541,18 +580,11 @@ private:
 		std::vector<Data::UnavailableReason> &&reasons) override;
 
 	Flags _flags = ChannelDataFlags(Flag::Forbidden);
-	int _peerGiftsCount = 0;
 
 	PtsWaiter _ptsWaiter;
 
 	Data::UsernamesInfo _username;
 
-	int _membersCount = -1;
-	int _adminsCount = 1;
-	int _restrictedCount = 0;
-	int _kickedCount = 0;
-	int _pendingRequestsCount = 0;
-	int _levelHint = 0;
 	std::vector<UserId> _recentRequesters;
 	MsgId _availableMinId = 0;
 
@@ -565,7 +597,19 @@ private:
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	std::unique_ptr<InvitePeek> _invitePeek;
 	QString _inviteLink;
-	std::optional<ChannelData*> _linkedChat;
+
+	ChannelData *_discussionLink = nullptr;
+	ChannelData *_monoforumLink = nullptr;
+	bool _discussionLinkKnown = false;
+
+	int _peerGiftsCount = 0;
+	int _membersCount = -1;
+	int _adminsCount = 1;
+	int _restrictedCount = 0;
+	int _kickedCount = 0;
+	int _pendingRequestsCount = 0;
+	int _levelHint = 0;
+	int _starsPerMessage = 0;
 
 	Data::AllowedReactions _allowedReactions;
 

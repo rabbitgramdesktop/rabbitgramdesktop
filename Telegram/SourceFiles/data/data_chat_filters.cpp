@@ -347,7 +347,7 @@ bool ChatFilter::contains(
 				: user->isContact()
 				? Flag::Contacts
 				: Flag::NonContacts;
-		} else if (const auto chat = peer->asChat()) {
+		} else if (peer->isChat()) {
 			return Flag::Groups;
 		} else if (const auto channel = peer->asChannel()) {
 			if (channel->isBroadcast()) {
@@ -459,6 +459,10 @@ bool ChatFilters::tagsEnabled() const {
 
 rpl::producer<bool> ChatFilters::tagsEnabledValue() const {
 	return _tagsEnabled.value();
+}
+
+rpl::producer<bool> ChatFilters::tagsEnabledChanges() const {
+	return _tagsEnabled.changes();
 }
 
 void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {

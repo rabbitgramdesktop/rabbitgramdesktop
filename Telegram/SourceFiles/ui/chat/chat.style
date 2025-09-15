@@ -34,14 +34,22 @@ historyReplyBottom: 2px;
 historyReplyPreview: 32px;
 historyReplyPreviewMargin: margins(7px, 4px, 4px, 4px);
 historyReplyPadding: margins(11px, 2px, 6px, 2px);
-historyReplyUser: icon {{ "chat/reply_type_user", windowFg }};
-historyReplyUserPadding: margins(0px, 4px, 4px, 0px);
-historyReplyGroup: icon {{ "chat/reply_type_group", windowFg }};
-historyReplyGroupPadding: margins(0px, 4px, 4px, 0px);
-historyReplyChannel: icon {{ "chat/reply_type_channel", windowFg }};
-historyReplyChannelPadding: margins(0px, 5px, 4px, 0px);
-historyReplyForward: icon {{ "mini_forward", windowFg }};
-historyReplyForwardPadding: margins(0px, 2px, 2px, 0px);
+historyReplyUser: IconEmoji {
+	icon: icon {{ "chat/reply_type_user", windowFg }};
+	padding: margins(0px, 4px, 4px, 0px);
+}
+historyReplyGroup: IconEmoji {
+	icon: icon {{ "chat/reply_type_group", windowFg }};
+	padding: margins(0px, 4px, 4px, 0px);
+}
+historyReplyChannel: IconEmoji {
+	icon: icon {{ "chat/reply_type_channel", windowFg }};
+	padding: margins(0px, 5px, 4px, 0px);
+}
+historyReplyForward: IconEmoji {
+	icon: icon {{ "mini_forward", windowFg }};
+	padding: margins(0px, 2px, 2px, 0px);
+}
 
 msgReplyPadding: margins(6px, 6px, 11px, 6px);
 msgReplyBarPos: point(1px, 0px);
@@ -49,6 +57,7 @@ msgReplyBarSize: size(2px, 36px);
 msgReplyBarSkip: 10px;
 msgServicePadding: margins(12px, 3px, 12px, 4px);
 msgServiceMargin: margins(10px, 10px, 10px, 2px);
+monoforumBarUserpicSkip: 2px;
 
 msgDateSpace: 12px;
 msgDateDelta: point(2px, 5px);
@@ -437,6 +446,10 @@ historyCallCameraInIcon: icon {{ "calls/call_camera_active", msgFileInBg }};
 historyCallCameraInIconSelected: icon {{ "calls/call_camera_active", msgFileInBgSelected }};
 historyCallCameraOutIcon: icon {{ "calls/call_camera_active", msgFileOutBg }};
 historyCallCameraOutIconSelected: icon {{ "calls/call_camera_active", msgFileOutBgSelected }};
+historyCallGroupInIcon: icon {{ "calls/call_group", msgFileInBg }};
+historyCallGroupInIconSelected: icon {{ "calls/call_group", msgFileInBgSelected }};
+historyCallGroupOutIcon: icon {{ "calls/call_group", msgFileOutBg }};
+historyCallGroupOutIconSelected: icon {{ "calls/call_group", msgFileOutBgSelected }};
 historyCallIconPosition: point(12px, 10px);
 historyCallLeft: 16px;
 historyCallTop: 9px;
@@ -515,6 +528,7 @@ historyVoiceMessageOutTTLSelected: icon {{ "chat/mini_media_once", historyFileOu
 historyTranscribeSkip: 10px;
 historyTranscribeSize: size(28px, 22px);
 historyTranscribeRadius: 4px;
+historyTranscribeLoadingSize: 24px;
 historyTranscribeInIcon: icon {{ "chat/voice_to_text", msgFileInBg }};
 historyTranscribeInIconSelected: icon {{ "chat/voice_to_text", msgFileInBgSelected }};
 historyTranscribeOutIcon: icon {{ "chat/voice_to_text", msgFileOutBg }};
@@ -651,6 +665,9 @@ historyPollOutChosen: icon {{ "poll_select_check", historyFileOutIconFg }};
 historyPollOutChosenSelected: icon {{ "poll_select_check", historyFileOutIconFgSelected }};
 historyPollInChosen: icon {{ "poll_select_check", historyFileInIconFg }};
 historyPollInChosenSelected: icon {{ "poll_select_check", historyFileInIconFgSelected }};
+
+historyChecklistTaskPadding: margins(32px, 12px, 0px, 12px);
+historyChecklistCheckedTop: 4px;
 
 historyViewButtonHeight: 48px;
 historyViewButtonMargins: margins(10px, 5px, 10px, 10px);
@@ -928,8 +945,11 @@ msgServiceGiftBoxTitlePadding: margins(0px, 20px, 0px, 6px);
 msgServiceGiftBoxStickerTop: -19px;
 msgServiceGiftBoxStickerSize: 140px;
 msgServiceStarGiftBoxWidth: 224px;
+msgServiceStarGiftByWidth: 272px;
 msgServiceStarGiftStickerTop: 24px;
 msgServiceStarGiftStickerSize: 100px;
+msgServiceGiftThemeStickerSize: 64px;
+msgServiceGiftThemeStickerPadding: margins(18px, 18px, 18px, 18px);
 
 historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
@@ -938,6 +958,9 @@ historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
 	minWidth: 136px;
 	maxHeight: 120px;
 }
+historySponsorInfoItemDark: FlatLabel(historySponsorInfoItem) {
+	textFg: mediaviewControlFg;
+}
 historyHasCustomEmoji: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: font(11px);
@@ -945,6 +968,7 @@ historyHasCustomEmoji: FlatLabel(defaultFlatLabel) {
 	minWidth: 80px;
 }
 historyHasCustomEmojiPosition: point(12px, 4px);
+historyBankCardMenuMultilinePosition: point(18px, 4px);
 
 historyTranslateLabel: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
@@ -1046,9 +1070,32 @@ chatSimilarName: TextStyle(defaultTextStyle) {
 chatSimilarWidthMax: 424px;
 chatSimilarSkip: 12px;
 
+chatSuggestWidth: 236px;
+chatSuggestInfoWidth: 272px;
+chatSuggestInfoTitleMargin: margins(16px, 16px, 16px, 6px);
+chatSuggestInfoMiddleMargin: margins(16px, 4px, 16px, 4px);
+chatSuggestInfoLastMargin: margins(16px, 4px, 16px, 16px);
+chatSuggestTableMiddleMargin: margins(8px, 4px, 8px, 4px);
+chatSuggestTableLastMargin: margins(8px, 4px, 8px, 16px);
+chatSuggestInfoFullMargin: margins(16px, 16px, 16px, 16px);
+chatSuggestAcceptIcon: IconEmoji {
+	icon: icon{{ "chat/paid_approve", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+chatSuggestDeclineIcon: IconEmoji {
+	icon: icon{{ "chat/paid_decline", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+chatSuggestChangeIcon: IconEmoji {
+	icon: icon{{ "chat/paid_edit", windowFg }};
+	padding: margins(0px, -2px, 0px, 0px);
+}
+
 premiumRequiredWidth: 186px;
 premiumRequiredIcon: icon{{ "chat/large_lockedchat", msgServiceFg }};
 premiumRequiredCircle: 60px;
+directMessagesIcon: icon{{ "chat/large_messages", msgServiceFg }};
+starsPerMessageWidth: 226px;
 
 repliesEmptyIcon: icon{{ "chat/large_quickreply", msgServiceFg }};
 greetingEmptyIcon: icon{{ "chat/large_greeting", msgServiceFg }};
@@ -1060,19 +1107,25 @@ repliesComposeControls: ComposeControls(defaultComposeControls) {
 	tabbedHeightMin: 220px;
 }
 
-boostMessageIcon: icon {{ "stories/boost_mini", windowFg }};
-boostMessageIconPadding: margins(0px, 2px, 0px, 0px);
-boostsMessageIcon: icon {{ "stories/boosts_mini", windowFg }};
-boostsMessageIconPadding: margins(0px, 2px, 0px, 0px);
-
-historyIvIcon: icon{{ "boosts/boost_mini2", windowFg }};
-historyIvIconPadding: margins(2px, 2px, 2px, 0px);
+boostMessageIcon: IconEmoji {
+	icon: icon {{ "stories/boost_mini", windowFg }};
+	padding: margins(0px, 2px, 0px, 0px);
+}
+boostsMessageIcon: IconEmoji {
+	icon: icon {{ "stories/boosts_mini", windowFg }};
+	padding: margins(0px, 2px, 0px, 0px);
+}
+historyIvIcon: IconEmoji {
+	icon: icon {{ "boosts/boost_mini2", windowFg }};
+	padding: margins(2px, 2px, 2px, 0px);
+}
 
 chatIntroStickerSize: 96px;
 chatIntroWidth: 224px;
 chatIntroTitleMargin: margins(11px, 16px, 11px, 4px);
 chatIntroMargin: margins(11px, 0px, 11px, 0px);
 chatIntroStickerPadding: margins(10px, 8px, 10px, 16px);
+chatGiftPreviewWidth: 264px;
 
 liveLocationLongInIcon: icon {{ "chat/live_location_long", msgInServiceFg }};
 liveLocationLongInIconSelected: icon {{ "chat/live_location_long", msgInServiceFgSelected }};
@@ -1245,3 +1298,159 @@ newPeerUserpics: GroupCallUserpics {
 }
 newPeerUserpicsPadding: margins(0px, 3px, 0px, 0px);
 newPeerWidth: 320px;
+
+swipeBackSize: 150px;
+
+chatTabsToggle: IconButton(defaultIconButton) {
+	width: 64px;
+	height: 36px;
+	icon: icon {{ "top_bar_profile-flip_horizontal", menuIconFg }};
+	iconOver: icon {{ "top_bar_profile-flip_horizontal", menuIconFgOver }};
+	ripple: emptyRippleAnimation;
+}
+chatTabsToggleActive: icon {{ "top_bar_profile-flip_horizontal", windowActiveTextFg }};
+chatTabsScroll: ScrollArea(defaultScrollArea) {
+	barHidden: true;
+}
+chatTabsSlider: SettingsSlider(defaultSettingsSlider) {
+	padding: 0px;
+	height: 36px;
+	barTop: 33px;
+	barSkip: 0px;
+	barStroke: 6px;
+	barRadius: 2px;
+	barFg: transparent;
+	barSnapToLabel: true;
+	strictSkip: 18px;
+	labelTop: 9px;
+	labelStyle: semiboldTextStyle;
+	labelFg: windowSubTextFg;
+	labelFgActive: lightButtonFg;
+	rippleBottomSkip: 1px;
+	rippleBg: windowBgOver;
+	rippleBgActive: lightButtonBgOver;
+	ripple: defaultRippleAnimation;
+}
+
+ChatTabsOutline {
+	radius: pixels;
+	stroke: pixels;
+	fg: color;
+	skip: pixels;
+}
+
+ChatTabsVertical {
+	barStroke: pixels;
+	barRadius: pixels;
+	barFg: color;
+	nameStyle: TextStyle;
+	nameWidth: pixels;
+	nameTop: pixels;
+	nameFg: color;
+	nameFgActive: color;
+	userpicTop: pixels;
+	userpicSize: pixels;
+	baseHeight: pixels;
+	width: pixels;
+	ripple: RippleAnimation;
+	rippleBg: color;
+	rippleBgActive: color;
+	duration: int;
+}
+
+chatTabsVertical: ChatTabsVertical {
+	barStroke: 8px;
+	barRadius: 4px;
+	barFg: sliderBgActive;
+	nameStyle: TextStyle(defaultTextStyle) {
+		font: font(10px);
+	}
+	nameWidth: 54px;
+	nameTop: 42px;
+	nameFg: windowSubTextFg;
+	nameFgActive: lightButtonFg;
+	userpicTop: 8px;
+	userpicSize: 28px;
+	baseHeight: 50px;
+	width: 64px;
+	ripple: defaultRippleAnimation;
+	rippleBg: windowBgOver;
+	rippleBgActive: lightButtonBgOver;
+	duration: 150;
+}
+
+chatTabsOutlineHorizontal: ChatTabsOutline {
+	stroke: 8px;
+	radius: 4px;
+	fg: sliderBgActive;
+	skip: 8px;
+}
+
+chatTabsOutlineVertical: ChatTabsOutline(chatTabsOutlineHorizontal) {
+}
+
+suggestPriceBox: Box(defaultBox) {
+	buttonPadding: margins(22px, 22px, 22px, 22px);
+	buttonHeight: 42px;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+	shadowIgnoreTopSkip: true;
+}
+suggestPriceEstimate: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+suggestPriceEstimateTop: 12px;
+tonInput: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(0px, 7px, 0px, 7px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	placeholderScale: 0.;
+	placeholderFont: boxTextFont;
+
+	heightMin: 34px;
+	heightMax: 100px;
+}
+starsFieldIconPosition: point(0px, 10px);
+tonFieldIconSize: 16px;
+tonFieldIconPosition: point(2px, 11px);
+
+suggestBarTonIconSize: 14px;
+suggestBarTonIconMargins: margins(0px, 3px, 0px, 0px);
+
+lowTonIconPadding: margins(12px, 20px, 12px, 0px);
+lowTonTitlePadding: margins(0px, 12px, 0px, 12px);
+lowTonTextPadding: margins(0px, 0px, 0px, 8px);
+lowTonText: FlatLabel(defaultFlatLabel) {
+	minWidth: 100px;
+	align: align(top);
+}
+
+groupMembersWidgetList: PeerList(defaultPeerList) {
+	item: PeerListItem(defaultPeerListItem) {
+		photoPosition: point(12px, 6px);
+		namePosition: point(68px, 11px);
+		statusPosition: point(68px, 31px);
+		checkbox: RoundImageCheckbox(defaultPeerListCheckbox) {
+			selectExtendTwice: 1px;
+			imageRadius: 21px;
+			imageSmallRadius: 19px;
+			check: RoundCheckbox(defaultPeerListCheck) {
+				size: 0px;
+			}
+		}
+		nameFgChecked: contactsNameFg;
+	}
+}
+
+saveMusicInfoMenu: Menu(defaultMenu) {
+	itemBgOver: windowBg;
+	itemFgOver: windowFg;
+	itemPadding: margins(17px, 4px, 17px, 3px);
+}

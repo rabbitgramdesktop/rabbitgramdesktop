@@ -7,10 +7,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_types.h"
 #include "data/data_flags.h"
-#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_cloud_file.h"
+#include "data/data_peer_common.h"
 #include "ui/userpic_view.h"
 
 struct BotInfo;
@@ -37,6 +38,8 @@ class Forum;
 class ForumTopic;
 class Session;
 class GroupCall;
+class SavedMessages;
+class SavedSublist;
 struct ReactionId;
 class WallPaper;
 
@@ -184,6 +187,12 @@ struct PeerBarDetails {
 	int paysPerMessage = 0;
 };
 
+struct PaintUserpicContext {
+	QPoint position;
+	int size = 0;
+	Ui::PeerUserpicShape shape = Ui::PeerUserpicShape::Auto;
+};
+
 class PeerData {
 protected:
 	PeerData(not_null<Data::Session*> owner, PeerId id);
@@ -232,9 +241,11 @@ public:
 	[[nodiscard]] bool isMegagroup() const;
 	[[nodiscard]] bool isBroadcast() const;
 	[[nodiscard]] bool isForum() const;
+	[[nodiscard]] bool isMonoforum() const;
 	[[nodiscard]] bool isGigagroup() const;
 	[[nodiscard]] bool isRepliesChat() const;
 	[[nodiscard]] bool isVerifyCodes() const;
+	[[nodiscard]] bool isFreezeAppealChat() const;
 	[[nodiscard]] bool sharedMediaInfo() const;
 	[[nodiscard]] bool savedSublistsInfo() const;
 	[[nodiscard]] bool hasStoriesHidden() const;
@@ -256,6 +267,10 @@ public:
 	[[nodiscard]] Data::Forum *forum() const;
 	[[nodiscard]] Data::ForumTopic *forumTopicFor(MsgId rootId) const;
 
+	[[nodiscard]] Data::SavedMessages *monoforum() const;
+	[[nodiscard]] Data::SavedSublist *monoforumSublistFor(
+		PeerId sublistPeerId) const;
+
 	[[nodiscard]] Data::PeerNotifySettings &notify() {
 		return _notify;
 	}
@@ -272,9 +287,11 @@ public:
 	[[nodiscard]] rpl::producer<bool> slowmodeAppliedValue() const;
 	[[nodiscard]] int slowmodeSecondsLeft() const;
 	[[nodiscard]] bool canManageGroupCall() const;
+	[[nodiscard]] bool amMonoforumAdmin() const;
 
 	[[nodiscard]] int starsPerMessage() const;
 	[[nodiscard]] int starsPerMessageChecked() const;
+	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] UserData *asBot();
 	[[nodiscard]] const UserData *asBot() const;
@@ -292,11 +309,22 @@ public:
 	[[nodiscard]] const ChatData *asChatNotMigrated() const;
 	[[nodiscard]] ChannelData *asChannelOrMigrated();
 	[[nodiscard]] const ChannelData *asChannelOrMigrated() const;
+	[[nodiscard]] ChannelData *asMonoforum();
+	[[nodiscard]] const ChannelData *asMonoforum() const;
 
 	[[nodiscard]] ChatData *migrateFrom() const;
 	[[nodiscard]] ChannelData *migrateTo() const;
 	[[nodiscard]] not_null<PeerData*> migrateToOrMe();
 	[[nodiscard]] not_null<const PeerData*> migrateToOrMe() const;
+	[[nodiscard]] not_null<PeerData*> userpicPaintingPeer();
+	[[nodiscard]] not_null<const PeerData*> userpicPaintingPeer() const;
+	[[nodiscard]] Ui::PeerUserpicShape userpicShape() const;
+
+	// isMonoforum() ? monoforumLink() : nullptr
+	[[nodiscard]] ChannelData *monoforumBroadcast() const;
+
+	// isMonoforum() ? nullptr : monoforumLink()
+	[[nodiscard]] ChannelData *broadcastMonoforum() const;
 
 	void updateFull();
 	void updateFullForced();
@@ -327,13 +355,26 @@ public:
 		const ImageLocation &location,
 		bool hasVideo);
 	void setUserpicPhoto(const MTPPhoto &data);
+
 	void paintUserpic(
 		Painter &p,
 		Ui::PeerUserpicView &view,
-		int x,
-		int y,
-		int size,
-		bool forceCircle = false) const;
+		PaintUserpicContext context) const;
+	void paintUserpic(
+			Painter &p,
+			Ui::PeerUserpicView &view,
+			int x,
+			int y,
+			int size,
+			bool forceCircle = false) const {
+		paintUserpic(p, view, {
+			.position = { x, y },
+			.size = size,
+			.shape = (forceCircle
+				? Ui::PeerUserpicShape::Circle
+				: Ui::PeerUserpicShape::Auto),
+		});
+	}
 	void paintUserpicLeft(
 			Painter &p,
 			Ui::PeerUserpicView &view,
@@ -390,11 +431,16 @@ public:
 	[[nodiscard]] bool canPinMessages() const;
 	[[nodiscard]] bool canEditMessagesIndefinitely() const;
 	[[nodiscard]] bool canCreatePolls() const;
+	[[nodiscard]] bool canCreateTodoLists() const;
 	[[nodiscard]] bool canCreateTopics() const;
 	[[nodiscard]] bool canManageTopics() const;
+	[[nodiscard]] bool canPostStories() const;
+	[[nodiscard]] bool canEditStories() const;
+	[[nodiscard]] bool canDeleteStories() const;
 	[[nodiscard]] bool canManageGifts() const;
 	[[nodiscard]] bool canTransferGifts() const;
 	[[nodiscard]] bool canExportChatHistory() const;
+	[[nodiscard]] bool autoTranslation() const;
 
 	// Returns true if about text was changed.
 	bool setAbout(const QString &newAbout);
@@ -484,8 +530,8 @@ public:
 	[[nodiscard]] Data::GroupCall *groupCall() const;
 	[[nodiscard]] PeerId groupCallDefaultJoinAs() const;
 
-	void setThemeEmoji(const QString &emoticon);
-	[[nodiscard]] const QString &themeEmoji() const;
+	void setThemeToken(const QString &token);
+	[[nodiscard]] const QString &themeToken() const;
 
 	void setWallPaper(
 		std::optional<Data::WallPaper> paper,
@@ -569,7 +615,7 @@ private:
 	uint8 _userpicHasVideo : 1 = 0;
 
 	QString _about;
-	QString _themeEmoticon;
+	QString _themeToken;
 	std::unique_ptr<Data::WallPaper> _wallPaper;
 
 };
@@ -582,10 +628,12 @@ void SetTopPinnedMessageId(
 [[nodiscard]] FullMsgId ResolveTopPinnedId(
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
+	PeerId monoforumPeerId,
 	PeerData *migrated = nullptr);
 [[nodiscard]] FullMsgId ResolveMinPinnedId(
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
+	PeerId monoforumPeerId,
 	PeerData *migrated = nullptr);
 
 } // namespace Data

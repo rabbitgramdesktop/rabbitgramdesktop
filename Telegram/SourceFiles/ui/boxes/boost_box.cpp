@@ -143,6 +143,7 @@ void AddFeaturesList(
 	const auto proj = &Ui::Text::RichLangValue;
 	const auto lowMax = std::max({
 		features.linkLogoLevel,
+		features.autotranslateLevel,
 		features.transcribeLevel,
 		features.emojiPackLevel,
 		features.emojiStatusLevel,
@@ -208,6 +209,11 @@ void AddFeaturesList(
 				st::boostFeatureCustomEmoji);
 		}
 		if (!group) {
+			if (i >= features.autotranslateLevel) {
+				add(
+					tr::lng_feature_autotranslate(proj),
+					st::boostFeatureAutoTranslate);
+			}
 			if (const auto j = features.linkStylesByLevel.find(i)
 				; j != end(features.linkStylesByLevel)) {
 				linkStyles += j->second;
@@ -445,7 +451,7 @@ void BoostBox(
 			: tr::lng_boost_channel_button();
 	}) | rpl::flatten_latest();
 
-	const auto button = box->addButton(rpl::duplicate(submit), [=] {
+	box->addButton(rpl::duplicate(submit), [=] {
 		if (state->submitted) {
 			return;
 		} else if (state->data.current().nextLevelBoosts > 0
@@ -513,17 +519,6 @@ void BoostBox(
 			box->closeBox();
 		}
 	});
-
-	rpl::combine(
-		std::move(submit),
-		box->widthValue()
-	) | rpl::start_with_next([=](const QString &, int width) {
-		const auto &padding = st::boostBox.buttonPadding;
-		button->resizeToWidth(width
-			- padding.left()
-			- padding.right());
-		button->moveToLeft(padding.left(), button->y());
-	}, button->lifetime());
 }
 
 object_ptr<Ui::RpWidget> MakeLinkLabel(
@@ -665,6 +660,8 @@ void AskBoostBox(
 		Fn<void()> startGiveaway) {
 	box->setWidth(st::boxWideWidth);
 	box->setStyle(st::boostBox);
+	box->setNoContentMargin(true);
+	box->addSkip(st::boxRowPadding.left());
 
 	FillBoostLimit(
 		BoxShowFinishes(box),
@@ -676,6 +673,8 @@ void AskBoostBox(
 
 	auto title = v::match(data.reason.data, [](AskBoostChannelColor) {
 		return tr::lng_boost_channel_title_color();
+	}, [](AskBoostAutotranslate) {
+		return tr::lng_boost_channel_title_autotranslate();
 	}, [](AskBoostWallpaper) {
 		return tr::lng_boost_channel_title_wallpaper();
 	}, [](AskBoostEmojiStatus) {
@@ -693,6 +692,11 @@ void AskBoostBox(
 	auto reasonText = v::match(data.reason.data, [&](
 			AskBoostChannelColor data) {
 		return tr::lng_boost_channel_needs_level_color(
+			lt_count,
+			rpl::single(float64(data.requiredLevel)),
+			Ui::Text::RichLangValue);
+	}, [&](AskBoostAutotranslate data) {
+		return tr::lng_boost_channel_needs_level_autotranslate(
 			lt_count,
 			rpl::single(float64(data.requiredLevel)),
 			Ui::Text::RichLangValue);
@@ -748,14 +752,16 @@ void AskBoostBox(
 			box,
 			std::move(title),
 			st::boostCenteredTitle),
-		st::boxRowPadding + QMargins(0, st::boostTitleSkip, 0, 0));
+		st::boxRowPadding + QMargins(0, st::boostTitleSkip, 0, 0),
+		style::al_top);
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
 			std::move(text),
 			st::boostText),
 		(st::boxRowPadding
-			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)));
+			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)),
+		style::al_top);
 
 	auto stats = object_ptr<Ui::IconButton>(box, st::boostLinkStatsButton);
 	stats->setClickedCallback(openStatistics);
@@ -766,21 +772,17 @@ void AskBoostBox(
 		box->uiShow(),
 		std::move(stats)));
 
+	AddFeaturesList(
+		box->verticalLayout(),
+		data.features,
+		data.boost.level + (data.boost.nextLevelBoosts ? 1 : 0),
+		data.group);
+
 	auto submit = tr::lng_boost_channel_ask_button();
-	const auto button = box->addButton(rpl::duplicate(submit), [=] {
+	box->addButton(rpl::duplicate(submit), [=] {
 		QGuiApplication::clipboard()->setText(data.link);
 		box->uiShow()->showToast(tr::lng_username_copied(tr::now));
 	});
-	rpl::combine(
-		std::move(submit),
-		box->widthValue()
-	) | rpl::start_with_next([=](const QString &, int width) {
-		const auto &padding = st::boostBox.buttonPadding;
-		button->resizeToWidth(width
-			- padding.left()
-			- padding.right());
-		button->moveToLeft(padding.left(), button->y());
-	}, button->lifetime());
 }
 
 void FillBoostLimit(

@@ -202,8 +202,8 @@ Line::Line(
 : Line(
 	parent,
 	st,
-	max ? textFactory(max) : QString(),
-	min ? textFactory(min) : QString(),
+	max ? textFactory(max).counter : QString(),
+	min ? textFactory(min).counter : QString(),
 	ratio) {
 }
 
@@ -372,7 +372,6 @@ void Line::recache(const QSize &s) {
 		}
 	};
 	const auto textPadding = st::premiumLineTextSkip;
-	const auto textTop = (s.height() - _leftLabel.minHeight()) / 2;
 	const auto rwidth = _rightLabel.maxWidth();
 	const auto pen = [&](bool gradient) {
 		return gradient ? st::activeButtonFg : _st.nonPremiumFg;
@@ -385,8 +384,10 @@ void Line::recache(const QSize &s) {
 		if (_dynamic) {
 			p.setFont(st::normalFont);
 			p.setPen(pen(_st.gradientFromLeft));
-			_leftLabel.drawLeft(p, textPadding, textTop, width, width);
-			_rightLabel.drawRight(p, textPadding, textTop, rwidth, width);
+			const auto leftTop = (s.height() - _leftLabel.minHeight()) / 2;
+			_leftLabel.drawLeft(p, textPadding, leftTop, width, width);
+			const auto rightTop = (s.height() - _rightLabel.minHeight()) / 2;
+			_rightLabel.drawRight(p, textPadding, rightTop, rwidth, width);
 		}
 		_leftPixmap = std::move(leftPixmap);
 	}
@@ -398,8 +399,10 @@ void Line::recache(const QSize &s) {
 		if (_dynamic) {
 			p.setFont(st::normalFont);
 			p.setPen(pen(!_st.gradientFromLeft));
-			_leftLabel.drawLeft(p, textPadding, textTop, width, width);
-			_rightLabel.drawRight(p, textPadding, textTop, rwidth, width);
+			const auto leftTop = (s.height() - _leftLabel.minHeight()) / 2;
+			_leftLabel.drawLeft(p, textPadding, leftTop, width, width);
+			const auto rightTop = (s.height() - _rightLabel.minHeight()) / 2;
+			_rightLabel.drawRight(p, textPadding, rightTop, rwidth, width);
 		}
 		_rightPixmap = std::move(rightPixmap);
 	}
@@ -493,8 +496,8 @@ void AddLimitRow(
 	AddLimitRow(
 		parent,
 		st,
-		max ? factory(max) : QString(),
-		min ? factory(min) : QString(),
+		max ? factory(max).counter : QString(),
+		min ? factory(min).counter : QString(),
 		ratio);
 }
 
@@ -504,9 +507,17 @@ void AddLimitRow(
 		LimitRowLabels labels,
 		rpl::producer<LimitRowState> state,
 		const style::margins &padding) {
-	parent->add(
+	const auto color = std::move(labels.activeLineBg);
+	const auto line = parent->add(
 		object_ptr<Line>(parent, st, std::move(labels), std::move(state)),
 		padding);
+	if (color) {
+		line->setColorOverride(color());
+
+		style::PaletteChanged() | rpl::start_with_next([=] {
+			line->setColorOverride(color());
+		}, line->lifetime());
+	}
 }
 
 void AddAccountsRow(
@@ -774,9 +785,9 @@ void ShowListBox(
 		if (entry.leftNumber || entry.rightNumber) {
 			auto factory = [=, text = ProcessTextFactory({})](int n) {
 				if (entry.customRightText && (n == entry.rightNumber)) {
-					return *entry.customRightText;
+					return Ui::Premium::BubbleText{ *entry.customRightText };
 				} else {
-					return text(n);
+					return Ui::Premium::BubbleText{ text(n) };
 				}
 			};
 			const auto limitRow = content->add(
@@ -927,9 +938,19 @@ void AddGiftOptions(
 		const auto costPerMonthIcon = info.costPerMonth.startsWith(kStar)
 			? GenerateStars(costPerMonthFont->height, 1)
 			: QImage();
-		const auto costPerMonthText = costPerMonthIcon.isNull()
-			? info.costPerMonth
-			: removedStar(info.costPerMonth);
+		const auto costPerMonthLabel
+			= row->lifetime().make_state<Ui::Text::String>();
+		costPerMonthLabel->setMarkedText(
+			st::shareBoxListItem.nameStyle,
+			TextWithEntities()
+				.append(Ui::Text::Wrapped(
+					TextWithEntities{ info.costNoDiscount },
+					EntityType::StrikeOut))
+				.append(' ')
+				.append(costPerMonthIcon.isNull()
+					? info.costPerMonth
+					: removedStar(info.costPerMonth)));
+
 		const auto costTotalEntry = [&] {
 			if (!info.costTotal.startsWith(kStar)) {
 				return QImage();
@@ -1049,12 +1070,26 @@ void AddGiftOptions(
 					0);
 			p.setPen(st::windowSubTextFg);
 			p.setFont(costPerMonthFont);
-			const auto perMonthLeft = costPerMonthFont->spacew
-				+ costPerMonthIcon.width() / style::DevicePixelRatio();
-			p.drawText(
-				perRect.translated(perMonthLeft, 0),
-				costPerMonthText,
-				style::al_left);
+
+			{
+				const auto left = costPerMonthIcon.isNull()
+					? 0
+					: (costPerMonthFont->spacew
+						+ costPerMonthIcon.width()
+							/ style::DevicePixelRatio());
+				const auto costTotalWidth = costTotalFont->width(
+					info.costTotal);
+				const auto pos = perRect.translated(left, 0).topLeft();
+				const auto availableWidth = row->width()
+					- pos.x()
+					- costTotalWidth;
+				costPerMonthLabel->draw(p, {
+					.position = pos,
+					.outerWidth = availableWidth,
+					.availableWidth = availableWidth,
+					.elisionLines = 1,
+				});
+			}
 			p.drawImage(perRect.topLeft(), costPerMonthIcon);
 
 			const auto totalRect = row->rect()

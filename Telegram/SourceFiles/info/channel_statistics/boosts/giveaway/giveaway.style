@@ -153,6 +153,7 @@ giveawayGiftCodeFooterMargin: margins(0px, 9px, 0px, 4px);
 giveawayGiftCodeBox: Box(defaultBox) {
 	buttonPadding: margins(22px, 11px, 22px, 22px);
 	buttonHeight: 42px;
+	buttonWide: true;
 	button: RoundButton(defaultActiveButton) {
 		height: 42px;
 		textTop: 12px;
@@ -205,11 +206,6 @@ starConvertButtonLoading: InfiniteRadialAnimation(startGiveawayButtonLoading) {
 
 starGiftSmallButton: defaultTableSmallButton;
 darkGiftCodeBox: Box(giveawayGiftCodeBox) {
-	button: RoundButton(defaultActiveButton) {
-		height: 42px;
-		textTop: 12px;
-		style: semiboldTextStyle;
-	}
 	bg: groupCallMembersBg;
 	title: FlatLabel(boxTitle) {
 		textFg: groupCallMembersFg;
@@ -218,9 +214,12 @@ darkGiftCodeBox: Box(giveawayGiftCodeBox) {
 }
 darkGiftLink: icon {{ "menu/copy", groupCallMembersFg }};
 darkGiftShare: icon {{ "menu/share", groupCallMembersFg }};
+darkGiftTheme: icon {{ "menu/colors", groupCallMembersFg }};
 darkGiftTransfer: icon {{ "chat/input_replace", groupCallMembersFg }};
 darkGiftNftWear: icon {{ "menu/nft_wear", groupCallMembersFg }};
 darkGiftNftTakeOff: icon {{ "menu/nft_takeoff", groupCallMembersFg }};
+darkGiftNftResell: icon {{ "menu/tag_sell", groupCallMembersFg }};
+darkGiftNftUnlist: icon {{ "menu/tag_remove", groupCallMembersFg }};
 darkGiftHide: icon {{ "menu/stealth", groupCallMembersFg }};
 darkGiftShow: icon {{ "menu/show_in_chat", groupCallMembersFg }};
 darkGiftPin: icon {{ "menu/pin", groupCallMembersFg }};
@@ -258,4 +257,14 @@ darkGiftTableValueMultiline: FlatLabel(giveawayGiftCodeValueMultiline) {
 darkGiftTableMessage: FlatLabel(giveawayGiftMessage) {
 	textFg: groupCallMembersFg;
 	palette: darkGiftPalette;
+}
+darkGiftCodeLink: FlatLabel(giveawayGiftCodeLink) {
+	textFg: mediaviewMenuFg;
+}
+darkGiftBoxClose: IconButton(boxTitleClose) {
+	icon: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
+	iconOver: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: groupCallMembersBgOver;
+	}
 }

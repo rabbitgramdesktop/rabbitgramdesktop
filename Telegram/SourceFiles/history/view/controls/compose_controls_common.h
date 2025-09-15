@@ -40,6 +40,7 @@ enum class WriteRestrictionType {
 	None,
 	Rights,
 	PremiumRequired,
+	Frozen,
 };
 
 struct WriteRestriction {
@@ -65,6 +66,7 @@ struct WriteRestriction {
 struct SetHistoryArgs {
 	required<History*> history;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 	Fn<bool()> showSlowmodeError;
 	Fn<Api::SendAction()> sendActionFactory;
 	rpl::producer<int> slowmodeSecondsLeft;

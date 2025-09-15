@@ -1,3 +1,175 @@
+6.1.3 (06.09.25)
+
+- Fix dead keys / alt combinations / input methods issues.
+
+6.1.2 (02.09.25)
+
+- Close selected chat in Ctrl+Tab chat switch by 'Q'.
+- Auto-split pasted multiple lines to checklist task creation.
+- Fix color picker in userpic builder.
+
+6.1.1 (01.09.25)
+
+- Ctrl+Tab / Ctrl+Shift+Tab collect chats on every launch.
+- Fix Ctrl+Tab / Ctrl+Shift+Tab shortcut override.
+- Fix possible crashes in saved music.
+- Fix webview error label alignment.
+
+6.1 (31.08.25)
+
+- Music on Profiles.
+- Gift Themes.
+- Gift Value Information.
+- Upgrading Gifts for Other Users.
+
+6.0.3 beta (22.08.25)
+
+- Ctrl+Tab / Ctrl+Shift+Tab for last opened chats switching.
+- New topic dividers for groups with topics and tabs.
+- Adjust volume of notification sounds.
+- Show stars required for the next rating level.
+- IV support on Linux (in case WebView works).
+
+6.0.2 (01.08.25)
+
+- Improve design of profile stars rating.
+
+6.0.1 (01.08.25)
+
+- Fix crashing on Windows 7.
+
+6.0 (31.07.25)
+
+- Public Post Search.
+- Story Albums.
+- Gift Collections.
+- Profile Rating.
+
+5.16.6 (25.07.25)
+
+- Fix bad layout in box buttons.
+- Fix several problems in gift collections.
+
+5.16.5 (23.07.25)
+
+- Age verification support.
+
+5.16.4 (11.07.25)
+
+- Fix problem with negative unread counters.
+- Fix stars values display in statistics.
+- Fix crash in messages fee disabling.
+
+5.16.3 (08.07.25)
+
+- Allow removing / charging fee in channel direct messages.
+- Don't offer creating checklists in channels.
+- Support author channel in gifts.
+
+5.16.2 (04.07.25)
+
+- Fix crash in some checklists.
+- Fix problems with some private chats message sending.
+- Fix chats list preview for rejected/balance-low suggestions.
+
+5.16.1 (02.07.25)
+
+- Fix inline keyboard updating in bot messages.
+- Fix possible crash in fast chat switching.
+- Different minor fixes.
+
+5.16 (01.07.25)
+
+- Create private and group checklists.
+- Suggest Posts in Channels.
+- Monetizing via Suggested Posts.
+
+5.15.4 (12.06.25)
+
+- Fix updating messages in Saved Messages subchats.
+- Fix possible issues with mouse cursor on Linux.
+
+5.15.3 (09.06.25)
+
+- Fix new contact top bar appearance.
+- Remove change photo button for channel direct messages.
+
+5.15.2 (05.06.25)
+
+- Fix sending messages in new forum layout.
+- Add statistics for user stars.
+
+5.15.1 (05.06.25)
+
+- Fix launch on Windows 7.
+- Fix launch on older Linux distributions.
+- Fix crash in group chat message right click.
+- Fix unread counters in channel direct messages.
+- Don't generate "User joined" message in channel direct messages.
+- Fix some other glitches in new forums and channel direct messages.
+
+5.15 (04.06.25)
+
+- Send Direct Messages to Channels.
+- Enable New Tab Layout for Topics.
+- Create Polls with Up To 12 Options.
+
+5.14.3 (18.05.25)
+
+- Fix stale birthday suggestions removing.
+- Fix notification click opening a new window.
+
+5.14.2 (08.05.25)
+
+- Buy Rare Gifts in the Marketplace.
+- Sell Your Gifts for Stars.
+- Set Your Channel to Auto-Translate.
+
+5.14.1 (01.05.25)
+
+- Fix launching on Windows 7.
+
+5.14 (01.05.25)
+
+- Secure Group Calls Made Easy.
+- Automated Business Accounts.
+- New Gifts Settings.
+
+5.13.1 (26.03.25)
+
+- Fix crash in group/channel stories.
+
+5.13 (26.03.25)
+
+- Allow transferring my unique gifts from Send Gift section.
+- Edit type of gifts you accept in Settings > Privacy and Security.
+- Swipe navigation using swipe gesture on touchpads / touchscreens.
+- Choose chat list quick action for swipe or middle click.
+
+5.12.6 beta (20.03.25)
+
+- Allow customizing chats list swipe left action.
+- Fix custom emoji in poll results view.
+- Fix crash in main menu swipe closing.
+
+5.12.5 beta (14.03.25)
+
+- Support swipe navigation on touchscreens.
+- Close main menu by swipe navigation.
+
+5.12.4 beta (12.03.25)
+
+- Touchpad swipe back to go back in navigation history.
+- Touchpad swipe between folders if they're horizontal.
+- Out-of-the-box monochrome tray icon on Linux.
+- Icons telegram{,{,-attention,-mute}-panel} are renamed
+to org.telegram.desktop{,{,-attention,-mute}-symbolic} for
+unified icon lookup in multiple (sometimes sandboxed) builds
+and GTK icon recolorization support.
+- Snap package got icon theming support,
+the icon names are snap.telegram-desktop.{,{,-attention,-mute}-symbolic}
+(notice the name ends with a dot in case of no suffix!).
+
 5.12.3 (10.03.25)
 
 - Fix a couple more crashes.

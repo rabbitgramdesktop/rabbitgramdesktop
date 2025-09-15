@@ -383,9 +383,11 @@ MTPInputInvoice Form::inputInvoice() const {
 		}
 		return MTP_inputInvoiceStars(
 			MTP_inputStorePaymentStarsTopup(
+				MTP_flags(0),
 				MTP_long(credits->credits),
 				MTP_string(credits->currency),
-				MTP_long(credits->amount)));
+				MTP_long(credits->amount),
+				MTPInputPeer()));
 	} else if (const auto gift = std::get_if<InvoiceStarGift>(&_id.value)) {
 		using Flag = MTPDinputInvoiceStarGift::Flag;
 		return MTP_inputInvoiceStarGift(
@@ -531,6 +533,7 @@ void Form::requestForm() {
 				.invoice = invoice,
 				.inputInvoice = inputInvoice(),
 				.starGiftLimitedCount = gift ? gift->limitedCount : 0,
+				.starGiftPerUserLimit = gift ? gift->perUserLimit : 0,
 				.starGiftForm = true,
 			};
 			_updates.fire(CreditsPaymentStarted{ .data = formData });
@@ -631,7 +634,7 @@ void Form::processReceipt(const MTPDpayments_paymentReceiptStars &data) {
 				ImageLocation())
 			: nullptr,
 		.peerId = peerFromUser(data.vbot_id().v),
-		.credits = StarsAmount(data.vtotal_amount().v),
+		.credits = CreditsAmount(data.vtotal_amount().v),
 		.date = data.vdate().v,
 	};
 	_updates.fire(CreditsReceiptReady{ .data = receiptData });

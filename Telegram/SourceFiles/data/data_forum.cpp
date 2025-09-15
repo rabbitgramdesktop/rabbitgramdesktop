@@ -7,12 +7,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "data/data_forum.h"
 
+#include "data/components/recent_peers.h"
 #include "data/data_channel.h"
 #include "data/data_histories.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_forum_icons.h"
 #include "data/data_forum_topic.h"
+#include "data/data_replies_list.h"
 #include "data/notify/data_notify_settings.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -48,7 +50,6 @@ Forum::Forum(not_null<History*> history)
 , _topicsList(&session(), {}, owner().maxPinnedChatsLimitValue(this)) {
 	Expects(_history->peer->isChannel());
 
-
 	if (_history->inChatList()) {
 		preloadTopics();
 	}
@@ -73,8 +74,11 @@ Forum::~Forum() {
 	auto &changes = session().changes();
 	const auto peerId = _history->peer->id;
 	for (const auto &[rootId, topic] : _topics) {
-		storage.unload(Storage::SharedMediaUnloadThread(peerId, rootId));
-		_history->setForwardDraft(rootId, {});
+		storage.unload(Storage::SharedMediaUnloadThread(
+			peerId,
+			rootId,
+			PeerId()));
+		_history->setForwardDraft(rootId, PeerId(), {});
 
 		const auto raw = topic.get();
 		changes.topicRemoved(raw);
@@ -176,34 +180,40 @@ void Forum::applyTopicDeleted(MsgId rootId) {
 	_topicsDeleted.emplace(rootId);
 
 	const auto i = _topics.find(rootId);
-	if (i != end(_topics)) {
-		const auto raw = i->second.get();
-		Core::App().notifications().clearFromTopic(raw);
-		owner().removeChatListEntry(raw);
-
-		if (ranges::contains(_lastTopics, not_null(raw))) {
-			reorderLastTopics();
-		}
-
-		_topicDestroyed.fire(raw);
-		session().changes().topicUpdated(
-			raw,
-			Data::TopicUpdate::Flag::Destroyed);
-		session().changes().entryUpdated(
-			raw,
-			Data::EntryUpdate::Flag::Destroyed);
-		_topics.erase(i);
-
-		_history->destroyMessagesByTopic(rootId);
-		session().storage().unload(Storage::SharedMediaUnloadThread(
-			_history->peer->id,
-			rootId));
-		_history->setForwardDraft(rootId, {});
+	if (i == end(_topics)) {
+		return;
 	}
+	const auto raw = i->second.get();
+	Core::App().notifications().clearFromTopic(raw);
+	owner().removeChatListEntry(raw);
+
+	if (ranges::contains(_lastTopics, not_null(raw))) {
+		reorderLastTopics();
+	}
+
+	if (_activeSubsectionTopic == raw) {
+		_activeSubsectionTopic = nullptr;
+	}
+	_topicDestroyed.fire(raw);
+	_history->session().recentPeers().chatOpenRemove(raw);
+	session().changes().topicUpdated(
+		raw,
+		Data::TopicUpdate::Flag::Destroyed);
+	session().changes().entryUpdated(
+		raw,
+		Data::EntryUpdate::Flag::Destroyed);
+	_topics.erase(i);
+
+	_history->destroyMessagesByTopic(rootId);
+	session().storage().unload(Storage::SharedMediaUnloadThread(
+		_history->peer->id,
+		rootId,
+		PeerId()));
+	_history->setForwardDraft(rootId, PeerId(), {});
 }
 
 void Forum::reorderLastTopics() {
-	// We want first kShowChatNamesCount histories, by last message date.
+	// We want first kShowTopicNamesCount histories, by last message date.
 	const auto pred = [](not_null<ForumTopic*> a, not_null<ForumTopic*> b) {
 		const auto aItem = a->chatListMessage();
 		const auto bItem = b->chatListMessage();
@@ -253,6 +263,47 @@ void Forum::recentTopicsInvalidate(not_null<ForumTopic*> topic) {
 
 const std::vector<not_null<ForumTopic*>> &Forum::recentTopics() const {
 	return _lastTopics;
+}
+
+void Forum::saveActiveSubsectionThread(not_null<Thread*> thread) {
+	if (const auto topic = thread->asTopic()) {
+		Assert(topic->forum() == this);
+		_activeSubsectionTopic = topic->creating() ? nullptr : topic;
+	} else {
+		Assert(thread == history());
+		_activeSubsectionTopic = nullptr;
+	}
+}
+
+Thread *Forum::activeSubsectionThread() const {
+	return _activeSubsectionTopic;
+}
+
+void Forum::markUnreadCountsUnknown(MsgId readTillId) {
+	if (!channel()->useSubsectionTabs()) {
+		return;
+	}
+	for (const auto &[rootId, topic] : _topics) {
+		const auto replies = topic->replies();
+		if (replies->unreadCountCurrent() > 0) {
+			replies->setInboxReadTill(readTillId, std::nullopt);
+		}
+	}
+}
+
+void Forum::updateUnreadCounts(
+		MsgId readTillId,
+		const base::flat_map<not_null<ForumTopic*>, int> &counts) {
+	if (!channel()->useSubsectionTabs()) {
+		return;
+	}
+	for (const auto &[rootId, topic] : _topics) {
+		const auto raw = topic.get();
+		const auto replies = raw->replies();
+		const auto i = counts.find(raw);
+		const auto count = (i != end(counts)) ? i->second : 0;
+		replies->setInboxReadTill(readTillId, count);
+	}
 }
 
 void Forum::listMessageChanged(HistoryItem *from, HistoryItem *to) {

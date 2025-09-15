@@ -159,6 +159,8 @@ WebPageType ParseWebPageType(
 		return WebPageType::VoiceChat;
 	} else if (type == u"telegram_livestream"_q) {
 		return WebPageType::Livestream;
+	} else if (type == u"telegram_call"_q) {
+		return WebPageType::ConferenceCall;
 	} else if (type == u"telegram_user"_q) {
 		return WebPageType::User;
 	} else if (type == u"telegram_botapp"_q) {
@@ -171,6 +173,10 @@ WebPageType ParseWebPageType(
 		return WebPageType::Giftcode;
 	} else if (type == u"telegram_stickerset"_q) {
 		return WebPageType::StickerSet;
+	} else if (type == u"telegram_story_album"_q) {
+		return WebPageType::StoryAlbum;
+	} else if (type == u"telegram_collection"_q) {
+		return WebPageType::GiftCollection;
 	} else if (hasIV) {
 		return WebPageType::ArticleWithIV;
 	} else {
@@ -370,7 +376,7 @@ void WebPageData::ApplyChanges(
 		}, [&](const auto &) {
 		});
 	}
-	session->data().sendWebPageGamePollNotifications();
+	session->data().sendWebPageGamePollTodoListNotifications();
 }
 
 QString WebPageData::displayedSiteName() const {

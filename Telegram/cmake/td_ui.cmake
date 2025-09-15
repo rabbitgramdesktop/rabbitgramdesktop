@@ -27,6 +27,7 @@ set(style_files
     info/info.style
     info/channel_statistics/boosts/giveaway/giveaway.style
     info/channel_statistics/earn/channel_earn.style
+    info/profile/info_levels.style
     info/userpic/info_userpic_builder.style
     intro/intro.style
     iv/iv.style
@@ -59,6 +60,8 @@ PRIVATE
 
     boxes/peers/edit_peer_history_visibility_box.cpp
     boxes/peers/edit_peer_history_visibility_box.h
+    boxes/peers/toggle_topics_box.cpp
+    boxes/peers/toggle_topics_box.h
 
     calls/group/ui/calls_group_recording_box.cpp
     calls/group/ui/calls_group_recording_box.h
@@ -86,6 +89,7 @@ PRIVATE
 
     data/raw/raw_countries_bounds.cpp
     data/raw/raw_countries_bounds.h
+    data/data_authorization.h
     data/data_birthday.cpp
     data/data_birthday.h
     data/data_channel_earn.h
@@ -102,8 +106,14 @@ PRIVATE
     dialogs/ui/chat_search_empty.h
     dialogs/ui/chat_search_in.cpp
     dialogs/ui/chat_search_in.h
+    dialogs/ui/dialogs_quick_action_context.h
+    dialogs/ui/dialogs_quick_action.h
     dialogs/ui/dialogs_stories_list.cpp
     dialogs/ui/dialogs_stories_list.h
+    dialogs/ui/dialogs_top_bar_suggestion_content.cpp
+    dialogs/ui/dialogs_top_bar_suggestion_content.h
+    dialogs/ui/posts_search_intro.cpp
+    dialogs/ui/posts_search_intro.h
     dialogs/ui/top_peers_strip.cpp
     dialogs/ui/top_peers_strip.h
 
@@ -130,9 +140,6 @@ PRIVATE
     history/admin_log/history_admin_log_filter_value.h
     history/history_view_top_toast.cpp
     history/history_view_top_toast.h
-    history/history_view_swipe.cpp
-    history/history_view_swipe.h
-    history/history_view_swipe_data.h
     history/view/controls/history_view_characters_limit.cpp
     history/view/controls/history_view_characters_limit.h
     history/view/controls/history_view_voice_record_button.cpp
@@ -140,6 +147,8 @@ PRIVATE
 
     info/profile/info_profile_icon.cpp
     info/profile/info_profile_icon.h
+    info/profile/info_profile_music_button.cpp
+    info/profile/info_profile_music_button.h
     info/userpic/info_userpic_bubble_wrap.cpp
     info/userpic/info_userpic_bubble_wrap.h
     info/userpic/info_userpic_color_circle_button.cpp
@@ -187,8 +196,12 @@ PRIVATE
 
     media/media_common.h
 
+    menu/gift_resale_filter.cpp
+    menu/gift_resale_filter.h
     menu/menu_check_item.cpp
     menu/menu_check_item.h
+    menu/menu_item_rate_transcribe.cpp
+    menu/menu_item_rate_transcribe.h
     menu/menu_ttl.cpp
     menu/menu_ttl.h
 
@@ -357,6 +370,8 @@ PRIVATE
     ui/chat/pinned_bar.h
     ui/chat/requests_bar.cpp
     ui/chat/requests_bar.h
+    ui/controls/button_labels.cpp
+    ui/controls/button_labels.h
     ui/controls/call_mute_button.cpp
     ui/controls/call_mute_button.h
     ui/controls/chat_service_checkbox.cpp
@@ -377,14 +392,26 @@ PRIVATE
     ui/controls/invite_link_label.h
     ui/controls/peer_list_dummy.cpp
     ui/controls/peer_list_dummy.h
+    ui/controls/round_video_recorder_data.h
     ui/controls/round_video_recorder.cpp
     ui/controls/round_video_recorder.h
     ui/controls/send_as_button.cpp
     ui/controls/send_as_button.h
     ui/controls/send_button.cpp
     ui/controls/send_button.h
+    ui/controls/stars_rating.cpp
+    ui/controls/stars_rating.h
+    ui/controls/subsection_tabs_slider.cpp
+    ui/controls/subsection_tabs_slider.h
+    ui/controls/sub_tabs.cpp
+    ui/controls/sub_tabs.h
+    ui/controls/swipe_handler.cpp
+    ui/controls/swipe_handler.h
+    ui/controls/swipe_handler_data.h
     ui/controls/tabbed_search.cpp
     ui/controls/tabbed_search.h
+    ui/controls/ton_common.cpp
+    ui/controls/ton_common.h
     ui/controls/who_reacted_context_action.cpp
     ui/controls/who_reacted_context_action.h
     ui/controls/window_outdated_bar.cpp
@@ -424,6 +451,8 @@ PRIVATE
     ui/text/format_song_name.h
     ui/text/format_values.cpp
     ui/text/format_values.h
+    ui/text/text_lottie_custom_emoji.cpp
+    ui/text/text_lottie_custom_emoji.h
     ui/text/text_options.cpp
     ui/text/text_options.h
 
@@ -519,6 +548,5 @@ PRIVATE
     desktop-app::lib_spellcheck
     desktop-app::lib_stripe
     desktop-app::external_kcoreaddons
-    desktop-app::external_openh264
     desktop-app::external_webrtc
 )

@@ -317,7 +317,7 @@ public:
 
 };
 
-class BirthdayPrivacyController final : public EditPrivacyController {
+class BirthdayPrivacyController : public EditPrivacyController {
 public:
 	using Option = EditPrivacyBox::Option;
 	using Exception = EditPrivacyBox::Exception;
@@ -355,6 +355,27 @@ public:
 		Exception exception) const override;
 	rpl::producer<QString> exceptionsDescription() const override;
 	bool allowMiniAppsToggle(Exception exception) const override;
+
+	object_ptr<Ui::RpWidget> setupAboveWidget(
+		not_null<Window::SessionController*> controller,
+		not_null<QWidget*> parent,
+		rpl::producer<Option> optionValue,
+		not_null<QWidget*> outerContainer) override;
+	object_ptr<Ui::RpWidget> setupBelowWidget(
+		not_null<Window::SessionController*> controller,
+		not_null<QWidget*> parent,
+		rpl::producer<Option> option) override;
+
+	void saveAdditional() override;
+
+private:
+	struct AdditionalState;
+
+	void ensureAdditionalState(
+		not_null<Window::SessionController*> controller,
+		rpl::lifetime &on);
+
+	AdditionalState *_state = nullptr;
 
 };
 

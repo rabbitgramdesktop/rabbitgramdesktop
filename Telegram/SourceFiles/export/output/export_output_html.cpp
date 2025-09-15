@@ -621,7 +621,14 @@ private:
 	[[nodiscard]] QByteArray pushPhotoMedia(
 		const Data::Photo &data,
 		const QString &basePath);
-	[[nodiscard]] QByteArray pushPoll(const Data::Poll &data);
+	[[nodiscard]] QByteArray pushPoll(
+		const Data::Poll &data,
+		const QString &internalLinksDomain,
+		const QString &relativeLinkBase);
+	[[nodiscard]] QByteArray pushTodoList(
+		const Data::TodoList &data,
+		const QString &internalLinksDomain,
+		const QString &relativeLinkBase);
 	[[nodiscard]] QByteArray pushGiveaway(
 		const PeersMap &peers,
 		const Data::GiveawayStart &data);
@@ -1346,16 +1353,16 @@ auto HtmlWriter::Wrap::pushMessage(
 			+ " refunded back "
 			+ amount;
 		return result;
-	}, [&](const ActionGiftStars &data) {
-		if (!data.credits || data.cost.isEmpty()) {
+	}, [&](const ActionGiftCredits &data) {
+		if (!data.amount || data.cost.isEmpty()) {
 			return serviceFrom + " sent you a gift.";
 		}
 		return serviceFrom
 			+ " sent you a gift for "
 			+ data.cost
 			+ ": "
-			+ QString::number(data.credits).toUtf8()
-			+ " Telegram Stars.";
+			+ QString::number(data.amount.value()).toUtf8()
+			+ (data.amount.ton() ? " TON." : " Telegram Stars.");
 	}, [&](const ActionPrizeStars &data) {
 		return "You won a prize in a giveaway organized by "
 			+ peers.wrapPeerName(data.peerId)
@@ -1367,6 +1374,107 @@ auto HtmlWriter::Wrap::pushMessage(
 			+ " sent you a gift of "
 			+ QByteArray::number(data.stars)
 			+ " Telegram Stars.";
+	}, [&](const ActionPaidMessagesRefunded &data) {
+		auto result = message.out
+			? ("You refunded "
+				+ QString::number(data.stars).toUtf8()
+				+ " Stars for "
+				+ QString::number(data.messages).toUtf8()
+				+ " messages to "
+				+ peers.wrapPeerName(dialog.peerId))
+			: (peers.wrapPeerName(dialog.peerId)
+				+ " refunded "
+				+ QString::number(data.stars).toUtf8()
+				+ " Stars for "
+				+ QString::number(data.messages).toUtf8()
+				+ " messages to you");
+		return result;
+	}, [&](const ActionPaidMessagesPrice &data) {
+		if (isChannel) {
+			auto result = !data.broadcastAllowed
+				? "Direct messages were disabled."
+				: ("Price per direct message changed to "
+					+ QString::number(data.stars).toUtf8()
+					+ " Telegram Stars.");
+			return result;
+		}
+		auto result = "Price per message changed to "
+			+ QString::number(data.stars).toUtf8()
+			+ " Telegram Stars.";
+		return result;
+	}, [&](const ActionTodoCompletions &data) {
+		auto completed = QByteArrayList();
+		for (const auto index : data.completed) {
+			completed.push_back(QByteArray::number(index));
+		}
+		auto incompleted = QByteArrayList();
+		for (const auto index : data.incompleted) {
+			incompleted.push_back(QByteArray::number(index));
+		}
+		const auto list = [](const QByteArrayList &v) {
+			return v.isEmpty()
+				? QByteArray()
+				: (v.size() > 1)
+				? (v.mid(0, v.size() - 1).join(", ") + " and " + v.back())
+				: v.front();
+		};
+		if (completed.isEmpty() && !incompleted.isEmpty()) {
+			return serviceFrom
+				+ " marked "
+				+ list(incompleted)
+				+ " as not done yet in "
+				+ wrapReplyToLink("this todo list") + ".";
+		} else if (!completed.isEmpty() && incompleted.isEmpty()) {
+			return serviceFrom
+				+ " marked "
+				+ list(completed)
+				+ " as done in "
+				+ wrapReplyToLink("this todo list") + ".";
+		}
+		return serviceFrom
+			+ " marked "
+			+ list(completed)
+			+ " as done and "
+			+ list(incompleted)
+			+ " as not done yet in "
+			+ wrapReplyToLink("this todo list") + ".";
+	}, [&](const ActionTodoAppendTasks &data) {
+		auto tasks = QByteArrayList();
+		for (const auto &task : data.items) {
+			tasks.push_back("&quot;"
+				+ FormatText(task.text, internalLinksDomain, _base)
+				+ "&quot;");
+		}
+		return serviceFrom + " added tasks: " + tasks.join(", ");
+	}, [&](const ActionSuggestedPostApproval &data) {
+		return serviceFrom
+			+ (data.rejected ? " rejected " : " approved ")
+			+ "your suggested post"
+			+ (data.price
+				? (", for "
+					+ QString::number(data.price.value()).toUtf8()
+					+ (data.price.ton() ? " TON" : " stars"))
+				: "")
+			+ (data.scheduleDate
+				? (", "
+					+ FormatDateText(data.scheduleDate)
+					+ " at "
+					+ FormatTimeText(data.scheduleDate))
+				: "")
+			+ (data.rejectComment.isEmpty()
+				? "."
+				: (", with comment: &quot;"
+					+ SerializeString(data.rejectComment)
+					+ "&quot;"));
+	}, [&](const ActionSuggestedPostSuccess &data) {
+		return "The paid post was shown for 24 hours and "
+			+ QString::number(data.price.value()).toUtf8()
+			+ (data.price.ton() ? " TON" : " stars")
+			+ " were transferred to the channel.";
+	}, [&](const ActionSuggestedPostRefund &data) {
+		return QByteArray() + (data.payerInitiated
+			? "The user refunded the payment, post was deleted."
+			: "The admin deleted the post early, the payment was refunded.");
 	}, [](v::null_t) { return QByteArray(); });
 
 	if (!serviceText.isEmpty()) {
@@ -1560,7 +1668,9 @@ auto HtmlWriter::Wrap::pushMessage(
 		block.append(popTag());
 	}
 	if (!message.reactions.empty()) {
-		block.append(pushDiv("reactions"));
+		block.append(pushTag("span", {
+			{ "class", "reactions" },
+		}));
 		for (const auto &reaction : message.reactions) {
 			auto reactionClass = QByteArray("reaction");
 			for (const auto &recent : reaction.recent) {
@@ -1574,10 +1684,10 @@ auto HtmlWriter::Wrap::pushMessage(
 				reactionClass += " paid";
 			}
 
-			block.append(pushTag("div", {
+			block.append(pushTag("span", {
 				{ "class", reactionClass },
 			}));
-			block.append(pushTag("div", {
+			block.append(pushTag("span", {
 				{ "class", "emoji" },
 			}));
 			switch (reaction.type) {
@@ -1596,7 +1706,7 @@ auto HtmlWriter::Wrap::pushMessage(
 			}
 			block.append(popTag());
 			if (!reaction.recent.empty()) {
-				block.append(pushTag("div", {
+				block.append(pushTag("span", {
 					{ "class", "userpics" },
 				}));
 				for (const auto &recent : reaction.recent) {
@@ -1617,7 +1727,7 @@ auto HtmlWriter::Wrap::pushMessage(
 			}
 			if (reaction.recent.empty()
 				|| (reaction.count > reaction.recent.size())) {
-				block.append(pushTag("div", {
+				block.append(pushTag("span", {
 					{ "class", "count" },
 				}));
 				block.append(NumberToString(reaction.count));
@@ -1691,7 +1801,9 @@ QByteArray HtmlWriter::Wrap::pushMedia(
 		Assert(!message.media.ttl);
 		return pushPhotoMedia(*photo, basePath);
 	} else if (const auto poll = std::get_if<Poll>(&content)) {
-		return pushPoll(*poll);
+		return pushPoll(*poll, internalLinksDomain, _base);
+	} else if (const auto todo = std::get_if<TodoList>(&content)) {
+		return pushTodoList(*todo, internalLinksDomain, _base);
 	} else if (const auto giveaway = std::get_if<GiveawayStart>(&content)) {
 		return pushGiveaway(peers, *giveaway);
 	} else if (const auto giveaway = std::get_if<GiveawayResults>(&content)) {
@@ -1969,13 +2081,19 @@ QByteArray HtmlWriter::Wrap::pushPhotoMedia(
 	return result;
 }
 
-QByteArray HtmlWriter::Wrap::pushPoll(const Data::Poll &data) {
+QByteArray HtmlWriter::Wrap::pushPoll(
+		const Data::Poll &data,
+		const QString &internalLinksDomain,
+		const QString &relativeLinkBase) {
 	using namespace Data;
 
 	auto result = pushDiv("media_wrap clearfix");
 	result.append(pushDiv("media_poll"));
 	result.append(pushDiv("question bold"));
-	result.append(SerializeString(data.question));
+	result.append(FormatText(
+		data.question,
+		internalLinksDomain,
+		relativeLinkBase));
 	result.append(popTag());
 	result.append(pushDiv("details"));
 	if (data.closed) {
@@ -2006,12 +2124,46 @@ QByteArray HtmlWriter::Wrap::pushPoll(const Data::Poll &data) {
 	};
 	for (const auto &answer : data.answers) {
 		result.append(pushDiv("answer"));
-		result.append("- " + SerializeString(answer.text) + details(answer));
+		result.append("- "
+			+ FormatText(answer.text, internalLinksDomain, relativeLinkBase)
+			+ details(answer));
 		result.append(popTag());
 	}
 	result.append(pushDiv("total details	"));
 	result.append(votes(data.totalVotes));
 	result.append(popTag());
+	result.append(popTag());
+	result.append(popTag());
+	return result;
+}
+
+QByteArray HtmlWriter::Wrap::pushTodoList(
+		const Data::TodoList &data,
+		const QString &internalLinksDomain,
+		const QString &relativeLinkBase) {
+	using namespace Data;
+
+	auto result = pushDiv("media_wrap clearfix");
+	result.append(pushDiv("media_poll"));
+	result.append(pushDiv("question bold"));
+	result.append(FormatText(
+		data.title,
+		internalLinksDomain,
+		relativeLinkBase));
+	result.append(popTag());
+	result.append(pushDiv("details"));
+	result.append(SerializeString("To-do List"));
+	result.append(popTag());
+	const auto details = [&](const TodoListItem &item) {
+		return QByteArray(""); // #TODO todo
+	};
+	for (const auto &item : data.items) {
+		result.append(pushDiv("answer"));
+		result.append("- "
+			+ FormatText(item.text, internalLinksDomain, relativeLinkBase)
+			+ details(item));
+		result.append(popTag());
+	}
 	result.append(popTag());
 	result.append(popTag());
 	return result;
@@ -2254,16 +2406,20 @@ MediaData HtmlWriter::Wrap::prepareMediaData(
 	if (const auto call = std::get_if<ActionPhoneCall>(&action.content)) {
 		result.classes = "media_call";
 		result.title = peers.peer(message.out
-				? message.peerId
-				: message.selfId).name();
+			? message.peerId
+			: message.selfId).name();
 		result.status = [&] {
-			using Reason = ActionPhoneCall::DiscardReason;
-			const auto reason = call->discardReason;
-			if (message.out) {
-				return reason == Reason::Missed ? "Cancelled" : "Outgoing";
-			} else if (reason == Reason::Missed) {
+			using State = ActionPhoneCall::State;
+			const auto state = call->state;
+			if (state == State::Invitation) {
+				return "Invitation";
+			} else if (state == State::Active) {
+				return "Ongoing";
+			} else if (message.out) {
+				return (state == State::Missed) ? "Cancelled" : "Outgoing";
+			} else if (state == State::Missed) {
 				return "Missed";
-			} else if (reason == Reason::Busy) {
+			} else if (state == State::Busy) {
 				return "Declined";
 			}
 			return "Incoming";
@@ -2321,10 +2477,12 @@ MediaData HtmlWriter::Wrap::prepareMediaData(
 		} else if (data.isVideoFile) {
 			// At least try to pushVideoFileMedia.
 		} else if (data.isAudioFile) {
-			result.title = (data.songPerformer.isEmpty()
-				|| data.songTitle.isEmpty())
-				? QByteArray("Audio file")
-				: data.songPerformer + " \xe2\x80\x93 " + data.songTitle;
+			result.title = (!data.songPerformer.isEmpty()
+				&& !data.songTitle.isEmpty())
+				? (data.songPerformer + " \xe2\x80\x93 " + data.songTitle)
+				: !data.name.isEmpty()
+				? data.name
+				: QByteArray("Audio file");
 			result.status = FormatDuration(data.duration);
 			if (!hasFile) {
 				result.status += ", " + FormatFileSize(data.file.size);
@@ -2400,6 +2558,7 @@ MediaData HtmlWriter::Wrap::prepareMediaData(
 		result.description = data.description;
 		result.status = Data::FormatMoneyAmount(data.amount, data.currency);
 	}, [](const Poll &data) {
+	}, [](const TodoList &data) {
 	}, [](const GiveawayStart &data) {
 	}, [](const GiveawayResults &data) {
 	}, [&](const PaidMedia &data) {

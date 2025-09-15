@@ -51,6 +51,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/view/media_view_pip.h"
 #include "media/view/media_view_overlay_raster.h"
 #include "media/view/media_view_overlay_opengl.h"
+#include "media/view/media_view_playback_sponsored.h"
 #include "media/stories/media_stories_share.h"
 #include "media/stories/media_stories_view.h"
 #include "media/streaming/media_streaming_document.h"
@@ -335,6 +336,7 @@ struct OverlayWidget::Streamed {
 
 	Streaming::Instance instance;
 	std::unique_ptr<PlaybackControls> controls;
+	std::unique_ptr<PlaybackSponsored> sponsored;
 	std::unique_ptr<base::PowerSaveBlocker> powerSaveBlocker;
 
 	bool ready = false;
@@ -366,6 +368,7 @@ struct OverlayWidget::PipWrap {
 struct OverlayWidget::ItemContext {
 	not_null<HistoryItem*> item;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 };
 
 struct OverlayWidget::StoriesContext {
@@ -1607,7 +1610,11 @@ void OverlayWidget::fillContextMenuActions(
 		if (const auto window = findWindow()) {
 			const auto show = window->uiShow();
 			const auto fullId = _message->fullId();
-			Menu::FillSponsored(_body, addAction, show, fullId, true);
+			Menu::FillSponsored(
+				addAction,
+				show,
+				fullId,
+				{ .dark = true, .skipInfo = true });
 		}
 		return;
 	}
@@ -2675,7 +2682,8 @@ void OverlayWidget::handleDocumentClick() {
 			findWindow(),
 			_document,
 			_message,
-			_topicRootId);
+			_topicRootId,
+			_monoforumPeerId);
 		if (_document && _document->loading() && !_radial.animating()) {
 			_radial.start(_documentMedia->progress());
 		}
@@ -2921,12 +2929,21 @@ void OverlayWidget::showMediaOverview() {
 				const auto topic = _topicRootId
 					? _history->peer->forumTopicFor(_topicRootId)
 					: nullptr;
+				const auto sublist = _monoforumPeerId
+					? _history->peer->monoforumSublistFor(_monoforumPeerId)
+					: nullptr;
 				if (_topicRootId && !topic) {
+					return;
+				} else if (_monoforumPeerId && !sublist) {
 					return;
 				}
 				window->showSection(_topicRootId
 					? std::make_shared<Info::Memento>(
 						topic,
+						Info::Section(*overviewType))
+					: _monoforumPeerId
+					? std::make_shared<Info::Memento>(
+						sublist,
 						Info::Section(*overviewType))
 					: std::make_shared<Info::Memento>(
 						_history->peer,
@@ -3017,6 +3034,7 @@ auto OverlayWidget::sharedMediaKey() const -> std::optional<SharedMediaKey> {
 		return SharedMediaKey{
 			_history->peer->id,
 			MsgId(0), // topicRootId
+			PeerId(0), // monoforumPeerId
 			_migrated ? _migrated->peer->id : 0,
 			SharedMediaType::ChatPhoto,
 			_photo
@@ -3032,6 +3050,7 @@ auto OverlayWidget::sharedMediaKey() const -> std::optional<SharedMediaKey> {
 			(isScheduled
 				? SparseIdsMergedSlice::kScheduledTopicId
 				: _topicRootId),
+			(isScheduled ? PeerId() : _monoforumPeerId),
 			_migrated ? _migrated->peer->id : 0,
 			type,
 			(_message->history() == _history
@@ -3362,7 +3381,7 @@ void OverlayWidget::refreshCaption() {
 			: Ui::ItemTextDefaultOptions()),
 		context);
 	if (_caption.hasSpoilers()) {
-		const auto weak = Ui::MakeWeak(widget());
+		const auto weak = base::make_weak(widget());
 		_caption.setSpoilerLinkFilter([=](const ClickContext &context) {
 			return (weak != nullptr);
 		});
@@ -3953,7 +3972,11 @@ bool OverlayWidget::initStreaming(const StartStreaming &startStreaming) {
 			&& !_streamed->instance.player().finished())) {
 		startStreamingPlayer(startStreaming);
 	} else {
-		_streamed->ready = _streamed->instance.player().ready();
+		if (_streamed->instance.player().ready()) {
+			markStreamedReady();
+		} else {
+			_streamed->ready = false;
+		}
 		updatePlaybackState();
 	}
 	return true;
@@ -3966,7 +3989,7 @@ void OverlayWidget::startStreamingPlayer(
 	const auto &player = _streamed->instance.player();
 	if (player.playing()) {
 		if (!_streamed->withSound) {
-			_streamed->ready = true;
+			markStreamedReady();
 			return;
 		}
 		_pip = nullptr;
@@ -3982,6 +4005,18 @@ void OverlayWidget::startStreamingPlayer(
 		? _photo->videoStartPosition()
 		: 0;
 	restartAtSeekPosition(_streamedPosition);
+}
+
+void OverlayWidget::markStreamedReady() {
+	Expects(_streamed != nullptr);
+
+	if (_streamed->ready) {
+		return;
+	}
+	_streamed->ready = true;
+	if (const auto sponsored = _streamed->sponsored.get()) {
+		sponsored->start();
+	}
 }
 
 void OverlayWidget::initStreamingThumbnail() {
@@ -4055,7 +4090,7 @@ void OverlayWidget::initStreamingThumbnail() {
 }
 
 void OverlayWidget::streamingReady(Streaming::Information &&info) {
-	_streamed->ready = true;
+	markStreamedReady();
 	if (videoShown()) {
 		applyVideoSize();
 		_streamedQualityChangeFrame = QImage();
@@ -4077,6 +4112,7 @@ void OverlayWidget::applyVideoSize() {
 
 bool OverlayWidget::createStreamingObjects() {
 	Expects(_photo || _document);
+	Expects(!_streamed);
 
 	const auto origin = fileOrigin();
 	const auto callback = [=] { waitingAnimationCallback(); };
@@ -4109,6 +4145,18 @@ bool OverlayWidget::createStreamingObjects() {
 			_body,
 			static_cast<PlaybackControls::Delegate*>(this));
 		_streamed->controls->show();
+		_streamed->sponsored = PlaybackSponsored::Has(_message)
+			? std::make_unique<PlaybackSponsored>(
+				_streamed->controls.get(),
+				uiShow(),
+				_message)
+			: nullptr;
+		if (const auto sponsored = _streamed->sponsored.get()) {
+			_layerBg->layerShownValue(
+			) | rpl::start_with_next([=](bool shown) {
+				sponsored->setPaused(shown);
+			}, sponsored->lifetime());
+		}
 		refreshClipControllerGeometry();
 	}
 	return true;
@@ -4238,7 +4286,7 @@ void OverlayWidget::initThemePreview() {
 	const auto weakSession = base::make_weak(&_document->session());
 	const auto path = _document->location().name();
 	const auto id = _themePreviewId = base::RandomValue<uint64>();
-	const auto weak = Ui::MakeWeak(_widget);
+	const auto weak = base::make_weak(_widget);
 	crl::async([=, data = std::move(current)]() mutable {
 		auto preview = GeneratePreview(
 			bytes,
@@ -4609,6 +4657,7 @@ void OverlayWidget::switchToPip() {
 	const auto document = _document;
 	const auto messageId = _message ? _message->fullId() : FullMsgId();
 	const auto topicRootId = _topicRootId;
+	const auto monoforumPeerId = _monoforumPeerId;
 	const auto closeAndContinue = [=] {
 		_showAsPip = false;
 		show(OpenRequest(
@@ -4616,6 +4665,7 @@ void OverlayWidget::switchToPip() {
 			document,
 			document->owner().message(messageId),
 			topicRootId,
+			monoforumPeerId,
 			true));
 	};
 	_showAsPip = true;
@@ -5699,9 +5749,9 @@ OverlayWidget::Entity OverlayWidget::entityForCollage(int index) const {
 		return { v::null, nullptr };
 	}
 	if (const auto document = std::get_if<DocumentData*>(&items[index])) {
-		return { *document, _message, _topicRootId };
+		return { *document, _message, _topicRootId, _monoforumPeerId };
 	} else if (const auto photo = std::get_if<PhotoData*>(&items[index])) {
-		return { *photo, _message, _topicRootId };
+		return { *photo, _message, _topicRootId, _monoforumPeerId };
 	}
 	return { v::null, nullptr };
 }
@@ -5712,12 +5762,12 @@ OverlayWidget::Entity OverlayWidget::entityForItemId(const FullMsgId &itemId) co
 	if (const auto item = _session->data().message(itemId)) {
 		if (const auto media = item->media()) {
 			if (const auto photo = media->photo()) {
-				return { photo, item, _topicRootId };
+				return { photo, item, _topicRootId, _monoforumPeerId };
 			} else if (const auto document = media->document()) {
-				return { document, item, _topicRootId };
+				return { document, item, _topicRootId, _monoforumPeerId };
 			}
 		}
-		return { v::null, item, _topicRootId };
+		return { v::null, item, _topicRootId, _monoforumPeerId };
 	}
 	return { v::null, nullptr };
 }
@@ -5744,6 +5794,9 @@ void OverlayWidget::setContext(
 		_history = _message->history();
 		_peer = _history->peer;
 		_topicRootId = _peer->isForum() ? item->topicRootId : MsgId();
+		_monoforumPeerId = _peer->amMonoforumAdmin()
+			? item->monoforumPeerId
+			: PeerId();
 		setStoriesPeer(nullptr);
 	} else if (const auto peer = std::get_if<not_null<PeerData*>>(&context)) {
 		_peer = *peer;
@@ -6395,7 +6448,7 @@ bool OverlayWidget::handleTouchEvent(not_null<QTouchEvent*> e) {
 		if (!_touchPress) {
 			break;
 		}
-		auto weak = Ui::MakeWeak(_widget);
+		auto weak = base::make_weak(_widget);
 		if (!_touchMove) {
 			const auto button = _touchRightButton
 				? Qt::RightButton
@@ -6677,7 +6730,8 @@ void OverlayWidget::updateHeader() {
 		} else {
 			if (_user
 				&& (index == count - 1)
-				&& SyncUserFallbackPhotoViewer(_user)) {
+				&& _photo
+				&& SyncUserFallbackPhotoViewer(_user) == _photo->id) {
 				_headerText = tr::lng_mediaview_profile_public_photo(tr::now);
 			} else if (_user
 				&& _user->hasPersonalPhoto()

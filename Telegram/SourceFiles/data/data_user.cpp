@@ -8,8 +8,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_user.h"
 
 #include "api/api_credits.h"
+#include "api/api_global_privacy.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_statistics.h"
+#include "base/timer_rpl.h"
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "storage/storage_user_photos.h"
@@ -17,6 +19,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/business/data_business_common.h"
 #include "data/business/data_business_info.h"
 #include "data/components/credits.h"
+#include "data/data_cloud_themes.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_peer_bot_command.h"
@@ -60,6 +64,20 @@ bool ApplyBotVerifierSettings(
 		return true;
 	}
 	return false;
+}
+
+[[nodiscard]] Data::StarsRating ParseStarsRating(
+		const MTPStarsRating *rating) {
+	if (!rating) {
+		return {};
+	}
+	const auto &data = rating->data();
+	return {
+		.level = data.vlevel().v,
+		.stars = int(data.vstars().v),
+		.thisLevelStars = int(data.vcurrent_level_stars().v),
+		.nextLevelStars = int(data.vnext_level_stars().value_or_empty()),
+	};
 }
 
 } // namespace
@@ -541,12 +559,35 @@ int UserData::starsPerMessage() const {
 	return _starsPerMessage;
 }
 
+void UserData::setStoriesCorrespondent(bool is) {
+	if (is) {
+		_flags.add(UserDataFlag::StoriesCorrespondent);
+	} else {
+		_flags.remove(UserDataFlag::StoriesCorrespondent);
+	}
+}
+
+bool UserData::storiesCorrespondent() const {
+	return (_flags.current() & UserDataFlag::StoriesCorrespondent);
+}
+
 void UserData::setStarsPerMessage(int stars) {
 	if (_starsPerMessage != stars) {
 		_starsPerMessage = stars;
 		session().changes().peerUpdated(this, UpdateFlag::StarsPerMessage);
 	}
 	checkTrustedPayForMessage();
+}
+
+void UserData::setStarsRating(Data::StarsRating value) {
+	if (_starsRating != value) {
+		_starsRating = value;
+		session().changes().peerUpdated(this, UpdateFlag::StarsRating);
+	}
+}
+
+Data::StarsRating UserData::starsRating() const {
+	return _starsRating;
 }
 
 bool UserData::canAddContact() const {
@@ -659,6 +700,13 @@ bool UserData::hasCalls() const {
 		&& (callsStatus() != CallsStatus::Unknown);
 }
 
+void UserData::setDisallowedGiftTypes(Api::DisallowedGiftTypes types) {
+	if (_disallowedGiftTypes != types) {
+		_disallowedGiftTypes = types;
+		session().changes().peerUpdated(this, UpdateFlag::GiftSettings);
+	}
+}
+
 namespace Data {
 
 void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
@@ -710,6 +758,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		| Flag::CanPinMessages
 		| Flag::VoiceMessagesForbidden
 		| Flag::ReadDatesPrivate
+		| (update.is_contact_require_premium()
+			? Flag::HasRequirePremiumToWrite
+			: Flag())
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::MessageMoneyRestrictionsKnown
 		| Flag::RequiresPremiumToWrite;
 	user->setFlags((user->flags() & ~mask)
@@ -723,9 +775,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			? Flag::VoiceMessagesForbidden
 			: Flag())
 		| (update.is_read_dates_private() ? Flag::ReadDatesPrivate : Flag())
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::MessageMoneyRestrictionsKnown
 		| (update.is_contact_require_premium()
-			? Flag::RequiresPremiumToWrite
+			? (Flag::RequiresPremiumToWrite | Flag::HasRequirePremiumToWrite)
 			: Flag()));
 	user->setIsBlocked(update.is_blocked());
 	user->setCallsStatus(update.is_phone_calls_private()
@@ -737,7 +790,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	user->setCommonChatsCount(update.vcommon_chats_count().v);
 	user->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
 	user->checkFolder(update.vfolder_id().value_or_empty());
-	user->setThemeEmoji(qs(update.vtheme_emoticon().value_or_empty()));
+	if (const auto theme = update.vtheme()) {
+		theme->match([&](const MTPDchatTheme &data) {
+			user->setThemeToken(qs(data.vemoticon()));
+		}, [&](const MTPDchatThemeUniqueGift &data) {
+			user->setThemeToken(
+				user->owner().cloudThemes().processGiftThemeGetToken(data));
+		});
+	} else {
+		user->setThemeToken(QString());
+	}
 	user->setTranslationDisabled(update.is_translations_disabled());
 	user->setPrivateForwardName(
 		update.vprivate_forward_name().value_or_empty());
@@ -759,6 +821,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 				Data::PeerUpdate::Flag::Rights);
 		}
 		if (info->canEditInformation) {
+			static constexpr auto kTimeout = crl::time(60000);
 			const auto id = user->id;
 			const auto weak = base::make_weak(&user->session());
 			const auto creditsLoadLifetime
@@ -768,23 +831,30 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			creditsLoad->request({}, [=](Data::CreditsStatusSlice slice) {
 				if (const auto strong = weak.get()) {
 					strong->credits().apply(id, slice.balance);
-					creditsLoadLifetime->destroy();
 				}
+				creditsLoadLifetime->destroy();
 			});
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				creditsLoadLifetime->destroy();
+			}, *creditsLoadLifetime);
 			const auto currencyLoadLifetime
 				= std::make_shared<rpl::lifetime>();
 			const auto currencyLoad
 				= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
-			currencyLoad->request(
-			) | rpl::start_with_error_done([=](const QString &error) {
-				currencyLoadLifetime->destroy();
-			}, [=] {
+			const auto apply = [=](const CreditsAmount &balance) {
 				if (const auto strong = weak.get()) {
-					strong->credits().applyCurrency(
-						id,
-						currencyLoad->data().currentBalance);
-					currencyLoadLifetime->destroy();
+					strong->credits().applyCurrency(id, balance);
 				}
+				currencyLoadLifetime->destroy();
+			};
+			currencyLoad->request() | rpl::start_with_error_done(
+				[=](const QString &error) {
+					apply(CreditsAmount(0, CreditsType::Ton));
+				},
+				[=] { apply(currencyLoad->data().currentBalance); },
+				*currencyLoadLifetime);
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				currencyLoadLifetime->destroy();
 			}, *currencyLoadLifetime);
 		}
 	}
@@ -814,8 +884,41 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	}
 	user->setBotVerifyDetails(
 		ParseBotVerifyDetails(update.vbot_verification()));
+	user->setStarsRating(ParseStarsRating(update.vstars_rating()));
+	if (user->isSelf()) {
+		user->owner().setPendingStarsRating({
+			.value = ParseStarsRating(update.vstars_my_pending_rating()),
+			.date = update.vstars_my_pending_rating_date().value_or_empty(),
+		});
+	}
+
+	if (const auto gifts = update.vdisallowed_gifts()) {
+		const auto &data = gifts->data();
+		user->setDisallowedGiftTypes(Api::DisallowedGiftType()
+			| (data.is_disallow_unlimited_stargifts()
+				? Api::DisallowedGiftType::Unlimited
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_limited_stargifts()
+				? Api::DisallowedGiftType::Limited
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_unique_stargifts()
+				? Api::DisallowedGiftType::Unique
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_premium_gifts()
+				? Api::DisallowedGiftType::Premium
+				: Api::DisallowedGiftType())
+			| (update.is_display_gifts_button()
+				? Api::DisallowedGiftType::SendHide
+				: Api::DisallowedGiftType()));
+	} else {
+		user->setDisallowedGiftTypes(Api::DisallowedGiftTypes()
+			| (update.is_display_gifts_button()
+				? Api::DisallowedGiftType::SendHide
+				: Api::DisallowedGiftType()));
+	}
 
 	user->owner().stories().apply(user, update.vstories());
+	user->owner().savedMusic().apply(user, update.vsaved_music());
 
 	user->fullUpdated();
 }
@@ -828,9 +931,8 @@ StarRefProgram ParseStarRefProgram(const MTPStarRefProgram *program) {
 	const auto &data = program->data();
 	result.commission = data.vcommission_permille().v;
 	result.durationMonths = data.vduration_months().value_or_empty();
-	result.revenuePerUser = data.vdaily_revenue_per_user()
-		? Data::FromTL(*data.vdaily_revenue_per_user())
-		: StarsAmount();
+	result.revenuePerUser = CreditsAmountFromTL(
+		data.vdaily_revenue_per_user());
 	result.endDate = data.vend_date().value_or_empty();
 	return result;
 }

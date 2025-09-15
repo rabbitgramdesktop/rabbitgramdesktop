@@ -32,7 +32,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/components/credits.h"
 #include "data/components/factchecks.h"
 #include "data/components/location_pickers.h"
+#include "data/components/promo_suggestions.h"
 #include "data/components/recent_peers.h"
+#include "data/components/recent_shared_media_gifts.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
@@ -109,6 +111,7 @@ Session::Session(
 , _sendAsPeers(std::make_unique<SendAsPeers>(this))
 , _attachWebView(std::make_unique<InlineBots::AttachWebView>(this))
 , _recentPeers(std::make_unique<Data::RecentPeers>(this))
+, _recentSharedGifts(std::make_unique<Data::RecentSharedMediaGifts>(this))
 , _scheduledMessages(std::make_unique<Data::ScheduledMessages>(this))
 , _sponsoredMessages(std::make_unique<Data::SponsoredMessages>(this))
 , _topPeers(std::make_unique<Data::TopPeers>(this, Data::TopPeerType::Chat))
@@ -117,6 +120,7 @@ Session::Session(
 , _factchecks(std::make_unique<Data::Factchecks>(this))
 , _locationPickers(std::make_unique<Data::LocationPickers>())
 , _credits(std::make_unique<Data::Credits>(this))
+, _promoSuggestions(std::make_unique<Data::PromoSuggestions>(this))
 , _cachedReactionIconFactory(std::make_unique<ReactionIconFactory>())
 , _supportHelper(Support::Helper::Create(this))
 , _fastButtonsBots(std::make_unique<Support::FastButtonsBots>(this))
@@ -160,15 +164,6 @@ Session::Session(
 			}
 		}, _lifetime);
 
-#ifndef OS_MAC_STORE
-		appConfig().value(
-		) | rpl::start_with_next([=] {
-			_premiumPossible = !appConfig().get<bool>(
-				u"premium_purchase_blocked"_q,
-				true);
-		}, _lifetime);
-#endif // OS_MAC_STORE
-
 		if (_settings->hadLegacyCallsPeerToPeerNobody()) {
 			api().userPrivacy().save(
 				Api::UserPrivacy::Key::CallsPeer2Peer,
@@ -204,6 +199,27 @@ Session::Session(
 	_api->requestNotifySettings(MTP_inputNotifyBroadcasts());
 
 	Core::App().downloadManager().trackSession(this);
+
+	appConfig().value(
+	) | rpl::start_with_next([=] {
+		appConfigRefreshed();
+	}, _lifetime);
+}
+
+void Session::appConfigRefreshed() {
+	const auto &config = appConfig();
+
+	_frozen = FreezeInfo{
+		.since = config.get<int>(u"freeze_since_date"_q, 0),
+		.until = config.get<int>(u"freeze_until_date"_q, 0),
+		.appealUrl = config.get<QString>(u"freeze_appeal_url"_q, QString()),
+	};
+
+#ifndef OS_MAC_STORE
+	_premiumPossible = !config.get<bool>(
+		u"premium_purchase_blocked"_q,
+		true);
+#endif // OS_MAC_STORE
 }
 
 void Session::setTmpPassword(const QByteArray &password, TimeId validUntil) {
@@ -429,6 +445,14 @@ Support::Templates& Session::supportTemplates() const {
 
 Support::FastButtonsBots &Session::fastButtonsBots() const {
 	return *_fastButtonsBots;
+}
+
+FreezeInfo Session::frozen() const {
+	return _frozen.current();
+}
+
+rpl::producer<FreezeInfo> Session::frozenValue() const {
+	return _frozen.value();
 }
 
 void Session::addWindow(not_null<Window::SessionController*> controller) {

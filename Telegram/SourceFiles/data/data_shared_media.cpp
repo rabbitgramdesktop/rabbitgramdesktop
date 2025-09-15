@@ -7,18 +7,18 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "data/data_shared_media.h"
 
-#include <rpl/combine.h>
-#include "main/main_session.h"
 #include "apiwrap.h"
-#include "storage/storage_facade.h"
-#include "history/history.h"
-#include "history/history_item.h"
+#include "core/crash_reports.h"
 #include "data/components/scheduled_messages.h"
 #include "data/data_document.h"
 #include "data/data_media_types.h"
 #include "data/data_photo.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
-#include "core/crash_reports.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "main/main_session.h"
+#include "storage/storage_facade.h"
 
 namespace {
 
@@ -110,11 +110,13 @@ rpl::producer<SparseIdsSlice> SharedMediaViewer(
 		auto requestMediaAround = [
 			peer = session->data().peer(key.peerId),
 			topicRootId = key.topicRootId,
+			monoforumPeerId = key.monoforumPeerId,
 			type = key.type
 		](const SparseIdsSliceBuilder::AroundData &data) {
 			peer->session().api().requestSharedMedia(
 				peer,
 				topicRootId,
+				monoforumPeerId,
 				type,
 				data.aroundId,
 				data.direction);
@@ -131,6 +133,7 @@ rpl::producer<SparseIdsSlice> SharedMediaViewer(
 		) | rpl::filter([=](const SliceUpdate &update) {
 			return (update.peerId == key.peerId)
 				&& (update.topicRootId == key.topicRootId)
+				&& (update.monoforumPeerId == key.monoforumPeerId)
 				&& (update.type == key.type);
 		}) | rpl::filter([=](const SliceUpdate &update) {
 			return builder->applyUpdate(update.data);
@@ -151,6 +154,8 @@ rpl::producer<SparseIdsSlice> SharedMediaViewer(
 			return (update.peerId == key.peerId)
 				&& (!update.topicRootId
 					|| update.topicRootId == key.topicRootId)
+				&& (!update.monoforumPeerId
+					|| update.monoforumPeerId == key.monoforumPeerId)
 				&& update.types.test(key.type);
 		}) | rpl::filter([=] {
 			return builder->removeAll();
@@ -228,6 +233,39 @@ rpl::producer<SparseIdsMergedSlice> SharedScheduledMediaViewer(
 	});
 }
 
+rpl::producer<SparseIdsMergedSlice> SavedMusicMediaViewer(
+		not_null<Main::Session*> session,
+		SharedMediaMergedKey key,
+		int limitBefore,
+		int limitAfter) {
+	Expects((key.mergedKey.universalId != 0)
+		|| (limitBefore == 0 && limitAfter == 0));
+
+	const auto peerId = key.mergedKey.peerId;
+	const auto item = key.mergedKey.universalId
+		? session->data().message(peerId, key.mergedKey.universalId)
+		: nullptr;
+
+	return Data::SavedMusicList(
+		session->data().peer(peerId),
+		item,
+		std::max(limitBefore, limitAfter)
+	) | rpl::map([=](const Data::SavedMusicSlice &slice) {
+		auto list = std::vector<MsgId>();
+		list.reserve(slice.size());
+		for (auto i = 0, count = int(slice.size()); i != count; ++i) {
+			list.push_back(slice[i]->id);
+		}
+		return SparseIdsMergedSlice(
+			key.mergedKey,
+			SparseUnsortedIdsSlice(
+				std::move(list),
+				slice.fullCount(),
+				slice.skippedBefore(),
+				slice.skippedAfter()));
+	});
+}
+
 rpl::producer<SparseIdsMergedSlice> SharedMediaMergedViewer(
 		not_null<Main::Session*> session,
 		SharedMediaMergedKey key,
@@ -236,6 +274,7 @@ rpl::producer<SparseIdsMergedSlice> SharedMediaMergedViewer(
 	auto createSimpleViewer = [=](
 			PeerId peerId,
 			MsgId topicRootId,
+			PeerId monoforumPeerId,
 			SparseIdsSlice::Key simpleKey,
 			int limitBefore,
 			int limitAfter) {
@@ -244,6 +283,7 @@ rpl::producer<SparseIdsMergedSlice> SharedMediaMergedViewer(
 			Storage::SharedMediaKey(
 				peerId,
 				topicRootId,
+				monoforumPeerId,
 				key.type,
 				simpleKey),
 			limitBefore,
@@ -472,6 +512,19 @@ rpl::producer<SharedMediaWithLastSlice> SharedMediaWithLastViewer(
 
 		if (key.topicRootId == SharedMediaWithLastSlice::kScheduledTopicId) {
 			return SharedScheduledMediaViewer(
+				session,
+				std::move(viewerKey),
+				limitBefore,
+				limitAfter
+			) | rpl::start_with_next([=](SparseIdsMergedSlice &&update) {
+				consumer.put_next(SharedMediaWithLastSlice(
+					session,
+					key,
+					std::move(update),
+					std::nullopt));
+			});
+		} else if (key.topicRootId == SharedMediaWithLastSlice::kSavedMusicTopicId) {
+			return SavedMusicMediaViewer(
 				session,
 				std::move(viewerKey),
 				limitBefore,

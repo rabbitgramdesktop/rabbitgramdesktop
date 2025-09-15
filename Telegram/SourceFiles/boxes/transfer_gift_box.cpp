@@ -12,8 +12,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_cloud_password.h"
 #include "base/unixtime.h"
 #include "boxes/passcode_box.h"
+#include "data/data_cloud_themes.h"
 #include "data/data_session.h"
 #include "data/data_star_gift.h"
+#include "data/data_thread.h"
 #include "data/data_user.h"
 #include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
 #include "boxes/peer_list_box.h"
@@ -23,14 +25,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/controls/sub_tabs.h"
+#include "ui/controls/ton_common.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h" // peerListSingleRow.
+#include "styles/style_credits.h" // starIconEmoji.
 #include "styles/style_dialogs.h" // recentPeersSpecialName.
 #include "styles/style_layers.h" // boxLabel.
 
@@ -88,8 +94,8 @@ void ConfirmExportBox(
 			Ui::Text::WithEntities),
 		st::boxLabel));
 	box->addButton(tr::lng_gift_transfer_confirm_button(), [=] {
-		confirmed([weak = Ui::MakeWeak(box)] {
-			if (const auto strong = weak.data()) {
+		confirmed([weak = base::make_weak(box)] {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		});
@@ -141,7 +147,7 @@ void ExportOnBlockchain(
 			fields.customSubmitButton = tr::lng_passcode_submit();
 			fields.customCheckCallback = crl::guard(parent, [=](
 					const Core::CloudPasswordResult &result,
-					QPointer<PasscodeBox> box) {
+					base::weak_qptr<PasscodeBox> box) {
 				using ExportUrl = MTPpayments_StarGiftWithdrawalUrl;
 				session->api().request(
 					MTPpayments_GetStarGiftWithdrawalUrl(
@@ -178,7 +184,7 @@ void ExportOnBlockchain(
 	const auto state = std::make_shared<State>();
 	const auto activate = [=] {
 		const auto now = base::unixtime::now();
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 		const auto left = (when > now) ? (when - now) : 0;
 		const auto hours = left ? std::max((left + 1800) / 3600, 1) : 0;
 		if (!hours) {
@@ -191,7 +197,7 @@ void ExportOnBlockchain(
 					state->exporting = false;
 					close();
 				}, [=] {
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->closeBox();
 					}
 					close();
@@ -421,47 +427,148 @@ void TransferGift(
 		not_null<PeerData*> to,
 		std::shared_ptr<Data::UniqueGift> gift,
 		Data::SavedStarGiftId savedId,
-		Fn<void(Payments::CheckoutResult)> done) {
-	Expects(to->isUser());
-
+		Fn<void(Payments::CheckoutResult)> done,
+		bool skipPaymentForm = false) {
 	const auto session = &window->session();
 	const auto weak = base::make_weak(window);
 	auto formDone = [=](
 			Payments::CheckoutResult result,
 			const MTPUpdates *updates) {
+		if (result == Payments::CheckoutResult::Free) {
+			Assert(!skipPaymentForm);
+			TransferGift(window, to, gift, savedId, done, true);
+			return;
+		}
 		done(result);
 		if (result == Payments::CheckoutResult::Paid) {
+			session->data().notifyGiftUpdate({
+				.id = savedId,
+				.action = Data::GiftUpdate::Action::Transfer,
+			});
 			if (const auto strong = weak.get()) {
-				strong->session().data().notifyGiftUpdate({
-					.id = savedId,
-					.action = Data::GiftUpdate::Action::Transfer,
-				});
-				Ui::ShowGiftTransferredToast(strong, to, *gift);
+				Ui::ShowGiftTransferredToast(strong->uiShow(), to, *gift);
 			}
 		}
 	};
-	if (gift->starsForTransfer <= 0) {
+	if (skipPaymentForm) {
+		// We can't check (gift->starsForTransfer <= 0) here.
+		//
+		// Sometimes we don't know the price for transfer.
+		// Like when we transfer a gift from Resale tab.
 		session->api().request(MTPpayments_TransferStarGift(
-			Api::InputSavedStarGiftId(savedId),
+			Api::InputSavedStarGiftId(savedId, gift),
 			to->input
 		)).done([=](const MTPUpdates &result) {
 			session->api().applyUpdates(result);
 			formDone(Payments::CheckoutResult::Paid, &result);
 		}).fail([=](const MTP::Error &error) {
 			formDone(Payments::CheckoutResult::Failed, nullptr);
-			if (const auto strong = weak.get()) {
+			const auto earlyPrefix = u"STARGIFT_TRANSFER_TOO_EARLY_"_q;
+			const auto type = error.type();
+			if (type.startsWith(earlyPrefix)) {
+				const auto seconds = type.mid(earlyPrefix.size()).toInt();
+				const auto newAvailableAt = base::unixtime::now() + seconds;
+				gift->canTransferAt = newAvailableAt;
+				if (const auto strong = weak.get()) {
+					ShowTransferGiftLater(strong->uiShow(), gift);
+				}
+			} else if (const auto strong = weak.get()) {
 				strong->showToast(error.type());
 			}
 		}).send();
-		return;
+	} else {
+		Ui::RequestStarsFormAndSubmit(
+			window->uiShow(),
+			MTP_inputInvoiceStarGiftTransfer(
+				Api::InputSavedStarGiftId(savedId, gift),
+				to->input),
+			std::move(formDone));
 	}
-	Ui::RequestStarsFormAndSubmit(
-		window,
-		MTP_inputInvoiceStarGiftTransfer(
-			Api::InputSavedStarGiftId(savedId),
-			to->input),
-		std::move(formDone));
 }
+
+void BuyResaleGift(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<PeerData*> to,
+		std::shared_ptr<Data::UniqueGift> gift,
+		CreditsType type,
+		Fn<void(Payments::CheckoutResult)> done) {
+	auto paymentDone = [=](
+			Payments::CheckoutResult result,
+			const MTPUpdates *updates) {
+		done(result);
+		if (result == Payments::CheckoutResult::Paid) {
+			gift->starsForResale = 0;
+			to->owner().notifyGiftUpdate({
+				.slug = gift->slug,
+				.action = Data::GiftUpdate::Action::ResaleChange,
+			});
+			Ui::ShowResaleGiftBoughtToast(show, to, *gift);
+		}
+	};
+
+	using Flag = MTPDinputInvoiceStarGiftResale::Flag;
+	const auto invoice = MTP_inputInvoiceStarGiftResale(
+		MTP_flags((type == CreditsType::Ton) ? Flag::f_ton : Flag()),
+		MTP_string(gift->slug),
+		to->input);
+
+	Ui::RequestOurForm(show, invoice, [=](
+			uint64 formId,
+			CreditsAmount price,
+			std::optional<Payments::CheckoutResult> failure) {
+		if ((type == CreditsType::Ton && price.stars())
+			|| (type == CreditsType::Stars && price.ton())) {
+			paymentDone(Payments::CheckoutResult::Failed, nullptr);
+			return;
+		}
+		const auto submit = [=] {
+			if (price.stars()) {
+				SubmitStarsForm(
+					show,
+					invoice,
+					formId,
+					price.whole(),
+					paymentDone);
+			} else {
+				SubmitTonForm(show, invoice, formId, price, paymentDone);
+			}
+		};
+		const auto was = (type == CreditsType::Ton)
+			? Data::UniqueGiftResaleTon(*gift)
+			: Data::UniqueGiftResaleStars(*gift);
+		if (failure) {
+			paymentDone(*failure, nullptr);
+		} else if (price != was) {
+			const auto cost = price.ton()
+				? Ui::Text::IconEmoji(&st::tonIconEmoji).append(
+					Lang::FormatCreditsAmountDecimal(price))
+				: Ui::Text::IconEmoji(&st::starIconEmoji).append(
+					Lang::FormatCountDecimal(price.whole()));
+			const auto cancelled = [=](Fn<void()> close) {
+				paymentDone(Payments::CheckoutResult::Cancelled, nullptr);
+				close();
+			};
+			show->show(Ui::MakeConfirmBox({
+				.text = tr::lng_gift_buy_price_change_text(
+					tr::now,
+					lt_price,
+					Ui::Text::Wrapped(cost, EntityType::Bold),
+					Ui::Text::WithEntities),
+				.confirmed = [=](Fn<void()> close) { close(); submit(); },
+				.cancelled = cancelled,
+				.confirmText = tr::lng_gift_buy_resale_button(
+					lt_cost,
+					rpl::single(cost),
+					Ui::Text::WithEntities),
+				.title = tr::lng_gift_buy_price_change_title(),
+			}));
+		} else {
+			submit();
+		}
+	});
+}
+
+} // namespace
 
 void ShowTransferToBox(
 		not_null<Window::SessionController*> controller,
@@ -492,11 +599,11 @@ void ShowTransferToBox(
 				return;
 			}
 			state->sent = true;
-			const auto weak = Ui::MakeWeak(box);
+			const auto weak = base::make_weak(box);
 			const auto done = [=](Payments::CheckoutResult result) {
 				if (result == Payments::CheckoutResult::Cancelled) {
 					closeParentBox();
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->closeBox();
 					}
 				} else if (result != Payments::CheckoutResult::Paid) {
@@ -506,7 +613,7 @@ void ShowTransferToBox(
 						controller->showPeerHistory(peer);
 					}
 					closeParentBox();
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->closeBox();
 					}
 				}
@@ -539,12 +646,13 @@ void ShowTransferToBox(
 	}));
 }
 
-} // namespace
-
 void ShowTransferGiftBox(
 		not_null<Window::SessionController*> window,
 		std::shared_ptr<Data::UniqueGift> gift,
 		Data::SavedStarGiftId savedId) {
+	if (ShowTransferGiftLater(window->uiShow(), gift)) {
+		return;
+	}
 	auto controller = std::make_unique<Controller>(
 		window,
 		gift,
@@ -565,4 +673,267 @@ void ShowTransferGiftBox(
 	window->show(
 		Box<PeerListBox>(std::move(controller), std::move(initBox)),
 		Ui::LayerOption::KeepOther);
+}
+
+void SetThemeFromUniqueGift(
+		not_null<Window::SessionController*> window,
+		std::shared_ptr<Data::UniqueGift> unique) {
+	class Controller final : public ChooseRecipientBoxController {
+	public:
+		Controller(
+			not_null<Window::SessionController*> window,
+			std::shared_ptr<Data::UniqueGift> unique)
+		: ChooseRecipientBoxController({
+			.session = &window->session(),
+			.callback = [=](not_null<Data::Thread*> thread) {
+				const auto weak = base::make_weak(window);
+				const auto peer = thread->peer();
+				SendPeerThemeChangeRequest(window, peer, QString(), unique);
+				if (weak) window->showPeerHistory(peer);
+				if (weak) window->hideLayer(anim::type::normal);
+			},
+			.filter = [=](not_null<Data::Thread*> thread) {
+				return thread->peer()->isUser();
+			},
+			.moneyRestrictionError = WriteMoneyRestrictionError,
+		}) {
+		}
+
+	private:
+		void prepareViewHook() override {
+			ChooseRecipientBoxController::prepareViewHook();
+			delegate()->peerListSetTitle(tr::lng_gift_transfer_choose());
+		}
+
+	};
+
+	window->show(
+		Box<PeerListBox>(
+			std::make_unique<Controller>(window, std::move(unique)),
+			[](not_null<PeerListBox*> box) {
+				box->addButton(tr::lng_cancel(), [=] {
+					box->closeBox();
+				});
+			}));
+}
+
+void SendPeerThemeChangeRequest(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		const QString &token,
+		const std::shared_ptr<Data::UniqueGift> &unique,
+		bool locallySet) {
+	const auto api = &peer->session().api();
+
+	api->request(MTPmessages_SetChatWallPaper(
+		MTP_flags(0),
+		peer->input,
+		MTPInputWallPaper(),
+		MTPWallPaperSettings(),
+		MTPint()
+	)).afterDelay(10).done([=](const MTPUpdates &result) {
+		api->applyUpdates(result);
+	}).send();
+
+	api->request(MTPmessages_SetChatTheme(
+		peer->input,
+		(unique
+			? MTP_inputChatThemeUniqueGift(MTP_string(unique->slug))
+			: MTP_inputChatTheme(MTP_string(token)))
+	)).done([=](const MTPUpdates &result) {
+		api->applyUpdates(result);
+		if (!locallySet) {
+			peer->updateFullForced();
+		}
+	}).send();
+}
+
+void SetPeerTheme(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		const QString &token,
+		const std::shared_ptr<Ui::ChatTheme> &theme) {
+	const auto giftTheme = token.startsWith(u"gift:"_q)
+		? peer->owner().cloudThemes().themeForToken(token)
+		: std::optional<Data::CloudTheme>();
+
+	peer->setThemeToken(token);
+	const auto dropWallPaper = (peer->wallPaper() != nullptr);
+	if (dropWallPaper) {
+		peer->setWallPaper({});
+	}
+
+	if (theme) {
+		// Remember while changes propagate through event loop.
+		controller->pushLastUsedChatTheme(theme);
+	}
+
+	SendPeerThemeChangeRequest(
+		controller,
+		peer,
+		token,
+		giftTheme ? giftTheme->unique : nullptr,
+		true);
+}
+
+void ShowBuyResaleGiftBox(
+		std::shared_ptr<ChatHelpers::Show> show,
+		std::shared_ptr<Data::UniqueGift> gift,
+		bool forceTon,
+		not_null<PeerData*> to,
+		Fn<void()> closeParentBox) {
+	show->show(Box([=](not_null<Ui::GenericBox*> box) {
+		struct State {
+			rpl::variable<bool> ton;
+			bool sent = false;
+		};
+		const auto state = std::make_shared<State>();
+		state->ton = gift->onlyAcceptTon || forceTon;
+
+		if (gift->onlyAcceptTon) {
+			box->addRow(
+				object_ptr<Ui::FlatLabel>(
+					box,
+					tr::lng_gift_buy_resale_only_ton(
+						Ui::Text::RichLangValue),
+					st::resaleConfirmTonOnly),
+				st::boxRowPadding + st::resaleConfirmTonOnlyMargin);
+		} else {
+			const auto tabs = box->addRow(
+				object_ptr<Ui::SubTabs>(
+					box,
+					Ui::SubTabsOptions{
+						.selected = (state->ton.current()
+							? u"ton"_q
+							: u"stars"_q),
+						.centered = true,
+					},
+					std::vector<Ui::SubTabsTab>{
+						{
+							u"stars"_q,
+							tr::lng_gift_buy_resale_pay_stars(
+								tr::now,
+								Ui::Text::WithEntities),
+						},
+						{
+							u"ton"_q,
+							tr::lng_gift_buy_resale_pay_ton(
+								tr::now,
+								Ui::Text::WithEntities),
+						},
+					}),
+				st::boxRowPadding + st::resaleConfirmTonOnlyMargin);
+			tabs->activated() | rpl::start_with_next([=](QString id) {
+				tabs->setActiveTab(id);
+				state->ton = (id == u"ton"_q);
+			}, tabs->lifetime());
+		}
+
+		auto transfer = state->ton.value() | rpl::map([=](bool ton) {
+			return tr::lng_gift_buy_resale_button(
+				lt_cost,
+				rpl::single(ton
+					? Data::FormatGiftResaleTon(*gift)
+					: Data::FormatGiftResaleStars(*gift)),
+				Ui::Text::WithEntities);
+		}) | rpl::flatten_latest();
+
+		auto callback = [=](Fn<void()> close) {
+			if (state->sent) {
+				return;
+			}
+			state->sent = true;
+			const auto weak = base::make_weak(box);
+			const auto done = [=](Payments::CheckoutResult result) {
+				if (result == Payments::CheckoutResult::Cancelled) {
+					closeParentBox();
+					close();
+				} else if (result != Payments::CheckoutResult::Paid) {
+					state->sent = false;
+				} else {
+					closeParentBox();
+					close();
+				}
+			};
+			const auto type = state->ton.current()
+				? CreditsType::Ton
+				: CreditsType::Stars;
+			BuyResaleGift(show, to, gift, type, done);
+		};
+
+		auto price = state->ton.value() | rpl::map([=](bool ton) {
+			return ton
+				? tr::lng_action_gift_for_ton(
+					lt_count_decimal,
+					rpl::single(gift->nanoTonForResale
+						/ float64(Ui::kNanosInOne)),
+					Ui::Text::Bold)
+				: tr::lng_action_gift_for_stars(
+					lt_count_decimal,
+					rpl::single(gift->starsForResale * 1.),
+					Ui::Text::Bold);
+		}) | rpl::flatten_latest();
+		Ui::ConfirmBox(box, {
+			.text = to->isSelf()
+				? tr::lng_gift_buy_resale_confirm_self(
+					lt_name,
+					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					lt_price,
+					std::move(price),
+					Ui::Text::WithEntities)
+				: tr::lng_gift_buy_resale_confirm(
+					lt_name,
+					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					lt_price,
+					std::move(price),
+					lt_user,
+					rpl::single(Ui::Text::Bold(to->shortName())),
+					Ui::Text::WithEntities),
+			.confirmed = std::move(callback),
+			.confirmText = std::move(transfer),
+		});
+	}));
+}
+
+bool ShowResaleGiftLater(
+		std::shared_ptr<ChatHelpers::Show> show,
+		std::shared_ptr<Data::UniqueGift> gift) {
+	const auto now = base::unixtime::now();
+	if (gift->canResellAt <= now) {
+		return false;
+	}
+	const auto seconds = gift->canResellAt - now;
+	const auto days = seconds / 86400;
+	const auto hours = seconds / 3600;
+	const auto minutes = std::max(seconds / 60, 1);
+	show->showToast({
+		.title = tr::lng_gift_resale_transfer_early_title(tr::now),
+		.text = { tr::lng_gift_resale_early(tr::now, lt_duration, days
+			? tr::lng_days(tr::now, lt_count, days)
+			: hours
+			? tr::lng_hours(tr::now, lt_count, hours)
+			: tr::lng_minutes(tr::now, lt_count, minutes)) },
+	});
+	return true;
+}
+
+bool ShowTransferGiftLater(
+		std::shared_ptr<ChatHelpers::Show> show,
+		std::shared_ptr<Data::UniqueGift> gift) {
+	const auto seconds = gift->canTransferAt - base::unixtime::now();
+	if (seconds <= 0) {
+		return false;
+	}
+	const auto days = seconds / 86400;
+	const auto hours = seconds / 3600;
+	const auto minutes = std::max(seconds / 60, 1);
+	show->showToast({
+		.title = tr::lng_gift_resale_transfer_early_title(tr::now),
+		.text = { tr::lng_gift_transfer_early(tr::now, lt_duration, days
+			? tr::lng_days(tr::now, lt_count, days)
+			: hours
+			? tr::lng_hours(tr::now, lt_count, hours)
+			: tr::lng_minutes(tr::now, lt_count, minutes)) },
+	});
+	return true;
 }

@@ -17,11 +17,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "info/profile/info_profile_widget.h"
 #include "info/media/info_media_widget.h"
 #include "info/common_groups/info_common_groups_widget.h"
+#include "info/peer_gifts/info_peer_gifts_common.h"
+#include "info/saved/info_saved_music_common.h"
+#include "info/stories/info_stories_common.h"
 #include "info/info_layer_widget.h"
 #include "info/info_section_widget.h"
 #include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/controls/swipe_handler.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/padding_wrap.h"
@@ -161,6 +165,8 @@ Ui::RpWidget *ContentWidget::doSetInnerWidget(
 			_innerWrap ? _innerWrap->padding() : style::margins()));
 	_innerWrap->move(0, 0);
 
+	setupSwipeHandler(_innerWrap);
+
 	// MSVC BUG + REGRESSION rpl::mappers::tuple :(
 	rpl::combine(
 		_scroll->scrollTopValue(),
@@ -175,6 +181,24 @@ Ui::RpWidget *ContentWidget::doSetInnerWidget(
 		_innerWrap->setVisibleTopBottom(top, bottom);
 		_scrollTillBottomChanges.fire_copy(std::max(desired - bottom, 0));
 	}, _innerWrap->lifetime());
+
+	rpl::combine(
+		_scroll->heightValue(),
+		_innerWrap->entity()->heightValue(),
+		_controller->wrapValue()
+	) | rpl::start_with_next([=](
+			int scrollHeight,
+			int innerHeight,
+			Wrap wrap) {
+		const auto added = (wrap == Wrap::Layer)
+			? 0
+			: std::max(scrollHeight - innerHeight, 0);
+		if (_addedHeight != added) {
+			_addedHeight = added;
+			updateInnerPadding();
+		}
+	}, _innerWrap->lifetime());
+	updateInnerPadding();
 
 	return _innerWrap->entity();
 }
@@ -205,9 +229,17 @@ rpl::producer<int> ContentWidget::scrollHeightValue() const {
 }
 
 void ContentWidget::applyAdditionalScroll(int additionalScroll) {
-	if (_innerWrap) {
-		_innerWrap->setPadding({ 0, 0, 0, additionalScroll });
+	if (_additionalScroll != additionalScroll) {
+		_additionalScroll = additionalScroll;
+		if (_innerWrap) {
+			updateInnerPadding();
+		}
 	}
+}
+
+void ContentWidget::updateInnerPadding() {
+	const auto addedToBottom = std::max(_additionalScroll, _addedHeight);
+	_innerWrap->setPadding({ 0, 0, 0, addedToBottom });
 }
 
 void ContentWidget::applyMaxVisibleHeight(int maxVisibleHeight) {
@@ -278,6 +310,7 @@ QRect ContentWidget::floatPlayerAvailableRect() const {
 void ContentWidget::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 	const auto peer = _controller->key().peer();
 	const auto topic = _controller->key().topic();
+	const auto sublist = _controller->key().sublist();
 	if (!peer && !topic) {
 		return;
 	}
@@ -287,6 +320,8 @@ void ContentWidget::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		Dialogs::EntryState{
 			.key = (topic
 				? Dialogs::Key{ topic }
+				: sublist
+				? Dialogs::Key{ sublist }
 				: Dialogs::Key{ peer->owner().history(peer) }),
 			.section = Dialogs::EntryState::Section::Profile,
 		},
@@ -381,17 +416,82 @@ not_null<Ui::ScrollArea*> ContentWidget::scroll() const {
 	return _scroll.data();
 }
 
+void ContentWidget::replaceSwipeHandler(
+		Ui::Controls::SwipeHandlerArgs *incompleteArgs) {
+	_swipeHandlerLifetime.destroy();
+	auto args = std::move(*incompleteArgs);
+	args.widget = _innerWrap;
+	args.scroll = _scroll.data();
+	args.onLifetime = &_swipeHandlerLifetime;
+	Ui::Controls::SetupSwipeHandler(std::move(args));
+}
+
+void ContentWidget::setupSwipeHandler(not_null<Ui::RpWidget*> widget) {
+	_swipeHandlerLifetime.destroy();
+
+	auto update = [=](Ui::Controls::SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!_swipeBackData.callback) {
+				_swipeBackData = Ui::Controls::SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			_swipeBackData.callback(data);
+			return;
+		} else if (_swipeBackData.lifetime) {
+			_swipeBackData = {};
+		}
+	};
+
+	auto init = [=](int, Qt::LayoutDirection direction) {
+		return (direction == Qt::RightToLeft && _controller->hasBackButton())
+			? Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+				checkBeforeClose(crl::guard(this, [=] {
+					_controller->parentController()->hideLayer();
+					_controller->showBackFromStack();
+				}));
+			})
+			: Ui::Controls::SwipeHandlerFinishData();
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = widget,
+		.scroll = _scroll.data(),
+		.update = std::move(update),
+		.init = std::move(init),
+		.onLifetime = &_swipeHandlerLifetime,
+	});
+}
+
 Key ContentMemento::key() const {
 	if (const auto topic = this->topic()) {
 		return Key(topic);
+	} else if (const auto sublist = this->sublist()) {
+		return Key(sublist);
 	} else if (const auto peer = this->peer()) {
 		return Key(peer);
 	} else if (const auto poll = this->poll()) {
 		return Key(poll, pollContextId());
 	} else if (const auto self = settingsSelf()) {
 		return Settings::Tag{ self };
+	} else if (const auto gifts = giftsPeer()) {
+		return PeerGifts::Tag{
+			gifts,
+			giftsCollectionId(),
+		};
 	} else if (const auto stories = storiesPeer()) {
-		return Stories::Tag{ stories, storiesTab() };
+		return Stories::Tag{
+			stories,
+			storiesAlbumId(),
+			storiesAddToAlbumId(),
+		};
+	} else if (const auto music = musicPeer()) {
+		return Saved::MusicTag{ music };
 	} else if (statisticsTag().peer) {
 		return statisticsTag();
 	} else if (const auto starref = starrefPeer()) {
@@ -408,12 +508,14 @@ Key ContentMemento::key() const {
 ContentMemento::ContentMemento(
 	not_null<PeerData*> peer,
 	Data::ForumTopic *topic,
+	Data::SavedSublist *sublist,
 	PeerId migratedPeerId)
 : _peer(peer)
-, _migratedPeerId((!topic && peer->migrateFrom())
+, _migratedPeerId((!topic && !sublist && peer->migrateFrom())
 	? peer->migrateFrom()->id
 	: 0)
-, _topic(topic) {
+, _topic(topic)
+, _sublist(sublist) {
 	if (_topic) {
 		_peer->owner().itemIdChanged(
 		) | rpl::start_with_next([=](const Data::Session::IdChange &change) {
@@ -433,7 +535,17 @@ ContentMemento::ContentMemento(Downloads::Tag downloads) {
 
 ContentMemento::ContentMemento(Stories::Tag stories)
 : _storiesPeer(stories.peer)
-, _storiesTab(stories.tab) {
+, _storiesAlbumId(stories.albumId)
+, _storiesAddToAlbumId(stories.addingToAlbumId) {
+}
+
+ContentMemento::ContentMemento(Saved::MusicTag music)
+: _musicPeer(music.peer) {
+}
+
+ContentMemento::ContentMemento(PeerGifts::Tag gifts)
+: _giftsPeer(gifts.peer)
+, _giftsCollectionId(gifts.collectionId) {
 }
 
 ContentMemento::ContentMemento(Statistics::Tag statistics)

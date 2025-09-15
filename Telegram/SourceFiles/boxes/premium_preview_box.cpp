@@ -133,6 +133,8 @@ void PreloadSticker(const std::shared_ptr<Data::DocumentMedia> &media) {
 		return tr::lng_premium_summary_subtitle_business();
 	case PremiumFeature::Effects:
 		return tr::lng_premium_summary_subtitle_effects();
+	case PremiumFeature::TodoLists:
+		return tr::lng_premium_summary_subtitle_todo_lists();
 
 	case PremiumFeature::BusinessLocation:
 		return tr::lng_business_subtitle_location();
@@ -198,6 +200,8 @@ void PreloadSticker(const std::shared_ptr<Data::DocumentMedia> &media) {
 		return tr::lng_premium_summary_about_business();
 	case PremiumFeature::Effects:
 		return tr::lng_premium_summary_about_effects();
+	case PremiumFeature::TodoLists:
+		return tr::lng_premium_summary_about_todo_lists();
 
 	case PremiumFeature::BusinessLocation:
 		return tr::lng_business_about_location();
@@ -538,6 +542,7 @@ struct VideoPreviewDocument {
 		case PremiumFeature::LastSeen: return "last_seen";
 		case PremiumFeature::MessagePrivacy: return "message_privacy";
 		case PremiumFeature::Effects: return "effects";
+		case PremiumFeature::TodoLists: return "todo";
 
 		case PremiumFeature::BusinessLocation: return "business_location";
 		case PremiumFeature::BusinessHours: return "business_hours";
@@ -897,7 +902,7 @@ void PreviewBox(
 
 	const auto outer = box->addRow(
 		ChatBackPreview(box, size.height(), back),
-		{});
+		style::margins());
 
 	struct Hiding {
 		not_null<Ui::RpWidget*> widget;
@@ -1074,26 +1079,21 @@ void PreviewBox(
 	auto text = state->selected.value(
 	) | rpl::map(SectionAbout) | rpl::flatten_latest();
 
-	const auto padding = st::premiumPreviewAboutPadding;
-	const auto available = size.width() - padding.left() - padding.right();
-	auto titleLabel = object_ptr<Ui::FlatLabel>(
-		box,
-		std::move(title),
-		st::premiumPreviewAboutTitle);
-	titleLabel->resizeToWidth(available);
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			std::move(titleLabel)),
-		st::premiumPreviewAboutTitlePadding);
-	auto textLabel = object_ptr<Ui::FlatLabel>(
-		box,
-		std::move(text),
-		st::premiumPreviewAbout);
-	textLabel->resizeToWidth(available);
+			std::move(title),
+			st::premiumPreviewAboutTitle),
+		st::premiumPreviewAboutTitlePadding,
+		style::al_top);
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(box, std::move(textLabel)),
-		padding);
+		object_ptr<Ui::FlatLabel>(
+			box,
+			std::move(text),
+			st::premiumPreviewAbout),
+		st::premiumPreviewAboutPadding,
+		style::al_top
+	)->setTryMakeSimilarLines(true);
 	box->addRow(
 		CreateSwitch(box->verticalLayout(), &state->selected, state->order),
 		st::premiumDotsMargin);

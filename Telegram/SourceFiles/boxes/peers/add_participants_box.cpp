@@ -179,6 +179,7 @@ void FillUpgradeToPremiumCover(
 		CreateUserpicsWithMoreBadge(
 			container,
 			rpl::single(std::move(userpicPeers)),
+			st::boostReplaceUserpicsRow,
 			kUserpicsLimit),
 		st::inviteForbiddenUserpicsPadding)
 	)->entity()->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -232,7 +233,8 @@ void FillUpgradeToPremiumCover(
 			container,
 			rpl::single(text),
 			st::inviteForbiddenInfo),
-		st::inviteForbiddenInfoPadding);
+		st::inviteForbiddenInfoPadding,
+		style::al_top);
 }
 
 void SimpleForbiddenBox(
@@ -510,7 +512,8 @@ void InviteForbiddenController::setComplexCover() {
 		if (_can) {
 			container->add(
 				MakeShowOrLabel(container, tr::lng_invite_upgrade_or()),
-				st::inviteForbiddenOrLabelPadding);
+				st::inviteForbiddenOrLabelPadding,
+				style::al_justify);
 		}
 		container->add(
 			object_ptr<Ui::FlatLabel>(
@@ -519,7 +522,8 @@ void InviteForbiddenController::setComplexCover() {
 					? tr::lng_invite_upgrade_via_title()
 					: tr::lng_via_link_cant()),
 				st::inviteForbiddenTitle),
-			st::inviteForbiddenTitlePadding);
+			st::inviteForbiddenTitlePadding,
+			style::al_top);
 
 		const auto about = _can
 			? (_peer->isBroadcast()
@@ -543,7 +547,8 @@ void InviteForbiddenController::setComplexCover() {
 				container,
 				rpl::single(about),
 				st::inviteForbiddenInfo),
-			st::inviteForbiddenInfoPadding);
+			st::inviteForbiddenInfoPadding,
+			style::al_top);
 	}
 	delegate()->peerListSetAboveWidget(std::move(cover));
 }
@@ -808,7 +813,7 @@ void AddParticipantsBoxController::rowClicked(not_null<PeerListRow*> row) {
 		updateTitle();
 	} else if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
 		if (!_peer->isMegagroup()) {
-			showBox(Box<MaxInviteBox>(_peer->asChannel()));
+			showBox(Box<MaxInviteBox>(channel));
 		}
 	} else if (count >= serverConfig.chatSizeMax
 		&& count < serverConfig.megagroupSizeMax) {
@@ -897,9 +902,9 @@ bool AddParticipantsBoxController::needsInviteLinkButton() {
 	return _peer->asChat()->canHaveInviteLink();
 }
 
-QPointer<Ui::BoxContent> AddParticipantsBoxController::showBox(
+base::weak_qptr<Ui::BoxContent> AddParticipantsBoxController::showBox(
 		object_ptr<Ui::BoxContent> box) const {
-	const auto weak = Ui::MakeWeak(box.data());
+	const auto weak = base::make_weak(box.data());
 	delegate()->peerListUiShow()->showBox(std::move(box));
 	return weak;
 }
@@ -975,7 +980,7 @@ void AddParticipantsBoxController::inviteSelectedUsers(
 			tr::lng_participant_invite_history(),
 			true,
 			st::defaultBoxCheckbox);
-		const auto weak = Ui::MakeWeak(checkbox.data());
+		const auto weak = base::make_weak(checkbox.data());
 
 		auto text = (users.size() == 1)
 			? tr::lng_participant_invite_sure(
@@ -1204,9 +1209,9 @@ void AddSpecialBoxController::migrate(
 	_additional.migrate(chat, channel);
 }
 
-QPointer<Ui::BoxContent> AddSpecialBoxController::showBox(
+base::weak_qptr<Ui::BoxContent> AddSpecialBoxController::showBox(
 		object_ptr<Ui::BoxContent> box) const {
-	const auto weak = Ui::MakeWeak(box.data());
+	const auto weak = base::make_weak(box.data());
 	delegate()->peerListUiShow()->showBox(std::move(box));
 	return weak;
 }
@@ -1521,6 +1526,7 @@ void AddSpecialBoxController::editAdminDone(
 	}
 
 	_additional.applyAdminLocally(user, rights, rank);
+	// _adminDoneCallback should call changes().chatAdminUpdated.
 	if (const auto callback = _adminDoneCallback) {
 		callback(user, rights, rank);
 	}

@@ -25,7 +25,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "history/history_item_components.h"
-#include "history/history_item_helpers.h"
 #include "history/history_item.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
@@ -176,7 +175,7 @@ Gif::Gif(
 				if (!isOut) {
 					if (const auto item = data->message(fullId)) {
 						// Destroys this.
-						ClearMediaAsExpired(item);
+						item->clearMediaAsExpired();
 					}
 				}
 			}, *lifetime);
@@ -2201,6 +2200,7 @@ void Gif::ensureTranscribeButton() const {
 	if (_data->isVideoMessage()
 		&& !_parent->data()->media()->ttlSeconds()
 		&& !_parent->data()->isScheduled()
+		&& !_parent->data()->isAdminLogEntry()
 		&& (_data->session().premium()
 			|| _data->session().api().transcribes().trialsSupport())) {
 		if (!_transcribe) {

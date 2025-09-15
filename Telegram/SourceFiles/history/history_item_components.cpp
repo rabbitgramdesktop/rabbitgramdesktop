@@ -48,12 +48,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_file_click_handler.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
+#include "data/data_todo_list.h"
 #include "main/main_session.h"
 #include "window/window_session_controller.h"
 #include "api/api_bot.h"
 #include "support/support_helper.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
+#include "styles/style_credits.h"
 #include "styles/style_dialogs.h" // dialogsMiniReplyStory.
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
@@ -69,6 +71,38 @@ base::options::toggle FastButtonsModeOption({
 	.name = "Fast buttons mode",
 	.description = "Trigger inline keyboard buttons by 1-9 keyboard keys.",
 });
+
+[[nodiscard]] TextWithEntities ComposeTodoTasksList(
+		int fullCount,
+		const std::vector<TextWithEntities> &names) {
+	const auto count = int(names.size());
+	if (!count) {
+		return tr::lng_action_todo_tasks_fallback(
+			tr::now,
+			lt_count,
+			fullCount,
+			Ui::Text::WithEntities);
+	} else if (count == 1) {
+		return names.front();
+	}
+	auto full = names.front();
+	for (auto i = 1; i != count - 1; ++i) {
+		full = tr::lng_action_todo_tasks_and_one(
+			tr::now,
+			lt_tasks,
+			full,
+			lt_task,
+			names[i],
+			Ui::Text::WithEntities);
+	}
+	return tr::lng_action_todo_tasks_and_last(
+		tr::now,
+		lt_tasks,
+		full,
+		lt_task,
+		names.back(),
+		Ui::Text::WithEntities);
+}
 
 } // namespace
 
@@ -196,7 +230,7 @@ bool HiddenSenderInfo::paintCustomUserpic(
 		image.isNull() ? nullptr : &image,
 		image.isNull() ? &emptyUserpic : nullptr,
 		size * style::DevicePixelRatio(),
-		false);
+		Ui::PeerUserpicShape::Circle);
 	p.drawImage(QRect(x, y, size, size), view.cached);
 	return valid;
 }
@@ -353,6 +387,7 @@ ReplyFields ReplyFieldsFromMTP(
 				= data.vreply_to_top_id().value_or(result.messageId.bare);
 			result.topicPost = data.is_forum_topic() ? 1 : 0;
 		}
+		result.todoItemId = data.vtodo_item_id().value_or_empty();
 		if (const auto header = data.vreply_from()) {
 			const auto &data = header->data();
 			result.externalPostAuthor
@@ -417,6 +452,13 @@ FullReplyTo ReplyToFromMTP(
 			};
 		}
 		return FullReplyTo();
+	}, [&](const MTPDinputReplyToMonoForum &data) {
+		const auto parsed = Data::PeerFromInputMTP(
+			&history->owner(),
+			data.vmonoforum_peer_id());
+		return FullReplyTo{
+			.monoforumPeerId = parsed ? parsed->id : PeerId(),
+		};
 	});
 }
 
@@ -706,11 +748,6 @@ ReplyKeyboard::ReplyKeyboard(
 		const auto context = _item->fullId();
 		const auto rowCount = int(markup->data.rows.size());
 		_rows.reserve(rowCount);
-		const auto buttonEmoji = Ui::Text::SingleCustomEmoji(
-			owner->customEmojiManager().registerInternalEmoji(
-				st::settingsPremiumIconStar,
-				QMargins(0, -st::moderateBoxExpandInnerSkip, 0, 0),
-				true));
 		for (auto i = 0; i != rowCount; ++i) {
 			const auto &row = markup->data.rows[i];
 			const auto rowSize = int(row.size());
@@ -719,24 +756,34 @@ ReplyKeyboard::ReplyKeyboard(
 			for (auto j = 0; j != rowSize; ++j) {
 				auto button = Button();
 				using Type = HistoryMessageMarkupButton::Type;
-				const auto isBuy = (row[j].type == Type::Buy);
 				static const auto RegExp = QRegularExpression("\\b"
 					+ Ui::kCreditsCurrency
 					+ "\\b");
-				const auto text = isBuy
+				const auto type = row[j].type;
+				const auto text = (type == Type::Buy)
 					? base::duplicate(row[j].text).replace(
 						RegExp,
 						QChar(0x2B50))
 					: row[j].text;
+				const auto withEmoji = [&](const style::IconEmoji &icon) {
+					return Ui::Text::IconEmoji(&icon).append(text);
+				};
 				const auto textWithEntities = [&] {
-					if (!isBuy) {
+					if (type == Type::SuggestAccept) {
+						return withEmoji(st::chatSuggestAcceptIcon);
+					} else if (type == Type::SuggestDecline) {
+						return withEmoji(st::chatSuggestDeclineIcon);
+					} else if (type == Type::SuggestChange) {
+						return withEmoji(st::chatSuggestChangeIcon);
+					} else if (type != Type::Buy) {
 						return TextWithEntities();
 					}
 					auto result = TextWithEntities();
 					auto firstPart = true;
 					for (const auto &part : text.split(QChar(0x2B50))) {
 						if (!firstPart) {
-							result.append(buttonEmoji);
+							result.append(Ui::Text::IconEmoji(
+								&st::starIconEmojiLarge));
 						}
 						result.append(part);
 						firstPart = false;
@@ -745,7 +792,7 @@ ReplyKeyboard::ReplyKeyboard(
 						? TextWithEntities()
 						: result;
 				}();
-				button.type = row.at(j).type;
+				button.type = type;
 				button.link = std::make_shared<ReplyMarkupClickHandler>(
 					owner,
 					i,
@@ -755,11 +802,7 @@ ReplyKeyboard::ReplyKeyboard(
 					button.text.setMarkedText(
 						_st->textStyle(),
 						TextUtilities::SingleLine(textWithEntities),
-						kMarkupTextOptions,
-						Core::TextContext({
-							.session = &item->history()->owner().session(),
-							.repaint = [=] { _st->repaint(item); },
-						}));
+						kMarkupTextOptions);
 				} else {
 					button.text.setText(
 						_st->textStyle(),
@@ -1174,6 +1217,95 @@ bool HistoryMessageReplyMarkup::hiddenBy(Data::Media *media) const {
 	return false;
 }
 
+void HistoryMessageReplyMarkup::updateSuggestControls(
+		SuggestionActions actions) {
+	if (actions == SuggestionActions::AcceptAndDecline) {
+		data.flags |= ReplyMarkupFlag::SuggestionAccept;
+	} else {
+		data.flags &= ~ReplyMarkupFlag::SuggestionAccept;
+	}
+	if (actions == SuggestionActions::None) {
+		data.flags &= ~ReplyMarkupFlag::SuggestionDecline;
+	} else {
+		data.flags |= ReplyMarkupFlag::Inline
+			| ReplyMarkupFlag::SuggestionDecline;
+	}
+	using Type = HistoryMessageMarkupButton::Type;
+	const auto has = [&](Type type) {
+		return !data.rows.empty()
+			&& ranges::contains(
+				data.rows.back(),
+				type,
+				&HistoryMessageMarkupButton::type);
+	};
+	if (actions == SuggestionActions::AcceptAndDecline) {
+		//     ... rows ...
+		// [decline] | [accept]
+		//   [suggestchanges]
+		if (has(Type::SuggestChange)) {
+			// Nothing changed.
+		} else {
+			if (has(Type::SuggestDecline)) {
+				data.rows.pop_back();
+			}
+			data.rows.push_back({
+				{
+					Type::SuggestDecline,
+					tr::lng_suggest_action_decline(tr::now),
+				},
+				{
+					Type::SuggestAccept,
+					tr::lng_suggest_action_accept(tr::now),
+				},
+			});
+			data.rows.push_back({ {
+				Type::SuggestChange,
+				tr::lng_suggest_action_change(tr::now),
+			} });
+			data.flags |= ReplyMarkupFlag::SuggestionAccept
+				| ReplyMarkupFlag::SuggestionDecline;
+		}
+		if (data.rows.size() > 2) {
+			data.flags |= ReplyMarkupFlag::SuggestionSeparator;
+		} else {
+			data.flags &= ~ReplyMarkupFlag::SuggestionSeparator;
+		}
+	} else {
+		while (!data.rows.empty()) {
+			if (has(Type::SuggestChange) || has(Type::SuggestAccept)) {
+				data.rows.pop_back();
+			} else if (has(Type::SuggestDecline)
+				&& actions == SuggestionActions::None) {
+				data.rows.pop_back();
+			} else {
+				break;
+			}
+		}
+		data.flags &= ~ReplyMarkupFlag::SuggestionAccept;
+		if (actions == SuggestionActions::None) {
+			data.flags &= ~ReplyMarkupFlag::SuggestionDecline;
+			data.flags &= ~ReplyMarkupFlag::SuggestionSeparator;
+		} else {
+			if (!has(Type::SuggestDecline)) {
+				// ... rows ...
+				//  [decline]
+				data.rows.push_back({ {
+					Type::SuggestDecline,
+					tr::lng_suggest_action_decline(tr::now),
+				} });
+				data.flags |= ReplyMarkupFlag::SuggestionDecline;
+			}
+			if (data.rows.size() > 1) {
+				data.flags |= ReplyMarkupFlag::SuggestionSeparator;
+			} else {
+				data.flags &= ~ReplyMarkupFlag::SuggestionSeparator;
+			}
+		}
+	}
+
+	inlineKeyboard = nullptr;
+}
+
 HistoryMessageLogEntryOriginal::HistoryMessageLogEntryOriginal() = default;
 
 HistoryMessageLogEntryOriginal::HistoryMessageLogEntryOriginal(
@@ -1204,11 +1336,7 @@ MessageFactcheck FromMTP(
 	}
 	const auto &data = factcheck->data();
 	if (const auto text = data.vtext()) {
-		const auto &data = text->data();
-		result.text = {
-			qs(data.vtext()),
-			Api::EntitiesFromMTP(session, data.ventities().v),
-		};
+		result.text = Api::ParseTextWithEntities(session, *text);
 	}
 	if (const auto country = data.vcountry()) {
 		result.country = qs(country->v);
@@ -1216,6 +1344,38 @@ MessageFactcheck FromMTP(
 	result.hash = data.vhash().v;
 	result.needCheck = data.is_need_check();
 	return result;
+}
+
+TextWithEntities ComposeTodoTasksList(
+		HistoryItem *itemWithList,
+		const std::vector<int> &ids) {
+	const auto media = itemWithList ? itemWithList->media() : nullptr;
+	const auto list = media ? media->todolist() : nullptr;
+	auto names = std::vector<TextWithEntities>();
+	if (list) {
+		names.reserve(ids.size());
+		for (const auto &id : ids) {
+			const auto i = ranges::find(list->items, id, &TodoListItem::id);
+			if (i == end(list->items)) {
+				names.clear();
+				break;
+			}
+			names.push_back(
+				TextWithEntities().append('"').append(i->text).append('"'));
+		}
+	}
+	return ComposeTodoTasksList(ids.size(), names);
+}
+
+TextWithEntities ComposeTodoTasksList(
+		not_null<HistoryServiceTodoAppendTasks*> append) {
+	auto names = std::vector<TextWithEntities>();
+	names.reserve(append->list.size());
+	for (const auto &task : append->list) {
+		names.push_back(
+			TextWithEntities().append('"').append(task.text).append('"'));
+	}
+	return ComposeTodoTasksList(names.size(), names);
 }
 
 HistoryDocumentCaptioned::HistoryDocumentCaptioned()

@@ -148,6 +148,7 @@ public:
 
 	[[nodiscard]] QString title() const;
 	[[nodiscard]] TextWithEntities titleWithIcon() const;
+	[[nodiscard]] TextWithEntities titleWithIconOrLogo() const;
 	[[nodiscard]] int titleVersion() const;
 	void applyTitle(const QString &title);
 	[[nodiscard]] DocumentId iconId() const;
@@ -181,7 +182,7 @@ public:
 	void setMuted(bool muted) override;
 
 	[[nodiscard]] auto sendActionPainter()
-		->not_null<HistoryView::SendActionPainter*> override;
+		-> HistoryView::SendActionPainter* override;
 
 private:
 	enum class Flag : uchar {

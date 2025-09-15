@@ -494,7 +494,7 @@ StickerSetBox::StickerSetBox(
 : StickerSetBox(parent, std::move(show), set->identifier(), set->type()) {
 }
 
-QPointer<Ui::BoxContent> StickerSetBox::Show(
+base::weak_qptr<Ui::BoxContent> StickerSetBox::Show(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<DocumentData*> document) {
 	if (const auto sticker = document->sticker()) {
@@ -503,7 +503,7 @@ QPointer<Ui::BoxContent> StickerSetBox::Show(
 				show,
 				sticker->set,
 				sticker->setType);
-			const auto result = QPointer<Ui::BoxContent>(box.data());
+			const auto result = base::make_weak(box.data());
 			show->showBox(std::move(box));
 			return result;
 		}
@@ -641,20 +641,11 @@ void ChangeSetNameBox(
 		const auto it = sets.find(input.id);
 		return (it == sets.end()) ? QString() : it->second->title;
 	}();
-	const auto wrap = box->addRow(object_ptr<Ui::FixedHeightWidget>(
+	const auto field = box->addRow(object_ptr<Ui::InputField>(
 		box,
-		st::editStickerSetNameField.heightMin));
-	auto owned = object_ptr<Ui::InputField>(
-		wrap,
 		st::editStickerSetNameField,
 		tr::lng_stickers_context_edit_name(),
-		wasName);
-	const auto field = owned.data();
-	wrap->widthValue() | rpl::start_with_next([=](int width) {
-		field->move(0, 0);
-		field->resize(width, field->height());
-		wrap->resize(width, field->height());
-	}, wrap->lifetime());
+		wasName));
 	field->selectAll();
 	constexpr auto kMaxSetNameLength = 50;
 	field->setMaxLength(kMaxSetNameLength);
@@ -1485,7 +1476,7 @@ void StickerSetBox::Inner::fillDeleteStickerBox(
 		int index) {
 	Expects(index >= 0 || index < _pack.size());
 	const auto document = _pack[index];
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto show = _show;
 
 	const auto container = box->verticalLayout();
@@ -1510,7 +1501,7 @@ void StickerSetBox::Inner::fillDeleteStickerBox(
 	sticker->paintRequest(
 	) | rpl::start_with_next([=] {
 		auto p = Painter(sticker);
-		if (const auto strong = weak.data()) {
+		if ([[maybe_unused]] const auto strong = weak.get()) {
 			const auto paused = On(PowerSaving::kStickersPanel)
 				|| show->paused(ChatHelpers::PauseReason::Layer);
 			paintSticker(p, index, QPoint(), paused, crl::now());
@@ -1551,7 +1542,7 @@ void StickerSetBox::Inner::fillDeleteStickerBox(
 		if (state->requestId.current()) {
 			return;
 		}
-		const auto weakBox = Ui::MakeWeak(box);
+		const auto weakBox = base::make_weak(box);
 		const auto buttonWidth = state->saveButton
 			? state->saveButton->width()
 			: 0;
@@ -1564,14 +1555,14 @@ void StickerSetBox::Inner::fillDeleteStickerBox(
 					Data::StickersType::Stickers);
 			}, [](const auto &) {
 			});
-			if (const auto strong = weak.data()) {
+			if ([[maybe_unused]] const auto strong = weak.get()) {
 				applySet(result);
 			}
-			if (const auto strongBox = weakBox.data()) {
+			if (const auto strongBox = weakBox.get()) {
 				strongBox->closeBox();
 			}
 		}).fail([=](const MTP::Error &error) {
-			if (const auto strongBox = weakBox.data()) {
+			if (const auto strongBox = weakBox.get()) {
 				strongBox->uiShow()->showToast(error.type());
 			}
 		}).send();

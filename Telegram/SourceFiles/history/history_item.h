@@ -22,18 +22,15 @@ struct HistoryMessageMarkupData;
 struct HistoryMessageReplyMarkup;
 struct HistoryMessageTranslation;
 struct HistoryMessageForwarded;
-struct HistoryMessageSavedMediaData;
-struct HistoryMessageFactcheck;
+struct HistoryMessageSuggestedPost;
 struct HistoryServiceDependentData;
+struct HistoryServiceTodoCompletions;
 enum class HistorySelfDestructType;
 struct PreparedServiceText;
 struct MessageFactcheck;
 class ReplyKeyboard;
 struct LanguageId;
-
-namespace Api {
-struct SendOptions;
-} // namespace Api
+enum class SuggestionActions : uchar;
 
 namespace base {
 template <typename Enum>
@@ -44,15 +41,6 @@ namespace Storage {
 enum class SharedMediaType : signed char;
 using SharedMediaTypesMask = base::enum_mask<SharedMediaType>;
 } // namespace Storage
-
-namespace Ui {
-class RippleAnimation;
-} // namespace Ui
-
-namespace style {
-struct BotKeyboardButton;
-struct RippleAnimation;
-} // namespace style
 
 namespace Data {
 struct MessagePosition;
@@ -71,24 +59,11 @@ struct PaidReactionSend;
 struct SendError;
 } // namespace Data
 
-namespace Main {
-class Session;
-} // namespace Main
-
-namespace Window {
-class SessionController;
-} // namespace Window
-
 namespace HistoryUnreadThings {
 enum class AddType;
 } // namespace HistoryUnreadThings
 
 namespace HistoryView {
-struct TextState;
-struct StateRequest;
-enum class CursorState : char;
-enum class PointState : char;
-enum class Context : char;
 class ElementDelegate;
 class Element;
 class Message;
@@ -109,6 +84,7 @@ struct HistoryItemCommonFields {
 	uint64 groupedId = 0;
 	EffectId effectId = 0;
 	HistoryMessageMarkupData markup;
+	HistoryMessageSuggestInfo suggest;
 	bool ignoreForwardFrom = false;
 	bool ignoreForwardCaptions = false;
 };
@@ -117,6 +93,12 @@ enum class HistoryReactionSource : char {
 	Selector,
 	Quick,
 	Existing,
+};
+
+enum class PaidPostType : uchar {
+	None,
+	Stars,
+	Ton,
 };
 
 class HistoryItem final : public RuntimeComposer<HistoryItem> {
@@ -207,8 +189,10 @@ public:
 	[[nodiscard]] bool isFromScheduled() const;
 	[[nodiscard]] bool isScheduled() const;
 	[[nodiscard]] bool isSponsored() const;
+	[[nodiscard]] bool canLookupMessageAuthor() const;
 	[[nodiscard]] bool skipNotification() const;
 	[[nodiscard]] bool isUserpicSuggestion() const;
+	[[nodiscard]] bool isSavedMusicItem() const;
 	[[nodiscard]] BusinessShortcutId shortcutId() const;
 	[[nodiscard]] bool isBusinessShortcut() const;
 	void setRealShortcutId(BusinessShortcutId id);
@@ -252,6 +236,9 @@ public:
 	[[nodiscard]] bool invertMedia() const {
 		return _flags & MessageFlag::InvertMedia;
 	}
+	[[nodiscard]] bool storyInProfile() const {
+		return _flags & MessageFlag::StoryInProfile;
+	}
 	[[nodiscard]] bool unread(not_null<Data::Thread*> thread) const;
 	[[nodiscard]] bool showNotification() const;
 	void markClientSideAsRead();
@@ -267,6 +254,7 @@ public:
 	void markMediaAndMentionRead();
 	bool markContentsRead(bool fromThisClient = false);
 	void setIsPinned(bool isPinned);
+	void setStoryInProfile(bool inProfile);
 
 	// For edit media in history_message.
 	void returnSavedMedia();
@@ -323,7 +311,7 @@ public:
 		return (_flags & MessageFlag::HideEdited);
 	}
 	[[nodiscard]] bool hideDisplayDate() const {
-		return (_flags & MessageFlag::HideDisplayDate);
+		return isEmpty() || (_flags & MessageFlag::HideDisplayDate);
 	}
 	[[nodiscard]] bool isLocal() const {
 		return _flags & MessageFlag::Local;
@@ -347,6 +335,7 @@ public:
 	[[nodiscard]] bool hasUnpaidContent() const;
 	[[nodiscard]] bool inHighlightProcess() const;
 	void highlightProcessDone();
+	[[nodiscard]] PaidPostType paidType() const;
 
 	void setCommentsInboxReadTill(MsgId readTillId);
 	void setCommentsMaxId(MsgId maxId);
@@ -377,8 +366,12 @@ public:
 	void overrideMedia(std::unique_ptr<Data::Media> media);
 
 	void applyEditionToHistoryCleared();
-	void updateReplyMarkup(HistoryMessageMarkupData &&markup);
+	void updateReplyMarkup(
+		HistoryMessageMarkupData &&markup,
+		bool ignoreSuggestButtons = false);
 	void contributeToSlowmode(TimeId realDate = 0);
+
+	void clearMediaAsExpired();
 
 	void addToUnreadThings(HistoryUnreadThings::AddType type);
 	void destroyHistoryEntry();
@@ -449,6 +442,8 @@ public:
 	[[nodiscard]] bool requiresSendInlineRight() const;
 	[[nodiscard]] Data::SendError errorTextForForward(
 		not_null<Data::Thread*> to) const;
+	[[nodiscard]] Data::SendError errorTextForForwardIgnoreRights(
+		not_null<Data::Thread*> to) const;
 	[[nodiscard]] const HistoryMessageTranslation *translation() const;
 	[[nodiscard]] bool translationShowRequiresCheck(LanguageId to) const;
 	bool translationShowRequiresRequest(LanguageId to);
@@ -517,7 +512,7 @@ public:
 	[[nodiscard]] MsgId originalId() const;
 
 	[[nodiscard]] Data::SavedSublist *savedSublist() const;
-	[[nodiscard]] PeerData *savedSublistPeer() const;
+	[[nodiscard]] PeerId sublistPeerId() const;
 	[[nodiscard]] PeerData *savedFromSender() const;
 	[[nodiscard]] const HiddenSenderInfo *savedFromHiddenSenderInfo() const;
 
@@ -562,6 +557,13 @@ public:
 	[[nodiscard]] bool canUpdateDate() const;
 	void customEmojiRepaint();
 
+	[[nodiscard]] SuggestionActions computeSuggestionActions() const;
+	[[nodiscard]] SuggestionActions computeSuggestionActions(
+		const HistoryMessageSuggestedPost *suggest) const;
+	[[nodiscard]] SuggestionActions computeSuggestionActions(
+		bool accepted,
+		bool rejected) const;
+
 	[[nodiscard]] bool needsUpdateForVideoQualities(const MTPMessage &data);
 
 	[[nodiscard]] TimeId ttlDestroyAt() const {
@@ -595,9 +597,12 @@ private:
 		return _flags & MessageFlag::Legacy;
 	}
 
-	[[nodiscard]] bool checkCommentsLinkedChat(ChannelId id) const;
+	[[nodiscard]] bool checkDiscussionLink(ChannelId id) const;
 
-	void setReplyMarkup(HistoryMessageMarkupData &&markup);
+	void setReplyMarkup(
+		HistoryMessageMarkupData &&markup,
+		bool ignoreSuggestButtons = false);
+	void updateSuggestControls(const HistoryMessageSuggestedPost *suggest);
 
 	void changeReplyToTopCounter(
 		not_null<HistoryMessageReply*> reply,
@@ -669,6 +674,17 @@ private:
 		CallId linkCallId);
 	[[nodiscard]] PreparedServiceText prepareCallScheduledText(
 		TimeId scheduleDate);
+	[[nodiscard]] PreparedServiceText prepareTodoCompletionsText();
+	[[nodiscard]] PreparedServiceText prepareTodoAppendTasksText();
+
+	[[nodiscard]] PreparedServiceText composeTodoIncompleted(
+		not_null<HistoryServiceTodoCompletions*> done);
+	[[nodiscard]] PreparedServiceText composeTodoCompleted(
+		not_null<HistoryServiceTodoCompletions*> done);
+
+	[[nodiscard]] PreparedServiceText prepareServiceTextForMessage(
+		const MTPMessageMedia &media,
+		bool unread);
 
 	void flagSensitiveContent();
 	[[nodiscard]] PeerData *computeDisplayFrom() const;

@@ -35,7 +35,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/slider_natural_width.h"
 #include "ui/wrap/slide_wrap.h"
@@ -118,7 +117,7 @@ void InnerWidget::fill() {
 	using namespace Info::ChannelEarn;
 	const auto container = this;
 	const auto &data = _state;
-	const auto multiplier = data.usdRate * Data::kEarnMultiplier;
+	const auto multiplier = data.usdRate;
 	constexpr auto kMinorLength = 3;
 
 	auto availableBalanceValue = rpl::single(
@@ -128,8 +127,15 @@ void InnerWidget::fill() {
 			return _state.availableBalance;
 		})
 	);
-	auto valueToString = [](StarsAmount v) {
-		return Lang::FormatStarsAmountDecimal(v);
+	auto overallBalanceValue = rpl::single(
+		data.overallRevenue
+	) | rpl::then(
+		_stateUpdated.events() | rpl::map([=] {
+			return _state.overallRevenue;
+		})
+	);
+	auto valueToString = [](CreditsAmount v) {
+		return Lang::FormatCreditsAmountDecimal(v);
 	};
 
 	if (data.revenueGraph.chart) {
@@ -154,7 +160,7 @@ void InnerWidget::fill() {
 		Ui::AddSkip(container, st::channelEarnOverviewTitleSkip);
 
 		const auto addOverview = [&](
-				rpl::producer<StarsAmount> value,
+				rpl::producer<CreditsAmount> value,
 				const tr::phrase<> &text) {
 			const auto line = container->add(
 				Ui::CreateSkipWidget(container, 0),
@@ -170,8 +176,10 @@ void InnerWidget::fill() {
 				line,
 				std::move(
 					value
-				) | rpl::map([=](StarsAmount v) {
-					return v ? ToUsd(v, multiplier, kMinorLength) : QString();
+				) | rpl::map([=](CreditsAmount v) {
+					return v
+						? ToUsd(v, multiplier, kMinorLength)
+						: QString();
 				}),
 				st::channelEarnOverviewSubMinorLabel);
 			rpl::combine(
@@ -205,17 +213,13 @@ void InnerWidget::fill() {
 			tr::lng_bot_earn_available);
 		Ui::AddSkip(container);
 		Ui::AddSkip(container);
-		// addOverview(data.currentBalance, tr::lng_bot_earn_reward);
-		// Ui::AddSkip(container);
-		// Ui::AddSkip(container);
 		addOverview(
-			rpl::single(
-				data.overallRevenue
-			) | rpl::then(
-				_stateUpdated.events() | rpl::map([=] {
-					return _state.overallRevenue;
-				})
-			),
+			rpl::single(data.currentBalance),
+			tr::lng_bot_earn_reward);
+		Ui::AddSkip(container);
+		Ui::AddSkip(container);
+		addOverview(
+			rpl::duplicate(overallBalanceValue),
 			tr::lng_bot_earn_total);
 		Ui::AddSkip(container);
 		Ui::AddSkip(container);
@@ -224,6 +228,7 @@ void InnerWidget::fill() {
 	}
 	{
 		AddHeader(container, tr::lng_bot_earn_balance_title);
+		Ui::AddSkip(container);
 		auto dateValue = rpl::single(
 			data.nextWithdrawalAt
 		) | rpl::then(
@@ -242,16 +247,20 @@ void InnerWidget::fill() {
 					return _state.buyAdsUrl;
 				})
 			),
-			rpl::duplicate(availableBalanceValue),
+			peer()->isSelf()
+				? rpl::duplicate(overallBalanceValue) | rpl::type_erased()
+				: rpl::duplicate(availableBalanceValue),
 			rpl::duplicate(dateValue),
 			_state.isWithdrawalEnabled,
-			rpl::duplicate(
-				availableBalanceValue
-			) | rpl::map([=](StarsAmount v) {
+			(peer()->isSelf()
+				? rpl::duplicate(overallBalanceValue) | rpl::type_erased()
+				: rpl::duplicate(availableBalanceValue)
+			) | rpl::map([=](CreditsAmount v) {
 				return v ? ToUsd(v, multiplier, kMinorLength) : QString();
 			}));
+		container->resizeToWidth(container->width());
 	}
-	if (BotStarRef::Join::Allowed(peer())) {
+	if (BotStarRef::Join::Allowed(peer()) && !peer()->isSelf()) {
 		const auto button = BotStarRef::AddViewListButton(
 			container,
 			tr::lng_credits_summary_earn_title(),
@@ -263,7 +272,9 @@ void InnerWidget::fill() {
 		Ui::AddSkip(container);
 		Ui::AddDivider(container);
 	}
-	fillHistory();
+	if (!peer()->isSelf()) {
+		fillHistory();
+	}
 }
 
 void InnerWidget::fillHistory() {

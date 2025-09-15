@@ -15,6 +15,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history.h"
 #include "history/history_drag_area.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
+#include "history/history_view_swipe_back_session.h"
 #include "menu/menu_send.h" // SendMenu::Type.
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/tooltip.h"
@@ -230,6 +231,8 @@ ScheduledWidget::ScheduledWidget(
 				_composeControls->editMessage(
 					fullId,
 					_inner->getSelectedTextRange(item));
+			} else if (media->todolist()) {
+				Window::PeerMenuEditTodoList(controller, item);
 			}
 		}
 	}, _inner->lifetime());
@@ -245,6 +248,7 @@ ScheduledWidget::ScheduledWidget(
 		_inner->setEmptyInfoWidget(std::move(emptyInfo));
 	}
 	setupComposeControls();
+	Window::SetupSwipeBackSection(this, _scroll, _inner);
 }
 
 ScheduledWidget::~ScheduledWidget() = default;
@@ -266,15 +270,22 @@ void ScheduledWidget::setupComposeControls() {
 					: tr::lng_forum_topic_closed(tr::now);
 			});
 			return rpl::combine(
+				session().frozenValue(),
 				session().changes().peerFlagsValue(
 					_history->peer,
 					Data::PeerUpdate::Flag::Rights),
 				Data::CanSendAnythingValue(_history->peer),
 				std::move(topicWriteRestrictions)
 			) | rpl::map([=](
+					const Main::FreezeInfo &info,
 					auto,
 					auto,
 					Data::SendError topicRestriction) {
+				if (info) {
+					return Controls::WriteRestriction{
+						.type = Controls::WriteRestrictionType::Frozen,
+					};
+				}
 				const auto allWithoutPolls = Data::AllSendRestrictions()
 					& ~ChatRestriction::SendPolls;
 				const auto canSendAnything = Data::CanSendAnyOf(
@@ -301,11 +312,17 @@ void ScheduledWidget::setupComposeControls() {
 		}()
 		: [&] {
 			return rpl::combine(
+				session().frozenValue(),
 				session().changes().peerFlagsValue(
 					_history->peer,
 					Data::PeerUpdate::Flag::Rights),
 				Data::CanSendAnythingValue(_history->peer)
-			) | rpl::map([=] {
+			) | rpl::map([=](const Main::FreezeInfo &info, auto, auto) {
+				if (info) {
+					return Controls::WriteRestriction{
+						.type = Controls::WriteRestrictionType::Frozen,
+					};
+				}
 				const auto allWithoutPolls = Data::AllSendRestrictions()
 					& ~ChatRestriction::SendPolls;
 				const auto canSendAnything = Data::CanSendAnyOf(
@@ -413,12 +430,8 @@ void ScheduledWidget::setupComposeControls() {
 			if (item->isScheduled() && item->history() == _history) {
 				showAtPosition(item->position());
 			} else {
-				JumpToMessageClickHandler(
-					item,
-					{},
-					to.quote,
-					to.quoteOffset
-				)->onClick({});
+				const auto highlight = to.highlight();
+				JumpToMessageClickHandler(item, {}, highlight)->onClick({});
 			}
 		}
 	}, lifetime());
@@ -1327,9 +1340,9 @@ void ScheduledWidget::showProcessingVideoTooltip() {
 			st::defaultImportantTooltipLabel),
 		st::defaultImportantTooltip);
 	const auto tooltip = _processingVideoTooltip.get();
-	const auto weak = QPointer<QWidget>(tooltip);
+	const auto weak = base::make_weak(tooltip);
 	const auto destroy = [=] {
-		delete weak.data();
+		delete weak.get();
 	};
 	tooltip->setAttribute(Qt::WA_TransparentForMouseEvents);
 	tooltip->setHiddenCallback([=] {

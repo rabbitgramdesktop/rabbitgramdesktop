@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "dialogs/ui/dialogs_quick_action_context.h"
 #include "ui/cached_round_corners.h"
 
 namespace style {
@@ -17,9 +18,6 @@ struct VerifiedBadge;
 namespace st {
 extern const style::DialogRow &defaultDialogRow;
 } // namespace st
-
-namespace Ui {
-} // namespace Ui
 
 namespace Data {
 class Forum;
@@ -57,6 +55,7 @@ struct TopicJumpCache {
 struct PaintContext {
 	RightButton *rightButton = nullptr;
 	std::vector<QImage*> *chatsFilterTags = nullptr;
+	QuickActionContext *quickActionContext = nullptr;
 	not_null<const style::DialogRow*> st;
 	TopicJumpCache *topicJumpCache = nullptr;
 	Data::Folder *folder = nullptr;
@@ -65,6 +64,7 @@ struct PaintContext {
 	FilterId filter = 0;
 	float64 topicsExpanded = 0.;
 	crl::time now = 0;
+	QStringView searchLowerText;
 	int width = 0;
 	bool active = false;
 	bool selected = false;
@@ -110,5 +110,7 @@ void PaintCollapsedRow(
 	const QString &text,
 	int unread,
 	const PaintContext &context);
+
+int PaintRightButton(QPainter &p, const PaintContext &context);
 
 } // namespace Dialogs::Ui

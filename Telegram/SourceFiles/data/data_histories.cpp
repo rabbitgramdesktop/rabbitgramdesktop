@@ -10,12 +10,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_text_entities.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
-#include "data/data_session.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_document.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
+#include "data/data_saved_music.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
 #include "base/unixtime.h"
 #include "base/random.h"
@@ -60,6 +63,14 @@ MTPInputReplyTo ReplyToForMTP(
 			&& (to->history() != history || to->id != replyingToTopicId))
 			? to->topicRootId()
 			: replyingToTopicId;
+		const auto possibleMonoforumPeerId = (to && to->sublistPeerId())
+			? to->sublistPeerId()
+			: replyTo.monoforumPeerId
+			? replyTo.monoforumPeerId
+			: history->session().user()->id;
+		const auto replyToMonoforumPeerId = history->peer->amMonoforumAdmin()
+			? possibleMonoforumPeerId
+			: PeerId();
 		const auto external = replyTo.messageId
 			&& (replyTo.messageId.peer != history->peer->id
 				|| replyingToTopicId != replyToTopicId);
@@ -74,9 +85,13 @@ MTPInputReplyTo ReplyToForMTP(
 				| (replyTo.quote.text.isEmpty()
 					? Flag()
 					: (Flag::f_quote_text | Flag::f_quote_offset))
+				| (replyToMonoforumPeerId
+					? Flag::f_monoforum_peer_id
+					: Flag())
 				| (quoteEntities.v.isEmpty()
 					? Flag()
-					: Flag::f_quote_entities)),
+					: Flag::f_quote_entities)
+				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())),
 			MTP_int(replyTo.messageId ? replyTo.messageId.msg : 0),
 			MTP_int(replyTo.topicRootId),
 			(external
@@ -84,7 +99,17 @@ MTPInputReplyTo ReplyToForMTP(
 				: MTPInputPeer()),
 			MTP_string(replyTo.quote.text),
 			quoteEntities,
-			MTP_int(replyTo.quoteOffset));
+			MTP_int(replyTo.quoteOffset),
+			(replyToMonoforumPeerId
+				? history->owner().peer(replyToMonoforumPeerId)->input
+				: MTPInputPeer()),
+			MTP_int(replyTo.todoItemId));
+	} else if (history->peer->amMonoforumAdmin()
+		&& replyTo.monoforumPeerId) {
+		const auto replyToMonoforumPeer = replyTo.monoforumPeerId
+			? history->owner().peer(replyTo.monoforumPeerId)
+			: history->session().user();
+		return MTP_inputReplyToMonoForum(replyToMonoforumPeer->input);
 	}
 	return MTPInputReplyTo();
 }
@@ -475,7 +500,26 @@ void Histories::changeDialogUnreadMark(
 	using Flag = MTPmessages_MarkDialogUnread::Flag;
 	session().api().request(MTPmessages_MarkDialogUnread(
 		MTP_flags(unread ? Flag::f_unread : Flag(0)),
+		MTPInputPeer(), // parent_peer
 		MTP_inputDialogPeer(history->peer->input)
+	)).send();
+}
+
+void Histories::changeSublistUnreadMark(
+		not_null<Data::SavedSublist*> sublist,
+		bool unread) {
+	const auto parent = sublist->parentChat();
+	if (!parent) {
+		return;
+	}
+	sublist->setUnreadMark(unread);
+
+	using Flag = MTPmessages_MarkDialogUnread::Flag;
+	session().api().request(MTPmessages_MarkDialogUnread(
+		MTP_flags(Flag::f_parent_peer
+			| (unread ? Flag::f_unread : Flag(0))),
+		parent->input,
+		MTP_inputDialogPeer(sublist->sublistPeer()->input)
 	)).send();
 }
 
@@ -671,6 +715,7 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 			} else {
 				Assert(!state->sentReadTill || state->sentReadTill > tillId);
 			}
+			history->validateMonoAndForumUnread(tillId);
 			sendReadRequests();
 			finish();
 		};
@@ -772,7 +817,7 @@ void Histories::deleteAllMessages(
 				channel->inputChannel,
 				MTP_int(deleteTillId)
 			)).done(finish).fail(finish).send();
-		} else if (revoke && chat && chat->amCreator()) {
+		} else if (!justClear && revoke && chat && chat->amCreator()) {
 			return session().api().request(MTPmessages_DeleteChat(
 				chat->inputChat
 			)).done(finish).fail([=](const MTP::Error &error) {
@@ -842,10 +887,10 @@ void Histories::deleteMessagesByDates(
 }
 
 void Histories::deleteMessagesByDates(
-		not_null<History*> history,
-		TimeId minDate,
-		TimeId maxDate,
-		bool revoke) {
+	not_null<History*> history,
+	TimeId minDate,
+	TimeId maxDate,
+	bool revoke) {
 	sendRequest(history, RequestType::Delete, [=](Fn<void()> finish) {
 		const auto peer = history->peer;
 		using Flag = MTPmessages_DeleteHistory::Flag;
@@ -878,10 +923,14 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 	base::flat_map<not_null<History*>, QVector<MTPint>> idsByPeer;
 	base::flat_map<not_null<PeerData*>, QVector<MTPint>> scheduledIdsByPeer;
 	base::flat_map<BusinessShortcutId, QVector<MTPint>> quickIdsByShortcut;
+	base::flat_set<not_null<DocumentData*>> savedMusic;
 	for (const auto &itemId : ids) {
 		if (const auto item = _owner->message(itemId)) {
 			const auto history = item->history();
-			if (item->isScheduled()) {
+			if (item->isSavedMusicItem()) {
+				savedMusic.emplace(item->media()->document());
+				continue;
+			} else if (item->isScheduled()) {
 				const auto wasOnServer = !item->isSending()
 					&& !item->hasFailed();
 				auto &scheduled = _owner->session().scheduledMessages();
@@ -929,6 +978,9 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 		)).done([=](const MTPUpdates &result) {
 			api->applyUpdates(result);
 		}).send();
+	}
+	for (const auto &document : savedMusic) {
+		document->owner().savedMusic().remove(document);
 	}
 
 	for (const auto item : remove) {
@@ -1054,13 +1106,12 @@ int Histories::sendPreparedMessage(
 		_creatingTopicRequests.emplace(id);
 		return id;
 	}
-	const auto realReplyTo = FullReplyTo{
-		.messageId = convertTopicReplyToId(history, replyTo.messageId),
-		.quote = replyTo.quote,
-		.storyId = replyTo.storyId,
-		.topicRootId = convertTopicReplyToId(history, replyTo.topicRootId),
-		.quoteOffset = replyTo.quoteOffset,
+	auto realReplyTo = replyTo;
+	const auto topicReplyToId = [&](const auto &id) {
+		return convertTopicReplyToId(history, id);
 	};
+	realReplyTo.messageId = topicReplyToId(replyTo.messageId);
+	realReplyTo.topicRootId = topicReplyToId(replyTo.topicRootId);
 	return v::match(message(history, realReplyTo), [&](const auto &request) {
 		const auto type = RequestType::Send;
 		return sendRequest(history, type, [=](Fn<void()> finish) {

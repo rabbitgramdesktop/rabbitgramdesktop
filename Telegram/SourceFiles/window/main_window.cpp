@@ -15,6 +15,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/platform/ui_platform_window.h"
 #include "platform/platform_window_title.h"
 #include "history/history.h"
+#include "info/media/info_media_widget.h" // SharedMediaTitle.
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "window/window_lock_widgets.h"
@@ -89,42 +90,24 @@ base::options::toggle OptionDisableTouchbar({
 	.restartRequired = true,
 });
 
-[[nodiscard]] QString TitleFromSeparateId(
+[[nodiscard]] QString TitleFromSeparateSharedMedia(
 		const Core::WindowTitleContent &settings,
 		const SeparateId &id) {
-	if (id.sharedMedia == SeparateSharedMediaType::None
-		|| !id.sharedMediaPeer()) {
+	if (id.type != SeparateType::SharedMedia) {
 		return QString();
 	}
-	const auto result = (id.sharedMedia == SeparateSharedMediaType::Photos)
-		? tr::lng_media_type_photos(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::Videos)
-		? tr::lng_media_type_videos(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::Files)
-		? tr::lng_media_type_files(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::Audio)
-		? tr::lng_media_type_songs(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::Links)
-		? tr::lng_media_type_links(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::GIF)
-		? tr::lng_media_type_gifs(tr::now)
-		: (id.sharedMedia == SeparateSharedMediaType::Voices)
-		? tr::lng_media_type_audios(tr::now)
-		: QString();
-
+	const auto type = id.sharedMediaType;
+	const auto result = Info::Media::SharedMediaTitle(type)(tr::now);
 	if (settings.hideChatName) {
 		return result;
 	}
-	const auto peer = id.sharedMediaPeer();
-	const auto topicRootId = id.sharedMediaTopicRootId();
-	const auto topic = topicRootId
-		? peer->forumTopicFor(topicRootId)
-		: nullptr;
+	const auto thread = id.thread;
+	const auto topic = thread->asTopic();
 	const auto name = topic
 		? topic->title()
-		: peer->isSelf()
+		: thread->peer()->isSelf()
 		? tr::lng_saved_messages(tr::now)
-		: peer->name();
+		: thread->peer()->name();
 	const auto wrapped = st::wrap_rtl(name);
 	return name + u" @ "_q + result;
 }
@@ -210,7 +193,7 @@ QIcon CreateIcon(Main::Session *session, bool returnNullIfDefault) {
 	}
 
 	const auto iconFromTheme = QIcon::fromTheme(
-		base::IconName(),
+		Platform::ApplicationIconName(),
 		result);
 
 	result = QIcon();
@@ -893,11 +876,11 @@ void MainWindow::updateTitle() {
 		&& Core::App().domain().accountsAuthedCount() > 1)
 		? st::wrap_rtl(session->authedName())
 		: QString();
-	const auto separateIdTitle = session
-		? TitleFromSeparateId(settings, session->windowId())
+	const auto separateSharedMediaTitle = session
+		? TitleFromSeparateSharedMedia(settings, session->windowId())
 		: QString();
-	if (!separateIdTitle.isEmpty()) {
-		setTitle(separateIdTitle);
+	if (!separateSharedMediaTitle.isEmpty()) {
+		setTitle(separateSharedMediaTitle);
 		return;
 	}
 	const auto key = (session && !settings.hideChatName)
@@ -1003,7 +986,7 @@ bool MainWindow::minimizeToTray() {
 	return true;
 }
 
-void MainWindow::showRightColumn(object_ptr<TWidget> widget) {
+void MainWindow::showRightColumn(object_ptr<Ui::RpWidget> widget) {
 	const auto wasWidth = width();
 	const auto wasRightWidth = _rightColumn ? _rightColumn->width() : 0;
 	_rightColumn = std::move(widget);

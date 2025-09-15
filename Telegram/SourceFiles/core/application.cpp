@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/lang/rabbit_lang.h"
 
 #include "data/data_abstract_structure.h"
+#include "data/data_channel.h"
 #include "data/data_forum.h"
 #include "data/data_message_reactions.h"
 #include "data/data_session.h"
@@ -87,6 +88,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/qthelp_url.h"
 #include "boxes/premium_limits_box.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/controls/location_picker.h"
 #include "styles/style_window.h"
 
 #include <QtCore/QStandardPaths>
@@ -94,6 +96,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QScreen>
 #include <QtGui/QWindow>
+
+#include <ksandbox.h>
 
 namespace Core {
 namespace {
@@ -324,6 +328,8 @@ void Application::run() {
 
 	// Check now to avoid re-entrance later.
 	[[maybe_unused]] const auto ivSupported = Iv::ShowButton();
+	[[maybe_unused]] const auto lpAvailable = Ui::LocationPicker::Available(
+		{});
 
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_windows.front().second.get());
@@ -645,6 +651,8 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 		if (base::Platform::GlobalShortcuts::IsToggleFullScreenKey(event)
 			&& toggleActiveWindowFullScreen()) {
 			return true;
+		} else if (Shortcuts::HandlePossibleChatSwitch(event)) {
+			return true;
 		}
 	} break;
 	case QEvent::MouseButtonPress:
@@ -653,8 +661,20 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 		updateNonIdle();
 	} break;
 
+	case QEvent::KeyRelease: {
+		const auto event = static_cast<QKeyEvent*>(e);
+		if (Shortcuts::HandlePossibleChatSwitch(event)) {
+			return true;
+		}
+	} break;
+
 	case QEvent::ShortcutOverride: {
-		// handle shortcuts ourselves
+		// Ctrl+Tab/Ctrl+Shift+Tab chat switch is a special shortcut case,
+		// because it not only does an action on the shortcut activation,
+		// but also keeps the UI visible until you release the Ctrl key.
+		Shortcuts::HandlePossibleChatSwitch(static_cast<QKeyEvent*>(e));
+
+		// Handle all the shortcut management manually.
 		return true;
 	} break;
 
@@ -899,7 +919,7 @@ void Application::forceLogOut(
 	box->setCloseByEscape(false);
 	box->setCloseByOutsideClick(false);
 	const auto weak = base::make_weak(account);
-	connect(box, &QObject::destroyed, [=] {
+	connect(box.get(), &QObject::destroyed, [=] {
 		crl::on_main(weak, [=] {
 			account->forcedLogOut();
 		});
@@ -1375,8 +1395,9 @@ Window::Controller *Application::windowForShowingHistory(
 
 Window::Controller *Application::windowForShowingForum(
 		not_null<Data::Forum*> forum) const {
+	const auto tabs = forum->channel()->useSubsectionTabs();
 	const auto id = Window::SeparateId(
-		Window::SeparateType::Forum,
+		tabs ? Window::SeparateType::Chat : Window::SeparateType::Forum,
 		forum->history());
 	if (const auto separate = separateWindowFor(id)) {
 		return separate;
@@ -1384,9 +1405,15 @@ Window::Controller *Application::windowForShowingForum(
 	auto result = (Window::Controller*)nullptr;
 	enumerateWindows([&](not_null<Window::Controller*> window) {
 		if (const auto controller = window->sessionController()) {
-			const auto current = controller->shownForum().current();
-			if (forum == current) {
-				result = window;
+			if (tabs) {
+				if (controller->windowId() == id) {
+					result = window;
+				}
+			} else {
+				const auto current = controller->shownForum().current();
+				if (forum == current) {
+					result = window;
+				}
 			}
 		}
 	});
@@ -1659,7 +1686,7 @@ void Application::registerLeaveSubscription(not_null<QWidget*> widget) {
 				if (e->type() == QEvent::Leave) {
 					if (const auto taken = _leaveFilters.take(window)) {
 						for (const auto &weak : taken->registered) {
-							if (const auto widget = weak.data()) {
+							if (const auto widget = weak.get()) {
 								QEvent ev(QEvent::Leave);
 								QCoreApplication::sendEvent(widget, &ev);
 							}

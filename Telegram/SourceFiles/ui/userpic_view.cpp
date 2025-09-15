@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings/rabbit_settings.h"
 
 #include "ui/empty_userpic.h"
+#include "ui/painter.h"
 #include "ui/image/image_prepare.h"
 
 namespace Ui {
@@ -27,14 +28,14 @@ void ValidateUserpicCache(
 		const QImage *cloud,
 		const EmptyUserpic *empty,
 		int size,
-		bool forum) {
+		PeerUserpicShape shape) {
 	Expects(cloud != nullptr || empty != nullptr);
 
 	const auto full = QSize(size, size);
 	const auto version = style::PaletteVersion();
-	const auto forumValue = forum ? 1 : 0;
+	const auto shapeValue = static_cast<uint32>(shape) & 3;
 	const auto regenerate = (view.cached.size() != QSize(size, size))
-		|| (view.forum != forumValue)
+		|| (view.shape != shapeValue)
 		|| (cloud && !view.empty.null())
 		|| (empty && empty != view.empty.get())
 		|| (empty && view.paletteVersion != version);
@@ -42,7 +43,7 @@ void ValidateUserpicCache(
 		return;
 	}
 	view.empty = empty;
-	view.forum = forumValue;
+	view.shape = shapeValue;
 	view.paletteVersion = version;
 
 	auto radius = size * RabbitSettings::userpicRoundness() / 100;

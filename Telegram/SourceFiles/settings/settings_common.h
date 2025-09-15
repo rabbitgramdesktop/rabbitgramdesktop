@@ -88,11 +88,11 @@ public:
 	[[nodiscard]] virtual const Ui::RoundRect *bottomSkipRounding() const {
 		return nullptr;
 	}
-	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToTop(
+	[[nodiscard]] virtual base::weak_qptr<Ui::RpWidget> createPinnedToTop(
 			not_null<QWidget*> parent) {
 		return nullptr;
 	}
-	[[nodiscard]] virtual QPointer<Ui::RpWidget> createPinnedToBottom(
+	[[nodiscard]] virtual base::weak_qptr<Ui::RpWidget> createPinnedToBottom(
 			not_null<Ui::RpWidget*> parent) {
 		return nullptr;
 	}
@@ -178,9 +178,10 @@ not_null<Button*> AddButtonWithLabel(
 	IconDescriptor &&descriptor = {});
 void CreateRightLabel(
 	not_null<Button*> button,
-	rpl::producer<QString> label,
+	v::text::data &&label,
 	const style::SettingsButton &st,
-	rpl::producer<QString> buttonText);
+	rpl::producer<QString> buttonText,
+	Ui::Text::MarkedContext context = {});
 
 struct DividerWithLottieDescriptor {
 	QString lottie;
@@ -203,7 +204,8 @@ struct LottieIcon {
 [[nodiscard]] LottieIcon CreateLottieIcon(
 	not_null<QWidget*> parent,
 	Lottie::IconDescriptor &&descriptor,
-	style::margins padding = {});
+	style::margins padding = {},
+	Fn<QColor()> colorOverride = nullptr);
 
 struct SliderWithLabel {
 	object_ptr<Ui::RpWidget> widget;

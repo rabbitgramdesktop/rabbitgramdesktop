@@ -269,6 +269,11 @@ whenReadPadding: margins(34px, 3px, 17px, 4px);
 whenReadIconPosition: point(8px, 0px);
 whenReadSkip: 3px;
 whenReadShowPadding: margins(6px, 0px, 6px, 2px);
+whoSentItem: Menu(defaultMenu) {
+	itemPadding: margins(17px, 3px, 17px, 4px);
+	itemRightSkip: 0px;
+	itemStyle: whenReadStyle;
+}
 
 switchPmButton: RoundButton(defaultBoxButton) {
 	width: 320px;
@@ -871,6 +876,10 @@ historyGiftToChannel: IconButton(defaultIconButton) {
 	rippleAreaSize: 40px;
 	ripple: universalRippleAnimation;
 }
+historyDirectMessage: IconButton(historyGiftToChannel) {
+	icon: icon{{ "menu/chat_discuss", windowActiveTextFg }};
+	iconOver: icon{{ "menu/chat_discuss", windowActiveTextFg }};
+}
 historyUnblock: FlatButton(historyComposeButton) {
 	color: attentionButtonFg;
 	overColor: attentionButtonFgOver;
@@ -1131,6 +1140,35 @@ historyScheduledToggle: IconButton(historyAttach) {
 		{ "chat/input_scheduled_dot", attentionButtonFg }
 	};
 }
+historyGiftToUser: IconButton(historyAttach) {
+	icon: icon {{ "chat/input_gift", historyComposeIconFg }};
+	iconOver: icon {{ "chat/input_gift", historyComposeIconFgOver }};
+}
+historySuggestPostToggle: IconButton(historyAttach) {
+	icon: icon{{ "chat/input_paid", historyComposeIconFg }};
+	iconOver: icon{{ "chat/input_paid", historyComposeIconFgOver }};
+}
+historySuggestIconPosition: point(4px, 4px);
+historySuggestIconActive: icon{{ "chat/input_paid", windowActiveTextFg }};
+
+suggestOptionsPrice: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(2px, 20px, 2px, 0px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+	placeholderFont: normalFont;
+
+	border: 0px;
+	borderActive: 0px;
+
+	heightMin: 32px;
+
+	style: defaultTextStyle;
+}
 
 historyAttachEmojiInner: IconButton(historyAttach) {
 	icon: icon {{ "chat/input_smile_face", historyComposeIconFg }};
@@ -1257,6 +1295,7 @@ historyRecordLockPosition: point(1px, 22px);
 historyRecordCancelButtonWidth: 100px;
 historyRecordCancelButtonFg: lightButtonFg;
 
+historyRecordTooltipSkip: 8px;
 historyRecordTooltip: ImportantTooltip(defaultImportantTooltip) {
 	padding: margins(4px, 4px, 4px, 4px);
 	radius: 11px;
@@ -1449,9 +1488,6 @@ editTagField: InputField(defaultInputField) {
 
 	heightMin: 36px;
 }
-editTagLimit: FlatLabel(defaultFlatLabel) {
-	textFg: windowSubTextFg;
-}
 
 editStickerSetNameField: InputField(defaultInputField) {
 	textMargins: margins(0px, 8px, 26px, 4px);
@@ -1566,3 +1602,42 @@ processingVideoView: RoundButton(defaultActiveButton) {
 	textBgOver: transparent;
 	ripple: emptyRippleAnimation;
 }
+
+frozenBarTitle: FlatLabel(defaultFlatLabel) {
+	style: semiboldTextStyle;
+	textFg: attentionButtonFg;
+}
+frozenRestrictionTitle: FlatLabel(frozenBarTitle) {
+	align: align(top);
+}
+frozenBarSubtitle: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+frozenRestrictionSubtitle: FlatLabel(frozenBarSubtitle) {
+	align: align(top);
+}
+frozenInfoBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 11px, 16px, 16px);
+	buttonHeight: 42px;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+	shadowIgnoreTopSkip: true;
+}
+
+menuTranscribeItemPadding: margins(0px, 10px, 0px, 10px);
+menuTranscribeDummyButton: IconButton(defaultIconButton) {
+	width: 40px;
+	height: 40px;
+
+	icon: icon {{ "chat/input_attach", historyComposeIconFgOver }};
+	iconOver: icon {{ "chat/input_attach", historyComposeIconFgOver }};
+
+	rippleAreaPosition: point(3px, 3px);
+	rippleAreaSize: 34px;
+	ripple: defaultRippleAnimationBgOver;
+}
+
+roundVideoFont: font(14px semibold);

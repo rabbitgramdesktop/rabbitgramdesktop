@@ -41,7 +41,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/checkbox.h" // Ui::RadiobuttonGroup.
 #include "ui/widgets/gradient_round_button.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -148,7 +147,6 @@ using Order = std::vector<QString>;
 				tr::lng_business_subtitle_chat_intro(),
 				tr::lng_business_about_chat_intro(),
 				PremiumFeature::ChatIntro,
-				true,
 			},
 		},
 		{
@@ -158,7 +156,6 @@ using Order = std::vector<QString>;
 				tr::lng_business_subtitle_chat_links(),
 				tr::lng_business_about_chat_links(),
 				PremiumFeature::ChatLinks,
-				true,
 			},
 		},
 		{
@@ -168,7 +165,6 @@ using Order = std::vector<QString>;
 				tr::lng_premium_summary_subtitle_filter_tags(),
 				tr::lng_premium_summary_about_filter_tags(),
 				PremiumFeature::FilterTags,
-				true,
 			},
 		},
 	};
@@ -335,9 +331,9 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
-	[[nodiscard]] QPointer<Ui::RpWidget> createPinnedToTop(
+	[[nodiscard]] base::weak_qptr<Ui::RpWidget> createPinnedToTop(
 		not_null<QWidget*> parent) override;
-	[[nodiscard]] QPointer<Ui::RpWidget> createPinnedToBottom(
+	[[nodiscard]] base::weak_qptr<Ui::RpWidget> createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) override;
 
 	void showFinished() override;
@@ -527,24 +523,23 @@ void Business::setupContent() {
 
 		const auto session = &_controller->session();
 		{
-			const auto arrow = Ui::Text::IconEmoji(&st::textMoreIconEmoji);
 			inner->add(object_ptr<Ui::DividerLabel>(
 				inner,
-				Ui::CreateLabelWithCustomEmoji(
+				object_ptr<Ui::FlatLabel>(
 					inner,
 					tr::lng_business_about_sponsored(
 						lt_link,
 						rpl::combine(
 							tr::lng_business_about_sponsored_link(
 								lt_emoji,
-								rpl::single(arrow),
+								rpl::single(Ui::Text::IconEmoji(
+									&st::textMoreIconEmoji)),
 								Ui::Text::RichLangValue),
 							tr::lng_business_about_sponsored_url()
 						) | rpl::map([](TextWithEntities text, QString url) {
 							return Ui::Text::Link(text, url);
 						}),
 						Ui::Text::RichLangValue),
-					Core::TextContext({ .session = session }),
 					st::boxDividerLabel),
 				st::defaultBoxDividerLabelPadding,
 				RectPart::Top | RectPart::Bottom));
@@ -585,7 +580,7 @@ void Business::setupContent() {
 	Ui::ResizeFitChild(this, content);
 }
 
-QPointer<Ui::RpWidget> Business::createPinnedToTop(
+base::weak_qptr<Ui::RpWidget> Business::createPinnedToTop(
 		not_null<QWidget*> parent) {
 	auto title = tr::lng_business_title();
 	auto about = [&]() -> rpl::producer<TextWithEntities> {
@@ -674,14 +669,14 @@ QPointer<Ui::RpWidget> Business::createPinnedToTop(
 		}
 	}, content->lifetime());
 
-	return Ui::MakeWeak(not_null<Ui::RpWidget*>{ content });
+	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }
 
 void Business::showFinished() {
 	_showFinished.fire({});
 }
 
-QPointer<Ui::RpWidget> Business::createPinnedToBottom(
+base::weak_qptr<Ui::RpWidget> Business::createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) {
 	const auto content = Ui::CreateChild<Ui::RpWidget>(parent.get());
 
@@ -750,7 +745,7 @@ QPointer<Ui::RpWidget> Business::createPinnedToBottom(
 		_subscribe->setVisible(!premium && premiumPossible);
 	}, _subscribe->lifetime());
 
-	return Ui::MakeWeak(not_null<Ui::RpWidget*>{ content });
+	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }
 
 } // namespace

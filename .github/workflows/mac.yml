@@ -56,7 +56,7 @@ jobs:
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Clone.
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
           path: ${{ env.REPO_NAME }}
@@ -114,18 +114,15 @@ jobs:
           fi
 
           ./configure.sh \
-          -D CMAKE_C_FLAGS="-Werror" \
-          -D CMAKE_CXX_FLAGS="-Werror" \
+          -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D TDESKTOP_API_TEST=ON \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
           $DEFINE
 
-          cd ../out
-
-          xcoderun='xcodebuild build -project Telegram.xcodeproj -scheme Telegram -destination "platform=macOS,arch=x86_64" -configuration Debug'
-          bash -c "$xcoderun" || bash -c "$xcoderun" || bash -c "$xcoderun"
+          cmake --build ../out --config Debug --parallel
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
