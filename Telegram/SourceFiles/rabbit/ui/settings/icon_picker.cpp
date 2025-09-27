@@ -35,7 +35,7 @@ const QVector<QString> icons{
 	RabbitAssets::TWITCH_ICON,
 };
 
-const auto rows = icons.size() / 4 + std::min(1, icons.size()) % 4;
+const auto rows = icons.size() / 4 + std::min(1, static_cast<int>(icons.size())) % 4;
 
 void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float strokeOpacity) {
 	xOffset += st::cpPadding;

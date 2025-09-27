@@ -39,6 +39,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "ui/userpic_view.h"
 #include "window/window_session_controller.h"
 #include "window/main_window.h" // Window::LogoNoMargin.
 #include "ui/image/image.h"
@@ -453,18 +454,18 @@ void PeerData::paintUserpic(
 		cloud ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
 		context.shape);
-
+	
 	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
-	if (context.shape && !RabbitSettings::generalRoundness()) radius *= .5;
+	if (context.shape == Ui::PeerUserpicShape::Forum && !RabbitSettings::generalRoundness()) radius *= .5;
 
 	p.save();
 	auto hq = PainterHighQualityEnabler(p);
 	QPainterPath clipPath;
 	clipPath.addRoundedRect(
-		QRect(x, y, size, size),
+		QRect(context.position, QSize(size, size)),
 		radius, radius);
 	p.setClipPath(clipPath);
-	p.drawImage(QRect(x, y, size, size), view.cached);
+	p.drawImage(QRect(context.position, QSize(size, size)), view.cached);
 	p.restore();
 }
 
