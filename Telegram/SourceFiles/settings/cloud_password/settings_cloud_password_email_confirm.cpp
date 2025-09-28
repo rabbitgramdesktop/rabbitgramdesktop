@@ -19,9 +19,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/cloud_password/settings_cloud_password_manage.h"
 #include "settings/cloud_password/settings_cloud_password_start.h"
+#include "settings/cloud_password/settings_cloud_password_step.h"
 #include "ui/vertical_list.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/sent_code_field.h"
@@ -138,13 +140,14 @@ void EmailConfirm::setupContent() {
 		state->unconfirmedPattern.isEmpty()
 			? tr::lng_settings_cloud_password_email_recovery_subtitle()
 			: tr::lng_cloud_password_confirm(),
-		rpl::single(
-			tr::lng_cloud_password_waiting_code(
-				tr::now,
-				lt_email,
-				state->unconfirmedPattern.isEmpty()
-					? recoverEmailPattern
-					: state->unconfirmedPattern)));
+		tr::lng_cloud_password_waiting_code(
+			lt_email,
+			rpl::single(
+				Ui::Text::WrapEmailPattern(
+					state->unconfirmedPattern.isEmpty()
+						? recoverEmailPattern
+						: state->unconfirmedPattern)),
+			TextWithEntities::Simple));
 
 	Ui::AddSkip(content, st::settingLocalPasscodeDescriptionBottomSkip);
 
@@ -152,11 +155,9 @@ void EmailConfirm::setupContent() {
 		content,
 		st::settingLocalPasscodeInputField,
 		tr::lng_change_phone_code_title());
-	const auto newInput = objectInput.data();
-	const auto wrap = content->add(
-		object_ptr<Ui::CenterWrap<Ui::InputField>>(
-			content,
-			std::move(objectInput)));
+	const auto newInput = content->add(
+		std::move(objectInput),
+		style::al_top);
 
 	const auto error = AddError(content, nullptr);
 	newInput->changes(
@@ -181,7 +182,9 @@ void EmailConfirm::setupContent() {
 		}
 	}, resendInfo->lifetime());
 
-	const auto resend = AddLinkButton(wrap, tr::lng_cloud_password_resend());
+	const auto resend = AddLinkButton(
+		newInput,
+		tr::lng_cloud_password_resend());
 	resend->setClickedCallback([=] {
 		if (_requestLifetime) {
 			return;

@@ -19,6 +19,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
+#include "boxes/peers/verify_peers_box.h"
 #include "boxes/report_messages_box.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
@@ -33,8 +34,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_folder.h"
+#include "data/data_forum.h"
 #include "data/data_forum_topic.h"
 #include "data/data_peer_values.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/notify/data_notify_settings.h"
@@ -43,12 +46,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "dialogs/ui/dialogs_message_view.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_item_preview.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
+#include "info/bot/starref/info_bot_starref_common.h"
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
+#include "info/profile/info_profile_cover.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_text.h"
@@ -61,12 +67,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "menu/menu_mute.h"
+#include "settings/settings_common.h"
 #include "support/support_helper.h"
 #include "ui/boxes/peer_qr_box.h"
 #include "ui/boxes/report_box_graphics.h"
 #include "ui/controls/userpic_button.h"
+#include "ui/effects/credits_graphics.h"
+#include "ui/effects/toggle_arrow.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/ui_utility.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h" // Ui::Text::ToUpper
 #include "ui/text/text_variant.h"
@@ -88,6 +98,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h" // settingsButtonRightSkip.
+#include "styles/style_window.h" // mainMenuToggleFourStrokes.
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -103,6 +114,12 @@ base::options::toggle ShowPeerIdBelowAbout({
 	.name = "Show Peer IDs in Profile",
 	.description = "Show peer IDs from API below their Bio / Description."
 		" Add contact IDs to exported data.",
+});
+
+base::options::toggle ShowChannelJoinedBelowAbout({
+	.id = kOptionShowChannelJoinedBelowAbout,
+	.name = "Show Channel Joined Date in Profile",
+	.description = "Show when you join Channel under its Description.",
 });
 
 [[nodiscard]] rpl::producer<TextWithEntities> UsernamesSubtext(
@@ -175,24 +192,47 @@ base::options::toggle ShowPeerIdBelowAbout({
 	return result;
 }
 
-[[nodiscard]] rpl::producer<TextWithEntities> AboutWithIdValue(
+[[nodiscard]] rpl::producer<TextWithEntities> AboutWithAdvancedValue(
 		not_null<PeerData*> peer) {
 
 	return AboutValue(
 		peer
 	) | rpl::map([=](TextWithEntities &&value) {
-		if (!ShowPeerIdBelowAbout.value()) {
-			return std::move(value);
+		if (ShowPeerIdBelowAbout.value()) {
+			using namespace Ui::Text;
+			if (!value.empty()) {
+				value.append("\n\n");
+			}
+			value.append(Italic(u"id: "_q));
+			const auto raw = peer->id.value & PeerId::kChatTypeMask;
+			value.append(Link(
+				Italic(Lang::FormatCountDecimal(raw)),
+				"internal:~peer_id~:copy:" + QString::number(raw)));
 		}
-		using namespace Ui::Text;
-		if (!value.empty()) {
-			value.append("\n\n");
+		if (ShowChannelJoinedBelowAbout.value()) {
+			if (const auto channel = peer->asChannel()) {
+				if (!channel->amCreator() && channel->inviteDate) {
+					if (!value.empty()) {
+						if (ShowPeerIdBelowAbout.value()) {
+							value.append("\n");
+						} else {
+							value.append("\n\n");
+						}
+					}
+					using namespace Ui::Text;
+					value.append((channel->isMegagroup()
+						? tr::lng_you_joined_group
+						: tr::lng_action_you_joined)(
+							tr::now,
+							Ui::Text::Italic));
+					value.append(Italic(": "));
+					const auto raw = channel->inviteDate;
+					value.append(Link(
+						Italic(langDateTimeFull(base::unixtime::parse(raw))),
+						"internal:~join_date~:show:" + QString::number(raw)));
+				}
+			}
 		}
-		value.append(Italic(u"id: "_q));
-		const auto raw = peer->id.value & PeerId::kChatTypeMask;
-		value.append(Link(
-			Italic(Lang::FormatCountDecimal(raw)),
-			"internal:~peer_id~:copy:" + QString::number(raw)));
 		return std::move(value);
 	});
 }
@@ -503,6 +543,8 @@ base::options::toggle ShowPeerIdBelowAbout({
 			dayHoursTextValue(state->day.value())
 		) | rpl::after_next(recount),
 		st::infoHoursValue);
+	const auto timingArrow = Ui::CreateChild<Ui::RpWidget>(openedWrap);
+	timingArrow->resize(Size(timing->st().style.font->height));
 	timing->setAttribute(Qt::WA_TransparentForMouseEvents);
 	state->opened.value() | rpl::start_with_next([=](bool value) {
 		opened->setTextColorOverride(value
@@ -516,7 +558,8 @@ base::options::toggle ShowPeerIdBelowAbout({
 		timing->sizeValue()
 	) | rpl::start_with_next([=](int width, int h1, QSize size) {
 		opened->moveToLeft(0, 0, width);
-		timing->moveToRight(0, 0, width);
+		timingArrow->moveToRight(0, 0, width);
+		timing->moveToRight(timingArrow->width(), 0, width);
 
 		const auto margins = opened->getMargins();
 		const auto added = margins.top() + margins.bottom();
@@ -529,10 +572,7 @@ base::options::toggle ShowPeerIdBelowAbout({
 		tr::lng_info_hours_label(),
 		st::infoLabel);
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
-	const auto link = Ui::CreateChild<Ui::LinkButton>(
-		labelWrap,
-		QString());
-	rpl::combine(
+	auto linkText = rpl::combine(
 		state->nonTrivial.value(),
 		state->hours.value(),
 		state->mine.value(),
@@ -547,10 +587,12 @@ base::options::toggle ShowPeerIdBelowAbout({
 			: my
 			? tr::lng_info_hours_my_time()
 			: tr::lng_info_hours_local_time();
-	}) | rpl::flatten_latest(
-	) | rpl::start_with_next([=](const QString &text) {
-		link->setText(text);
-	}, link->lifetime());
+	}) | rpl::flatten_latest();
+	const auto link = Ui::CreateChild<Ui::RoundButton>(
+		labelWrap,
+		std::move(linkText),
+		st::defaultTableSmallButton);
+	link->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	link->setClickedCallback([=] {
 		state->myTimezone = !state->myTimezone.current();
 		state->expanded = true;
@@ -574,6 +616,38 @@ base::options::toggle ShowPeerIdBelowAbout({
 			inner,
 			object_ptr<Ui::VerticalLayout>(inner)));
 	other->toggleOn(state->expanded.value(), anim::type::normal);
+	constexpr auto kSlideDuration = float64(st::slideWrapDuration);
+	other->setDuration(kSlideDuration);
+	{
+		const auto arrowAnimation
+			= other->lifetime().make_state<Ui::Animations::Basic>();
+		arrowAnimation->init([=] {
+			timingArrow->update();
+			if (!other->animating()) {
+				arrowAnimation->stop();
+			}
+		});
+		timingArrow->paintRequest() | rpl::start_with_next([=] {
+			auto p = QPainter(timingArrow);
+			const auto progress = other->animating()
+				? (crl::now() - arrowAnimation->started()) / kSlideDuration
+				: 1.;
+
+			const auto path = Ui::ToggleUpDownArrowPath(
+				timingArrow->width() / 2,
+				timingArrow->height() / 2,
+				st::infoHoursArrowSize,
+				st::mainMenuToggleFourStrokes,
+				other->toggled() ? progress : 1 - progress);
+
+			auto hq = PainterHighQualityEnabler(p);
+			p.fillPath(path, timing->st().textFg);
+		}, timingArrow->lifetime());
+		state->expanded.value() | rpl::start_with_next([=] {
+			arrowAnimation->start();
+		}, other->lifetime());
+	}
+
 	other->finishAnimating();
 	const auto days = other->entity();
 
@@ -735,8 +809,7 @@ auto AddActionButton(
 		ToggleOn &&toggleOn,
 		Callback &&callback,
 		const style::icon *icon,
-		const style::SettingsButton &st
-			= st::infoSharedMediaButton) {
+		const style::SettingsButton &st = st::infoSharedMediaButton) {
 	auto result = parent->add(object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
 		parent,
 		object_ptr<Ui::SettingsButton>(
@@ -776,19 +849,21 @@ template <typename Text, typename ToggleOn, typename Callback>
 		st));
 }
 
-rpl::producer<uint64> AddCurrencyAction(
+rpl::producer<CreditsAmount> AddCurrencyAction(
 		not_null<UserData*> user,
 		not_null<Ui::VerticalLayout*> wrap,
 		not_null<Controller*> controller) {
 	struct State final {
-		rpl::variable<uint64> balance;
+		rpl::variable<CreditsAmount> balance;
+		Ui::Text::CustomEmojiHelper helper;
 	};
 	const auto state = wrap->lifetime().make_state<State>();
 	const auto parentController = controller->parentController();
 	const auto wrapButton = AddActionButton(
 		wrap,
 		tr::lng_manage_peer_bot_balance_currency(),
-		state->balance.value() | rpl::map(rpl::mappers::_1 > 0),
+		state->balance.value(
+		) | rpl::map(rpl::mappers::_1 > CreditsAmount(0)),
 		[=] { parentController->showSection(Info::ChannelEarn::Make(user)); },
 		nullptr);
 	{
@@ -811,31 +886,32 @@ rpl::producer<uint64> AddCurrencyAction(
 		state->balance = balance;
 	}
 	{
-		const auto weak = Ui::MakeWeak(wrap);
+		const auto weak = base::make_weak(wrap);
 		const auto currencyLoadLifetime
 			= std::make_shared<rpl::lifetime>();
 		const auto currencyLoad
 			= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
-		currencyLoad->request(
-		) | rpl::start_with_error_done([=](const QString &error) {
-			currencyLoadLifetime->destroy();
-		}, [=] {
-			if (const auto strong = weak.data()) {
-				state->balance = currencyLoad->data().currentBalance;
+		const auto done = [=](CreditsAmount balance) {
+			if ([[maybe_unused]] const auto strong = weak.get()) {
+				state->balance = balance;
 				currencyLoadLifetime->destroy();
 			}
-		}, *currencyLoadLifetime);
+		};
+		currencyLoad->request() | rpl::start_with_error_done(
+			[=](const QString &error) {
+				done(CreditsAmount(0, CreditsType::Ton));
+			},
+			[=] { done(currencyLoad->data().currentBalance); },
+			*currencyLoadLifetime);
 	}
 	const auto &st = st::infoSharedMediaButton;
 	const auto button = wrapButton->entity();
 	const auto name = Ui::CreateChild<Ui::FlatLabel>(button, st.rightLabel);
-	const auto icon = Ui::Text::SingleCustomEmoji(
-		user->owner().customEmojiManager().registerInternalEmoji(
-			Ui::Earn::IconCurrencyColored(
-				st.rightLabel.style.font,
-				st.rightLabel.textFg->c),
-			st::channelEarnCurrencyCommonMargins,
-			false));
+	const auto icon = state->helper.paletteDependent({ .factory = [=] {
+		return Ui::Earn::IconCurrencyColored(
+			st.rightLabel.style.font,
+			st.rightLabel.textFg->c);
+	}, .margin = st::channelEarnCurrencyCommonMargins });
 	name->show();
 	rpl::combine(
 		button->widthValue(),
@@ -844,7 +920,7 @@ rpl::producer<uint64> AddCurrencyAction(
 	) | rpl::start_with_next([=, &st](
 			int width,
 			const QString &button,
-			uint64 balance) {
+			CreditsAmount balance) {
 		const auto available = width
 			- rect::m::sum::h(st.padding)
 			- st.style.font->width(button)
@@ -854,10 +930,7 @@ rpl::producer<uint64> AddCurrencyAction(
 				.append(QChar(' '))
 				.append(Info::ChannelEarn::MajorPart(balance))
 				.append(Info::ChannelEarn::MinorPart(balance)),
-			Core::MarkedTextContext{
-				.session = &user->session(),
-				.customEmojiRepaint = [=] { name->update(); },
-			});
+			state->helper.context());
 		name->resizeToNaturalWidth(available);
 		name->moveToRight(st::settingsButtonRightSkip, st.padding.top());
 	}, name->lifetime());
@@ -866,19 +939,20 @@ rpl::producer<uint64> AddCurrencyAction(
 	return state->balance.value();
 }
 
-rpl::producer<uint64> AddCreditsAction(
+rpl::producer<CreditsAmount> AddCreditsAction(
 		not_null<UserData*> user,
 		not_null<Ui::VerticalLayout*> wrap,
 		not_null<Controller*> controller) {
 	struct State final {
-		rpl::variable<uint64> balance;
+		rpl::variable<CreditsAmount> balance;
 	};
 	const auto state = wrap->lifetime().make_state<State>();
 	const auto parentController = controller->parentController();
 	const auto wrapButton = AddActionButton(
 		wrap,
 		tr::lng_manage_peer_bot_balance_credits(),
-		state->balance.value() | rpl::map(rpl::mappers::_1 > 0),
+		state->balance.value(
+		) | rpl::map(rpl::mappers::_1 > CreditsAmount(0)),
 		[=] { parentController->showSection(Info::BotEarn::Make(user)); },
 		nullptr);
 	{
@@ -909,7 +983,10 @@ rpl::producer<uint64> AddCreditsAction(
 	const auto &st = st::infoSharedMediaButton;
 	const auto button = wrapButton->entity();
 	const auto name = Ui::CreateChild<Ui::FlatLabel>(button, st.rightLabel);
-	const auto icon = user->owner().customEmojiManager().creditsEmoji();
+
+	auto helper = Ui::Text::CustomEmojiHelper();
+	const auto icon = helper.paletteDependent(Ui::Earn::IconCreditsEmoji());
+	const auto context = helper.context([=] { name->update(); });
 	name->show();
 	rpl::combine(
 		button->widthValue(),
@@ -918,7 +995,7 @@ rpl::producer<uint64> AddCreditsAction(
 	) | rpl::start_with_next([=, &st](
 			int width,
 			const QString &button,
-			uint64 balance) {
+			CreditsAmount balance) {
 		const auto available = width
 			- rect::m::sum::h(st.padding)
 			- st.style.font->width(button)
@@ -926,11 +1003,8 @@ rpl::producer<uint64> AddCreditsAction(
 		name->setMarkedText(
 			base::duplicate(icon)
 				.append(QChar(' '))
-				.append(Lang::FormatCountDecimal(balance)),
-			Core::MarkedTextContext{
-				.session = &user->session(),
-				.customEmojiRepaint = [=] { name->update(); },
-			});
+				.append(Lang::FormatCreditsAmountDecimal(balance)),
+			context);
 		name->resizeToNaturalWidth(available);
 		name->moveToRight(st::settingsButtonRightSkip, st.padding.top());
 	}, name->lifetime());
@@ -949,6 +1023,10 @@ public:
 	DetailsFiller(
 		not_null<Controller*> controller,
 		not_null<Ui::RpWidget*> parent,
+		not_null<Data::SavedSublist*> sublist);
+	DetailsFiller(
+		not_null<Controller*> controller,
+		not_null<Ui::RpWidget*> parent,
 		not_null<Data::ForumTopic*> topic);
 
 	object_ptr<Ui::RpWidget> fill();
@@ -957,12 +1035,22 @@ private:
 	object_ptr<Ui::RpWidget> setupPersonalChannel(not_null<UserData*> user);
 	object_ptr<Ui::RpWidget> setupInfo();
 	object_ptr<Ui::RpWidget> setupMuteToggle();
+	void setupAboutVerification();
 	void setupMainApp();
+	void setupBotPermissions();
 	void setupMainButtons();
 	Ui::MultiSlideTracker fillTopicButtons();
 	Ui::MultiSlideTracker fillUserButtons(
 		not_null<UserData*> user);
 	Ui::MultiSlideTracker fillChannelButtons(
+		not_null<ChannelData*> channel);
+	Ui::MultiSlideTracker fillDiscussionButtons(
+		not_null<ChannelData*> channel);
+	void addShowTopicsListButton(
+		Ui::MultiSlideTracker &tracker,
+		not_null<Data::Forum*> forum);
+	void addViewChannelButton(
+		Ui::MultiSlideTracker &tracker,
 		not_null<ChannelData*> channel);
 
 	void addReportReaction(Ui::MultiSlideTracker &tracker);
@@ -987,6 +1075,7 @@ private:
 	not_null<Ui::RpWidget*> _parent;
 	not_null<PeerData*> _peer;
 	Data::ForumTopic *_topic = nullptr;
+	Data::SavedSublist *_sublist = nullptr;
 	Origin _origin;
 	object_ptr<Ui::VerticalLayout> _wrap;
 
@@ -1002,12 +1091,14 @@ public:
 	object_ptr<Ui::RpWidget> fill();
 
 private:
+	void addAffiliateProgram(not_null<UserData*> user);
 	void addBalanceActions(not_null<UserData*> user);
 	void addInviteToGroupAction(not_null<UserData*> user);
 	void addShareContactAction(not_null<UserData*> user);
 	void addEditContactAction(not_null<UserData*> user);
 	void addDeleteContactAction(not_null<UserData*> user);
 	void addBotCommandActions(not_null<UserData*> user);
+	void addFastButtonsMode(not_null<UserData*> user);
 	void addReportAction();
 	void addBlockAction(not_null<UserData*> user);
 	void addLeaveChannelAction(not_null<ChannelData*> channel);
@@ -1087,6 +1178,17 @@ DetailsFiller::DetailsFiller(
 DetailsFiller::DetailsFiller(
 	not_null<Controller*> controller,
 	not_null<Ui::RpWidget*> parent,
+	not_null<Data::SavedSublist*> sublist)
+: _controller(controller)
+, _parent(parent)
+, _peer(sublist->sublistPeer())
+, _sublist(sublist)
+, _wrap(_parent) {
+}
+
+DetailsFiller::DetailsFiller(
+	not_null<Controller*> controller,
+	not_null<Ui::RpWidget*> parent,
 	not_null<Data::ForumTopic*> topic)
 : _controller(controller)
 , _parent(parent)
@@ -1131,6 +1233,23 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			return false;
 		} else if (SetClickContext<CashtagClickHandler>(handler, context)) {
 			return false;
+		} else if (handler->url().startsWith(u"internal:~join_date~:"_q)) {
+			const auto joinDate = handler->url().split(
+				u"show:"_q,
+				Qt::SkipEmptyParts).last();
+			if (!joinDate.isEmpty()) {
+				const auto weak = base::make_weak(window);
+				window->session().api().resolveJumpToDate(
+					Dialogs::Key(peer->owner().history(peer)),
+					base::unixtime::parse(joinDate.toULongLong()).date(),
+					[=](not_null<PeerData*> p, MsgId m) {
+						const auto f = Window::SectionShow::Way::Forward;
+						if (const auto strong = weak.get()) {
+							strong->showPeerHistory(p, f, m);
+						}
+					});
+				return false;
+			}
 		} else if (SetClickContext<UrlClickHandler>(handler, context)) {
 			return false;
 		}
@@ -1233,20 +1352,18 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			not_null<Ui::FlatLabel*> label,
 			int rightSkip) {
 		const auto parent = label->parentWidget();
+		const auto container = result.data();
 		rpl::combine(
+			container->widthValue(),
 			label->geometryValue(),
 			button->sizeValue()
-		) | rpl::start_with_next([=](const QRect &, const QSize &buttonSize) {
-			const auto s = parent->size();
+		) | rpl::start_with_next([=](int width, QRect, QSize buttonSize) {
 			button->moveToRight(
 				rightSkip,
-				(s.height() - buttonSize.height()) / 2);
-			label->resizeToWidth(
-				s.width()
-					- rightSkip
-					- label->geometry().left()
-					- st::lineWidth * 2
-					- buttonSize.width());
+				(parent->height() - buttonSize.height()) / 2);
+			const auto x = Ui::MapFrom(container, label, QPoint(0, 0)).x();
+			const auto s = Ui::MapFrom(container, button, QPoint(0, 0)).x();
+			label->resizeToWidth(s - x);
 		}, button->lifetime());
 	};
 	const auto controller = _controller->parentController();
@@ -1341,8 +1458,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			? tr::lng_info_about_label()
 			: tr::lng_info_bio_label();
 		addTranslateToMenu(
-			addInfoLine(std::move(label), AboutWithIdValue(user)).text,
-			AboutWithIdValue(user));
+			addInfoLine(std::move(label), AboutWithAdvancedValue(user)).text,
+			AboutWithAdvancedValue(user));
 
 		const auto usernameLine = addInfoOneLine(
 			UsernamesSubtext(_peer, tr::lng_info_username_label()),
@@ -1365,7 +1482,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		const auto qrButton = Ui::CreateChild<Ui::IconButton>(
 			usernameLine.text->parentWidget(),
 			st::infoProfileLabeledButtonQr);
-		const auto rightSkip = st::infoProfileLabeledButtonQrRightSkip;
+		const auto rightSkip = 0;// st::infoProfileLabeledButtonQrRightSkip;
 		fitLabelToButton(qrButton, usernameLine.text, rightSkip);
 		fitLabelToButton(qrButton, usernameLine.subtext, rightSkip);
 		qrButton->setClickedCallback([=] {
@@ -1376,8 +1493,11 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 
 		if (!user->isBot()) {
 			tracker.track(result->add(
-				CreateBirthday(result, controller, user)));
-			tracker.track(result->add(CreateWorkingHours(result, user)));
+				CreateBirthday(result, controller, user),
+				{},
+				style::al_justify));
+			tracker.track(result->add(
+				CreateWorkingHours(result, user), {}, style::al_justify));
 
 			auto locationText = user->session().changes().peerFlagsValue(
 				user,
@@ -1443,7 +1563,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			const auto qr = Ui::CreateChild<Ui::IconButton>(
 				linkLine.text->parentWidget(),
 				st::infoProfileLabeledButtonQr);
-			const auto rightSkip = st::infoProfileLabeledButtonQrRightSkip;
+			const auto rightSkip = 0;// st::infoProfileLabeledButtonQrRightSkip;
 			fitLabelToButton(qr, linkLine.text, rightSkip);
 			fitLabelToButton(qr, linkLine.subtext, rightSkip);
 			qr->setClickedCallback([=, peer = _peer] {
@@ -1472,9 +1592,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 
 		const auto about = addInfoLine(tr::lng_info_about_label(), _topic
 			? rpl::single(TextWithEntities())
-			: AboutWithIdValue(_peer));
+			: AboutWithAdvancedValue(_peer));
 		if (!_topic) {
-			addTranslateToMenu(about.text, AboutWithIdValue(_peer));
+			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 	}
 	if (!_peer->isSelf()) {
@@ -1554,8 +1674,6 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 		}));
 		onlyChannelWrap->finishAnimating();
 
-		Ui::AddDivider(onlyChannelWrap->entity());
-
 		auto text = rpl::duplicate(
 			channel
 		) | rpl::map([=](ChannelData *channel) {
@@ -1585,6 +1703,8 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 			onlyChannelWrap,
 			st::infoIconMediaChannel,
 			st::infoPersonalChannelIconPosition);
+
+		Ui::AddDivider(onlyChannelWrap->entity());
 	}
 
 	{
@@ -1599,6 +1719,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 				&& user->personalChannelMessageId();
 		}));
 		messageChannelWrap->finishAnimating();
+		messageChannelWrap->toggledValue(
+		) | rpl::filter(rpl::mappers::_1) | rpl::start_with_next([=] {
+			messageChannelWrap->resizeToWidth(messageChannelWrap->width());
+		}, messageChannelWrap->lifetime());
 
 		const auto clear = [=] {
 			while (messageChannelWrap->entity()->count()) {
@@ -1614,7 +1738,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 
 			messageChannelWrap->toggle(false, anim::type::instant);
 			clear();
-			Ui::AddDivider(messageChannelWrap->entity());
+
 			Ui::AddSkip(messageChannelWrap->entity());
 
 			const auto inner = messageChannelWrap->entity()->add(
@@ -1648,17 +1772,28 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 			const auto preview = Ui::CreateChild<Ui::RpWidget>(line);
 			auto &lifetime = preview->lifetime();
 			using namespace Dialogs::Ui;
-			const auto previewView = lifetime.make_state<MessageView>();
-			const auto previewUpdate = [=] { preview->update(); };
+			struct State {
+				MessageView view;
+				HistoryItem *item = nullptr;
+				rpl::lifetime lifetime;
+			};
+			const auto state = lifetime.make_state<State>();
+			state->item = item;
+			item->history()->session().changes().realtimeMessageUpdates(
+				Data::MessageUpdate::Flag::Destroyed
+			) | rpl::start_with_next([=](const Data::MessageUpdate &update) {
+				if (update.item == state->item) {
+					state->lifetime.destroy();
+					state->item = nullptr;
+					preview->update();
+				}
+			}, state->lifetime);
+
 			preview->resize(0, st::infoLabeled.style.font->height);
-			if (!previewView->dependsOn(item)) {
-				previewView->prepare(item, nullptr, previewUpdate, {});
-			}
 			preview->paintRequest(
-			) | rpl::start_with_next([=, fullId = item->fullId()](
-					const QRect &rect) {
+			) | rpl::start_with_next([=] {
 				auto p = Painter(preview);
-				const auto item = user->session().data().message(fullId);
+				const auto item = state->item;
 				if (!item) {
 					p.setPen(st::infoPersonalChannelDateLabel.textFg);
 					p.setBrush(Qt::NoBrush);
@@ -1669,30 +1804,27 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 						style::al_left);
 					return;
 				}
-				if (previewView->prepared(item, nullptr)) {
-					previewView->paint(p, preview->rect(), {
-						.st = &st::defaultDialogRow,
-						.currentBg = st::boxBg->b,
-					});
-				} else if (!previewView->dependsOn(item)) {
-					p.setPen(st::infoPersonalChannelDateLabel.textFg);
-					p.setBrush(Qt::NoBrush);
-					p.setFont(st::infoPersonalChannelDateLabel.style.font);
-					p.drawText(
-						preview->rect(),
-						tr::lng_contacts_loading(tr::now),
-						style::al_left);
-					previewView->prepare(item, nullptr, previewUpdate, {});
-					preview->update();
+				if (!state->view.prepared(item, nullptr, nullptr)) {
+					const auto repaint = [=] { preview->update(); };
+					state->view.prepare(
+						item,
+						nullptr,
+						nullptr,
+						repaint,
+						{});
 				}
+				state->view.paint(p, preview->rect(), {
+					.st = &st::defaultDialogRow,
+					.currentBg = st::boxBg->b,
+				});
 			}, preview->lifetime());
 
-			line->sizeValue(
+			line->sizeValue() | rpl::filter_size(
 			) | rpl::start_with_next([=](const QSize &size) {
 				const auto left = stLabeled.left();
 				const auto right = st::infoPersonalChannelDateSkip;
 				const auto top = stLabeled.top();
-				date->moveToRight(right, top);
+				date->moveToRight(right, top, size.width());
 
 				name->resizeToWidth(size.width()
 					- left
@@ -1723,14 +1855,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 						st::infoProfileLabeledPadding.bottom()));
 			}
 			{
-				const auto button = Ui::CreateChild<Ui::RippleButton>(
+				const auto button = Ui::CreateSimpleRectButton(
 					messageChannelWrap->entity(),
 					st::defaultRippleAnimation);
-				button->paintRequest(
-				) | rpl::start_with_next([=](const QRect &rect) {
-					auto p = QPainter(button);
-					button->paintRipple(p, 0, 0);
-				}, button->lifetime());
 				inner->geometryValue(
 				) | rpl::start_with_next([=](const QRect &rect) {
 					button->setGeometry(rect);
@@ -1742,9 +1869,12 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 						msg);
 				});
 				button->lower();
+				inner->lifetime().make_state<base::unique_qptr<Ui::RpWidget>>(
+					button);
 			}
 			inner->setAttribute(Qt::WA_TransparentForMouseEvents);
 			Ui::AddSkip(messageChannelWrap->entity());
+			Ui::AddDivider(messageChannelWrap->entity());
 
 			Ui::ToggleChildrenVisibility(messageChannelWrap->entity(), true);
 			Ui::ToggleChildrenVisibility(line, true);
@@ -1829,13 +1959,34 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupMuteToggle() {
 	return result;
 }
 
+void DetailsFiller::setupAboutVerification() {
+	const auto peer = _peer;
+	const auto inner = _wrap->add(object_ptr<Ui::VerticalLayout>(_wrap));
+	peer->session().changes().peerFlagsValue(
+		peer,
+		Data::PeerUpdate::Flag::VerifyInfo
+	) | rpl::start_with_next([=] {
+		const auto info = peer->botVerifyDetails();
+		while (inner->count()) {
+			delete inner->widgetAt(0);
+		}
+		if (!info) {
+			Ui::AddDivider(inner);
+		} else if (!info->description.empty()) {
+			Ui::AddDividerText(inner, rpl::single(info->description));
+		}
+		inner->resizeToWidth(inner->width());
+	}, inner->lifetime());
+}
+
 void DetailsFiller::setupMainApp() {
 	const auto button = _wrap->add(
 		object_ptr<Ui::RoundButton>(
 			_wrap,
 			tr::lng_profile_open_app(),
 			st::infoOpenApp),
-		st::infoOpenAppMargin);
+		st::infoOpenAppMargin,
+		style::al_justify);
 	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 
 	const auto user = _peer->asUser();
@@ -1865,6 +2016,37 @@ void DetailsFiller::setupMainApp() {
 	Ui::AddSkip(_wrap);
 }
 
+void DetailsFiller::setupBotPermissions() {
+	AddSkip(_wrap);
+	AddSubsectionTitle(_wrap, tr::lng_profile_bot_permissions_title());
+	const auto emoji = _wrap->add(
+		object_ptr<Ui::SettingsButton>(
+			_wrap,
+			tr::lng_profile_bot_emoji_status_access(),
+			st::infoSharedMediaButton));
+	object_ptr<Profile::FloatingIcon>(
+		emoji,
+		st::infoIconEmojiStatusAccess,
+		st::infoSharedMediaButtonIconPosition);
+
+	const auto user = _peer->asUser();
+	emoji->toggleOn(
+		rpl::single(bool(user->botInfo->canManageEmojiStatus))
+	)->toggledValue() | rpl::filter([=](bool allowed) {
+		return allowed != user->botInfo->canManageEmojiStatus;
+	}) | rpl::start_with_next([=](bool allowed) {
+		user->botInfo->canManageEmojiStatus = allowed;
+		const auto session = &user->session();
+		session->api().request(MTPbots_ToggleUserEmojiStatusPermission(
+			user->inputUser,
+			MTP_bool(allowed)
+		)).send();
+	}, emoji->lifetime());
+	AddSkip(_wrap);
+	AddDivider(_wrap);
+	AddSkip(_wrap);
+}
+
 void DetailsFiller::setupMainButtons() {
 	auto wrapButtons = [=](auto &&callback) {
 		auto topSkip = _wrap->add(CreateSlideSkipWidget(_wrap));
@@ -1880,7 +2062,11 @@ void DetailsFiller::setupMainButtons() {
 			return fillUserButtons(user);
 		});
 	} else if (const auto channel = _peer->asChannel()) {
-		if (!channel->isMegagroup()) {
+		if (channel->isMegagroup()) {
+			wrapButtons([=] {
+				return fillDiscussionButtons(channel);
+			});
+		} else {
 			wrapButtons([=] {
 				return fillChannelButtons(channel);
 			});
@@ -1945,23 +2131,37 @@ void DetailsFiller::addReportReaction(
 }
 
 Ui::MultiSlideTracker DetailsFiller::fillTopicButtons() {
+	Ui::MultiSlideTracker tracker;
+	addShowTopicsListButton(tracker, _topic->forum());
+	return tracker;
+}
+
+void DetailsFiller::addShowTopicsListButton(
+		Ui::MultiSlideTracker &tracker,
+		not_null<Data::Forum*> forum) {
 	using namespace rpl::mappers;
 
-	Ui::MultiSlideTracker tracker;
 	const auto window = _controller->parentController();
-
-	const auto forum = _topic->forum();
+	const auto channel = forum->channel();
 	auto showTopicsVisible = rpl::combine(
 		window->adaptive().oneColumnValue(),
 		window->shownForum().value(),
 		_1 || (_2 != forum));
+	const auto callback = [=] {
+		if (const auto forum = channel->forum()) {
+			if (channel->useSubsectionTabs()) {
+				window->searchInChat(forum->history());
+			} else {
+				window->showForum(forum);
+			}
+		}
+	};
 	AddMainButton(
 		_wrap,
 		tr::lng_forum_show_topics_list(),
 		std::move(showTopicsVisible),
-		[=] { window->showForum(forum); },
+		callback,
 		tracker);
-	return tracker;
 }
 
 Ui::MultiSlideTracker DetailsFiller::fillUserButtons(
@@ -1969,6 +2169,9 @@ Ui::MultiSlideTracker DetailsFiller::fillUserButtons(
 	using namespace rpl::mappers;
 
 	Ui::MultiSlideTracker tracker;
+	if (user->isSelf()) {
+		return tracker;
+	}
 	auto window = _controller->parentController();
 
 	auto addSendMessageButton = [&] {
@@ -1993,34 +2196,28 @@ Ui::MultiSlideTracker DetailsFiller::fillUserButtons(
 			tracker);
 	};
 
-	if (user->isSelf()) {
-		auto separator = _wrap->add(object_ptr<Ui::SlideWrap<>>(
-			_wrap,
-			object_ptr<Ui::PlainShadow>(_wrap),
-			st::infoProfileSeparatorPadding)
-		)->setDuration(
-			st::infoSlideDuration
-		);
-
-		addSendMessageButton();
-
-		separator->toggleOn(
-			std::move(tracker).atLeastOneShownValue()
-		);
-	} else {
+	if (!user->isVerifyCodes()) {
 		addSendMessageButton();
 	}
-
-	addReportReaction(tracker);
+	if (!_sublist) {
+		addReportReaction(tracker);
+	}
 
 	return tracker;
 }
 
 Ui::MultiSlideTracker DetailsFiller::fillChannelButtons(
 		not_null<ChannelData*> channel) {
+	Ui::MultiSlideTracker tracker;
+	addViewChannelButton(tracker, channel);
+	return tracker;
+}
+
+void DetailsFiller::addViewChannelButton(
+		Ui::MultiSlideTracker &tracker,
+		not_null<ChannelData*> channel) {
 	using namespace rpl::mappers;
 
-	Ui::MultiSlideTracker tracker;
 	auto window = _controller->parentController();
 	auto activePeerValue = window->activeChatValue(
 	) | rpl::map([](Dialogs::Key key) {
@@ -2041,6 +2238,40 @@ Ui::MultiSlideTracker DetailsFiller::fillChannelButtons(
 		std::move(viewChannelVisible),
 		std::move(viewChannel),
 		tracker);
+}
+
+Ui::MultiSlideTracker DetailsFiller::fillDiscussionButtons(
+		not_null<ChannelData*> channel) {
+	using namespace rpl::mappers;
+
+	Ui::MultiSlideTracker tracker;
+	auto window = _controller->parentController();
+	auto viewDiscussionVisible = window->dialogsEntryStateValue(
+	) | rpl::map([=](const Dialogs::EntryState &state) {
+		const auto history = state.key.history();
+		return (state.section == Dialogs::EntryState::Section::Replies)
+			&& history
+			&& (history->peer == channel);
+	});
+	auto viewDiscussion = [=] {
+		window->showPeerHistory(
+			channel,
+			Window::SectionShow::Way::Forward);
+	};
+	AddMainButton(
+		_wrap,
+		tr::lng_profile_view_discussion(),
+		std::move(viewDiscussionVisible),
+		std::move(viewDiscussion),
+		tracker);
+
+	if (const auto forum = channel->forum()) {
+		if (channel->useSubsectionTabs()) {
+			addShowTopicsListButton(tracker, forum);
+		}
+	} else if (const auto broadcast = channel->monoforumBroadcast()) {
+		addViewChannelButton(tracker, broadcast);
+	}
 
 	return tracker;
 }
@@ -2048,10 +2279,14 @@ Ui::MultiSlideTracker DetailsFiller::fillChannelButtons(
 object_ptr<Ui::RpWidget> DetailsFiller::fill() {
 	Expects(!_topic || !_topic->creating());
 
-	if (const auto user = _peer->asUser()) {
+	if (!_topic) {
+		setupAboutVerification();
+	} else {
+		add(object_ptr<Ui::BoxContentDivider>(_wrap));
+	}
+	if (const auto user = _sublist ? nullptr : _peer->asUser()) {
 		add(setupPersonalChannel(user));
 	}
-	add(object_ptr<Ui::BoxContentDivider>(_wrap));
 	add(CreateSkipWidget(_wrap));
 	add(setupInfo());
 	if (const auto user = _peer->asUser()) {
@@ -2059,9 +2294,12 @@ object_ptr<Ui::RpWidget> DetailsFiller::fill() {
 			if (info->hasMainApp) {
 				setupMainApp();
 			}
+			if (info->canManageEmojiStatus) {
+				setupBotPermissions();
+			}
 		}
 	}
-	if (!_peer->isSelf()) {
+	if (!_sublist && !_peer->isSelf()) {
 		add(setupMuteToggle());
 	}
 	setupMainButtons();
@@ -2077,6 +2315,80 @@ ActionsFiller::ActionsFiller(
 : _controller(controller)
 , _parent(parent)
 , _peer(peer) {
+}
+
+void ActionsFiller::addAffiliateProgram(not_null<UserData*> user) {
+	if (!user->isBot()) {
+		return;
+	}
+
+	const auto wrap = _wrap->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			_wrap.data(),
+			object_ptr<Ui::VerticalLayout>(_wrap.data())));
+	const auto inner = wrap->entity();
+	auto program = user->session().changes().peerFlagsValue(
+		user,
+		Data::PeerUpdate::Flag::StarRefProgram
+	) | rpl::map([=] {
+		return user->botInfo->starRefProgram;
+	}) | rpl::start_spawning(inner->lifetime());
+	auto commission = rpl::duplicate(
+		program
+	) | rpl::filter([=](StarRefProgram program) {
+		return program.commission > 0;
+	}) | rpl::map([=](StarRefProgram program) {
+		return Info::BotStarRef::FormatCommission(program.commission);
+	});
+	const auto show = _controller->uiShow();
+
+	struct StarRefRecipients {
+		std::vector<not_null<PeerData*>> list;
+		bool requested = false;
+		Fn<void()> open;
+	};
+	const auto recipients = std::make_shared<StarRefRecipients>();
+	recipients->open = [=] {
+		if (!recipients->list.empty()) {
+			const auto program = user->botInfo->starRefProgram;
+			show->show(Info::BotStarRef::JoinStarRefBox(
+				{ user, { program } },
+				user->session().user(),
+				recipients->list));
+		} else if (!recipients->requested) {
+			recipients->requested = true;
+			const auto done = [=](std::vector<not_null<PeerData*>> list) {
+				recipients->list = std::move(list);
+				recipients->open();
+			};
+			Info::BotStarRef::ResolveRecipients(&user->session(), done);
+		}
+	};
+
+	inner->add(EditPeerInfoBox::CreateButton(
+		inner,
+		tr::lng_manage_peer_bot_star_ref(),
+		rpl::duplicate(commission),
+		recipients->open,
+		st::infoSharedMediaCountButton,
+		{ .icon = &st::menuIconSharing, .newBadge = true }));
+	Ui::AddSkip(inner);
+	Ui::AddDividerText(
+		inner,
+		tr::lng_manage_peer_bot_star_ref_about(
+			lt_bot,
+			rpl::single(TextWithEntities{ user->name() }),
+			lt_amount,
+			rpl::duplicate(commission) | Ui::Text::ToWithEntities(),
+			Ui::Text::RichLangValue));
+	Ui::AddSkip(inner);
+
+	wrap->toggleOn(std::move(
+		program
+	) | rpl::map([](StarRefProgram program) {
+		return program.commission > 0;
+	}));
+	wrap->finishAnimating();
 }
 
 void ActionsFiller::addBalanceActions(not_null<UserData*> user) {
@@ -2095,7 +2407,8 @@ void ActionsFiller::addBalanceActions(not_null<UserData*> user) {
 		rpl::combine(
 			std::move(currencyBalance),
 			std::move(creditsBalance)
-		) | rpl::map((rpl::mappers::_1 + rpl::mappers::_2) > 0));
+		) | rpl::map((rpl::mappers::_1 > CreditsAmount(0))
+			|| (rpl::mappers::_2 > CreditsAmount(0))));
 }
 
 void ActionsFiller::addInviteToGroupAction(not_null<UserData*> user) {
@@ -2134,11 +2447,17 @@ void ActionsFiller::addShareContactAction(not_null<UserData*> user) {
 
 void ActionsFiller::addEditContactAction(not_null<UserData*> user) {
 	const auto controller = _controller->parentController();
+	const auto edit = [=] {
+		if (controller->showFrozenError()) {
+			return;
+		}
+		controller->window().show(Box(EditContactBox, controller, user));
+	};
 	AddActionButton(
 		_wrap,
 		tr::lng_info_edit_contact(),
 		IsContactValue(user),
-		[=] { controller->window().show(Box(EditContactBox, controller, user)); },
+		edit,
 		&st::infoIconEdit);
 }
 
@@ -2152,7 +2471,36 @@ void ActionsFiller::addDeleteContactAction(not_null<UserData*> user) {
 		&st::infoIconDelete);
 }
 
+void ActionsFiller::addFastButtonsMode(not_null<UserData*> user) {
+	Expects(user->isBot());
+
+	const auto bots = &user->session().fastButtonsBots();
+	const auto button = _wrap->add(object_ptr<Ui::SettingsButton>(
+		_wrap,
+		rpl::single(u"Fast buttons mode"_q),
+		st::infoSharedMediaButton));
+	object_ptr<Info::Profile::FloatingIcon>(
+		button,
+		st::infoIconMediaBot,
+		st::infoSharedMediaButtonIconPosition);
+
+	AddSkip(_wrap);
+	AddDivider(_wrap);
+	AddSkip(_wrap);
+
+	button->toggleOn(bots->enabledValue(user));
+	button->toggledValue(
+	) | rpl::filter([=](bool value) {
+		return value != bots->enabled(user);
+	}) | rpl::start_with_next([=](bool value) {
+		bots->setEnabled(user, value);
+	}, button->lifetime());
+}
+
 void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
+	if (FastButtonsMode()) {
+		addFastButtonsMode(user);
+	}
 	const auto window = _controller->parentController();
 	const auto findBotCommand = [user](const QString &command) {
 		if (!user->isBot()) {
@@ -2343,6 +2691,7 @@ void ActionsFiller::addJoinChannelAction(
 
 void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 	if (user->isBot()) {
+		addAffiliateProgram(user);
 		addBalanceActions(user);
 		addInviteToGroupAction(user);
 	}
@@ -2402,6 +2751,7 @@ object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 } // namespace
 
 const char kOptionShowPeerIdBelowAbout[] = "show-peer-id-below-about";
+const char kOptionShowChannelJoinedBelowAbout[] = "show-channel-joined-below-about";
 
 object_ptr<Ui::RpWidget> SetupDetails(
 		not_null<Controller*> controller,
@@ -2409,6 +2759,14 @@ object_ptr<Ui::RpWidget> SetupDetails(
 		not_null<PeerData*> peer,
 		Origin origin) {
 	DetailsFiller filler(controller, parent, peer, origin);
+	return filler.fill();
+}
+
+object_ptr<Ui::RpWidget> SetupDetails(
+		not_null<Controller*> controller,
+		not_null<Ui::RpWidget*> parent,
+		not_null<Data::SavedSublist*> sublist) {
+	DetailsFiller filler(controller, parent, sublist);
 	return filler.fill();
 }
 
@@ -2546,6 +2904,97 @@ object_ptr<Ui::RpWidget> SetupChannelMembersAndManage(
 		st::menuIconAdmin,
 		st::infoChannelAdminsIconPosition);
 
+	const auto canViewBalance = false
+		|| (channel->flags() & ChannelDataFlag::CanViewRevenue)
+		|| (channel->flags() & ChannelDataFlag::CanViewCreditsRevenue)
+		|| (channel->loadedStatus() != ChannelData::LoadedStatus::Full);
+	if (canViewBalance) {
+		const auto balanceWrap = result->entity()->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				result->entity(),
+				object_ptr<Ui::VerticalLayout>(result->entity())));
+		auto refreshed = channel->session().credits().refreshedByPeerId(
+			channel->id);
+		auto creditsValue = rpl::single(
+			rpl::empty_value()
+		) | rpl::then(rpl::duplicate(refreshed)) | rpl::map([=] {
+			return channel->session().credits().balance(channel->id);
+		});
+		auto currencyValue = rpl::single(
+			rpl::empty_value()
+		) | rpl::then(rpl::duplicate(refreshed)) | rpl::map([=] {
+			return channel->session().credits().balanceCurrency(channel->id);
+		});
+		const auto emptyAmount = CreditsAmount(0);
+		balanceWrap->toggleOn(
+			rpl::combine(
+				rpl::duplicate(creditsValue),
+				rpl::duplicate(currencyValue)
+			) | rpl::map(rpl::mappers::_1 > emptyAmount
+				|| rpl::mappers::_2 > emptyAmount),
+			anim::type::normal);
+		balanceWrap->finishAnimating();
+
+		const auto &st = st::infoSharedMediaButton;
+
+		auto customEmojiFactory = [height = st.style.font->height,
+				font = st.rightLabel.style.font,
+				color = st.rightLabel.textFg->c](
+			QStringView data,
+			const Ui::Text::MarkedContext &context
+		) -> std::unique_ptr<Ui::Text::CustomEmoji> {
+			return (data == Ui::kCreditsCurrency)
+				? Ui::MakeCreditsIconEmoji(height, 1)
+				: std::make_unique<Ui::Text::ShiftedEmoji>(
+					Ui::Earn::MakeCurrencyIconEmoji(font, color),
+					QPoint(0, st::channelEarnCurrencyCommonMargins.top()));
+		};
+		const auto context = Ui::Text::MarkedContext{
+			.customEmojiFactory = std::move(customEmojiFactory),
+		};
+
+		const auto balance = balanceWrap->entity();
+		const auto button = AddActionButton(
+			balance,
+			tr::lng_manage_peer_bot_balance(),
+			rpl::single(true),
+			[=] { controller->showSection(Info::ChannelEarn::Make(peer)); },
+			nullptr);
+
+		::Settings::CreateRightLabel(
+			button->entity(),
+			rpl::combine(
+				std::move(creditsValue),
+				std::move(currencyValue)
+			) | rpl::map([](CreditsAmount credits, CreditsAmount currency) {
+				auto creditsText = (credits > CreditsAmount(0))
+					? Ui::MakeCreditsIconEntity()
+						.append(QChar(' '))
+						.append(Info::ChannelEarn::MajorPart(credits))
+						.append(credits.nano()
+							? Info::ChannelEarn::MinorPart(credits)
+							: QString())
+					: TextWithEntities();
+				auto currencyText = (currency > CreditsAmount(0))
+					? Ui::Text::SingleCustomEmoji("_")
+						.append(QChar(' '))
+						.append(Info::ChannelEarn::MajorPart(currency))
+						.append(Info::ChannelEarn::MinorPart(currency))
+					: TextWithEntities();
+				return currencyText
+					.append(QChar(' '))
+					.append(std::move(creditsText));
+			}),
+			st,
+			tr::lng_manage_peer_bot_balance(),
+			context);
+
+		object_ptr<FloatingIcon>(
+			balance,
+			st::menuIconEarn,
+			st::infoChannelAdminsIconPosition);
+	}
+
 	if (EditPeerInfoBox::Available(channel)) {
 		const auto sessionController = controller->parentController();
 		const auto button = AddActionButton(
@@ -2569,6 +3018,49 @@ object_ptr<Ui::RpWidget> SetupChannelMembersAndManage(
 	result->entity()->add(CreateSkipWidget(result));
 
 	return result;
+}
+
+Cover *AddCover(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Controller*> controller,
+		not_null<PeerData*> peer,
+		Data::ForumTopic *topic,
+		Data::SavedSublist *sublist) {
+	const auto shown = sublist ? sublist->sublistPeer() : peer;
+	const auto result = topic
+		? container->add(object_ptr<Cover>(
+			container,
+			controller->parentController(),
+			topic))
+		: container->add(object_ptr<Cover>(
+			container,
+			controller->parentController(),
+			shown,
+			[=] { return controller->wrapWidget(); }));
+	result->showSection(
+	) | rpl::start_with_next([=](Section section) {
+		controller->showSection(topic
+			? std::make_shared<Info::Memento>(topic, section)
+			: std::make_shared<Info::Memento>(shown, section));
+	}, result->lifetime());
+	result->setOnlineCount(rpl::single(0));
+	return result;
+}
+
+void AddDetails(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Controller*> controller,
+		not_null<PeerData*> peer,
+		Data::ForumTopic *topic,
+		Data::SavedSublist *sublist,
+		Origin origin) {
+	if (topic) {
+		container->add(SetupDetails(controller, container, topic));
+	} else if (sublist) {
+		container->add(SetupDetails(controller, container, sublist));
+	} else {
+		container->add(SetupDetails(controller, container, peer, origin));
+	}
 }
 
 } // namespace Profile

@@ -71,21 +71,21 @@ auto MediaGenericPart::stickerTakePlayer(
 
 MediaGeneric::MediaGeneric(
 	not_null<Element*> parent,
-	Fn<void(Fn<void(std::unique_ptr<Part>)>)> generate,
+	Fn<void(
+		not_null<MediaGeneric*>,
+		Fn<void(std::unique_ptr<Part>)>)> generate,
 	MediaGenericDescriptor &&descriptor)
 : Media(parent)
+, _paintBg(std::move(descriptor.paintBg))
+, _fullAreaLink(descriptor.fullAreaLink)
 , _maxWidthCap(descriptor.maxWidth)
 , _service(descriptor.service)
 , _hideServiceText(descriptor.hideServiceText) {
-	generate([&](std::unique_ptr<Part> part) {
+	generate(this, [&](std::unique_ptr<Part> part) {
 		_entries.push_back({
 			.object = std::move(part),
 		});
 	});
-	if (descriptor.serviceLink) {
-		parent->data()->setCustomServiceLink(
-			std::move(descriptor.serviceLink));
-	}
 }
 
 MediaGeneric::~MediaGeneric() {
@@ -123,12 +123,19 @@ void MediaGeneric::draw(Painter &p, const PaintContext &context) const {
 	const auto outer = width();
 	if (outer < st::msgPadding.left() + st::msgPadding.right() + 1) {
 		return;
+	} else if (_paintBg) {
+		_paintBg(p, context, this);
 	} else if (_service) {
 		PainterHighQualityEnabler hq(p);
 		const auto radius = st::msgServiceGiftBoxRadius;
 		p.setPen(Qt::NoPen);
 		p.setBrush(context.st->msgServiceBg());
-		p.drawRoundedRect(QRect(0, 0, width(), height()), radius, radius);
+		const auto rect = QRect(0, 0, width(), height());
+		p.drawRoundedRect(rect, radius, radius);
+		//if (context.selected()) {
+		//	p.setBrush(context.st->serviceTextPalette().selectBg);
+		//	p.drawRoundedRect(rect, radius, radius);
+		//}
 	}
 
 	auto translated = 0;
@@ -149,6 +156,11 @@ TextState MediaGeneric::textState(
 
 	const auto outer = width();
 	if (outer < st::msgPadding.left() + st::msgPadding.right() + 1) {
+		return result;
+	}
+
+	if (_fullAreaLink && QRect(0, 0, width(), height()).contains(point)) {
+		result.link = _fullAreaLink;
 		return result;
 	}
 
@@ -229,12 +241,15 @@ QMargins MediaGeneric::inBubblePadding() const {
 MediaGenericTextPart::MediaGenericTextPart(
 	TextWithEntities text,
 	QMargins margins,
+	const style::TextStyle &st,
 	const base::flat_map<uint16, ClickHandlerPtr> &links,
-	const std::any &context)
+	const Ui::Text::MarkedContext &context,
+	style::align align)
 : _text(st::msgMinWidth)
-, _margins(margins) {
+, _margins(margins)
+, _align(align) {
 	_text.setMarkedText(
-		st::defaultTextStyle,
+		st,
 		text,
 		kMarkupTextOptions,
 		context);
@@ -248,53 +263,87 @@ void MediaGenericTextPart::draw(
 		not_null<const MediaGeneric*> owner,
 		const PaintContext &context,
 		int outerWidth) const {
-	const auto service = owner->service();
-	p.setPen(service
-		? context.st->msgServiceFg()
-		: context.messageStyle()->historyTextFg);
+	const auto use = (width() - _margins.left() - _margins.right());
+	setupPen(p, owner, context);
 	_text.draw(p, {
-		.position = { (outerWidth - width()) / 2, _margins.top() },
+		.position = {
+			((_align == style::al_top)
+				? ((outerWidth - use) / 2)
+				: _margins.left()),
+			_margins.top(),
+		},
 		.outerWidth = outerWidth,
-		.availableWidth = width(),
-		.align = style::al_top,
-		.palette = &(service
+		.availableWidth = use,
+		.align = _align,
+		.palette = &(owner->service()
 			? context.st->serviceTextPalette()
 			: context.messageStyle()->textPalette),
 		.spoiler = Ui::Text::DefaultSpoilerCache(),
 		.now = context.now,
 		.pausedEmoji = context.paused || On(PowerSaving::kEmojiChat),
 		.pausedSpoiler = context.paused || On(PowerSaving::kChatSpoiler),
+		.elisionLines = elisionLines(),
 	});
+}
+
+void MediaGenericTextPart::setupPen(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context) const {
+	const auto service = owner->service();
+	p.setPen(service
+		? context.st->msgServiceFg()
+		: context.messageStyle()->historyTextFg);
+}
+
+int MediaGenericTextPart::elisionLines() const {
+	return 0;
 }
 
 TextState MediaGenericTextPart::textState(
 		QPoint point,
 		StateRequest request,
 		int outerWidth) const {
-	point -= QPoint{ (outerWidth - width()) / 2, _margins.top() };
+	const auto use = (width() - _margins.left() - _margins.right());
+	point -= QPoint{
+		((_align == style::al_top)
+			? ((outerWidth - use) / 2)
+			: _margins.left()),
+		_margins.top(),
+	};
 	auto result = TextState();
 	auto forText = request.forText();
-	forText.align = style::al_top;
-	result.link = _text.getState(point, width(), forText).link;
+	forText.align = _align;
+	result.link = _text.getState(point, use, forText).link;
 	return result;
 }
 
 QSize MediaGenericTextPart::countOptimalSize() {
+	const auto lines = elisionLines();
+	const auto height = lines
+		? std::min(_text.minHeight(), lines * _text.style()->font->height)
+		: _text.minHeight();
 	return {
 		_margins.left() + _text.maxWidth() + _margins.right(),
-		_margins.top() + _text.minHeight() + _margins.bottom(),
+		_margins.top() + height + _margins.bottom(),
 	};
 }
 
 QSize MediaGenericTextPart::countCurrentSize(int newWidth) {
 	auto skip = _margins.left() + _margins.right();
-	const auto size = CountOptimalTextSize(
-		_text,
-		st::msgMinWidth,
-		newWidth - skip);
+	const auto size = (_align == style::al_top)
+		? CountOptimalTextSize(
+			_text,
+			st::msgMinWidth,
+			std::max(st::msgMinWidth, newWidth - skip))
+		: QSize(newWidth - skip, _text.countHeight(newWidth - skip));
+	const auto lines = elisionLines();
+	const auto height = lines
+		? std::min(size.height(), lines * _text.style()->font->height)
+		: size.height();
 	return {
 		size.width() + skip,
-		_margins.top() + size.height() + _margins.bottom(),
+		_margins.top() + height + _margins.bottom(),
 	};
 }
 
@@ -435,13 +484,13 @@ void StickerInBubblePart::ensureCreated(Element *replacing) const {
 		return;
 	} else if (const auto data = _lookup()) {
 		const auto sticker = data.sticker;
-		if (const auto info = sticker->sticker()) {
+		if (sticker->sticker()) {
 			const auto skipPremiumEffect = true;
 			_link = data.link;
 			_skipTop = data.skipTop;
 			_sticker.emplace(_parent, sticker, skipPremiumEffect, replacing);
-			if (data.singleTimePlayback) {
-				_sticker->setDiceIndex(info->alt, 1);
+			if (data.stopOnLastFrame) {
+				_sticker->setStopOnLastFrame(true);
 			}
 			_sticker->initSize(data.size);
 			_sticker->setCustomCachingTag(data.cacheTag);
@@ -551,7 +600,7 @@ void StickerWithBadgePart::paintBadge(
 void StickerWithBadgePart::validateBadge(
 		const PaintContext &context) const {
 	const auto stm = context.messageStyle();
-	const auto &badgeFg = stm->historyFileRadialFg->c;
+	const auto &badgeFg = st::premiumButtonFg->c;
 	const auto &badgeBorder = stm->msgBg->c;
 	if (!_badge.isNull()
 		&& _badgeFg == badgeFg

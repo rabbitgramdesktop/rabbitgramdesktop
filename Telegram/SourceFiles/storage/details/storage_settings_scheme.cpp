@@ -1059,9 +1059,7 @@ bool ReadSetting(
 			auto id = Ui::Emoji::IdFromOldKey(static_cast<uint64>(i.key()));
 			if (!id.isEmpty()) {
 				auto index = Ui::Emoji::ColorIndexFromOldKey(i.value());
-				if (index >= 0) {
-					variants.insert(id, index);
-				}
+				variants.insert(id, index);
 			}
 		}
 		Core::App().settings().setLegacyEmojiVariants(std::move(variants));
@@ -1086,6 +1084,7 @@ bool ReadSetting(
 			context.sessionSettings().setHiddenPinnedMessageId(
 				DeserializePeerId(i.key()),
 				MsgId(0), // topicRootId
+				PeerId(0), // monoforumPeerId
 				MsgId(i.value()));
 		}
 		context.legacyRead = true;

@@ -202,7 +202,11 @@ EntitiesInText EntitiesFromMTP(
 				d.vlength().v,
 			});
 		}, [&](const MTPDmessageEntityBankCard &d) {
-			// Skipping cards. // #TODO entities
+			result.push_back({
+				EntityType::BankCard,
+				d.voffset().v,
+				d.vlength().v,
+			});
 		}, [&](const MTPDmessageEntitySpoiler &d) {
 			result.push_back({
 				EntityType::Spoiler,
@@ -229,7 +233,7 @@ EntitiesInText EntitiesFromMTP(
 }
 
 MTPVector<MTPMessageEntity> EntitiesToMTP(
-		not_null<Main::Session*> session,
+		Main::Session *session,
 		const EntitiesInText &entities,
 		ConvertOption option) {
 	auto v = QVector<MTPMessageEntity>();
@@ -273,6 +277,9 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 		case EntityType::Phone: {
 			v.push_back(MTP_messageEntityPhone(offset, length));
 		} break;
+		case EntityType::BankCard: {
+			v.push_back(MTP_messageEntityBankCard(offset, length));
+		} break;
 		case EntityType::Hashtag: {
 			v.push_back(MTP_messageEntityHashtag(offset, length));
 		} break;
@@ -283,6 +290,7 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 			v.push_back(MTP_messageEntityMention(offset, length));
 		} break;
 		case EntityType::MentionName: {
+			Assert(session != nullptr);
 			const auto valid = MentionNameEntity(
 				session,
 				offset,
@@ -342,6 +350,16 @@ MTPVector<MTPMessageEntity> EntitiesToMTP(
 		}
 	}
 	return MTP_vector<MTPMessageEntity>(std::move(v));
+}
+
+TextWithEntities ParseTextWithEntities(
+		Main::Session *session,
+		const MTPTextWithEntities &text) {
+	const auto &data = text.data();
+	return {
+		.text = qs(data.vtext()),
+		.entities = EntitiesFromMTP(session, data.ventities().v),
+	};
 }
 
 } // namespace Api

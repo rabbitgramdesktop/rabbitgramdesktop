@@ -26,6 +26,7 @@ namespace Data {
 class Session;
 class Folder;
 struct WebPageDraft;
+class SavedSublist;
 
 [[nodiscard]] MTPInputReplyTo ReplyToForMTP(
 	not_null<History*> history,
@@ -63,6 +64,7 @@ public:
 	void readInboxOnNewMessage(not_null<HistoryItem*> item);
 	void readClientSideMessage(not_null<HistoryItem*> item);
 	void sendPendingReadInbox(not_null<History*> history);
+	void reportDelivery(not_null<HistoryItem*> item);
 
 	void requestDialogEntry(not_null<Data::Folder*> folder);
 	void requestDialogEntry(
@@ -70,6 +72,9 @@ public:
 		Fn<void()> callback = nullptr);
 	void dialogEntryApplied(not_null<History*> history);
 	void changeDialogUnreadMark(not_null<History*> history, bool unread);
+	void changeSublistUnreadMark(
+		not_null<Data::SavedSublist*> sublist,
+		bool unread);
 	void requestFakeChatListMessage(not_null<History*> history);
 
 	void requestGroupAround(not_null<HistoryItem*> item);
@@ -201,6 +206,7 @@ private:
 	void postponeRequestDialogEntries();
 
 	void sendDialogRequests();
+	void reportPendingDeliveries();
 
 	[[nodiscard]] bool isCreatingTopic(
 		not_null<History*> history,
@@ -235,6 +241,11 @@ private:
 		std::vector<DelayedByTopicMessage>> _creatingTopics;
 	base::flat_map<FullMsgId, MsgId> _createdTopicIds;
 	base::flat_set<mtpRequestId> _creatingTopicRequests;
+
+	base::flat_map<
+		not_null<PeerData*>,
+		base::flat_set<MsgId>> _pendingDeliveryReport;
+	base::flat_set<not_null<PeerData*>> _deliveryReportSent;
 
 };
 

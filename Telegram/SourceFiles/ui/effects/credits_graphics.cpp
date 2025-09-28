@@ -17,6 +17,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "history/view/media/history_view_sticker_player.h"
+#include "info/bot/starref/info_bot_starref_common.h"
 #include "info/userpic/info_userpic_emoji_builder_preview.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -25,6 +26,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/text/custom_emoji_instance.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/number_input.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -162,23 +166,27 @@ not_null<RpWidget*> CreateSingleStarWidget(
 
 not_null<MaskedInputField*> AddInputFieldForCredits(
 		not_null<VerticalLayout*> container,
-		rpl::producer<uint64> value) {
+		rpl::producer<CreditsAmount> value) {
 	const auto &st = st::botEarnInputField;
 	const auto inputContainer = container->add(
 		CreateSkipWidget(container, st.heightMin));
-	const auto currentValue = rpl::variable<uint64>(
+	const auto currentValue = rpl::variable<CreditsAmount>(
 		rpl::duplicate(value));
 	const auto input = CreateChild<NumberInput>(
 		inputContainer,
 		st,
-		tr::lng_bot_earn_out_ph(),
-		QString::number(currentValue.current()),
-		currentValue.current());
+		tr::lng_bot_earn_out_ph_max(
+			lt_amount,
+			currentValue.value() | rpl::map([](CreditsAmount amount) {
+				return QString::number(amount.whole());
+			})),
+		QString::number(currentValue.current().whole()),
+		currentValue.current().whole());
 	rpl::duplicate(
 		value
-	) | rpl::start_with_next([=](uint64 v) {
-		input->changeLimit(v);
-		input->setText(QString::number(v));
+	) | rpl::start_with_next([=](CreditsAmount v) {
+		input->changeLimit(v.whole());
+		input->setText(QString::number(v.whole()));
 	}, input->lifetime());
 	const auto icon = CreateSingleStarWidget(
 		inputContainer,
@@ -215,6 +223,12 @@ PaintRoundImageCallback GenerateCreditsPaintUserpicCallback(
 		};
 	}
 	const auto bg = [&]() -> EmptyUserpic::BgColors {
+		if (entry.postsSearch) {
+			return {
+				st::historyPeerSavedMessagesBg,
+				st::historyPeerSavedMessagesBg2,
+			};
+		}
 		switch (entry.peerType) {
 		case Data::CreditsHistoryEntry::PeerType::API:
 			return { st::historyPeer2UserpicBg, st::historyPeer2UserpicBg2 };
@@ -298,7 +312,9 @@ PaintRoundImageCallback GenerateCreditsPaintUserpicCallback(
 	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {
 		userpic->paintCircle(p, x, y, outerWidth, size);
 		const auto rect = QRect(x, y, size, size);
-		((entry.peerType == PeerType::AppStore)
+		(entry.postsSearch
+			? st::creditsHistorySearchPostsIcon
+			: (entry.peerType == PeerType::AppStore)
 			? st::sessionIconiPhone
 			: (entry.peerType == PeerType::PlayMarket)
 			? st::sessionIconAndroid
@@ -533,7 +549,7 @@ Fn<PaintRoundImageCallback(Fn<void()>)> PaintPreviewCallback(
 				extended,
 				std::move(update));
 		};
-	} else if (entry.photoId) {
+	} else if (entry.photoId && entry.subscriptionUntil.isNull()) {
 		const auto photo = session->data().photo(entry.photoId);
 		return [=](Fn<void()> update) {
 			return GenerateCreditsPaintEntryCallback(
@@ -545,15 +561,39 @@ Fn<PaintRoundImageCallback(Fn<void()>)> PaintPreviewCallback(
 }
 
 TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
-	return (entry.floodSkip
+	return (entry.starrefCommission && !entry.starrefAmount)
+		? tr::lng_credits_commission(
+			tr::now,
+			lt_amount,
+			TextWithEntities{
+				Info::BotStarRef::FormatCommission(entry.starrefCommission)
+			},
+			TextWithEntities::Simple)
+		: entry.paidMessagesCount
+		? tr::lng_credits_paid_messages_fee(
+			tr::now,
+			lt_count,
+			entry.paidMessagesCount,
+			TextWithEntities::Simple)
+		: (entry.premiumMonthsForStars
+		? tr::lng_premium_summary_title
+		: entry.floodSkip
 		? tr::lng_credits_box_history_entry_api
 		: entry.reaction
 		? tr::lng_credits_box_history_entry_reaction_name
+		: entry.giftUpgraded
+		? tr::lng_credits_box_history_entry_gift_upgrade
+		: entry.giftResale
+		? (entry.in
+			? tr::lng_credits_box_history_entry_gift_sold
+			: tr::lng_credits_box_history_entry_gift_bought)
 		: entry.bareGiveawayMsgId
 		? tr::lng_credits_box_history_entry_giveaway_name
 		: entry.converted
 		? tr::lng_credits_box_history_entry_gift_converted
-		: entry.convertStars
+		: (entry.gift && !entry.in && entry.uniqueGift)
+		? tr::lng_credits_box_history_entry_gift_transfer
+		: (entry.starsConverted || (entry.gift && !entry.in))
 		? tr::lng_credits_box_history_entry_gift_sent
 		: entry.gift
 		? tr::lng_credits_box_history_entry_gift_name
@@ -655,6 +695,28 @@ QImage CreditsWhiteDoubledIcon(int size, float64 outlineRatio) {
 		drawSingle(p);
 	}
 	return result;
+}
+
+std::unique_ptr<Ui::Text::CustomEmoji> MakeCreditsIconEmoji(
+		int height,
+		int count) {
+	return std::make_unique<Ui::CustomEmoji::Internal>(
+		u"credits_icon:%1:%2"_q.arg(height).arg(count),
+		GenerateStars(height, count));
+}
+
+Ui::Text::MarkedContext MakeCreditsIconContext(int height, int count) {
+	auto customEmojiFactory = [=](
+		QStringView data,
+		const Ui::Text::MarkedContext &context
+	) -> std::unique_ptr<Ui::Text::CustomEmoji> {
+		return MakeCreditsIconEmoji(height, count);
+	};
+	return { .customEmojiFactory = std::move(customEmojiFactory) };
+}
+
+TextWithEntities MakeCreditsIconEntity() {
+	return Ui::Text::SingleCustomEmoji(Ui::kCreditsCurrency);
 }
 
 } // namespace Ui

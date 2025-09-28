@@ -78,6 +78,7 @@ public:
 
 	bool closeByOutsideClick() const override;
 	void checkBeforeClose(Fn<void()> close) override;
+	void checkBeforeCloseByEscape(Fn<void()> close) override;
 	rpl::producer<QString> title() override;
 
 	void enableBackButton() override;
@@ -103,8 +104,8 @@ private:
 		rpl::event_stream<> backButtonEnables;
 	} _flexibleScroll;
 	not_null<::Settings::AbstractSection*> _inner;
-	QPointer<Ui::RpWidget> _pinnedToTop;
-	QPointer<Ui::RpWidget> _pinnedToBottom;
+	base::weak_qptr<Ui::RpWidget> _pinnedToTop;
+	base::weak_qptr<Ui::RpWidget> _pinnedToBottom;
 
 	rpl::event_stream<std::vector<Type>> _removesFromStack;
 

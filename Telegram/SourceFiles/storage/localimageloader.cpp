@@ -404,12 +404,15 @@ void SendingAlbum::removeItem(not_null<HistoryItem*> item) {
 	Assert(i != end(items));
 	items.erase(i);
 	if (moveCaption) {
-		const auto caption = item->originalText();
+		auto caption = item->originalText();
 		const auto firstId = items.front().msgId;
 		if (const auto first = item->history()->owner().message(firstId)) {
 			// We don't need to finishEdition() here, because the whole
 			// album will be rebuilt after one item was removed from it.
-			first->setText(caption);
+			auto firstCaption = first->originalText();
+			first->setText(firstCaption.text.isEmpty()
+				? std::move(caption)
+				: firstCaption.append('\n').append(std::move(caption)));
 			refreshMediaCaption(first);
 		}
 	}
@@ -468,6 +471,7 @@ FileLoadTask::FileLoadTask(
 	const QString &filepath,
 	const QByteArray &content,
 	std::unique_ptr<Ui::PreparedFileInformation> information,
+	std::unique_ptr<FileLoadTask> videoCover,
 	SendMediaType type,
 	const FileLoadTo &to,
 	const TextWithTags &caption,
@@ -481,6 +485,7 @@ FileLoadTask::FileLoadTask(
 , _album(std::move(album))
 , _filepath(filepath)
 , _content(content)
+, _videoCover(std::move(videoCover))
 , _information(std::move(information))
 , _type(type)
 , _caption(caption)
@@ -688,6 +693,15 @@ void FileLoadTask::process(Args &&args) {
 		.spoiler = _spoiler,
 		.album = _album,
 	});
+	if (const auto cover = _videoCover.get()) {
+		cover->process();
+		if (const auto &result = cover->peekResult()) {
+			if (result->type == SendMediaType::Photo
+				&& !result->fileparts.empty()) {
+				_result->videoCover = result;
+			}
+		}
+	}
 
 	QString filename, filemime;
 	qint64 filesize = 0;
@@ -1073,8 +1087,8 @@ void FileLoadTask::finish() {
 	}
 }
 
-FilePrepareResult *FileLoadTask::peekResult() const {
-	return _result.get();
+const std::shared_ptr<FilePrepareResult> &FileLoadTask::peekResult() const {
+	return _result;
 }
 
 std::unique_ptr<Ui::PreparedFileInformation> FileLoadTask::readMediaInformation(

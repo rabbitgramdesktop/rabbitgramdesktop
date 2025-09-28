@@ -10,7 +10,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/round_rect.h"
 #include "ui/effects/animations.h"
-#include "styles/style_widgets.h"
+#include "ui/text/text.h"
+
+namespace style {
+struct TextStyle;
+struct SettingsSlider;
+} // namespace style
+
+namespace st {
+extern const style::SettingsSlider &defaultSettingsSlider;
+} // namespace st
 
 namespace Ui {
 
@@ -24,11 +33,12 @@ public:
 	void addSection(const QString &label);
 	void addSection(
 		const TextWithEntities &label,
-		const std::any &context = {});
+		Text::MarkedContext context = {});
 	void setSections(const std::vector<QString> &labels);
 	void setSections(
 		const std::vector<TextWithEntities> &labels,
-		const std::any &context = {});
+		Text::MarkedContext context = {},
+		Fn<bool()> paused = nullptr);
 	int activeSection() const {
 		return _activeIndex;
 	}
@@ -36,9 +46,14 @@ public:
 	void setActiveSectionFast(int index);
 	void finishAnimating();
 
+	void setAdditionalContentWidthToSection(int index, int width);
+
 	[[nodiscard]] rpl::producer<int> sectionActivated() const {
 		return _sectionActivated.events();
 	}
+
+	[[nodiscard]] int sectionsCount() const;
+	[[nodiscard]] int lookupSectionLeft(int index) const;
 
 protected:
 	void timerEvent(QTimerEvent *e) override;
@@ -53,12 +68,13 @@ protected:
 		Section(
 			const TextWithEntities &label,
 			const style::TextStyle &st,
-			const std::any &context);
+			const Text::MarkedContext &context);
 
+		Text::String label;
+		std::unique_ptr<RippleAnimation> ripple;
 		int left = 0;
 		int width = 0;
-		Ui::Text::String label;
-		std::unique_ptr<RippleAnimation> ripple;
+		int contentWidth = 0;
 	};
 	struct Range {
 		int left = 0;
@@ -72,11 +88,8 @@ protected:
 		return _sections.size();
 	}
 
-	template <typename Lambda>
-	void enumerateSections(Lambda callback);
-
-	template <typename Lambda>
-	void enumerateSections(Lambda callback) const;
+	void enumerateSections(Fn<bool(Section&)> callback);
+	void enumerateSections(Fn<bool(const Section&)> callback) const;
 
 	virtual void startRipple(int sectionIndex) {
 	}
@@ -89,6 +102,10 @@ protected:
 
 	void setSelectOnPress(bool selectOnPress);
 
+	[[nodiscard]] std::vector<Section> &sectionsRef();
+
+	[[nodiscard]] bool paused() const;
+
 private:
 	void activateCallback();
 	virtual const style::TextStyle &getLabelStyle() const = 0;
@@ -98,6 +115,7 @@ private:
 	void setSelectedSection(int index);
 
 	std::vector<Section> _sections;
+	Fn<bool()> _paused;
 	int _activeIndex = 0;
 	bool _selectOnPress = true;
 	bool _snapToLabel = false;
@@ -116,7 +134,14 @@ private:
 
 class SettingsSlider : public DiscreteSlider {
 public:
-	SettingsSlider(QWidget *parent, const style::SettingsSlider &st = st::defaultSettingsSlider);
+	SettingsSlider(
+		QWidget *parent,
+		const style::SettingsSlider &st = st::defaultSettingsSlider);
+
+	[[nodiscard]] const style::SettingsSlider &st() const;
+
+	[[nodiscard]] int centerOfSection(int section) const;
+	virtual void fitWidthToSections();
 
 	void setRippleTopRoundRadius(int radius);
 
@@ -127,13 +152,14 @@ protected:
 
 	void startRipple(int sectionIndex) override;
 
+	std::vector<float64> countSectionsWidths(int newWidth) const;
+
 private:
 	const style::TextStyle &getLabelStyle() const override;
 	int getAnimationDuration() const override;
 	QImage prepareRippleMask(int sectionIndex, const Section &section);
 
 	void resizeSections(int newWidth);
-	std::vector<float64> countSectionsWidths(int newWidth) const;
 
 	const style::SettingsSlider &_st;
 	std::optional<Ui::RoundRect> _bar;

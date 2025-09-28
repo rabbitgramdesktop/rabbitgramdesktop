@@ -644,7 +644,7 @@ void Widget::updateTimeText(const TrackState &state) {
 		display = state.position;
 	} else if (state.length) {
 		display = state.length;
-	} else if (const auto song = document->song()) {
+	} else if (document->song()) {
 		display = (document->duration() * frequency) / 1000;
 	}
 
@@ -701,7 +701,7 @@ void Widget::handleSongChange() {
 				const auto date = parsed.date();
 				const auto time = QLocale().toString(
 					parsed.time(), 
-					RabbitSettings::JsonSettings::GetBool("show_seconds")
+					RabbitSettings::showSeconds()
 						? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 						: QLocale::system().timeFormat(QLocale::ShortFormat));
 				const auto today = QDateTime::currentDateTime().date();

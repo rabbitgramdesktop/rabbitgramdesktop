@@ -10,11 +10,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/timer.h"
 #include "data/data_report.h"
 #include "ui/rp_widget.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animations.h"
 #include "ui/dragging_scroll_manager.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/widgets/scroll_area.h"
-#include "history/history_view_swipe_data.h"
+#include "ui/userpic_view.h"
 #include "history/view/history_view_top_bar_widget.h"
 
 #include <QtGui/QPainterPath>
@@ -34,6 +35,7 @@ struct SelectionModeResult;
 struct StateRequest;
 enum class CursorState : char;
 enum class PointState : char;
+enum class ElementChatMode : char;
 class EmptyPainter;
 class Element;
 class TranslateTracker;
@@ -121,7 +123,7 @@ public:
 	void setItemsRevealHeight(int revealHeight);
 	void changeItemsRevealHeight(int revealHeight);
 	void checkActivation();
-	void recountHistoryGeometry();
+	void recountHistoryGeometry(bool initial = false);
 	void updateSize();
 	void setShownPinned(HistoryItem *item);
 
@@ -164,7 +166,7 @@ public:
 		const QString &query,
 		const FullMsgId &context);
 	void elementHandleViaClick(not_null<UserData*> bot);
-	bool elementIsChatWide();
+	HistoryView::ElementChatMode elementChatMode();
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient();
 	void elementReplyTo(const FullReplyTo &to);
 	void elementStartInteraction(not_null<const Element*> view);
@@ -192,6 +194,7 @@ public:
 
 	void setChooseReportReason(Data::ReportInput reportInput);
 	void clearChooseReportReason();
+	void toggleRemoveFromUserpics(bool remove);
 
 	// -1 if should not be visible, -2 if bad history()
 	[[nodiscard]] int itemTop(const HistoryItem *item) const;
@@ -220,6 +223,9 @@ public:
 	[[nodiscard]] ClickContext prepareClickContext(
 		Qt::MouseButton button,
 		FullMsgId itemId) const;
+
+	[[nodiscard]] auto sendIntroSticker() const
+		-> rpl::producer<not_null<DocumentData*>>;
 
 	[[nodiscard]] static auto DelegateMixin()
 	-> std::unique_ptr<HistoryMainElementDelegateMixin>;
@@ -250,7 +256,8 @@ private:
 
 	using ChosenReaction = HistoryView::Reactions::ChosenReaction;
 	using VideoUserpic = Dialogs::Ui::VideoUserpic;
-	using SelectedItems = std::map<HistoryItem*, TextSelection, std::less<>>;
+	using SelectedItems
+		= base::flat_map<HistoryItem*, TextSelection, std::less<>>;
 	enum class MouseAction {
 		None,
 		PrepareDrag,
@@ -276,7 +283,7 @@ private:
 	// for each found message (in given direction) in the passed history with passed top offset.
 	//
 	// Method has "bool (*Method)(not_null<Element*> view, int itemtop, int itembottom)" signature
-	// if it returns false the enumeration stops immidiately.
+	// if it returns false the enumeration stops immediately.
 	template <bool TopToBottom, typename Method>
 	void enumerateItemsInHistory(History *history, int historytop, Method method);
 
@@ -296,7 +303,7 @@ private:
 	// for each found userpic (from the top to the bottom) using enumerateItems() method.
 	//
 	// Method has "bool (*Method)(not_null<Element*> view, int userpicTop)" signature
-	// if it returns false the enumeration stops immidiately.
+	// if it returns false the enumeration stops immediately.
 	template <typename Method>
 	void enumerateUserpics(Method method);
 
@@ -304,9 +311,17 @@ private:
 	// for each found date element (from the bottom to the top) using enumerateItems() method.
 	//
 	// Method has "bool (*Method)(not_null<Element*> view, int itemtop, int dateTop)" signature
-	// if it returns false the enumeration stops immidiately.
+	// if it returns false the enumeration stops immediately.
 	template <typename Method>
 	void enumerateDates(Method method);
+
+	// This function finds all forum thread bar elements that are displayed and calls template method
+	// for each found date element (from the bottom to the top) using enumerateItems() method.
+	//
+	// Method has "bool (*Method)(not_null<Element*> view, int itemtop, int dateTop)" signature
+	// if it returns false the enumeration stops immediately.
+	template <typename Method>
+	void enumerateForumThreadBars(Method method);
 
 	void scrollDateCheck();
 	void scrollDateHideByTimer();
@@ -415,6 +430,7 @@ private:
 	void blockSenderItem(FullMsgId itemId);
 	void blockSenderAsGroup(FullMsgId itemId);
 	void copySelectedText();
+	void editCaptionUploadLayer(not_null<HistoryItem*> item);
 
 	[[nodiscard]] auto reactionButtonParameters(
 		not_null<const Element*> view,
@@ -425,7 +441,7 @@ private:
 	void reactionChosen(const ChosenReaction &reaction);
 
 	void setupSharingDisallowed();
-	void setupSwipeReply();
+	void setupSwipeReplyAndBack();
 	[[nodiscard]] bool hasCopyRestriction(HistoryItem *item = nullptr) const;
 	[[nodiscard]] bool hasCopyMediaRestriction(
 		not_null<HistoryItem*> item) const;
@@ -454,6 +470,8 @@ private:
 	int _contentWidth = 0;
 	int _historyPaddingTop = 0;
 	int _revealHeight = 0;
+	int _forumThreadBarWidth = 0;
+	Ui::PeerUserpicView _forumThreadBarUserpicView;
 
 	// Save visible area coords for painting / pressing userpics.
 	int _visibleAreaTop = 0;
@@ -466,6 +484,7 @@ private:
 	std::unique_ptr<HistoryView::AboutView> _aboutView;
 	std::unique_ptr<HistoryView::EmptyPainter> _emptyPainter;
 	std::unique_ptr<HistoryView::TranslateTracker> _translateTracker;
+	rpl::event_stream<not_null<DocumentData*>> _sendIntroSticker;
 
 	mutable History *_curHistory = nullptr;
 	mutable int _curBlock = 0;
@@ -478,6 +497,7 @@ private:
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
+	bool _removeFromUserpics = false;
 
 	base::flat_set<not_null<const HistoryItem*>> _animatedStickersPlayed;
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpics;
@@ -499,6 +519,8 @@ private:
 	HistoryItem *_dragStateItem = nullptr;
 	CursorState _mouseCursorState = CursorState();
 	uint16 _mouseTextSymbol = 0;
+	bool _mouseActive = false;
+	bool _dragStateUserpic = false;
 	bool _pressWasInactive = false;
 	bool _recountedAfterPendingResizedItems = false;
 	bool _useCornerReaction = false;
@@ -537,7 +559,8 @@ private:
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
 
-	HistoryView::ChatPaintGestureHorizontalData _gestureHorizontal;
+	Ui::Controls::SwipeContextData _gestureHorizontal;
+	Ui::Controls::SwipeBackResult _swipeBackData;
 
 	// _menu must be destroyed before _whoReactedMenuLifetime.
 	rpl::lifetime _whoReactedMenuLifetime;
@@ -550,5 +573,8 @@ private:
 	Element *_scrollDateLastItem = nullptr;
 	int _scrollDateLastItemTop = 0;
 	ClickHandlerPtr _scrollDateLink;
+	ClickHandlerPtr _forumThreadBarLink;
 
 };
+
+[[nodiscard]] bool CanSendReply(not_null<const HistoryItem*> item);

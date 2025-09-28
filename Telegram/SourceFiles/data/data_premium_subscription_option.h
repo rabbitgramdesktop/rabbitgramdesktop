@@ -10,10 +10,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace Data {
 
 struct PremiumSubscriptionOption {
+	int months = 0;
 	QString duration;
 	QString discount;
 	QString costPerMonth;
+	QString costNoDiscount;
 	QString costTotal;
+	QString currency;
 	QString total;
 	QString botUrl;
 };

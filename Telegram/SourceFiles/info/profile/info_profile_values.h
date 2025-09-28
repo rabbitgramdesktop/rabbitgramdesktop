@@ -113,16 +113,17 @@ struct LinkWithUrl {
 [[nodiscard]] rpl::producer<int> SharedMediaCountValue(
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
+	PeerId monoforumPeerId,
 	PeerData *migrated,
 	Storage::SharedMediaType type);
 [[nodiscard]] rpl::producer<int> CommonGroupsCountValue(
 	not_null<UserData*> user);
-[[nodiscard]] rpl::producer<int> SimilarChannelsCountValue(
-	not_null<ChannelData*> channel);
+[[nodiscard]] rpl::producer<int> SimilarPeersCountValue(
+	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<int> SavedSublistCountValue(
 	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<int> PeerGiftsCountValue(
-	not_null<UserData*> user);
+	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<bool> CanAddMemberValue(
 	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<int> FullReactionsCountValue(
@@ -130,9 +131,9 @@ struct LinkWithUrl {
 [[nodiscard]] rpl::producer<bool> CanViewParticipantsValue(
 	not_null<ChannelData*> megagroup);
 
-enum class BadgeType;
+enum class BadgeType : uchar;
 [[nodiscard]] rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer);
-[[nodiscard]] rpl::producer<DocumentId> EmojiStatusIdValue(
+[[nodiscard]] rpl::producer<EmojiStatusId> EmojiStatusIdValue(
 	not_null<PeerData*> peer);
 
 [[nodiscard]] rpl::producer<QString> BirthdayLabelText(

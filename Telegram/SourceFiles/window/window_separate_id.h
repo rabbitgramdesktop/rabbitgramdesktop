@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+class ChannelData;
 class PeerData;
 
 namespace Data {
@@ -21,6 +22,10 @@ class Account;
 class Session;
 } // namespace Main
 
+namespace Storage {
+enum class SharedMediaType : signed char;
+} // namespace Storage
+
 namespace Window {
 
 enum class SeparateType {
@@ -29,6 +34,12 @@ enum class SeparateType {
 	Chat,
 	Forum,
 	SavedSublist,
+	SharedMedia,
+};
+
+struct SeparateSharedMedia {
+	not_null<Data::Thread*> thread;
+	Storage::SharedMediaType type = {};
 };
 
 struct SeparateId {
@@ -38,11 +49,14 @@ struct SeparateId {
 	SeparateId(SeparateType type, not_null<Data::Thread*> thread);
 	SeparateId(not_null<Data::Thread*> thread);
 	SeparateId(not_null<PeerData*> peer);
+	SeparateId(
+		not_null<Data::Thread*> thread,
+		Storage::SharedMediaType sharedMediaType);
 
 	SeparateType type = SeparateType::Primary;
+	Storage::SharedMediaType sharedMediaType = {};
 	Main::Account *account = nullptr;
 	Data::Thread *thread = nullptr; // For types except Main and Archive.
-
 	[[nodiscard]] bool valid() const {
 		return account != nullptr;
 	}

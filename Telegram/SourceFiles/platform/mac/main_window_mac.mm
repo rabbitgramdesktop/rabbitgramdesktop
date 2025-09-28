@@ -18,8 +18,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/player/media_player_instance.h"
 #include "media/audio/media_audio.h"
 #include "storage/localstorage.h"
-#include "window/window_session_controller.h"
+#include "ui/text/text_utilities.h"
 #include "window/window_controller.h"
+#include "window/window_session_controller.h"
 #include "platform/mac/touchbar/mac_touchbar_manager.h"
 #include "platform/platform_specific.h"
 #include "platform/platform_notifications_manager.h"
@@ -368,7 +369,7 @@ void MainWindow::createGlobalMenu() {
 	{
 		auto callback = [=] {
 			ensureWindowShown();
-			controller().show(Box<AboutBox>());
+			controller().show(Box(AboutBox));
 		};
 		main->addAction(
 			tr::lng_mac_menu_about_telegram(
@@ -519,13 +520,27 @@ void MainWindow::createGlobalMenu() {
 
 	edit->addSeparator();
 	edit->addAction(
-		tr::lng_mac_menu_emoji_and_symbols(tr::now).replace('&', "&&"),
+		tr::lng_mac_menu_emoji_and_symbols(
+			tr::now,
+			Ui::Text::FixAmpersandInAction),
 		this,
 		[] { [NSApp orderFrontCharacterPalette:nil]; },
 		QKeySequence(Qt::MetaModifier | Qt::ControlModifier | Qt::Key_Space)
 	)->setShortcutContext(Qt::WidgetShortcut);
 
 	QMenu *window = psMainMenu.addMenu(tr::lng_mac_menu_window(tr::now));
+
+	window->addAction(
+		tr::lng_mac_menu_fullscreen(tr::now),
+		this,
+		[=] {
+			NSWindow *nsWindow = [reinterpret_cast<NSView*>(winId()) window];
+			[nsWindow toggleFullScreen:nsWindow];
+		},
+		QKeySequence(Qt::MetaModifier | Qt::ControlModifier | Qt::Key_F)
+	)->setShortcutContext(Qt::WidgetShortcut);
+	window->addSeparator();
+
 	psContacts = window->addAction(tr::lng_mac_menu_contacts(tr::now));
 	connect(psContacts, &QAction::triggered, psContacts, crl::guard(this, [=] {
 		Expects(sessionController() != nullptr && !controller().locked());

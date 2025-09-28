@@ -416,7 +416,7 @@ QString FormatTTL(float64 ttl) {
 				+ ' '
 				+ tr::lng_days(tr::now, lt_count, int(days % 7));
 		}
-	} else if (ttl < (86400 * 31) * 12) {
+	} else if (ttl <= (86400 * 31) * 11) {
 		return tr::lng_months(tr::now, lt_count, int(ttl / (86400 * 31)));
 	} else {
 		return tr::lng_years({}, lt_count, std::round(ttl / (86400 * 365)));
@@ -501,7 +501,7 @@ QString FormatDialogsDate(const QDateTime &lastTime) {
 
 	if ((lastDate == nowDate)
 		|| (std::abs(lastTime.secsTo(now)) < kRecentlyInSeconds)) {
-		return RabbitSettings::JsonSettings::GetBool("show_seconds")
+		return RabbitSettings::showSeconds()
 			? QLocale().toString(lastTime.time(), QLocale::LongFormat).remove(" t")
 			: QLocale().toString(lastTime.time(), QLocale::ShortFormat);
 	} else if (std::abs(lastDate.daysTo(nowDate)) < 7) {

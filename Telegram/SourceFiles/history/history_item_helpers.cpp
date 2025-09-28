@@ -24,6 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"
+#include "history/view/controls/history_view_suggest_options.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "main/main_account.h"
@@ -38,9 +39,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/click_handler_types.h" // ClickHandlerContext.
+#include "settings/settings_credits_graphics.h"
+#include "storage/storage_account.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/item_text_options.h"
 #include "lang/lang_keys.h"
 
@@ -59,7 +64,34 @@ bool PeerCallKnown(not_null<PeerData*> peer) {
 
 } // namespace
 
-QString GetErrorTextForSending(
+int ComputeSendingMessagesCount(
+		not_null<History*> history,
+		const SendingErrorRequest &request) {
+	auto result = 0;
+	if (request.text && !request.text->empty()) {
+		auto sending = TextWithEntities();
+		auto left = TextWithEntities{
+			request.text->text,
+			TextUtilities::ConvertTextTagsToEntities(request.text->tags)
+		};
+		auto prepareFlags = Ui::ItemTextOptions(
+			history,
+			history->session().user()).flags;
+		TextUtilities::PrepareForSending(left, prepareFlags);
+
+		while (TextUtilities::CutPart(sending, left, MaxMessageSize)) {
+			++result;
+		}
+		if (!result) {
+			++result;
+		}
+	}
+	return result
+		+ (request.story ? 1 : 0)
+		+ (request.forward ? int(request.forward->size()) : 0);
+}
+
+Data::SendError GetErrorForSending(
 		not_null<PeerData*> peer,
 		SendingErrorRequest request) {
 	const auto forum = request.topicRootId ? peer->forum() : nullptr;
@@ -71,13 +103,13 @@ QString GetErrorTextForSending(
 		: peer->owner().history(peer);
 	if (request.story) {
 		if (const auto error = request.story->errorTextForForward(thread)) {
-			return *error;
+			return error;
 		}
 	}
 	if (request.forward) {
 		for (const auto &item : *request.forward) {
 			if (const auto error = item->errorTextForForward(thread)) {
-				return *error;
+				return error;
 			}
 		}
 	}
@@ -87,15 +119,15 @@ QString GetErrorTextForSending(
 			peer,
 			ChatRestriction::SendOther);
 		if (error) {
-			return *error;
+			return error;
 		} else if (!Data::CanSendTexts(thread)) {
 			return tr::lng_forward_cant(tr::now);
 		}
 	}
 	if (peer->slowmodeApplied()) {
-		const auto count = (hasText ? 1 : 0)
-			+ (request.story ? 1 : 0)
-			+ (request.forward ? int(request.forward->size()) : 0);
+		const auto count = request.messagesCount
+			? request.messagesCount
+			: ComputeSendingMessagesCount(thread->owningHistory(), request);
 		if (const auto history = peer->owner().historyLoaded(peer)) {
 			if (!request.ignoreSlowmodeCountdown
 				&& (history->latestSendingMessage() != nullptr)
@@ -133,15 +165,368 @@ QString GetErrorTextForSending(
 				Ui::FormatDurationWordsSlowmode(left));
 		}
 	}
-
-	return QString();
+	return {};
 }
 
-QString GetErrorTextForSending(
+Data::SendError GetErrorForSending(
 		not_null<Data::Thread*> thread,
 		SendingErrorRequest request) {
 	request.topicRootId = thread->topicRootId();
-	return GetErrorTextForSending(thread->peer(), std::move(request));
+	return GetErrorForSending(thread->peer(), std::move(request));
+}
+
+Data::SendErrorWithThread GetErrorForSending(
+		const std::vector<not_null<Data::Thread*>> &threads,
+		SendingErrorRequest request) {
+	for (const auto thread : threads) {
+		const auto error = GetErrorForSending(thread, request);
+		if (error) {
+			return Data::SendErrorWithThread{ error, thread };
+		}
+	}
+	return {};
+}
+
+std::optional<SendPaymentDetails> ComputePaymentDetails(
+		not_null<PeerData*> peer,
+		int messagesCount) {
+	const auto user = peer->asUser();
+	const auto channel = user ? nullptr : peer->asChannel();
+	const auto has = (user && user->hasStarsPerMessage())
+		|| (channel && channel->hasStarsPerMessage());
+	if (!has) {
+		return SendPaymentDetails();
+	}
+
+	const auto known1 = peer->session().credits().loaded();
+	if (!known1) {
+		peer->session().credits().load();
+	}
+
+	const auto known2 = user
+		? user->messageMoneyRestrictionsKnown()
+		: channel->starsPerMessageKnown();
+	if (!known2) {
+		peer->updateFull();
+	}
+
+	if (!known1 || !known2) {
+		return {};
+	} else if (const auto perMessage = peer->starsPerMessageChecked()) {
+		return SendPaymentDetails{
+			.messages = messagesCount,
+			.stars = messagesCount * perMessage,
+		};
+	}
+	return SendPaymentDetails();
+}
+
+bool SuggestPaymentDataReady(
+		not_null<PeerData*> peer,
+		SuggestPostOptions suggest) {
+	if (!suggest.exists || !suggest.price() || peer->amMonoforumAdmin()) {
+		return true;
+	} else if (suggest.ton && !peer->session().credits().tonLoaded()) {
+		peer->session().credits().tonLoad();
+		return false;
+	} else if (!suggest.ton && !peer->session().credits().loaded()) {
+		peer->session().credits().load();
+		return false;
+	}
+	return true;
+}
+
+object_ptr<Ui::BoxContent> MakeSendErrorBox(
+		const Data::SendErrorWithThread &error,
+		bool withTitle) {
+	Expects(error.error.has_value() && error.thread != nullptr);
+
+	auto text = TextWithEntities();
+	if (withTitle) {
+		text.append(
+			Ui::Text::Bold(error.thread->chatListName())
+		).append("\n\n");
+	}
+	if (error.error.boostsToLift) {
+		text.append(Ui::Text::Link(error.error.text));
+	} else {
+		text.append(error.error.text);
+	}
+	const auto peer = error.thread->peer();
+	const auto lifting = error.error.boostsToLift;
+	const auto filter = [=](const auto &...) {
+		Expects(peer->isChannel());
+
+		const auto window = ChatHelpers::ResolveWindowDefault()(
+			&peer->session());
+		window->resolveBoostState(peer->asChannel(), lifting);
+		return false;
+	};
+	return Ui::MakeInformBox({
+		.text = text,
+		.labelFilter = filter,
+	});
+}
+
+void ShowSendPaidConfirm(
+		not_null<Window::SessionNavigation*> navigation,
+		not_null<PeerData*> peer,
+		SendPaymentDetails details,
+		Fn<void()> confirmed,
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
+	return ShowSendPaidConfirm(
+		navigation->uiShow(),
+		peer,
+		details,
+		confirmed,
+		styles,
+		suggestStarsPrice);
+}
+
+void ShowSendPaidConfirm(
+		std::shared_ptr<Main::SessionShow> show,
+		not_null<PeerData*> peer,
+		SendPaymentDetails details,
+		Fn<void()> confirmed,
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
+	ShowSendPaidConfirm(
+		std::move(show),
+		std::vector<not_null<PeerData*>>{ peer },
+		details,
+		confirmed,
+		styles,
+		suggestStarsPrice);
+}
+
+void ShowSendPaidConfirm(
+		std::shared_ptr<Main::SessionShow> show,
+		const std::vector<not_null<PeerData*>> &peers,
+		SendPaymentDetails details,
+		Fn<void()> confirmed,
+		PaidConfirmStyles styles,
+		int suggestStarsPrice) {
+	Expects(!peers.empty());
+
+	const auto singlePeer = (peers.size() > 1)
+		? (PeerData*)nullptr
+		: peers.front().get();
+	const auto singlePeerId = singlePeer ? singlePeer->id : PeerId();
+	const auto check = [=] {
+		const auto required = details.stars + suggestStarsPrice;
+		if (!required) {
+			return;
+		}
+		const auto done = [=](Settings::SmallBalanceResult result) {
+			if (result == Settings::SmallBalanceResult::Success
+				|| result == Settings::SmallBalanceResult::Already) {
+				confirmed();
+			}
+		};
+		using namespace Settings;
+		MaybeRequestBalanceIncrease(
+			show,
+			required,
+			(suggestStarsPrice
+				? SmallBalanceSource(SmallBalanceForSuggest{ singlePeerId })
+				: SmallBalanceForMessage{ singlePeerId }),
+			done);
+	};
+	auto usersOnly = true;
+	for (const auto &peer : peers) {
+		if (!peer->isUser()) {
+			usersOnly = false;
+			break;
+		}
+	}
+	const auto singlePeerStars = singlePeer
+		? singlePeer->starsPerMessageChecked()
+		: 0;
+	if (singlePeer) {
+		const auto session = &singlePeer->session();
+		const auto trusted = session->local().isPeerTrustedPayForMessage(
+			singlePeerId,
+			singlePeerStars);
+		if (trusted) {
+			check();
+			return;
+		}
+	}
+	const auto messages = details.messages;
+	const auto stars = details.stars;
+	show->showBox(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto trust = std::make_shared<base::weak_qptr<Ui::Checkbox>>();
+		const auto proceed = [=](Fn<void()> close) {
+			if (singlePeer && (*trust)->checked()) {
+				const auto session = &singlePeer->session();
+				session->local().markPeerTrustedPayForMessage(
+					singlePeerId,
+					singlePeerStars);
+			}
+			check();
+			close();
+		};
+		Ui::ConfirmBox(box, {
+			.text = (singlePeer
+				? tr::lng_payment_confirm_text(
+					tr::now,
+					lt_count,
+					stars / messages,
+					lt_name,
+					Ui::Text::Bold(singlePeer->shortName()),
+					Ui::Text::RichLangValue)
+				: (usersOnly
+					? tr::lng_payment_confirm_users
+					: tr::lng_payment_confirm_chats)(
+						tr::now,
+						lt_count,
+						int(peers.size()),
+						Ui::Text::RichLangValue)).append(' ').append(
+							tr::lng_payment_confirm_sure(
+								tr::now,
+								lt_count,
+								messages,
+								lt_amount,
+								tr::lng_payment_confirm_amount(
+									tr::now,
+									lt_count,
+									stars,
+									Ui::Text::RichLangValue),
+								Ui::Text::RichLangValue)),
+			.confirmed = proceed,
+			.confirmText = tr::lng_payment_confirm_button(
+				lt_count,
+				rpl::single(messages * 1.)),
+			.labelStyle = styles.label,
+			.title = tr::lng_payment_confirm_title(),
+		});
+		if (singlePeer) {
+			const auto skip = st::defaultCheckbox.margin.top();
+			*trust = box->addRow(
+				object_ptr<Ui::Checkbox>(
+					box,
+					tr::lng_payment_confirm_dont_ask(tr::now),
+					false,
+					(styles.checkbox
+						? *styles.checkbox
+						: st::defaultCheckbox)),
+				st::boxRowPadding + QMargins(0, skip, 0, skip));
+		}
+	}));
+}
+
+bool SendPaymentHelper::check(
+		not_null<Window::SessionNavigation*> navigation,
+		not_null<PeerData*> peer,
+		Api::SendOptions options,
+		int messagesCount,
+		Fn<void(int)> resend,
+		PaidConfirmStyles styles) {
+	return check(
+		navigation->uiShow(),
+		peer,
+		options,
+		messagesCount,
+		std::move(resend),
+		styles);
+}
+
+bool SendPaymentHelper::check(
+		std::shared_ptr<Main::SessionShow> show,
+		not_null<PeerData*> peer,
+		Api::SendOptions options,
+		int messagesCount,
+		Fn<void(int)> resend,
+		PaidConfirmStyles styles) {
+	clear();
+
+	const auto admin = peer->amMonoforumAdmin();
+	const auto suggest = options.suggest;
+	const auto starsApproved = options.starsApproved;
+	const auto checkSuggestPriceStars = (admin || suggest.ton)
+		? 0
+		: int(base::SafeRound(suggest.price().value()));
+	const auto checkSuggestPriceTon = (!admin && suggest.ton)
+		? suggest.price()
+		: CreditsAmount();
+	const auto details = ComputePaymentDetails(peer, messagesCount);
+	const auto suggestDetails = SuggestPaymentDataReady(peer, suggest);
+	if (!details || !suggestDetails) {
+		_resend = [=] { resend(starsApproved); };
+
+		if ((!details || !suggest.ton)
+			&& !peer->session().credits().loaded()) {
+			peer->session().credits().loadedValue(
+			) | rpl::filter(
+				rpl::mappers::_1
+			) | rpl::take(1) | rpl::start_with_next([=] {
+				if (const auto callback = base::take(_resend)) {
+					callback();
+				}
+			}, _lifetime);
+		}
+
+		if ((!suggestDetails && suggest.ton)
+			&& !peer->session().credits().tonLoaded()) {
+			peer->session().credits().tonLoadedValue(
+			) | rpl::filter(
+				rpl::mappers::_1
+			) | rpl::take(1) | rpl::start_with_next([=] {
+				if (const auto callback = base::take(_resend)) {
+					callback();
+				}
+			}, _lifetime);
+		}
+
+		peer->session().changes().peerUpdates(
+			peer,
+			Data::PeerUpdate::Flag::FullInfo
+		) | rpl::start_with_next([=] {
+			if (const auto callback = base::take(_resend)) {
+				callback();
+			}
+		}, _lifetime);
+
+		return false;
+	} else if (const auto stars = details->stars; stars > starsApproved) {
+		ShowSendPaidConfirm(show, peer, *details, [=] {
+			resend(stars);
+		}, styles, checkSuggestPriceStars);
+		return false;
+	} else if (checkSuggestPriceStars
+		&& (CreditsAmount(details->stars + checkSuggestPriceStars)
+			> peer->session().credits().balance())) {
+		using namespace Settings;
+		const auto broadcast = peer->monoforumBroadcast();
+		const auto broadcastId = (broadcast ? broadcast : peer)->id;
+		const auto forMessages = details->stars;
+		const auto required = forMessages + checkSuggestPriceStars;
+		const auto done = [=](SmallBalanceResult result) {
+			if (result == SmallBalanceResult::Success
+				|| result == SmallBalanceResult::Already) {
+				resend(forMessages);
+			}
+		};
+		MaybeRequestBalanceIncrease(
+			show,
+			required,
+			SmallBalanceForSuggest{ broadcastId },
+			done);
+		return false;
+	}
+	if (checkSuggestPriceTon
+		&& checkSuggestPriceTon > peer->session().credits().tonBalance()) {
+		using namespace HistoryView;
+		show->show(Box(InsufficientTonBox, peer, checkSuggestPriceTon));
+		return false;
+	}
+	return true;
+}
+
+void SendPaymentHelper::clear() {
+	_lifetime.destroy();
+	_resend = nullptr;
 }
 
 void RequestDependentMessageItem(
@@ -198,6 +583,8 @@ TimeId NewMessageDate(const Api::SendOptions &options) {
 PeerId NewMessageFromId(const Api::SendAction &action) {
 	return action.options.sendAs
 		? action.options.sendAs->id
+		: action.history->peer->amMonoforumAdmin()
+		? action.history->peer->monoforumBroadcast()->id
 		: action.history->peer->amAnonymous()
 		? PeerId()
 		: action.history->session().userPeerId();
@@ -326,22 +713,19 @@ bool IsItemScheduledUntilOnline(not_null<const HistoryItem*> item) {
 ClickHandlerPtr JumpToMessageClickHandler(
 		not_null<HistoryItem*> item,
 		FullMsgId returnToId,
-		TextWithEntities highlightPart,
-		int highlightPartOffsetHint) {
+		MessageHighlightId highlight) {
 	return JumpToMessageClickHandler(
 		item->history()->peer,
 		item->id,
 		returnToId,
-		std::move(highlightPart),
-		highlightPartOffsetHint);
+		std::move(highlight));
 }
 
 ClickHandlerPtr JumpToMessageClickHandler(
 		not_null<PeerData*> peer,
 		MsgId msgId,
 		FullMsgId returnToId,
-		TextWithEntities highlightPart,
-		int highlightPartOffsetHint) {
+		MessageHighlightId highlight) {
 	return std::make_shared<LambdaClickHandler>([=] {
 		const auto separate = Core::App().separateWindowFor(peer);
 		const auto controller = separate
@@ -351,8 +735,7 @@ ClickHandlerPtr JumpToMessageClickHandler(
 			auto params = Window::SectionShow{
 				Window::SectionShow::Way::Forward
 			};
-			params.highlightPart = highlightPart;
-			params.highlightPartOffsetHint = highlightPartOffsetHint;
+			params.highlight = highlight;
 			params.origin = Window::SectionShow::OriginMessage{
 				returnToId
 			};
@@ -394,7 +777,8 @@ ClickHandlerPtr HideSponsoredClickHandler() {
 			if (session.premium()) {
 				using Result = Data::SponsoredReportResult;
 				session.sponsoredMessages().createReportCallback(
-					my.itemId)(Result::Id("-1"), [](const auto &) {});
+					my.itemId
+				).callback(Result::Id("-1"), [](const auto &) {});
 			} else {
 				ShowPremiumPreviewBox(controller, PremiumFeature::NoAds);
 			}
@@ -454,6 +838,11 @@ MessageFlags FlagsFromMTP(
 		| ((flags & MTP::f_invert_media) ? Flag::InvertMedia : Flag())
 		| ((flags & MTP::f_video_processing_pending)
 			? Flag::EstimatedDate
+			: Flag())
+		| ((flags & MTP::f_paid_suggested_post_ton)
+			? Flag::TonPaidSuggested
+			: (flags & MTP::f_paid_suggested_post_stars)
+			? Flag::StarsPaidSuggested
 			: Flag());
 }
 
@@ -472,7 +861,10 @@ MessageFlags FlagsFromMTP(
 		| ((flags & MTP::f_post) ? Flag::Post : Flag())
 		| ((flags & MTP::f_legacy) ? Flag::Legacy : Flag())
 		| ((flags & MTP::f_from_id) ? Flag::HasFromId : Flag())
-		| ((flags & MTP::f_reply_to) ? Flag::HasReplyInfo : Flag());
+		| ((flags & MTP::f_reply_to) ? Flag::HasReplyInfo : Flag())
+		| ((flags & MTP::f_reactions_are_possible)
+			? Flag::ReactionsAllowed
+			: Flag());
 }
 
 MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
@@ -503,7 +895,8 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 						| Flag::f_quote_offset))
 				| (quoteEntities.v.empty()
 					? Flag()
-					: Flag::f_quote_entities)),
+					: Flag::f_quote_entities)
+				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())),
 			MTP_int(replyTo.messageId.msg),
 			peerToMTP(externalPeerId),
 			MTPMessageFwdHeader(), // reply_from
@@ -511,7 +904,8 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 			MTP_int(replyToTop),
 			MTP_string(replyTo.quote.text),
 			quoteEntities,
-			MTP_int(replyTo.quoteOffset));
+			MTP_int(replyTo.quoteOffset),
+			MTP_int(replyTo.todoItemId));
 	}
 	return MTPMessageReplyHeader();
 }
@@ -586,6 +980,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaPoll &) {
 		return Result::Good;
+	}, [](const MTPDmessageMediaToDo &) {
+		return Result::Good;
 	}, [](const MTPDmessageMediaDice &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaStory &data) {
@@ -606,6 +1002,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 [[nodiscard]] CallId CallIdFromInput(const MTPInputGroupCall &data) {
 	return data.match([&](const MTPDinputGroupCall &data) {
 		return data.vid().v;
+	}, [](const auto &) -> CallId {
+		Unexpected("slug/msg in CallIdFromInput.");
 	});
 }
 
@@ -882,30 +1280,6 @@ void ShowTrialTranscribesToast(int left, TimeId until) {
 		.filter = filter,
 		.duration = kToastDuration,
 	});
-}
-
-void ClearMediaAsExpired(not_null<HistoryItem*> item) {
-	if (const auto media = item->media()) {
-		if (!media->ttlSeconds()) {
-			return;
-		}
-		if (const auto document = media->document()) {
-			item->applyEditionToHistoryCleared();
-			auto text = (document->isVideoFile()
-				? tr::lng_ttl_video_expired
-				: document->isVoiceMessage()
-				? tr::lng_ttl_voice_expired
-				: document->isVideoMessage()
-				? tr::lng_ttl_round_expired
-				: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
-			item->updateServiceText(PreparedServiceText{ std::move(text) });
-		} else if (const auto photo = media->photo()) {
-			item->applyEditionToHistoryCleared();
-			item->updateServiceText(PreparedServiceText{
-				tr::lng_ttl_photo_expired(tr::now, Ui::Text::WithEntities)
-			});
-		}
-	}
 }
 
 int ItemsForwardSendersCount(const HistoryItemsList &list) {

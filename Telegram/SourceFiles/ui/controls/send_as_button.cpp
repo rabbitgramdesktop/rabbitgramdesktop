@@ -55,7 +55,7 @@ void SendAsButton::paintEvent(QPaintEvent *e) {
 		p.setBrush(_st.activeBg);
 		{
 			PainterHighQualityEnabler hq(p);
-			auto radius = _st.size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
+			auto radius = _st.size * RabbitSettings::userpicRoundness() / 100.;
 			p.drawRoundedRect(left, top, _st.size, _st.size, radius, radius);
 		}
 

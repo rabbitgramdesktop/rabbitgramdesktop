@@ -8,7 +8,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "statistics/statistics_data_deserialize.h"
 
 #include "base/debug_log.h"
-#include "data/data_channel_earn.h" // kEarnMultiplier.
 #include "data/data_statistics_chart.h"
 #include "statistics/statistics_types.h"
 #include "ui/text/format_values.h" // kCreditsCurrency.
@@ -64,9 +63,9 @@ Data::StatisticalChart StatisticalChartFromJSON(const QByteArray &json) {
 		const auto columnId = array.first().toString();
 		if (columnId == u"x"_q) {
 			const auto length = array.size() - 1;
-			result.x.resize(length);
+			result.x.reserve(length);
 			for (auto i = 0; i < length; i++) {
-				result.x[i] = array.at(i + 1).toDouble();
+				result.x.push_back(array.at(i + 1).toDouble());
 			}
 		} else {
 			auto line = Data::StatisticalChart::Line();
@@ -76,10 +75,7 @@ Data::StatisticalChart StatisticalChartFromJSON(const QByteArray &json) {
 			line.isHiddenOnStart = ranges::contains(hiddenLines, columnId);
 			line.y.resize(length);
 			for (auto i = 0; i < length; i++) {
-				using Currency = Data::StatisticalCurrency;
-				const auto multiplier = (result.currency == Currency::Credits)
-					? Data::kEarnMultiplier
-					: 1;
+				const auto multiplier = 1;
 				const auto value = ChartValue(
 						base::SafeRound(array.at(i + 1).toDouble()))
 					* multiplier;
@@ -94,7 +90,7 @@ Data::StatisticalChart StatisticalChartFromJSON(const QByteArray &json) {
 			result.lines.push_back(std::move(line));
 		}
 		if (result.x.size() > 1) {
-			result.timeStep = result.x[1] - result.x[0];
+			result.timeStep = std::max(1., result.x[1] - result.x[0]);
 		} else {
 			constexpr auto kOneDay = 3600 * 24 * 1000;
 			result.timeStep = kOneDay;

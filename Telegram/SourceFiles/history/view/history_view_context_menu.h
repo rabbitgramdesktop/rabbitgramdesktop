@@ -60,11 +60,13 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 void CopyPostLink(
 	not_null<Window::SessionController*> controller,
 	FullMsgId itemId,
-	Context context);
+	Context context,
+	std::optional<TimeId> videoTimestamp = {});
 void CopyPostLink(
 	std::shared_ptr<Main::SessionShow> show,
 	FullMsgId itemId,
-	Context context);
+	Context context,
+	std::optional<TimeId> videoTimestamp = {});
 void CopyStoryLink(
 	std::shared_ptr<Main::SessionShow> show,
 	FullStoryId storyId);
@@ -84,9 +86,10 @@ void AddWhoReactedAction(
 	not_null<QWidget*> context,
 	not_null<HistoryItem*> item,
 	not_null<Window::SessionController*> controller);
-void MaybeAddWhenEditedAction(
+void MaybeAddWhenEditedForwardedAction(
 	not_null<Ui::PopupMenu*> menu,
-	not_null<HistoryItem*> item);
+	not_null<HistoryItem*> item,
+	not_null<Window::SessionController*> controller);
 void ShowWhoReactedMenu(
 	not_null<base::unique_qptr<Ui::PopupMenu>*> menu,
 	QPoint position,

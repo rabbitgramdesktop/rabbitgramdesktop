@@ -78,26 +78,16 @@ giveawayGiftCodeTable: Table(defaultTable) {
 	labelMinWidth: 91px;
 }
 giveawayGiftCodeTableMargin: margins(24px, 4px, 24px, 4px);
-giveawayGiftCodeLabel: FlatLabel(defaultFlatLabel) {
-	textFg: menuIconColor;
-	maxHeight: 24px;
-	style: TextStyle(semiboldTextStyle) {
-		font: font(12px semibold);
-	}
-}
 giveawayGiftCodeLabelMargin: margins(13px, 10px, 13px, 10px);
-giveawayGiftCodeValue: FlatLabel(defaultFlatLabel) {
-	maxHeight: 24px;
+giveawayGiftCodeValueMultiline: FlatLabel(defaultTableValue) {
+	minWidth: 128px;
+	maxHeight: 100px;
 	style: TextStyle(defaultTextStyle) {
-		font: font(12px);
+		font: font(10px);
 		linkUnderline: kLinkUnderlineNever;
 	}
 }
-giveawayGiftCodeValueMultiline: FlatLabel(giveawayGiftCodeValue) {
-	minWidth: 128px;
-	maxHeight: 100px;
-}
-giveawayGiftMessage: FlatLabel(giveawayGiftCodeValue) {
+giveawayGiftMessage: FlatLabel(defaultTableValue) {
 	minWidth: 128px;
 	maxHeight: 0px;
 }
@@ -163,6 +153,7 @@ giveawayGiftCodeFooterMargin: margins(0px, 9px, 0px, 4px);
 giveawayGiftCodeBox: Box(defaultBox) {
 	buttonPadding: margins(22px, 11px, 22px, 22px);
 	buttonHeight: 42px;
+	buttonWide: true;
 	button: RoundButton(defaultActiveButton) {
 		height: 42px;
 		textTop: 12px;
@@ -213,19 +204,67 @@ starConvertButtonLoading: InfiniteRadialAnimation(startGiveawayButtonLoading) {
 	thickness: 2px;
 }
 
-starGiftSmallButton: RoundButton(defaultActiveButton) {
-	textFg: windowActiveTextFg;
-	textFgOver: windowActiveTextFg;
-	textBg: lightButtonBgOver;
-	textBgOver: lightButtonBgOver;
-	width: -12px;
-	height: 18px;
-	radius: 9px;
-	textTop: 0px;
-	style: TextStyle(defaultTextStyle) {
-		font: font(12px);
+starGiftSmallButton: defaultTableSmallButton;
+darkGiftCodeBox: Box(giveawayGiftCodeBox) {
+	bg: groupCallMembersBg;
+	title: FlatLabel(boxTitle) {
+		textFg: groupCallMembersFg;
 	}
+	titleAdditionalFg: groupCallMemberNotJoinedStatus;
+}
+darkGiftLink: icon {{ "menu/copy", groupCallMembersFg }};
+darkGiftShare: icon {{ "menu/share", groupCallMembersFg }};
+darkGiftTheme: icon {{ "menu/colors", groupCallMembersFg }};
+darkGiftTransfer: icon {{ "chat/input_replace", groupCallMembersFg }};
+darkGiftNftWear: icon {{ "menu/nft_wear", groupCallMembersFg }};
+darkGiftNftTakeOff: icon {{ "menu/nft_takeoff", groupCallMembersFg }};
+darkGiftNftResell: icon {{ "menu/tag_sell", groupCallMembersFg }};
+darkGiftNftUnlist: icon {{ "menu/tag_remove", groupCallMembersFg }};
+darkGiftHide: icon {{ "menu/stealth", groupCallMembersFg }};
+darkGiftShow: icon {{ "menu/show_in_chat", groupCallMembersFg }};
+darkGiftPin: icon {{ "menu/pin", groupCallMembersFg }};
+darkGiftUnpin: icon {{ "menu/unpin", groupCallMembersFg }};
+darkGiftPalette: TextPalette(defaultTextPalette) {
+	linkFg: mediaviewTextLinkFg;
+	monoFg: groupCallMembersFg;
+	spoilerFg: groupCallMembersFg;
+}
+darkGiftTable: Table(giveawayGiftCodeTable) {
+	headerBg: groupCallMembersBgOver;
+	borderFg: mediaviewMenuBgOver;
+	smallButton: RoundButton(defaultTableSmallButton) {
+		textFg: groupCallMembersFg;
+		textFgOver: groupCallMembersFg;
+		textBg: groupCallMenuBgRipple;
+		textBgOver: groupCallMenuBgRipple;
+		ripple: RippleAnimation(defaultRippleAnimation) {
+			color: mediaviewMenuBgOver;
+		}
+	}
+	defaultLabel: FlatLabel(defaultTableLabel) {
+		textFg: groupCallMembersFg;
+		palette: darkGiftPalette;
+	}
+	defaultValue: FlatLabel(defaultTableValue) {
+		textFg: groupCallMembersFg;
+		palette: darkGiftPalette;
+	}
+}
+darkGiftTableValueMultiline: FlatLabel(giveawayGiftCodeValueMultiline) {
+	textFg: groupCallMembersFg;
+	palette: darkGiftPalette;
+}
+darkGiftTableMessage: FlatLabel(giveawayGiftMessage) {
+	textFg: groupCallMembersFg;
+	palette: darkGiftPalette;
+}
+darkGiftCodeLink: FlatLabel(giveawayGiftCodeLink) {
+	textFg: mediaviewMenuFg;
+}
+darkGiftBoxClose: IconButton(boxTitleClose) {
+	icon: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
+	iconOver: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
 	ripple: RippleAnimation(defaultRippleAnimation) {
-		color: lightButtonBgRipple;
+		color: groupCallMembersBgOver;
 	}
 }

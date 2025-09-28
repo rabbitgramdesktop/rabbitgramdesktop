@@ -61,6 +61,10 @@ public:
 			Exception exception) const {
 		return false;
 	}
+	[[nodiscard]] virtual bool allowMiniAppsToggle(
+			Exception exception) const {
+		return false;
+	}
 	virtual void handleExceptionsChange(
 		Exception exception,
 		rpl::producer<int> value) {
@@ -165,3 +169,16 @@ private:
 void EditMessagesPrivacyBox(
 	not_null<Ui::GenericBox*> box,
 	not_null<Window::SessionController*> controller);
+
+[[nodiscard]] rpl::producer<int> SetupChargeSlider(
+	not_null<Ui::VerticalLayout*> container,
+	not_null<PeerData*> peer,
+	std::optional<int> savedValue,
+	int defaultValue,
+	bool allowZero = false);
+
+void EditDirectMessagesPriceBox(
+	not_null<Ui::GenericBox*> box,
+	not_null<ChannelData*> channel,
+	std::optional<int> savedValue,
+	Fn<void(std::optional<int>)> callback);

@@ -16,6 +16,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_web_page.h"
 #include "data/data_game.h"
 #include "data/data_peer_values.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_folder.h"
@@ -52,10 +53,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "apiwrap.h"
 #include "dialogs/dialogs_widget.h"
 #include "history/history_widget.h"
-#include "history/history_item_helpers.h" // GetErrorTextForSending.
+#include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/view/media/history_view_media.h"
+#include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_service_message.h"
-#include "history/view/history_view_sublist_section.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_cloud_manager.h"
 #include "inline_bots/inline_bot_layout_item.h"
@@ -222,6 +223,8 @@ StackItemSection::StackItemSection(
 rpl::producer<> StackItemSection::sectionRemoveRequests() const {
 	if (const auto topic = _memento->topicForRemoveRequests()) {
 		return rpl::merge(_memento->removeRequests(), topic->destroyed());
+	} else if (const auto sublist = _memento->sublistForRemoveRequests()) {
+		return rpl::merge(_memento->removeRequests(), sublist->destroyed());
 	}
 	return _memento->removeRequests();
 }
@@ -556,19 +559,20 @@ bool MainWidget::setForwardDraft(
 	const auto history = thread->owningHistory();
 	const auto items = session().data().idsToItems(draft.ids);
 	const auto topicRootId = thread->topicRootId();
-	const auto error = GetErrorTextForSending(
+	const auto monoforumPeerId = thread->monoforumPeerId();
+	const auto error = GetErrorForSending(
 		history->peer,
 		{
 			.topicRootId = topicRootId,
 			.forward = &items,
 			.ignoreSlowmodeCountdown = true,
 		});
-	if (!error.isEmpty()) {
-		_controller->show(Ui::MakeInformBox(error));
+	if (error) {
+		Data::ShowSendErrorToast(_controller, history->peer, error);
 		return false;
 	}
 
-	history->setForwardDraft(topicRootId, std::move(draft));
+	history->setForwardDraft(topicRootId, monoforumPeerId, std::move(draft));
 	_controller->showThread(
 		thread,
 		ShowAtUnreadMsgId,
@@ -595,12 +599,17 @@ bool MainWidget::shareUrl(
 	};
 	const auto history = thread->owningHistory();
 	const auto topicRootId = thread->topicRootId();
+	const auto monoforumPeerId = thread->monoforumPeerId();
 	history->setLocalDraft(std::make_unique<Data::Draft>(
 		textWithTags,
-		FullReplyTo{ .topicRootId = topicRootId },
+		FullReplyTo{
+			.topicRootId = topicRootId,
+			.monoforumPeerId = monoforumPeerId,
+		},
+		SuggestPostOptions(),
 		cursor,
 		Data::WebPageDraft()));
-	history->clearLocalEditDraft(topicRootId);
+	history->clearLocalEditDraft(topicRootId, monoforumPeerId);
 	history->session().changes().entryUpdated(
 		thread,
 		Data::EntryUpdate::Flag::LocalDraftSet);
@@ -611,12 +620,12 @@ bool MainWidget::sendPaths(
 		not_null<Data::Thread*> thread,
 		const QStringList &paths) {
 	if (!Data::CanSendAnyOf(thread, Data::FilesSendRestrictions())) {
-		_controller->show(Ui::MakeInformBox(
-			tr::lng_forward_send_files_cant()));
+		_controller->showToast(
+			tr::lng_forward_send_files_cant(tr::now));
 		return false;
 	} else if (const auto error = Data::AnyFileRestrictionError(
 			thread->peer())) {
-		_controller->show(Ui::MakeInformBox(*error));
+		Data::ShowSendErrorToast(controller(), thread->peer(), error);
 		return false;
 	} else {
 		_controller->showThread(
@@ -643,6 +652,17 @@ bool MainWidget::filesOrForwardDrop(
 			clearHider(_hider);
 		}
 		return true;
+	} else if (const auto history = thread->asHistory()
+		; history && history->peer->monoforum()) {
+		Window::ShowDropMediaBox(
+			_controller,
+			Core::ShareMimeMediaData(data),
+			history->peer->monoforum());
+		if (_hider) {
+			_hider->startHide();
+			clearHider(_hider);
+		}
+		return true;
 	}
 	if (data->hasFormat(u"application/x-td-forward"_q)) {
 		auto draft = Data::ForwardDraft{
@@ -659,12 +679,12 @@ bool MainWidget::filesOrForwardDrop(
 		}
 		return false;
 	} else if (!Data::CanSendAnyOf(thread, Data::FilesSendRestrictions())) {
-		_controller->show(Ui::MakeInformBox(
-			tr::lng_forward_send_files_cant()));
+		_controller->showToast(
+			tr::lng_forward_send_files_cant(tr::now));
 		return false;
 	} else if (const auto error = Data::AnyFileRestrictionError(
 			thread->peer())) {
-		_controller->show(Ui::MakeInformBox(*error));
+		Data::ShowSendErrorToast(_controller, thread->peer(), error);
 		return false;
 	} else {
 		_controller->showThread(
@@ -744,7 +764,10 @@ void MainWidget::hideSingleUseKeyboard(FullMsgId replyToId) {
 	_history->hideSingleUseKeyboard(replyToId);
 }
 
-void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat) {
+void MainWidget::searchMessages(
+		const QString &query,
+		Dialogs::Key inChat,
+		PeerData *searchFrom) {
 	const auto complex = Data::HashtagWithUsernameFromQuery(query);
 	if (!complex.username.isEmpty()) {
 		_controller->showPeerByLink(Window::PeerByLinkInfo{
@@ -760,6 +783,7 @@ void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat) {
 			.inChat = ((tags.empty() || inChat.sublist())
 				? inChat
 				: session().data().history(session().user())),
+			.fromPeer = inChat ? searchFrom : nullptr,
 			.tags = tags,
 			.query = tags.empty() ? query : QString(),
 		};
@@ -772,19 +796,26 @@ void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat) {
 		}
 	} else {
 		if (const auto sublist = inChat.sublist()) {
+			using namespace HistoryView;
 			controller()->showSection(
-				std::make_shared<HistoryView::SublistMemento>(sublist));
+				std::make_shared<ChatMemento>(ChatViewId{
+					.history = sublist->owningHistory(),
+					.sublist = sublist,
+				}));
 		} else if (!tags.empty()) {
 			inChat = controller()->session().data().history(
 				controller()->session().user());
 		}
 		if ((!_mainSection
-			|| !_mainSection->searchInChatEmbedded(inChat, query))
-			&& !_history->searchInChatEmbedded(inChat, query)) {
+			|| !_mainSection->searchInChatEmbedded(query, inChat, searchFrom))
+			&& !_history->searchInChatEmbedded(query, inChat, searchFrom)) {
 			const auto account = not_null(&session().account());
 			if (const auto window = Core::App().windowFor(account)) {
 				if (const auto controller = window->sessionController()) {
-					controller->content()->searchMessages(query, inChat);
+					controller->content()->searchMessages(
+						query,
+						inChat,
+						searchFrom);
 					controller->widget()->activate();
 				}
 			}
@@ -919,15 +950,15 @@ void MainWidget::setCurrentCall(Calls::Call *call) {
 	}
 	_currentCallLifetime.destroy();
 	_currentCall = call;
-	if (_currentCall) {
+	if (call) {
 		_callTopBar.destroy();
-		_currentCall->stateValue(
+		call->stateValue(
 		) | rpl::start_with_next([=](Calls::Call::State state) {
 			using State = Calls::Call::State;
 			if (state != State::Established) {
 				destroyCallTopBar();
 			} else if (!_callTopBar) {
-				createCallTopBar();
+				createCallTopBar(call, nullptr);
 			}
 		}, _currentCallLifetime);
 	} else {
@@ -941,7 +972,7 @@ void MainWidget::setCurrentGroupCall(Calls::GroupCall *call) {
 	}
 	_currentCallLifetime.destroy();
 	_currentGroupCall = call;
-	if (_currentGroupCall) {
+	if (call) {
 		_callTopBar.destroy();
 		_currentGroupCall->stateValue(
 		) | rpl::start_with_next([=](Calls::GroupCall::State state) {
@@ -953,7 +984,7 @@ void MainWidget::setCurrentGroupCall(Calls::GroupCall *call) {
 				&& state != State::Connecting) {
 				destroyCallTopBar();
 			} else if (!_callTopBar) {
-				createCallTopBar();
+				createCallTopBar(nullptr, call);
 			}
 		}, _currentCallLifetime);
 	} else {
@@ -961,15 +992,17 @@ void MainWidget::setCurrentGroupCall(Calls::GroupCall *call) {
 	}
 }
 
-void MainWidget::createCallTopBar() {
-	Expects(_currentCall != nullptr || _currentGroupCall != nullptr);
+void MainWidget::createCallTopBar(
+		Calls::Call *call,
+		Calls::GroupCall *group) {
+	Expects(call || group);
 
 	const auto show = controller()->uiShow();
 	_callTopBar.create(
 		this,
-		(_currentCall
-			? object_ptr<Calls::TopBar>(this, _currentCall, show)
-			: object_ptr<Calls::TopBar>(this, _currentGroupCall, show)));
+		(call
+			? object_ptr<Calls::TopBar>(this, call, show)
+			: object_ptr<Calls::TopBar>(this, group, show)));
 	_callTopBar->entity()->initBlobsUnder(this, _callTopBar->geometryValue());
 	_callTopBar->heightValue(
 	) | rpl::start_with_next([this](int value) {
@@ -1091,6 +1124,12 @@ void MainWidget::dialogsCancelled() {
 	_history->activate();
 }
 
+void MainWidget::toggleFiltersMenu(bool value) const {
+	if (_dialogs) {
+		_dialogs->toggleFiltersMenu(value);
+	}
+}
+
 void MainWidget::setChatBackground(
 		const Data::WallPaper &background,
 		QImage &&image) {
@@ -1153,7 +1192,7 @@ float64 MainWidget::chatBackgroundProgress() const {
 	if (_background) {
 		if (_background->generating) {
 			return 1.;
-		} else if (const auto document = _background->data.document()) {
+		} else if (_background->data.document()) {
 			return _background->dataMedia->progress();
 		}
 	}
@@ -1334,6 +1373,7 @@ void MainWidget::showHistory(
 	}
 
 	if (peerId && params.activation != anim::activation::background) {
+		Core::App().hideMediaView();
 		_controller->window().activate();
 	}
 
@@ -1435,11 +1475,7 @@ void MainWidget::showHistory(
 		&& way != Way::Forward) {
 		ClearBotStartToken(_history->peer());
 	}
-	_history->showHistory(
-		peerId,
-		showAtMsgId,
-		params.highlightPart,
-		params.highlightPartOffsetHint);
+	_history->showHistory(peerId, showAtMsgId, params);
 	if (alreadyThatPeer && params.reapplyLocalDraft) {
 		_history->applyDraft(HistoryWidget::FieldHistoryAction::NewEntry);
 	}
@@ -1483,7 +1519,7 @@ void MainWidget::showHistory(
 						: Window::SlideDirection::FromRight,
 					animationParams);
 			} else {
-				_history->show();
+				_history->showFast();
 				crl::on_main(this, [=] {
 					_controller->widget()->setInnerFocus();
 				});
@@ -1503,6 +1539,8 @@ void MainWidget::showHistory(
 	}
 
 	floatPlayerCheckVisibility();
+
+	controller()->dropSubsectionTabs();
 }
 
 void MainWidget::showMessage(
@@ -1515,6 +1553,7 @@ void MainWidget::showMessage(
 			if (_mainSection->showMessage(peerId, params, itemId)) {
 				if (params.activation != anim::activation::background) {
 					_controller->window().activate();
+					_controller->window().hideSettingsAndLayer();
 				}
 				return;
 			}
@@ -1527,6 +1566,12 @@ void MainWidget::showMessage(
 	}
 	if (const auto topic = item->topic()) {
 		_controller->showTopic(topic, item->id, params);
+		if (params.activation != anim::activation::background) {
+			_controller->window().activate();
+		}
+	} else if (const auto sublist = item->savedSublist()
+		; sublist && sublist->parentChat()) {
+		_controller->showSublist(sublist, item->id, params);
 		if (params.activation != anim::activation::background) {
 			_controller->window().activate();
 		}
@@ -1997,6 +2042,8 @@ bool MainWidget::showBackFromStack(const SectionShow &params) {
 		});
 		return (_dialogs != nullptr);
 	}
+	session().api().saveCurrentDraftToCloud();
+
 	auto item = std::move(_stack.back());
 	_stack.pop_back();
 	if (const auto currentHistoryPeer = _history->peer()) {
@@ -2324,6 +2371,9 @@ void MainWidget::updateControlsGeometry() {
 						(thread->asTopic()
 							? std::make_shared<Info::Memento>(
 								thread->asTopic())
+							: thread->asSublist()
+							? std::make_shared<Info::Memento>(
+								thread->asSublist())
 							: Info::Memento::Default(
 								thread->asHistory()->peer)),
 						params.withThirdColumn());
@@ -2587,14 +2637,17 @@ auto MainWidget::thirdSectionForCurrentMainSection(
 		return std::move(_thirdSectionFromStack);
 	} else if (const auto topic = key.topic()) {
 		return std::make_shared<Info::Memento>(topic);
+	} else if (const auto sublist = key.sublist()
+		; sublist && sublist->parentChat()) {
+		return std::make_shared<Info::Memento>(sublist);
 	} else if (const auto peer = key.peer()) {
 		return std::make_shared<Info::Memento>(
 			peer,
 			Info::Memento::DefaultSection(peer));
 	} else if (const auto sublist = key.sublist()) {
 		return std::make_shared<Info::Memento>(
-			session().user(),
-			Info::Memento::DefaultSection(session().user()));
+			sublist->owningHistory()->peer,
+			Info::Memento::DefaultSection(sublist->owningHistory()->peer));
 	}
 	Unexpected("Key in MainWidget::thirdSectionForCurrentMainSection().");
 }

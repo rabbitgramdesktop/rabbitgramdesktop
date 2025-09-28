@@ -9,10 +9,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "api/api_chat_participants.h"
 #include "api/api_invite_links.h"
+#include "api/api_premium.h"
 #include "boxes/peers/edit_participant_box.h"
 #include "boxes/peers/edit_peer_type_box.h"
 #include "boxes/peers/replace_boost_box.h"
 #include "boxes/max_invite_box.h"
+#include "chat_helpers/message_field.h"
 #include "lang/lang_keys.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -22,6 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_changes.h"
 #include "data/data_peer_values.h"
 #include "history/history.h"
+#include "history/history_item_helpers.h"
 #include "dialogs/dialogs_indexed_list.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/show_or_premium_box.h"
@@ -52,16 +55,39 @@ constexpr auto kUserpicsLimit = 3;
 
 class ForbiddenRow final : public PeerListRow {
 public:
-	ForbiddenRow(not_null<PeerData*> peer, bool locked);
+	ForbiddenRow(
+		not_null<PeerData*> peer,
+		not_null<const style::PeerListItem*> lockSt,
+		bool locked);
 
 	PaintRoundImageCallback generatePaintUserpicCallback(
 		bool forceRound) override;
 
+	Api::MessageMoneyRestriction restriction() const;
+	void setRestriction(Api::MessageMoneyRestriction restriction);
+
+	void preloadUserpic() override;
+	void paintUserpicOverlay(
+		Painter &p,
+		const style::PeerListItem &st,
+		int x,
+		int y,
+		int outerWidth) override;
+
+	bool refreshLock();
+
 private:
+	struct Restriction {
+		Api::MessageMoneyRestriction value;
+		RestrictionBadgeCache cache;
+	};
+
 	const bool _locked = false;
+	const not_null<const style::PeerListItem*> _lockSt;
 	QImage _disabledFrame;
 	InMemoryKey _userpicKey;
 	int _paletteVersion = 0;
+	std::shared_ptr<Restriction> _restriction;
 
 };
 
@@ -81,6 +107,9 @@ public:
 	[[nodiscard]] rpl::producer<int> selectedValue() const {
 		return _selected.value();
 	}
+	[[nodiscard]] rpl::producer<int> starsToSend() const {
+		return _starsToSend.value();
+	}
 
 	void send(
 		std::vector<not_null<PeerData*>> list,
@@ -89,9 +118,15 @@ public:
 
 private:
 	void appendRow(not_null<UserData*> user);
-	[[nodiscard]] std::unique_ptr<PeerListRow> createRow(
+	[[nodiscard]] std::unique_ptr<ForbiddenRow> createRow(
 		not_null<UserData*> user) const;
 	[[nodiscard]] bool canInvite(not_null<PeerData*> peer) const;
+
+	void send(
+		std::vector<not_null<PeerData*>> list,
+		Ui::ShowPtr show,
+		Fn<void()> close,
+		Api::SendOptions options);
 
 	void setSimpleCover();
 	void setComplexCover();
@@ -101,7 +136,10 @@ private:
 	const std::vector<not_null<UserData*>> &_users;
 	const bool _can = false;
 	rpl::variable<int> _selected;
+	rpl::variable<int> _starsToSend;
 	bool _sending = false;
+
+	rpl::lifetime _paymentCheckLifetime;
 
 };
 
@@ -141,6 +179,7 @@ void FillUpgradeToPremiumCover(
 		CreateUserpicsWithMoreBadge(
 			container,
 			rpl::single(std::move(userpicPeers)),
+			st::boostReplaceUserpicsRow,
 			kUserpicsLimit),
 		st::inviteForbiddenUserpicsPadding)
 	)->entity()->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -194,7 +233,8 @@ void FillUpgradeToPremiumCover(
 			container,
 			rpl::single(text),
 			st::inviteForbiddenInfo),
-		st::inviteForbiddenInfoPadding);
+		st::inviteForbiddenInfoPadding,
+		style::al_top);
 }
 
 void SimpleForbiddenBox(
@@ -256,11 +296,17 @@ Main::Session &InviteForbiddenController::session() const {
 	return _peer->session();
 }
 
-ForbiddenRow::ForbiddenRow(not_null<PeerData*> peer, bool locked)
+ForbiddenRow::ForbiddenRow(
+	not_null<PeerData*> peer,
+	not_null<const style::PeerListItem*> lockSt,
+	bool locked)
 : PeerListRow(peer)
-, _locked(locked) {
+, _locked(locked)
+, _lockSt(lockSt) {
 	if (_locked) {
 		setCustomStatus(tr::lng_invite_status_disabled(tr::now));
+	} else {
+		setRestriction(Api::ResolveMessageMoneyRestrictions(peer, nullptr));
 	}
 }
 
@@ -339,6 +385,76 @@ PaintRoundImageCallback ForbiddenRow::generatePaintUserpicCallback(
 	};
 }
 
+
+Api::MessageMoneyRestriction ForbiddenRow::restriction() const {
+	return _restriction
+		? _restriction->value
+		: Api::MessageMoneyRestriction();
+}
+
+void ForbiddenRow::setRestriction(Api::MessageMoneyRestriction restriction) {
+	if (!restriction || !restriction.starsPerMessage) {
+		_restriction = nullptr;
+		return;
+	} else if (!_restriction) {
+		_restriction = std::make_unique<Restriction>();
+	}
+	_restriction->value = restriction;
+}
+
+void ForbiddenRow::paintUserpicOverlay(
+		Painter &p,
+		const style::PeerListItem &st,
+		int x,
+		int y,
+		int outerWidth) {
+	if (const auto &r = _restriction) {
+		PaintRestrictionBadge(
+			p,
+			_lockSt,
+			r->value.starsPerMessage,
+			r->cache,
+			x,
+			y,
+			outerWidth,
+			st.photoSize);
+	}
+}
+
+bool ForbiddenRow::refreshLock() {
+	if (_locked) {
+		return false;
+	} else if (const auto user = peer()->asUser()) {
+		using Restriction = Api::MessageMoneyRestriction;
+		auto r = Api::ResolveMessageMoneyRestrictions(user, nullptr);
+		if (!r || !r.starsPerMessage) {
+			r = Restriction();
+		}
+		if ((_restriction ? _restriction->value : Restriction()) != r) {
+			setRestriction(r);
+			return true;
+		}
+	}
+	return false;
+}
+
+void ForbiddenRow::preloadUserpic() {
+	PeerListRow::preloadUserpic();
+
+	const auto peer = this->peer();
+	const auto known = Api::ResolveMessageMoneyRestrictions(
+		peer,
+		nullptr).known;
+	if (known) {
+		return;
+	} else if (const auto user = peer->asUser()) {
+		const auto api = &user->session().api();
+		api->premium().resolveMessageMoneyRestrictions(user);
+	} else if (const auto group = peer->asChannel()) {
+		group->updateFull();
+	}
+}
+
 void InviteForbiddenController::setSimpleCover() {
 	delegate()->peerListSetTitle(
 		_can ? tr::lng_profile_add_via_link() : tr::lng_via_link_cant());
@@ -396,7 +512,8 @@ void InviteForbiddenController::setComplexCover() {
 		if (_can) {
 			container->add(
 				MakeShowOrLabel(container, tr::lng_invite_upgrade_or()),
-				st::inviteForbiddenOrLabelPadding);
+				st::inviteForbiddenOrLabelPadding,
+				style::al_justify);
 		}
 		container->add(
 			object_ptr<Ui::FlatLabel>(
@@ -405,7 +522,8 @@ void InviteForbiddenController::setComplexCover() {
 					? tr::lng_invite_upgrade_via_title()
 					: tr::lng_via_link_cant()),
 				st::inviteForbiddenTitle),
-			st::inviteForbiddenTitlePadding);
+			st::inviteForbiddenTitlePadding,
+			style::al_top);
 
 		const auto about = _can
 			? (_peer->isBroadcast()
@@ -429,12 +547,37 @@ void InviteForbiddenController::setComplexCover() {
 				container,
 				rpl::single(about),
 				st::inviteForbiddenInfo),
-			st::inviteForbiddenInfoPadding);
+			st::inviteForbiddenInfoPadding,
+			style::al_top);
 	}
 	delegate()->peerListSetAboveWidget(std::move(cover));
 }
 
 void InviteForbiddenController::prepare() {
+	session().api().premium().someMessageMoneyRestrictionsResolved(
+	) | rpl::start_with_next([=] {
+		auto stars = 0;
+		const auto process = [&](not_null<PeerListRow*> raw) {
+			const auto row = static_cast<ForbiddenRow*>(raw.get());
+			if (row->refreshLock()) {
+				delegate()->peerListUpdateRow(raw);
+			}
+			if (const auto r = row->restriction()) {
+				stars += r.starsPerMessage;
+			}
+		};
+		auto count = delegate()->peerListFullRowsCount();
+		for (auto i = 0; i != count; ++i) {
+			process(delegate()->peerListRowAt(i));
+		}
+		_starsToSend = stars;
+
+		count = delegate()->peerListSearchRowsCount();
+		for (auto i = 0; i != count; ++i) {
+			process(delegate()->peerListSearchRowAt(i));
+		}
+	}, lifetime());
+
 	if (session().premium()
 		|| (_forbidden.premiumAllowsInvite.empty()
 			&& _forbidden.premiumAllowsWrite.empty())) {
@@ -464,6 +607,11 @@ void InviteForbiddenController::rowClicked(not_null<PeerListRow*> row) {
 	const auto checked = row->checked();
 	delegate()->peerListSetRowChecked(row, !checked);
 	_selected = _selected.current() + (checked ? -1 : 1);
+	const auto r = static_cast<ForbiddenRow*>(row.get())->restriction();
+	if (r.starsPerMessage) {
+		_starsToSend = _starsToSend.current()
+			+ (checked ? -r.starsPerMessage : r.starsPerMessage);
+	}
 }
 
 void InviteForbiddenController::appendRow(not_null<UserData*> user) {
@@ -473,6 +621,9 @@ void InviteForbiddenController::appendRow(not_null<UserData*> user) {
 		delegate()->peerListAppendRow(std::move(row));
 		if (canInvite(user)) {
 			delegate()->peerListSetRowChecked(raw, true);
+			if (const auto r = raw->restriction()) {
+				_starsToSend = _starsToSend.current() + r.starsPerMessage;
+			}
 		}
 	}
 }
@@ -481,7 +632,64 @@ void InviteForbiddenController::send(
 		std::vector<not_null<PeerData*>> list,
 		Ui::ShowPtr show,
 		Fn<void()> close) {
-	if (_sending || list.empty()) {
+	send(list, show, close, {});
+}
+
+void InviteForbiddenController::send(
+		std::vector<not_null<PeerData*>> list,
+		Ui::ShowPtr show,
+		Fn<void()> close,
+		Api::SendOptions options) {
+	if (list.empty()) {
+		return;
+	}
+	_paymentCheckLifetime.destroy();
+
+	const auto withPaymentApproved = [=](int approved) {
+		auto copy = options;
+		copy.starsApproved = approved;
+		send(list, show, close, copy);
+	};
+	const auto messagesCount = 1;
+	const auto alreadyApproved = options.starsApproved;
+	auto paid = std::vector<not_null<PeerData*>>();
+	auto waiting = base::flat_set<not_null<PeerData*>>();
+	auto totalStars = 0;
+	for (const auto &peer : list) {
+		const auto details = ComputePaymentDetails(peer, messagesCount);
+		if (!details) {
+			waiting.emplace(peer);
+		} else if (details->stars > 0) {
+			totalStars += details->stars;
+			paid.push_back(peer);
+		}
+	}
+	if (!waiting.empty()) {
+		session().changes().peerUpdates(
+			Data::PeerUpdate::Flag::FullInfo
+		) | rpl::start_with_next([=](const Data::PeerUpdate &update) {
+			if (waiting.contains(update.peer)) {
+				withPaymentApproved(alreadyApproved);
+			}
+		}, _paymentCheckLifetime);
+
+		if (!session().credits().loaded()) {
+			session().credits().loadedValue(
+			) | rpl::filter(
+				rpl::mappers::_1
+			) | rpl::take(1) | rpl::start_with_next([=] {
+				withPaymentApproved(alreadyApproved);
+			}, _paymentCheckLifetime);
+		}
+		return;
+	} else if (totalStars > alreadyApproved) {
+		const auto sessionShow = Main::MakeSessionShow(show, &session());
+		ShowSendPaidConfirm(sessionShow, paid, SendPaymentDetails{
+			.messages = messagesCount,
+			.stars = totalStars,
+		}, [=] { withPaymentApproved(totalStars); });
+		return;
+	} else if (_sending) {
 		return;
 	}
 	_sending = true;
@@ -492,12 +700,18 @@ void InviteForbiddenController::send(
 		if (link.isEmpty()) {
 			return false;
 		}
+		auto full = options;
 		auto &api = _peer->session().api();
-		auto options = Api::SendOptions();
 		for (const auto &to : list) {
+			auto copy = full;
+			copy.starsApproved = std::min(
+				to->starsPerMessageChecked(),
+				full.starsApproved);
+			full.starsApproved -= copy.starsApproved;
+
 			const auto history = to->owner().history(to);
 			auto message = Api::MessageToSend(
-				Api::SendAction(history, options));
+				Api::SendAction(history, copy));
 			message.textWithTags = { link };
 			message.action.clearDraft = false;
 			api.sendMessage(std::move(message));
@@ -542,10 +756,11 @@ void InviteForbiddenController::send(
 	}
 }
 
-std::unique_ptr<PeerListRow> InviteForbiddenController::createRow(
+std::unique_ptr<ForbiddenRow> InviteForbiddenController::createRow(
 		not_null<UserData*> user) const {
 	const auto locked = _can && !canInvite(user);
-	return std::make_unique<ForbiddenRow>(user, locked);
+	const auto lockSt = &computeListSt().item;
+	return std::make_unique<ForbiddenRow>(user, lockSt, locked);
 }
 
 } // namespace
@@ -584,8 +799,8 @@ void AddParticipantsBoxController::subscribeToMigration() {
 }
 
 void AddParticipantsBoxController::rowClicked(not_null<PeerListRow*> row) {
-	const auto premiumRequiredError = WritePremiumRequiredError;
-	if (RecipientRow::ShowLockedError(this, row, premiumRequiredError)) {
+	const auto moneyRestrictionError = WriteMoneyRestrictionError;
+	if (RecipientRow::ShowLockedError(this, row, moneyRestrictionError)) {
 		return;
 	}
 	const auto &serverConfig = session().serverConfig();
@@ -598,7 +813,7 @@ void AddParticipantsBoxController::rowClicked(not_null<PeerListRow*> row) {
 		updateTitle();
 	} else if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
 		if (!_peer->isMegagroup()) {
-			showBox(Box<MaxInviteBox>(_peer->asChannel()));
+			showBox(Box<MaxInviteBox>(channel));
 		}
 	} else if (count >= serverConfig.chatSizeMax
 		&& count < serverConfig.megagroupSizeMax) {
@@ -614,7 +829,7 @@ void AddParticipantsBoxController::itemDeselectedHook(
 void AddParticipantsBoxController::prepareViewHook() {
 	updateTitle();
 
-	TrackPremiumRequiredChanges(this, lifetime());
+	TrackMessageMoneyRestrictionsChanges(this, lifetime());
 }
 
 int AddParticipantsBoxController::alreadyInCount() const {
@@ -687,9 +902,9 @@ bool AddParticipantsBoxController::needsInviteLinkButton() {
 	return _peer->asChat()->canHaveInviteLink();
 }
 
-QPointer<Ui::BoxContent> AddParticipantsBoxController::showBox(
+base::weak_qptr<Ui::BoxContent> AddParticipantsBoxController::showBox(
 		object_ptr<Ui::BoxContent> box) const {
-	const auto weak = Ui::MakeWeak(box.data());
+	const auto weak = base::make_weak(box.data());
 	delegate()->peerListUiShow()->showBox(std::move(box));
 	return weak;
 }
@@ -765,7 +980,7 @@ void AddParticipantsBoxController::inviteSelectedUsers(
 			tr::lng_participant_invite_history(),
 			true,
 			st::defaultBoxCheckbox);
-		const auto weak = Ui::MakeWeak(checkbox.data());
+		const auto weak = base::make_weak(checkbox.data());
 
 		auto text = (users.size() == 1)
 			? tr::lng_participant_invite_sure(
@@ -929,12 +1144,15 @@ bool ChatInviteForbidden(
 		) | rpl::start_with_next([=](bool has) {
 			box->clearButtons();
 			if (has) {
-				box->addButton(tr::lng_via_link_send(), [=] {
+				const auto send = box->addButton(tr::lng_via_link_send(), [=] {
 					weak->send(
 						box->collectSelectedRows(),
 						box->uiShow(),
 						crl::guard(box, [=] { box->closeBox(); }));
 				});
+				send->setText(PaidSendButtonText(
+					weak->starsToSend(),
+					tr::lng_via_link_send()));
 			}
 			box->addButton(tr::lng_create_group_skip(), [=] {
 				box->closeBox();
@@ -991,9 +1209,9 @@ void AddSpecialBoxController::migrate(
 	_additional.migrate(chat, channel);
 }
 
-QPointer<Ui::BoxContent> AddSpecialBoxController::showBox(
+base::weak_qptr<Ui::BoxContent> AddSpecialBoxController::showBox(
 		object_ptr<Ui::BoxContent> box) const {
-	const auto weak = Ui::MakeWeak(box.data());
+	const auto weak = base::make_weak(box.data());
 	delegate()->peerListUiShow()->showBox(std::move(box));
 	return weak;
 }
@@ -1308,6 +1526,7 @@ void AddSpecialBoxController::editAdminDone(
 	}
 
 	_additional.applyAdminLocally(user, rights, rank);
+	// _adminDoneCallback should call changes().chatAdminUpdated.
 	if (const auto callback = _adminDoneCallback) {
 		callback(user, rights, rank);
 	}

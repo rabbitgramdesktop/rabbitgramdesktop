@@ -1,14 +1,14 @@
 #define MyAppShortName "rabbitGram"
 #define MyAppName "rabbitGram Desktop"
 #define MyAppPublisher "xmdnx"
-#define MyAppVersion "5.7"
+#define MyAppVersion "5.12.3"
 #define MyAppURL "https://t.me/rabbitGramUpdates"
-#define ReleasePath "C:\Users\xmdn\source\repos\rtgdesktopdev\out\Release"
+#define ReleasePath "C:\Users\xmdnusr\source\rtgdesktopdev\out\Release"
 #define MyAppExeName "rabbitGram.exe"
 #define MyAppId "4356CE01-4137-4C55-9F8B-FB4EEBB6EC0C"
 #define CurrentYear GetDateTimeString('yyyy','','')
 #define MyBuildTarget "win64"
-#define MyAppVersionFull "5.7-04112024"
+#define MyAppVersionFull "5.12.3-13032025"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -45,8 +45,8 @@ WizardStyle=modern
   #define ArchModulesFolder "arm64"
   AppVerName={#MyAppName} {#MyAppVersion} arm64
 #elif MyBuildTarget == "win64"
-  ArchitecturesAllowed="x64 arm64"
-  ArchitecturesInstallIn64BitMode="x64 arm64"
+  ArchitecturesAllowed="x64compatible"
+  ArchitecturesInstallIn64BitMode="x64compatible"
   OutputBaseFilename=rtgdsetup-x64.{#MyAppVersionFull}
   #define ArchModulesFolder "x64"
   AppVerName={#MyAppName} {#MyAppVersion} 64bit
@@ -71,7 +71,6 @@ Name: "ua";      MessagesFile: "compiler:Languages\Ukrainian.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; OnlyBelowVersion: 0,6.1
 
 [Files]
 Source: "{#ReleasePath}\rabbitGram.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -84,7 +83,6 @@ Source: "{#ReleasePath}\{#ModulesFolder}\d3d\d3dcompiler_47.dll"; DestDir: "{app
 Name: "{group}\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppShortName}}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppShortName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppShortName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

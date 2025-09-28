@@ -1285,7 +1285,7 @@ bool FieldAutocomplete::Inner::chooseAtIndex(
 	} else if (!_mrows->empty()) {
 		if (index < _mrows->size()) {
 			const auto user = _mrows->at(index).user;
-			const auto mentionUsername = (RabbitSettings::JsonSettings::GetInt("comma_after_mention") && !user->isBot())
+			const auto mentionUsername = (RabbitSettings::commaAfterMention() && !user->isBot())
 				? PrimaryUsername(user) + ","
 				: PrimaryUsername(user);			
 			_mentionChosen.fire({ user, mentionUsername, method });
@@ -1752,7 +1752,8 @@ void InitFieldAutocomplete(
 			&& peer->isUser()
 			&& !peer->asUser()->isBot()
 			&& (!shortcutMessages
-				|| shortcutMessages->shortcuts().list.empty())) {
+				|| shortcutMessages->shortcuts().list.empty()
+				|| peer->starsPerMessageChecked() != 0)) {
 			parsed = {};
 		}
 		raw->showFiltered(peer, parsed.query, parsed.fromStart);

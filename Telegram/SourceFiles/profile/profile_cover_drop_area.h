@@ -12,7 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Profile {
 
-class CoverDropArea : public TWidget {
+class CoverDropArea : public Ui::RpWidget {
 public:
 	CoverDropArea(QWidget *parent, const QString &title, const QString &subtitle);
 

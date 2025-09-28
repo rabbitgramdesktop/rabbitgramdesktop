@@ -14,28 +14,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace {
 
-[[nodiscard]] InlineBots::PeerTypes PeerTypesFromMTP(
-		const MTPvector<MTPInlineQueryPeerType> &types) {
-	using namespace InlineBots;
-	auto result = PeerTypes(0);
-	for (const auto &type : types.v) {
-		result |= type.match([&](const MTPDinlineQueryPeerTypePM &data) {
-			return PeerType::User;
-		}, [&](const MTPDinlineQueryPeerTypeChat &data) {
-			return PeerType::Group;
-		}, [&](const MTPDinlineQueryPeerTypeMegagroup &data) {
-			return PeerType::Group;
-		}, [&](const MTPDinlineQueryPeerTypeBroadcast &data) {
-			return PeerType::Broadcast;
-		}, [&](const MTPDinlineQueryPeerTypeBotPM &data) {
-			return PeerType::Bot;
-		}, [&](const MTPDinlineQueryPeerTypeSameBotPM &data) {
-			return PeerType();
-		});
-	}
-	return result;
-}
-
 [[nodiscard]] RequestPeerQuery RequestPeerQueryFromTL(
 		const MTPDkeyboardButtonRequestPeer &query) {
 	using Type = RequestPeerQuery::Type;
@@ -75,6 +53,28 @@ namespace {
 }
 
 } // namespace
+
+InlineBots::PeerTypes PeerTypesFromMTP(
+		const MTPvector<MTPInlineQueryPeerType> &types) {
+	using namespace InlineBots;
+	auto result = PeerTypes(0);
+	for (const auto &type : types.v) {
+		result |= type.match([&](const MTPDinlineQueryPeerTypePM &data) {
+			return PeerType::User;
+		}, [&](const MTPDinlineQueryPeerTypeChat &data) {
+			return PeerType::Group;
+		}, [&](const MTPDinlineQueryPeerTypeMegagroup &data) {
+			return PeerType::Group;
+		}, [&](const MTPDinlineQueryPeerTypeBroadcast &data) {
+			return PeerType::Broadcast;
+		}, [&](const MTPDinlineQueryPeerTypeBotPM &data) {
+			return PeerType::Bot;
+		}, [&](const MTPDinlineQueryPeerTypeSameBotPM &data) {
+			return PeerType();
+		});
+	}
+	return result;
+}
 
 HistoryMessageMarkupButton::HistoryMessageMarkupButton(
 	Type type,
@@ -312,7 +312,7 @@ HistoryMessageRepliesData::HistoryMessageRepliesData(
 	if (!data) {
 		return;
 	}
-	const auto &fields = data->c_messageReplies();
+	const auto &fields = data->data();
 	if (const auto list = fields.vrecent_repliers()) {
 		recentRepliers.reserve(list->v.size());
 		for (const auto &id : list->v) {
@@ -325,4 +325,32 @@ HistoryMessageRepliesData::HistoryMessageRepliesData(
 	maxId = fields.vmax_id().value_or_empty();
 	isNull = false;
 	pts = fields.vreplies_pts().v;
+}
+
+HistoryMessageSuggestInfo::HistoryMessageSuggestInfo(
+		const MTPSuggestedPost *data) {
+	if (!data) {
+		return;
+	}
+	const auto &fields = data->data();
+	price = CreditsAmountFromTL(fields.vprice());
+	date = fields.vschedule_date().value_or_empty();
+	accepted = fields.is_accepted();
+	rejected = fields.is_rejected();
+	exists = true;
+}
+
+HistoryMessageSuggestInfo::HistoryMessageSuggestInfo(
+	const Api::SendOptions &options)
+: HistoryMessageSuggestInfo(options.suggest) {
+}
+
+HistoryMessageSuggestInfo::HistoryMessageSuggestInfo(
+		SuggestPostOptions options) {
+	if (!options.exists) {
+		return;
+	}
+	price = options.price();
+	date = options.date;
+	exists = true;
 }

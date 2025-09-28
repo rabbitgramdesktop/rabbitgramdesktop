@@ -9,8 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/concurrent_timer.h"
 #include "base/debug_log.h"
+#include "ffmpeg/ffmpeg_bytes_io_wrap.h"
 #include "ffmpeg/ffmpeg_utility.h"
 #include "media/audio/media_audio_capture.h"
+#include "ui/controls/round_video_recorder_data.h"
 #include "ui/image/image_prepare.h"
 #include "ui/arc_angles.h"
 #include "ui/dynamic_image.h"
@@ -26,8 +28,8 @@ namespace {
 constexpr auto kSide = 400;
 constexpr auto kUpdateEach = crl::time(100);
 constexpr auto kAudioFrequency = 48'000;
-constexpr auto kAudioBitRate = 32'000;
-constexpr auto kVideoBitRate = 3 * 1024 * 1024;
+constexpr auto kAudioBitRate = 64 * 1024;
+constexpr auto kVideoBitRate = 2 * 1024 * 1024;
 constexpr auto kMinDuration = crl::time(200);
 constexpr auto kMaxDuration = 60 * crl::time(1000);
 constexpr auto kInitTimeout = 5 * crl::time(1000);
@@ -37,41 +39,15 @@ constexpr auto kMinithumbsInRow = 16;
 constexpr auto kFadeDuration = crl::time(150);
 constexpr auto kSkipFrames = 8;
 constexpr auto kMinScale = 0.7;
+constexpr auto &kPlainLogoFrames = RoundVideoData::kLogoFrames;
+constexpr auto kLogoSize = RoundVideoData::kLogoSize;
+constexpr auto kLogoXShift = -10;
+constexpr auto kLogoYShift = 10;
+constexpr auto kOverlayOpacity = 0.1;
+constexpr auto kOverlayOpaque = 1. - kOverlayOpacity;
+constexpr auto kOverlayUVOpaque = 128 * kOverlayOpaque;
 
 using namespace FFmpeg;
-
-struct ReadBytesWrap {
-	int64 size = 0;
-	int64 offset = 0;
-	const uchar *data = nullptr;
-
-	static int Read(void *opaque, uint8_t *buf, int buf_size) {
-		auto wrap = static_cast<ReadBytesWrap*>(opaque);
-		const auto toRead = std::min(
-			int64(buf_size),
-			wrap->size - wrap->offset);
-		if (toRead > 0) {
-			memcpy(buf, wrap->data + wrap->offset, toRead);
-			wrap->offset += toRead;
-		}
-		return toRead;
-	};
-	static int64_t Seek(void *opaque, int64_t offset, int whence) {
-		auto wrap = static_cast<ReadBytesWrap*>(opaque);
-		auto updated = int64(-1);
-		switch (whence) {
-		case SEEK_SET: updated = offset; break;
-		case SEEK_CUR: updated = wrap->offset + offset; break;
-		case SEEK_END: updated = wrap->size + offset; break;
-		case AVSEEK_SIZE: return wrap->size; break;
-		}
-		if (updated < 0 || updated > wrap->size) {
-			return -1;
-		}
-		wrap->offset = updated;
-		return updated;
-	};
-};
 
 [[nodiscard]] int MinithumbSize() {
 	const auto full = st::historySendSize.height();
@@ -79,6 +55,115 @@ struct ReadBytesWrap {
 	const auto outer = full - margin.top() - margin.bottom();
 	const auto inner = outer - 2 * st::msgWaveformMin;
 	return inner * style::DevicePixelRatio();
+}
+
+[[nodiscard]] QImage CircularTextImage(
+		const QString &text,
+		int width,
+		int height,
+		int radius,
+		float64 startAngle = 0.0,
+		float64 endAngle = 360.0,
+		const QColor &textColor = Qt::black,
+		const QColor &bgColor = Qt::white,
+		const QFont &font = QFont(),
+		bool reverseDirection = false) {
+	auto image = QImage(width, height, QImage::Format_ARGB32);
+	image.fill(bgColor);
+
+	auto painter = QPainter(&image);
+	painter.setRenderHint(QPainter::Antialiasing, true);
+	painter.setPen(textColor);
+	painter.setFont(font);
+
+	auto center = QPoint(width / 2, height / 2);
+	painter.translate(center);
+
+	if (endAngle < startAngle) {
+		std::swap(startAngle, endAngle);
+	}
+
+	const auto startRad = float64(startAngle - 90) * M_PI / 180.0;
+	const auto endRad = float64(endAngle - 90) * M_PI / 180.0;
+	const auto angleRange = float64(endRad) - float64(startRad);
+
+	const auto &metrics = QFontMetrics(font);
+
+	for (auto i = 0; i < text.length(); ++i) {
+		const auto ratio = (text.length() <= 1)
+			? 0.5
+			: reverseDirection
+			? 1.0 - static_cast<float64>(i) / (text.length() - 1)
+			: static_cast<float64>(i) / (text.length() - 1);
+
+		const auto angle = startRad + ratio * angleRange;
+
+		const auto x = radius * std::cos(angle);
+		const auto y = radius * std::sin(angle);
+
+		const auto degrees = (angle * 180.0 / M_PI) - 90;
+		painter.save();
+		painter.translate(x, y);
+		painter.rotate(degrees);
+		const auto offset = (i == text.length() - 1) ? 2. : 0.;
+		painter.drawText(
+			-metrics.horizontalAdvance(text[i]) / 2 + offset,
+			metrics.ascent() / 2,
+			QString(text[i]));
+		painter.restore();
+	}
+
+	return image;
+}
+
+using PrecomputedLogo = std::array<std::array<float, kLogoSize>, kLogoSize>;
+[[nodiscard]] const std::vector<PrecomputedLogo> &PrecomputedLogos() {
+	static std::vector<PrecomputedLogo> precomputedLogos;
+
+	if (!precomputedLogos.empty()) {
+		return precomputedLogos;
+	}
+	constexpr auto kAntialiasRadius = 0.4;
+	precomputedLogos.resize(kPlainLogoFrames.size());
+	const auto antialiasFactor = 1.0
+		/ (2. * kAntialiasRadius * kAntialiasRadius);
+
+	for (auto index = size_t(0); index < kPlainLogoFrames.size(); ++index) {
+		uint8_t logoFrame[kLogoSize][kLogoSize] = {{ 0 }};
+		RoundVideoData::DecompressLogoRLEFrame(
+			kPlainLogoFrames[index],
+			logoFrame);
+
+		for (auto y = 0; y < kLogoSize; ++y) {
+			for (auto x = 0; x < kLogoSize; ++x) {
+				auto blendedValue = 0.;
+				auto weightSum = 0.;
+
+				const auto minY = std::max(0, y - 1);
+				const auto maxY = std::min(kLogoSize - 1, y + 1);
+				const auto minX = std::max(0, x - 1);
+				const auto maxX = std::min(kLogoSize - 1, x + 1);
+
+				for (auto sampleY = minY; sampleY <= maxY; ++sampleY) {
+					const auto dy = sampleY - y;
+					for (auto sampleX = minX; sampleX <= maxX; ++sampleX) {
+						const auto dx = sampleX - x;
+						const auto distanceSq = dx * dx + dy * dy;
+						const auto weight
+							= std::exp(-distanceSq * antialiasFactor);
+
+						blendedValue += logoFrame[sampleY][sampleX] * weight;
+						weightSum += weight;
+					}
+				}
+
+				precomputedLogos[index][y][x] = (weightSum > 0)
+					? (blendedValue / weightSum)
+					: 0;
+			}
+		}
+	}
+	return precomputedLogos;
 }
 
 } // namespace
@@ -107,18 +192,9 @@ private:
 		std::array<int64, kMaxStreams> lastDts = { 0 };
 	};
 
-	static int Write(void *opaque, uint8_t *buf, int buf_size) {
-		return static_cast<Private*>(opaque)->write(buf, buf_size);
-	}
-	static int64_t Seek(void *opaque, int64_t offset, int whence) {
-		return static_cast<Private*>(opaque)->seek(offset, whence);
-	}
-
-	int write(uint8_t *buf, int buf_size);
-	int64_t seek(int64_t offset, int whence);
-
 	void initEncoding();
 	void initCircleMask();
+	void initCircularTextImage();
 	void initMinithumbsCanvas();
 	void maybeSaveMinithumb(
 		not_null<AVFrame*> frame,
@@ -144,7 +220,7 @@ private:
 	void updateResultDuration(int64 pts, AVRational timeBase);
 
 	void mirrorYUV420P(not_null<AVFrame*> frame);
-	void cutCircleFromYUV420P(not_null<AVFrame*> frame);
+	void drawLogoOnYUV420P(not_null<AVFrame*> frame);
 
 	[[nodiscard]] RoundVideoResult appendToPrevious(RoundVideoResult video);
 	[[nodiscard]] static FormatPointer OpenInputContext(
@@ -182,8 +258,7 @@ private:
 	crl::time _firstAudioChunkFinished = 0;
 	crl::time _firstVideoFrameTime = 0;
 
-	QByteArray _result;
-	int64_t _resultOffset = 0;
+	WriteBytesWrap _result;
 	crl::time _resultDuration = 0;
 	bool _finished = false;
 
@@ -200,6 +275,9 @@ private:
 	RoundVideoResult _previous;
 
 	ReadBytesWrap _forConcat1, _forConcat2;
+
+	uint8_t _logoFrameCounter = 0;
+	QImage _circularTextImage;
 
 	std::vector<bool> _circleMask; // Always nice to use vector<bool>! :D
 
@@ -221,6 +299,7 @@ RoundVideoRecorder::Private::Private(
 , _timeoutTimer(_weak, [=] { timeout(); }) {
 	initEncoding();
 	initCircleMask();
+	initCircularTextImage();
 	initMinithumbsCanvas();
 
 	_timeoutTimer.callOnce(kInitTimeout);
@@ -230,49 +309,12 @@ RoundVideoRecorder::Private::~Private() {
 	finishEncoding();
 }
 
-int RoundVideoRecorder::Private::write(uint8_t *buf, int buf_size) {
-	if (const auto total = _resultOffset + int64(buf_size)) {
-		const auto size = int64(_result.size());
-		constexpr auto kReserve = 1024 * 1024;
-		_result.reserve((total / kReserve) * kReserve);
-		const auto overwrite = std::min(
-			size - _resultOffset,
-			int64(buf_size));
-		if (overwrite) {
-			memcpy(_result.data() + _resultOffset, buf, overwrite);
-		}
-		if (const auto append = buf_size - overwrite) {
-			_result.append(
-				reinterpret_cast<const char*>(buf) + overwrite,
-				append);
-		}
-		_resultOffset += buf_size;
-	}
-	return buf_size;
-}
-
-int64_t RoundVideoRecorder::Private::seek(int64_t offset, int whence) {
-	const auto checkedSeek = [&](int64_t offset) {
-		if (offset < 0 || offset > int64(_result.size())) {
-			return int64_t(-1);
-		}
-		return int64_t(_resultOffset = offset);
-	};
-	switch (whence) {
-	case SEEK_SET: return checkedSeek(offset);
-	case SEEK_CUR: return checkedSeek(_resultOffset + offset);
-	case SEEK_END: return checkedSeek(int64(_result.size()) + offset);
-	case AVSEEK_SIZE: return int64(_result.size());
-	}
-	return -1;
-}
-
 void RoundVideoRecorder::Private::initEncoding() {
 	_format = MakeWriteFormatPointer(
-		static_cast<void*>(this),
+		static_cast<void*>(&_result),
 		nullptr,
-		&Private::Write,
-		&Private::Seek,
+		&WriteBytesWrap::Write,
+		&WriteBytesWrap::Seek,
 		"mp4"_q);
 
 	if (!initVideo()) {
@@ -388,7 +430,6 @@ bool RoundVideoRecorder::Private::initAudio() {
 	_audioCodec->sample_rate = kAudioFrequency;
 #if DA_FFMPEG_NEW_CHANNEL_LAYOUT
 	_audioCodec->ch_layout = AV_CHANNEL_LAYOUT_MONO;
-	_audioCodec->channels = _audioCodec->ch_layout.nb_channels;
 #else
 	_audioCodec->channel_layout = AV_CH_LAYOUT_MONO;
 	_audioCodec->channels = _audioChannels;
@@ -422,10 +463,10 @@ bool RoundVideoRecorder::Private::initAudio() {
 		&_swrContext);
 #else // DA_FFMPEG_NEW_CHANNEL_LAYOUT
 	_swrContext = MakeSwresamplePointer(
-		&_audioCodec->ch_layout,
+		_audioCodec->channel_layout,
 		AV_SAMPLE_FMT_S16,
 		_audioCodec->sample_rate,
-		&_audioCodec->ch_layout,
+		_audioCodec->channel_layout,
 		_audioCodec->sample_fmt,
 		_audioCodec->sample_rate,
 		&_swrContext);
@@ -482,7 +523,7 @@ RoundVideoResult RoundVideoRecorder::Private::finish() {
 	}
 	finishEncoding();
 	auto result = appendToPrevious({
-		.content = base::take(_result),
+		.content = base::take(_result.content),
 		.duration = base::take(_resultDuration),
 		//.waveform = {},
 		.minithumbs = base::take(_minithumbs),
@@ -513,10 +554,10 @@ RoundVideoResult RoundVideoRecorder::Private::appendToPrevious(
 	}
 
 	auto output = MakeWriteFormatPointer(
-		static_cast<void*>(this),
+		static_cast<void*>(&_result),
 		nullptr,
-		&Private::Write,
-		&Private::Seek,
+		&WriteBytesWrap::Write,
+		&WriteBytesWrap::Seek,
 		"mp4"_q);
 
 	for (auto i = 0; i != input1->nb_streams; ++i) {
@@ -557,7 +598,7 @@ RoundVideoResult RoundVideoRecorder::Private::appendToPrevious(
 		fail(Error::Encoding);
 		return {};
 	}
-	video.content = base::take(_result);
+	video.content = base::take(_result.content);
 	video.duration += _previous.duration;
 	return video;
 }
@@ -680,7 +721,7 @@ void RoundVideoRecorder::Private::deinitEncoding() {
 	_firstAudioChunkFinished = 0;
 	_firstVideoFrameTime = 0;
 
-	_resultOffset = 0;
+	_result.offset = 0;
 
 	_maxLevelSinceLastUpdate = 0;
 	_lastUpdateDuration = 0;
@@ -754,7 +795,7 @@ void RoundVideoRecorder::Private::encodeVideoFrame(
 		_videoFrame->linesize);
 
 	mirrorYUV420P(_videoFrame.get());
-	cutCircleFromYUV420P(_videoFrame.get());
+	drawLogoOnYUV420P(_videoFrame.get());
 
 	_videoFrame->pts = mcstimestamp - _videoFirstTimestamp;
 	maybeSaveMinithumb(_videoFrame.get(), frame, crop);
@@ -828,6 +869,23 @@ void RoundVideoRecorder::Private::initCircleMask() {
 	}
 }
 
+void RoundVideoRecorder::Private::initCircularTextImage() {
+	constexpr auto kCircularTextRadius = kSide / 2 + 17;
+	constexpr auto kCircularTextStartAngle = 125;
+	constexpr auto kCircularTextEndAngle = 145;
+	_circularTextImage = CircularTextImage(
+		u"Telegram"_q.toUpper(),
+		kSide,
+		kSide,
+		kCircularTextRadius,
+		kCircularTextStartAngle,
+		kCircularTextEndAngle,
+		Qt::white,
+		Qt::transparent,
+		st::roundVideoFont,
+		true);
+}
+
 void RoundVideoRecorder::Private::initMinithumbsCanvas() {
 	const auto width = kMinithumbsInRow * _minithumbSize;
 	const auto seconds = (kMaxDuration + 999) / 1000;
@@ -853,45 +911,74 @@ void RoundVideoRecorder::Private::mirrorYUV420P(not_null<AVFrame*> frame) {
 	}
 }
 
-void RoundVideoRecorder::Private::cutCircleFromYUV420P(
+void RoundVideoRecorder::Private::drawLogoOnYUV420P(
 		not_null<AVFrame*> frame) {
 	const auto width = frame->width;
 	const auto height = frame->height;
 
-	auto yMaskIndex = 0;
+	const auto logoBottom = height - kLogoSize + kLogoYShift;
+	const auto logoStartX = kLogoXShift;
+	const auto logoEndX = logoStartX + kLogoSize;
+	const auto logoStartY = logoBottom;
+	const auto logoEndY = logoBottom + kLogoSize;
+
+	const auto &currentLogo = PrecomputedLogos()[_logoFrameCounter];
+	_logoFrameCounter = (_logoFrameCounter + 1) % kPlainLogoFrames.size();
+
 	auto yData = frame->data[0];
 	const auto ySkip = frame->linesize[0] - width;
-	for (int y = 0; y < height; ++y) {
-		for (int x = 0; x < width; ++x) {
+
+	const auto uvWidth = width / 2;
+	auto uData = frame->data[1];
+	auto vData = frame->data[2];
+	const auto uvSkip = frame->linesize[1] - uvWidth;
+	auto yMaskIndex = 0;
+
+	for (auto y = 0; y < height; ++y) {
+		for (auto x = 0; x < width; ++x) {
 			if (_circleMask[yMaskIndex]) {
-				*yData = 255;
+				*yData = static_cast<uint8_t>(*yData * kOverlayOpacity
+					+ 16 * kOverlayOpaque);
 			}
+
+			if ((x >= logoStartX && x < logoEndX)
+				&& (y >= logoStartY && y < logoEndY)) {
+				const auto logoX = x - kLogoXShift;
+				const auto logoY = y - logoBottom;
+
+				const auto blendedValue = currentLogo[logoX][logoY];
+				if (blendedValue > 0) {
+					const auto logoFactor = blendedValue / 255.0f;
+					*yData = static_cast<uint8_t>(*yData * (1 - logoFactor)
+						+ 255 * logoFactor);
+				}
+			}
+
+			const auto textAlpha = qAlpha(_circularTextImage.pixel(x, y))
+				/ 255.;
+			*yData = std::min(
+				*yData + static_cast<uint8_t>(textAlpha * 100),
+				255);
+
 			++yData;
 			++yMaskIndex;
 		}
 		yData += ySkip;
-	}
 
-	const auto whalf = width / 2;
-	const auto hhalf = height / 2;
-
-	auto uvMaskIndex = 0;
-	auto uData = frame->data[1];
-	auto vData = frame->data[2];
-	const auto uSkip = frame->linesize[1] - whalf;
-	for (auto y = 0; y != hhalf; ++y) {
-		for (auto x = 0; x != whalf; ++x) {
-			if (_circleMask[uvMaskIndex]) {
-				*uData = 128;
-				*vData = 128;
+		if (y % 2 == 0) {
+			for (auto x = 0; x < uvWidth; ++x) {
+				if (_circleMask[(y * width) + (x * 2)]) {
+					*uData = static_cast<uint8_t>(*uData * kOverlayOpacity
+						+ kOverlayUVOpaque);
+					*vData = static_cast<uint8_t>(*vData * kOverlayOpacity
+						+ kOverlayUVOpaque);
+				}
+				++uData;
+				++vData;
 			}
-			++uData;
-			++vData;
-			uvMaskIndex += 2;
+			uData += uvSkip;
+			vData += uvSkip;
 		}
-		uData += uSkip;
-		vData += uSkip;
-		uvMaskIndex += width;
 	}
 }
 

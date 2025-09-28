@@ -13,6 +13,10 @@ namespace Api {
 struct GiftCode;
 } // namespace Api
 
+namespace ChatHelpers {
+class Show;
+} // namespace ChatHelpers
+
 namespace Data {
 struct Boost;
 struct CreditsHistoryEntry;
@@ -21,7 +25,16 @@ struct GiveawayResults;
 struct SubscriptionEntry;
 } // namespace Data
 
+namespace Main {
+class Session;
+} // namespace Main
+
+namespace Settings {
+struct CreditsEntryBoxStyleOverrides;
+} // namespace Settings
+
 namespace Ui {
+class Show;
 class GenericBox;
 class VerticalLayout;
 } // namespace Ui
@@ -54,27 +67,48 @@ void ResolveGiveawayInfo(
 	std::optional<Data::GiveawayStart> start,
 	std::optional<Data::GiveawayResults> results);
 
+[[nodiscard]] QString TonAddressUrl(
+	not_null<Main::Session*> session,
+	const QString &address);
+
 void AddStarGiftTable(
-	not_null<Window::SessionNavigation*> controller,
+	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
 	const Data::CreditsHistoryEntry &entry,
-	Fn<void()> convertToStars);
+	Fn<void()> convertToStars,
+	Fn<void()> startUpgrade);
 void AddCreditsHistoryEntryTable(
-	not_null<Window::SessionNavigation*> controller,
+	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
 	const Data::CreditsHistoryEntry &entry);
 
 void AddSubscriptionEntryTable(
-	not_null<Window::SessionNavigation*> controller,
+	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
 	const Data::SubscriptionEntry &s);
 void AddSubscriberEntryTable(
-	not_null<Window::SessionNavigation*> controller,
+	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
 	not_null<PeerData*> peer,
 	TimeId date);
 
 void AddCreditsBoostTable(
-	not_null<Window::SessionNavigation*> controller,
+	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
 	const Data::Boost &boost);
+
+void AddChannelEarnTable(
+	std::shared_ptr<Ui::Show> show,
+	not_null<Ui::VerticalLayout*> container,
+	const Data::CreditsHistoryEntry &entry);
+
+void AddUniqueGiftValueTable(
+	std::shared_ptr<ChatHelpers::Show> show,
+	not_null<Ui::VerticalLayout*> container,
+	Settings::CreditsEntryBoxStyleOverrides st,
+	const Data::CreditsHistoryEntry &entry);

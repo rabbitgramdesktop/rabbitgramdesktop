@@ -10,7 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace Editor {
 
 ItemImage::ItemImage(
-	const QPixmap &&pixmap,
+	QPixmap &&pixmap,
 	ItemBase::Data data)
 : ItemBase(std::move(data))
 , _pixmap(std::move(pixmap)) {

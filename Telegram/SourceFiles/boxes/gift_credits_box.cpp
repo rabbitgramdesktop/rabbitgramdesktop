@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_credits.h"
 #include "boxes/peer_list_controllers.h"
+#include "core/ui_integration.h" // TextContext.
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -23,7 +24,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/text/text_utilities.h"
 #include "ui/vertical_list.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
 #include "styles/style_channel_earn.h"
@@ -49,51 +49,26 @@ void GiftCreditsBox(
 
 	Ui::AddSkip(content);
 	Ui::AddSkip(content);
+	Ui::AddSkip(content);
 	const auto &stUser = st::premiumGiftsUserpicButton;
 	const auto userpicWrap = content->add(
-		object_ptr<Ui::CenterWrap<>>(
-			content,
-			object_ptr<Ui::UserpicButton>(content, peer, stUser)));
+		object_ptr<Ui::UserpicButton>(content, peer, stUser),
+		style::al_top);
 	userpicWrap->setAttribute(Qt::WA_TransparentForMouseEvents);
 	Ui::AddSkip(content);
 	Ui::AddSkip(content);
 
-	{
-		const auto widget = Ui::CreateChild<Ui::RpWidget>(content);
-		using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
-		const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
-			widget,
-			false,
-			Ui::Premium::MiniStars::Type::BiStars);
-		stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
-		widget->resize(
-			st::boxWidth - stUser.photoSize,
-			stUser.photoSize * 2);
-		content->sizeValue(
-		) | rpl::start_with_next([=](const QSize &size) {
-			widget->moveToLeft(stUser.photoSize / 2, 0);
-			const auto starsRect = Rect(widget->size());
-			stars->setPosition(starsRect.topLeft());
-			stars->setSize(starsRect.size());
-			widget->lower();
-		}, widget->lifetime());
-		widget->paintRequest(
-		) | rpl::start_with_next([=](const QRect &r) {
-			auto p = QPainter(widget);
-			p.fillRect(r, Qt::transparent);
-			stars->paint(p);
-		}, widget->lifetime());
-	}
+	Settings::AddMiniStars(
+		content,
+		Ui::CreateChild<Ui::RpWidget>(content),
+		stUser.photoSize,
+		box->width(),
+		2.);
 	{
 		Ui::AddSkip(content);
-		const auto arrow = Ui::Text::SingleCustomEmoji(
-			peer->owner().customEmojiManager().registerInternalEmoji(
-				st::topicButtonArrow,
-				st::channelEarnLearnArrowMargins,
-				false));
 		auto link = tr::lng_credits_box_history_entry_gift_about_link(
 			lt_emoji,
-			rpl::single(arrow),
+			rpl::single(Ui::Text::IconEmoji(&st::textMoreIconEmoji)),
 			Ui::Text::RichLangValue
 		) | rpl::map([](TextWithEntities text) {
 			return Ui::Text::Link(
@@ -101,19 +76,17 @@ void GiftCreditsBox(
 				u"internal:stars_examples"_q);
 		});
 		content->add(
-			object_ptr<Ui::CenterWrap<>>(
+			object_ptr<Ui::FlatLabel>(
 				content,
-				Ui::CreateLabelWithCustomEmoji(
-					content,
-					tr::lng_credits_box_history_entry_gift_out_about(
-						lt_user,
-						rpl::single(TextWithEntities{ peer->shortName() }),
-						lt_link,
-						std::move(link),
-						Ui::Text::RichLangValue),
-					{ .session = &peer->session() },
-					st::creditsBoxAbout)),
-			st::boxRowPadding);
+				tr::lng_credits_box_history_entry_gift_out_about(
+					lt_user,
+					rpl::single(TextWithEntities{ peer->shortName() }),
+					lt_link,
+					std::move(link),
+					Ui::Text::RichLangValue),
+				st::creditsBoxAbout),
+			st::boxRowPadding,
+			style::al_top);
 	}
 	Ui::AddSkip(content);
 	Ui::AddSkip(box->verticalLayout());
@@ -122,8 +95,11 @@ void GiftCreditsBox(
 		Main::MakeSessionShow(box->uiShow(), &peer->session()),
 		box->verticalLayout(),
 		peer,
-		0,
-		[=] { gifted(); box->uiShow()->hideLayer(); });
+		CreditsAmount(),
+		[=] { gifted(); box->uiShow()->hideLayer(); },
+		box->showFinishes(),
+		tr::lng_credits_summary_options_subtitle(),
+		{});
 
 	box->setPinnedToBottomContent(
 		object_ptr<Ui::VerticalLayout>(box));

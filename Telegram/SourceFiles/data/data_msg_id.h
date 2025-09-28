@@ -86,7 +86,9 @@ constexpr auto SpecialMsgIdShift = EndStoryMsgId.bare;
 constexpr auto ShowAtTheEndMsgId = MsgId(SpecialMsgIdShift + 1);
 constexpr auto SwitchAtTopMsgId = MsgId(SpecialMsgIdShift + 2);
 constexpr auto ShowAndStartBotMsgId = MsgId(SpecialMsgIdShift + 4);
+constexpr auto ShowAndMaybeStartBotMsgId = MsgId(SpecialMsgIdShift + 5);
 constexpr auto ShowForChooseMessagesMsgId = MsgId(SpecialMsgIdShift + 6);
+constexpr auto kSearchQueryOffsetHint = -1;
 
 static_assert(SpecialMsgIdShift + 0xFF < 0);
 static_assert(-(SpecialMsgIdShift + 0xFF) > ServerMaxMsgId);
@@ -170,21 +172,65 @@ inline QDebug operator<<(QDebug debug, const FullMsgId &fullMsgId) {
 
 Q_DECLARE_METATYPE(FullMsgId);
 
+struct MessageHighlightId {
+	TextWithEntities quote;
+	int quoteOffset = 0;
+	int todoItemId = 0;
+
+	[[nodiscard]] bool empty() const {
+		return quote.empty() && !todoItemId;
+	}
+	[[nodiscard]] friend inline bool operator==(
+		const MessageHighlightId &a,
+		const MessageHighlightId &b) = default;
+};
+
 struct FullReplyTo {
 	FullMsgId messageId;
 	TextWithEntities quote;
 	FullStoryId storyId;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 	int quoteOffset = 0;
+	int todoItemId = 0;
 
-	[[nodiscard]] bool valid() const {
+	[[nodiscard]] MessageHighlightId highlight() const {
+		return { quote, quoteOffset, todoItemId };
+	}
+	[[nodiscard]] bool replying() const {
 		return messageId || (storyId && storyId.peer);
 	}
 	explicit operator bool() const {
-		return valid();
+		return replying() || monoforumPeerId;
 	}
 	friend inline auto operator<=>(FullReplyTo, FullReplyTo) = default;
 	friend inline bool operator==(FullReplyTo, FullReplyTo) = default;
+};
+
+struct SuggestPostOptions {
+	uint32 exists : 1 = 0;
+	uint32 priceWhole : 31 = 0;
+	uint32 priceNano : 31 = 0;
+	uint32 ton : 1 = 0;
+	TimeId date = 0;
+
+	[[nodiscard]] CreditsAmount price() const {
+		return CreditsAmount(
+			priceWhole,
+			priceNano,
+			ton ? CreditsType::Ton : CreditsType::Stars);
+	}
+
+	explicit operator bool() const {
+		return exists != 0;
+	}
+
+	friend inline auto operator<=>(
+		SuggestPostOptions,
+		SuggestPostOptions) = default;
+	friend inline bool operator==(
+		SuggestPostOptions,
+		SuggestPostOptions) = default;
 };
 
 struct GlobalMsgId {
@@ -218,6 +264,15 @@ struct hash<FullStoryId> {
 		return QtPrivate::QHashCombine().operator()(
 			std::hash<BareId>()(value.peer.value),
 			value.story);
+	}
+};
+
+template <>
+struct hash<FullMsgId> {
+	size_t operator()(FullMsgId value) const {
+		return QtPrivate::QHashCombine().operator()(
+			std::hash<BareId>()(value.peer.value),
+			value.msg.bare);
 	}
 };
 

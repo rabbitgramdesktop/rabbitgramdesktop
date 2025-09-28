@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_chat_invite.h"
 
 #include "apiwrap.h"
+#include "api/api_credits.h"
 #include "boxes/premium_limits_box.h"
 #include "core/application.h"
 #include "data/components/credits.h"
@@ -141,13 +142,12 @@ void ConfirmSubscriptionBox(
 	const auto content = box->verticalLayout();
 
 	Ui::AddSkip(content, st::confirmInvitePhotoTop);
-	const auto userpicWrap = content->add(
-		object_ptr<Ui::CenterWrap<>>(
-			content,
-			object_ptr<Ui::RpWidget>(content)));
-	const auto userpic = userpicWrap->entity();
+	const auto userpic = content->add(
+		object_ptr<Ui::RpWidget>(content),
+		style::al_top);
 	const auto photoSize = st::confirmInvitePhotoSize;
 	userpic->resize(Size(photoSize));
+	userpic->setNaturalWidth(photoSize);
 	const auto creditsIconSize = photoSize / 3;
 	const auto creditsIconCallback =
 		Ui::PaintOutlinedColoredCreditsIconCallback(
@@ -187,8 +187,8 @@ void ConfirmSubscriptionBox(
 		}
 		auto p = QPainter(userpic);
 		p.drawImage(0, 0, state->frame);
-	}, userpicWrap->lifetime());
-	userpicWrap->setAttribute(Qt::WA_TransparentForMouseEvents);
+	}, userpic->lifetime());
+	userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
 	if (photo) {
 		state->photoMedia = photo->createMediaView();
 		state->photoMedia->wanted(Data::PhotoSize::Small, Data::FileOrigin());
@@ -196,7 +196,7 @@ void ConfirmSubscriptionBox(
 			session->downloaderTaskFinished(
 			) | rpl::start_with_next([=] {
 				userpic->update();
-			}, userpicWrap->entity()->lifetime());
+			}, userpic->lifetime());
 		}
 	} else {
 		state->photoEmpty = std::make_unique<Ui::EmptyUserpic>(
@@ -206,75 +206,53 @@ void ConfirmSubscriptionBox(
 	Ui::AddSkip(content);
 	Ui::AddSkip(content);
 
-	{
-		const auto widget = Ui::CreateChild<Ui::RpWidget>(content);
-		using ColoredMiniStars = Ui::Premium::ColoredMiniStars;
-		const auto stars = widget->lifetime().make_state<ColoredMiniStars>(
-			widget,
-			false,
-			Ui::Premium::MiniStars::Type::BiStars);
-		stars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
-		widget->resize(
-			st::boxWideWidth - photoSize,
-			photoSize * 2);
-		content->sizeValue(
-		) | rpl::start_with_next([=](const QSize &size) {
-			widget->moveToLeft(photoSize / 2, 0);
-			const auto starsRect = Rect(widget->size());
-			stars->setPosition(starsRect.topLeft());
-			stars->setSize(starsRect.size());
-			widget->lower();
-		}, widget->lifetime());
-		widget->paintRequest(
-		) | rpl::start_with_next([=](const QRect &r) {
-			auto p = QPainter(widget);
-			p.fillRect(r, Qt::transparent);
-			stars->paint(p);
-		}, widget->lifetime());
-	}
+	Settings::AddMiniStars(
+		content,
+		Ui::CreateChild<Ui::RpWidget>(content),
+		photoSize,
+		box->width(),
+		2.);
 
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_channel_invite_subscription_title(),
-				st::inviteLinkSubscribeBoxTitle)));
+			tr::lng_channel_invite_subscription_title(),
+			st::inviteLinkSubscribeBoxTitle),
+		style::al_top);
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_channel_invite_subscription_about(
-					lt_channel,
-					rpl::single(Ui::Text::Bold(name)),
-					lt_price,
-					tr::lng_credits_summary_options_credits(
-						lt_count,
-						rpl::single(amount) | tr::to_count(),
-						Ui::Text::Bold),
-					Ui::Text::WithEntities),
-				st::inviteLinkSubscribeBoxAbout)));
+			tr::lng_channel_invite_subscription_about(
+				lt_channel,
+				rpl::single(Ui::Text::Bold(name)),
+				lt_price,
+				tr::lng_credits_summary_options_credits(
+					lt_count,
+					rpl::single(amount) | tr::to_count(),
+					Ui::Text::Bold),
+				Ui::Text::WithEntities),
+			st::inviteLinkSubscribeBoxAbout),
+		style::al_top);
 	Ui::AddSkip(content);
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_channel_invite_subscription_terms(
-					lt_link,
-					rpl::combine(
-						tr::lng_paid_react_agree_link(),
-						tr::lng_group_invite_subscription_about_url()
-					) | rpl::map([](const QString &text, const QString &url) {
-						return Ui::Text::Link(text, url);
-					}),
-					Ui::Text::RichLangValue),
-				st::inviteLinkSubscribeBoxTerms)));
+			tr::lng_channel_invite_subscription_terms(
+				lt_link,
+				rpl::combine(
+					tr::lng_paid_react_agree_link(),
+					tr::lng_group_invite_subscription_about_url()
+				) | rpl::map([](const QString &text, const QString &url) {
+					return Ui::Text::Link(text, url);
+				}),
+				Ui::Text::RichLangValue),
+			st::inviteLinkSubscribeBoxTerms),
+		style::al_top);
 
 	{
 		const auto balance = Settings::AddBalanceWidget(
 			content,
+			session,
 			session->credits().balanceValue(),
 			true);
 		session->credits().load(true);
@@ -290,25 +268,44 @@ void ConfirmSubscriptionBox(
 		}, balance->lifetime());
 	}
 
-	const auto sendCredits = [=, weak = Ui::MakeWeak(box)] {
+	const auto sendCredits = [=, weak = base::make_weak(box)] {
 		const auto show = box->uiShow();
 		const auto buttonWidth = state->saveButton
 			? state->saveButton->width()
 			: 0;
+		const auto finish = [=] {
+			state->api = std::nullopt;
+			state->loading.force_assign(false);
+			if (const auto strong = weak.get()) {
+				strong->closeBox();
+			}
+		};
 		state->api->request(
 			MTPpayments_SendStarsForm(
 				MTP_long(formId),
 				MTP_inputInvoiceChatInviteSubscription(MTP_string(hash)))
 		).done([=](const MTPpayments_PaymentResult &result) {
-			state->api = std::nullopt;
-			state->loading.force_assign(false);
 			result.match([&](const MTPDpayments_paymentResult &data) {
 				session->api().applyUpdates(data.vupdates());
 			}, [](const MTPDpayments_paymentVerificationNeeded &data) {
 			});
-			if (weak) {
-				box->closeBox();
+			const auto refill = session->data().activeCreditsSubsRebuilder();
+			const auto strong = weak.get();
+			if (!strong) {
+				return;
 			}
+			if (!refill) {
+				return finish();
+			}
+			const auto api
+				= strong->lifetime().make_state<Api::CreditsHistory>(
+					session->user(),
+					true,
+					true);
+			api->requestSubscriptions({}, [=](Data::CreditsStatusSlice d) {
+				refill->fire(std::move(d));
+				finish();
+			});
 		}).fail([=](const MTP::Error &error) {
 			const auto id = error.type();
 			if (weak) {
@@ -436,6 +433,12 @@ void CheckChatInvite(
 			}
 		});
 	}, [=](const MTP::Error &error) {
+		if (MTP::IsFloodError(error)) {
+			if (const auto strong = weak.get()) {
+				strong->show(Ui::MakeInformBox(tr::lng_flood_error()));
+			}
+			return;
+		}
 		if (error.code() != 400) {
 			return;
 		}

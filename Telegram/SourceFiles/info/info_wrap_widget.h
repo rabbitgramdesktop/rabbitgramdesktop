@@ -15,6 +15,9 @@ enum class SharedMediaType : signed char;
 } // namespace Storage
 
 namespace Ui {
+namespace Controls {
+struct SwipeHandlerArgs;
+} // namespace Controls
 class FadeShadow;
 class PlainShadow;
 class PopupMenu;
@@ -49,6 +52,8 @@ enum class Wrap {
 	Layer,
 	Narrow,
 	Side,
+	Search,
+	StoryAlbumEdit,
 };
 
 struct SelectedItem {
@@ -60,6 +65,7 @@ struct SelectedItem {
 	bool canForward = false;
 	bool canToggleStoryPin = false;
 	bool canUnpinStory = false;
+	bool storyInProfile = false;
 };
 
 struct SelectedItems {
@@ -75,7 +81,8 @@ enum class SelectionAction {
 	Forward,
 	Delete,
 	ToggleStoryPin,
-	ToggleStoryInProfile,
+	ToggleStoryToProfile,
+	ToggleStoryToArchive,
 };
 
 class WrapWidget final : public Window::SectionWidget {
@@ -121,6 +128,7 @@ public:
 
 	object_ptr<Ui::RpWidget> createTopBarSurrogate(QWidget *parent);
 
+	[[nodiscard]] bool hasBackButton() const;
 	[[nodiscard]] bool closeByOutsideClick() const;
 
 	void updateGeometry(
@@ -137,6 +145,10 @@ public:
 	[[nodiscard]] rpl::producer<> removeRequests() const override {
 		return _removeRequests.events();
 	}
+
+	[[nodiscard]] rpl::producer<SelectedItems> selectedListValue() const;
+
+	void replaceSwipeHandler(Ui::Controls::SwipeHandlerArgs *incompleteArgs);
 
 	~WrapWidget();
 
@@ -161,6 +173,7 @@ private:
 	void injectActiveProfileMemento(
 		std::shared_ptr<ContentMemento> memento);
 	void checkBeforeClose(Fn<void()> close);
+	void checkBeforeCloseByEscape(Fn<void()> close);
 	void restoreHistoryStack(
 		std::vector<std::shared_ptr<ContentMemento>> stack);
 	bool hasStackHistory() const {
@@ -179,7 +192,6 @@ private:
 	void highlightTopBar();
 	void setupShortcuts();
 
-	[[nodiscard]] bool hasBackButton() const;
 	[[nodiscard]] bool willHaveBackButton(
 		const Window::SectionShow &params) const;
 
@@ -199,12 +211,13 @@ private:
 		not_null<Window::SessionController*> window,
 		not_null<ContentMemento*> memento);
 
-	rpl::producer<SelectedItems> selectedListValue() const;
 	bool requireTopBarSearch() const;
 
 	void addTopBarMenuButton();
 	void addProfileCallsButton();
 	void showTopBarMenu(bool check);
+
+	const bool _isSeparatedWindow = false;
 
 	rpl::variable<Wrap> _wrap;
 	std::unique_ptr<Controller> _controller;

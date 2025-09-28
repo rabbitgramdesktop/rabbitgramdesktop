@@ -24,6 +24,14 @@ UserpicButton {
 	uploadIcon: icon;
 	uploadIconPosition: point;
 }
+UserpicsRow {
+	button: UserpicButton;
+	bg: color;
+	shift: pixels;
+	stroke: pixels;
+	complex: bool;
+	invert: bool;
+}
 ShortInfoBox {
 	label: FlatLabel;
 	labeled: FlatLabel;
@@ -341,7 +349,7 @@ aboutVersionLink: LinkButton(defaultLinkButton) {
 	color: windowSubTextFg;
 	overColor: windowSubTextFg;
 }
-aboutTextTop: 34px;
+aboutTopSkip: 19px;
 aboutSkip: 14px;
 aboutLabel: FlatLabel(defaultFlatLabel) {
 	minWidth: 300px;
@@ -750,7 +758,7 @@ backgroundCheckbox: Checkbox(defaultCheckbox) {
 	textFg: msgServiceFg;
 	textFgActive: msgServiceFg;
 
-	width: -50px;
+	width: -10px;
 	margin: margins(0px, 0px, 0px, 0px);
 
 	textPosition: point(0px, 6px);
@@ -1108,8 +1116,16 @@ moderateBoxExpandInnerSkip: 2px;
 moderateBoxExpandFont: font(11px);
 moderateBoxExpandToggleSize: 4px;
 moderateBoxExpandToggleFourStrokes: 3px;
-moderateBoxExpandIcon: icon{{ "info/edit/expand_arrow_small-flip_vertical", windowActiveTextFg }};
-moderateBoxExpandIconDown: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+moderateBoxExpandIcon: IconEmoji{
+	icon: icon{{ "info/edit/expand_arrow_small-flip_vertical", windowActiveTextFg }};
+	padding: margins(-2px, -1px, 0px, 0px);
+	useIconColor: true;
+}
+moderateBoxExpandIconDown: IconEmoji{
+	icon: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+	padding: margins(-2px, -1px, 0px, 0px);
+	useIconColor: true;
+}
 moderateBoxDividerLabel: FlatLabel(boxDividerLabel) {
 	palette: TextPalette(defaultTextPalette) {
 		selectLinkFg: windowActiveTextFg;
@@ -1122,3 +1138,17 @@ profileQrBackgroundRadius: 12px;
 profileQrIcon: icon{{ "qr_mini", windowActiveTextFg }};
 profileQrBackgroundMargins: margins(36px, 12px, 36px, 12px);
 profileQrBackgroundPadding: margins(0px, 24px, 0px, 24px);
+
+foldersMenu: PopupMenu(popupMenuWithIcons) {
+	maxHeight: 320px;
+	menu: Menu(menuWithIcons) {
+		itemPadding: margins(54px, 8px, 44px, 8px);
+	}
+}
+
+fakeUserpicButton: UserpicButton(defaultUserpicButton) {
+	size: size(1px, 1px);
+	photoSize: 1px;
+	changeIcon: icon {{ "settings/photo", transparent }};
+	uploadBg: transparent;
+}

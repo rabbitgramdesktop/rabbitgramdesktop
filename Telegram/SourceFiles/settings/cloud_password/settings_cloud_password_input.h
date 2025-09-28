@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace Settings {
 
 Type CloudPasswordInputId();
+Type CloudPasswordSuggestionInputId();
 
 } // namespace Settings
 

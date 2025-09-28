@@ -11,12 +11,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "storage/localstorage.h"
+#include "lottie/lottie_icon.h"
 #include "main/main_session.h"
 #include "media/player/media_player_float.h" // Media::Player::RoundPainter.
 #include "media/audio/media_audio.h"
 #include "media/player/media_player_instance.h"
 #include "history/history_item_components.h"
-#include "history/history_item_helpers.h" // ClearMediaAsExpired.
+#include "history/history_item.h"
 #include "history/history.h"
 #include "core/click_handler_types.h" // kDocumentFilenameTooltipProperty.
 #include "history/view/history_view_element.h"
@@ -25,6 +26,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/media/history_view_media_common.h"
 #include "ui/text/format_values.h"
 #include "ui/text/format_song_document_name.h"
+#include "ui/text/text_lottie_custom_emoji.h"
 #include "ui/text/text_utilities.h"
 #include "ui/chat/chat_style.h"
 #include "ui/painter.h"
@@ -271,10 +273,10 @@ void PaintWaveform(
 	};
 	add(FormatDownloadText(document->size, document->size));
 	const auto duration = document->duration() / 1000;
-	if (const auto song = document->song()) {
+	if (document->song()) {
 		add(FormatPlayedText(duration, duration));
 		add(FormatDurationAndSizeText(duration, document->size));
-	} else if (const auto voice = document->voice() ? document->voice() : document->round()) {
+	} else if (document->voice() ? document->voice() : document->round()) {
 		add(FormatPlayedText(duration, duration));
 		add(FormatDurationAndSizeText(duration, document->size));
 	} else if (document->isVideoFile()) {
@@ -330,7 +332,7 @@ Document::Document(
 					}
 					if (const auto item = data->message(fullId)) {
 						// Destroys this.
-						ClearMediaAsExpired(item);
+						item->clearMediaAsExpired();
 					}
 				}, *lifetime);
 
@@ -420,9 +422,12 @@ QSize Document::countOptimalSize() {
 		const auto transcribes = &session->api().transcribes();
 		if (_parent->data()->media()->ttlSeconds()
 			|| _realParent->isScheduled()
+			|| _realParent->isAdminLogEntry()
 			|| (!session->premium()
 				&& !transcribes->freeFor(_realParent)
-				&& !transcribes->trialsSupport())) {
+				&& !transcribes->trialsSupport())
+			|| (!session->premium()
+				&& _data->duration() > transcribes->trialsMaxLengthMs())) {
 			voice->transcribe = nullptr;
 			voice->transcribeText = {};
 		} else {
@@ -437,15 +442,25 @@ QSize Document::countOptimalSize() {
 			voice->transcribe->setLoading(
 				entry.shown && (entry.requestId || entry.pending),
 				update);
+			const auto pending = entry.pending;
+			auto descriptor = pending
+				? Lottie::IconDescriptor{
+					.name = u"transcribe_loading"_q,
+					.color = &st::historyTextInFg,
+					.sizeOverride = Size(st::historyTranscribeLoadingSize),
+					.colorizeUsingAlpha = true,
+				}
+				: Lottie::IconDescriptor();
 			auto text = (entry.requestId || !entry.shown)
 				? TextWithEntities()
 				: entry.toolong
 				? Ui::Text::Italic(tr::lng_audio_transcribe_long(tr::now))
 				: entry.failed
 				? Ui::Text::Italic(tr::lng_attach_failed(tr::now))
-				: TextWithEntities{
-					entry.result + (entry.pending ? " [...]" : ""),
-				};
+				: TextWithEntities{ entry.result }.append(
+					pending
+						? Ui::Text::LottieEmoji(descriptor)
+						: TextWithEntities());
 			voice->transcribe->setOpened(
 				!text.empty(),
 				creating ? Fn<void()>() : update);
@@ -458,7 +473,11 @@ QSize Document::countOptimalSize() {
 				voice->transcribeText = Ui::Text::String(minResizeWidth);
 				voice->transcribeText.setMarkedText(
 					st::messageTextStyle,
-					text);
+					text,
+					kMarkupTextOptions,
+					pending
+						? Ui::Text::LottieEmojiContext(std::move(descriptor))
+						: Ui::Text::MarkedContext());
 				hasTranscribe = true;
 				if (const auto skipBlockWidth = _parent->hasVisibleText()
 					? 0
@@ -501,9 +520,19 @@ QSize Document::countOptimalSize() {
 		accumulate_max(maxWidth, tleft + named->name.maxWidth() + tright);
 		accumulate_min(maxWidth, st::msgMaxWidth);
 	}
-	if (voice && voice->transcribe) {
-		maxWidth += st::historyTranscribeSkip
-			+ voice->transcribe->size().width();
+	if (voice) {
+		const auto maxWaveformWidth = ::Media::Player::kWaveformSamplesCount *
+			(st::msgWaveformBar + st::msgWaveformSkip);
+		const auto transcribeWidth = voice->transcribe
+			? (voice->transcribe->size().width() + st::historyTranscribeSkip)
+			: 0;
+		accumulate_max(
+			maxWidth,
+			maxWaveformWidth
+				+ rect::m::sum::h(st.padding)
+				+ st.thumbSize
+				+ st.thumbSkip
+				+ transcribeWidth);
 	}
 
 	auto minHeight = st.padding.top() + st.thumbSize + st.padding.bottom();
@@ -543,12 +572,21 @@ QSize Document::countCurrentSize(int newWidth) {
 	if (!captioned && !hasTranscribe) {
 		auto result = File::countCurrentSize(newWidth);
 		if (isBubbleBottom()) {
-			if (const auto link = thumbedLinkMaxWidth()) {
+			const auto thumbedWidth = thumbedLinkMaxWidth();
+			const auto statusWidth = thumbedWidth
+				? 0
+				: st::normalFont->width(_statusText);
+			if (thumbedWidth || statusWidth) {
 				const auto needed = st.padding.left()
-					+ st.thumbSize
+					+ (thumbedWidth
+						? st.thumbSize + st.thumbSkip
+						: st::msgFileLayout.thumbSize
+							+ st::mediaUnreadSkip)
+					+ (thumbedWidth + statusWidth)
 					+ st.thumbSkip
-					+ link
-					+ st.thumbSkip
+					+ (_realParent->hasUnreadMediaFlag()
+						? st::mediaUnreadSkip + st::mediaUnreadSize
+						: 0)
 					+ _parent->bottomInfoFirstLineWidth()
 					+ st.padding.right();
 				if (result.width() < needed) {

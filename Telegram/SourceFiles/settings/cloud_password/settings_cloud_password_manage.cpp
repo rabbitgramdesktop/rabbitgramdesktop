@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "settings/cloud_password/settings_cloud_password_manage.h"
 
 #include "api/api_cloud_password.h"
+#include "core/application.h"
 #include "core/core_cloud_password.h"
 #include "lang/lang_keys.h"
 #include "settings/cloud_password/settings_cloud_password_common.h"
@@ -16,6 +17,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "settings/cloud_password/settings_cloud_password_hint.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/cloud_password/settings_cloud_password_start.h"
+#include "settings/cloud_password/settings_cloud_password_step.h"
 #include "ui/vertical_list.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/widgets/buttons.h"
@@ -51,7 +53,7 @@ public:
 	[[nodiscard]] rpl::producer<QString> title() override;
 	void setupContent();
 
-	[[nodiscard]] QPointer<Ui::RpWidget> createPinnedToBottom(
+	[[nodiscard]] base::weak_qptr<Ui::RpWidget> createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) override;
 
 protected:
@@ -97,7 +99,10 @@ void Manage::setupContent() {
 		showBack();
 	};
 
-	SetupAutoCloseTimer(content->lifetime(), quit);
+	SetupAutoCloseTimer(
+		content->lifetime(),
+		quit,
+		[] { return Core::App().lastNonIdleTime(); });
 
 	const auto state = cloudPassword().stateCurrent();
 	if (!state) {
@@ -179,7 +184,7 @@ void Manage::setupContent() {
 	Ui::ResizeFitChild(this, content);
 }
 
-QPointer<Ui::RpWidget> Manage::createPinnedToBottom(
+base::weak_qptr<Ui::RpWidget> Manage::createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) {
 
 	const auto disable = [=](Fn<void()> close) {

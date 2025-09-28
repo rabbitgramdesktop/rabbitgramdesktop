@@ -240,8 +240,7 @@ StickersListWidget::StickersListWidget(
 	}
 
 	_settings->addClickHandler([=] {
-		if (const auto window = _show->resolveWindow(
-				WindowUsage::PremiumPromo)) {
+		if (const auto window = _show->resolveWindow()) {
 			// While media viewer can't show StickersBox.
 			using Section = StickersBox::Section;
 			window->show(
@@ -1746,8 +1745,8 @@ void StickersListWidget::showStickerSetBox(
 			base::timer_once(kTimeout),
 			document->owner().stickers().updated(
 				Data::StickersType::Stickers)
-		) | rpl::start_with_next([=, weak = Ui::MakeWeak(this)] {
-			if (weak.data()) {
+		) | rpl::start_with_next([=, weak = base::make_weak(this)] {
+			if (weak.get()) {
 				showStickerSetBox(document, setId);
 			}
 			lifetime->destroy();
@@ -2302,7 +2301,7 @@ auto StickersListWidget::collectRecentStickers() -> std::vector<Sticker> {
 	_custom.reserve(cloudCount + recent.size() + customCount);
 
 	auto recent_stickers_limit = []() {
-		return RabbitSettings::JsonSettings::GetBool("more_recent_stickers")
+		return RabbitSettings::moreRecentStickers()
 			? kRecentDisplayLimitMore : kRecentDisplayLimit;
 	};
 

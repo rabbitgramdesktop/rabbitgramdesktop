@@ -8,14 +8,19 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_user.h"
 
 #include "api/api_credits.h"
+#include "api/api_global_privacy.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_statistics.h"
+#include "base/timer_rpl.h"
 #include "storage/localstorage.h"
+#include "storage/storage_account.h"
 #include "storage/storage_user_photos.h"
 #include "main/main_session.h"
 #include "data/business/data_business_common.h"
 #include "data/business/data_business_info.h"
 #include "data/components/credits.h"
+#include "data/data_cloud_themes.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_peer_bot_command.h"
@@ -35,6 +40,45 @@ namespace {
 constexpr auto kSetOnlineAfterActivity = TimeId(30);
 
 using UpdateFlag = Data::PeerUpdate::Flag;
+
+bool ApplyBotVerifierSettings(
+		not_null<BotInfo*> info,
+		const MTPBotVerifierSettings *settings) {
+	if (!settings) {
+		const auto taken = base::take(info->verifierSettings);
+		return taken != nullptr;
+	}
+	const auto &data = settings->data();
+	const auto parsed = BotVerifierSettings{
+		.iconId = DocumentId(data.vicon().v),
+		.company = qs(data.vcompany()),
+		.customDescription = qs(data.vcustom_description().value_or_empty()),
+		.canModifyDescription = data.is_can_modify_custom_description(),
+	};
+	if (!info->verifierSettings) {
+		info->verifierSettings = std::make_unique<BotVerifierSettings>(
+			parsed);
+		return true;
+	} else if (*info->verifierSettings != parsed) {
+		*info->verifierSettings = parsed;
+		return true;
+	}
+	return false;
+}
+
+[[nodiscard]] Data::StarsRating ParseStarsRating(
+		const MTPStarsRating *rating) {
+	if (!rating) {
+		return {};
+	}
+	const auto &data = rating->data();
+	return {
+		.level = data.vlevel().v,
+		.stars = int(data.vstars().v),
+		.thisLevelStars = int(data.vcurrent_level_stars().v),
+		.nextLevelStars = int(data.vnext_level_stars().value_or_empty()),
+	};
+}
 
 } // namespace
 
@@ -205,6 +249,16 @@ void UserData::setBusinessDetails(Data::BusinessDetails details) {
 	session().changes().peerUpdated(this, UpdateFlag::BusinessDetails);
 }
 
+void UserData::setStarRefProgram(StarRefProgram program) {
+	const auto info = botInfo.get();
+	if (info && info->starRefProgram != program) {
+		info->starRefProgram = program;
+		session().changes().peerUpdated(
+			this,
+			Data::PeerUpdate::Flag::StarRefProgram);
+	}
+}
+
 ChannelId UserData::personalChannelId() const {
 	return _personalChannelId;
 }
@@ -222,7 +276,11 @@ void UserData::setPersonalChannel(ChannelId channelId, MsgId messageId) {
 	}
 }
 
-void UserData::setName(const QString &newFirstName, const QString &newLastName, const QString &newPhoneName, const QString &newUsername) {
+void UserData::setName(
+		const QString &newFirstName,
+		const QString &newLastName,
+		const QString &newPhoneName,
+		const QString &newUsername) {
 	bool changeName = !newFirstName.isEmpty() || !newLastName.isEmpty();
 
 	QString newFullName;
@@ -235,7 +293,14 @@ void UserData::setName(const QString &newFirstName, const QString &newLastName, 
 			firstName = newFirstName;
 			lastName = newLastName;
 		}
-		newFullName = lastName.isEmpty() ? firstName : tr::lng_full_name(tr::now, lt_first_name, firstName, lt_last_name, lastName);
+		newFullName = lastName.isEmpty()
+			? firstName
+			: tr::lng_full_name(
+				tr::now,
+				lt_first_name,
+				firstName,
+				lt_last_name,
+				lastName);
 	}
 	updateNameDelayed(newFullName, newPhoneName, newUsername);
 }
@@ -345,7 +410,31 @@ void UserData::setBotInfo(const MTPBotInfo &info) {
 		const auto privacyChanged = (botInfo->privacyPolicyUrl != privacy);
 		botInfo->privacyPolicyUrl = privacy;
 
-		if (changedCommands || changedButton || privacyChanged) {
+		if (const auto settings = d.vapp_settings()) {
+			const auto &data = settings->data();
+			botInfo->botAppColorTitleDay = Ui::MaybeColorFromSerialized(
+				data.vheader_color()).value_or(QColor(0, 0, 0, 0));
+			botInfo->botAppColorTitleNight = Ui::MaybeColorFromSerialized(
+				data.vheader_dark_color()).value_or(QColor(0, 0, 0, 0));
+			botInfo->botAppColorBodyDay = Ui::MaybeColorFromSerialized(
+				data.vbackground_color()).value_or(QColor(0, 0, 0, 0));
+			botInfo->botAppColorBodyNight = Ui::MaybeColorFromSerialized(
+				data.vbackground_dark_color()).value_or(QColor(0, 0, 0, 0));
+		} else {
+			botInfo->botAppColorTitleDay
+				= botInfo->botAppColorTitleNight
+				= botInfo->botAppColorBodyDay
+				= botInfo->botAppColorBodyNight
+				= QColor(0, 0, 0, 0);
+		}
+		const auto changedVerifierSettings = ApplyBotVerifierSettings(
+			botInfo.get(),
+			d.vverifier_settings());
+
+		if (changedCommands
+			|| changedButton
+			|| privacyChanged
+			|| changedVerifierSettings) {
 			owner().botCommandsChanged(this);
 		}
 	} break;
@@ -442,24 +531,63 @@ bool UserData::hasStoriesHidden() const {
 	return (flags() & UserDataFlag::StoriesHidden);
 }
 
-bool UserData::someRequirePremiumToWrite() const {
-	return (flags() & UserDataFlag::SomeRequirePremiumToWrite);
+bool UserData::hasRequirePremiumToWrite() const {
+	return (flags() & UserDataFlag::HasRequirePremiumToWrite);
 }
 
-bool UserData::meRequiresPremiumToWrite() const {
-	return !isSelf() && (flags() & UserDataFlag::MeRequiresPremiumToWrite);
+bool UserData::hasStarsPerMessage() const {
+	return (flags() & UserDataFlag::HasStarsPerMessage);
 }
 
-bool UserData::requirePremiumToWriteKnown() const {
-	return (flags() & UserDataFlag::RequirePremiumToWriteKnown);
+bool UserData::requiresPremiumToWrite() const {
+	return !isSelf() && (flags() & UserDataFlag::RequiresPremiumToWrite);
 }
 
-bool UserData::canSendIgnoreRequirePremium() const {
+bool UserData::messageMoneyRestrictionsKnown() const {
+	return (flags() & UserDataFlag::MessageMoneyRestrictionsKnown);
+}
+
+bool UserData::canSendIgnoreMoneyRestrictions() const {
 	return !isInaccessible() && !isRepliesChat() && !isVerifyCodes();
 }
 
 bool UserData::readDatesPrivate() const {
 	return (flags() & UserDataFlag::ReadDatesPrivate);
+}
+
+int UserData::starsPerMessage() const {
+	return _starsPerMessage;
+}
+
+void UserData::setStoriesCorrespondent(bool is) {
+	if (is) {
+		_flags.add(UserDataFlag::StoriesCorrespondent);
+	} else {
+		_flags.remove(UserDataFlag::StoriesCorrespondent);
+	}
+}
+
+bool UserData::storiesCorrespondent() const {
+	return (_flags.current() & UserDataFlag::StoriesCorrespondent);
+}
+
+void UserData::setStarsPerMessage(int stars) {
+	if (_starsPerMessage != stars) {
+		_starsPerMessage = stars;
+		session().changes().peerUpdated(this, UpdateFlag::StarsPerMessage);
+	}
+	checkTrustedPayForMessage();
+}
+
+void UserData::setStarsRating(Data::StarsRating value) {
+	if (_starsRating != value) {
+		_starsRating = value;
+		session().changes().peerUpdated(this, UpdateFlag::StarsRating);
+	}
+}
+
+Data::StarsRating UserData::starsRating() const {
+	return _starsRating;
 }
 
 bool UserData::canAddContact() const {
@@ -484,6 +612,33 @@ const std::vector<QString> &UserData::usernames() const {
 
 bool UserData::isUsernameEditable(QString username) const {
 	return _username.isEditable(username);
+}
+
+void UserData::setBotVerifyDetails(Ui::BotVerifyDetails details) {
+	if (!details) {
+		if (_botVerifyDetails) {
+			_botVerifyDetails = nullptr;
+			session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+		}
+	} else if (!_botVerifyDetails) {
+		_botVerifyDetails = std::make_unique<Ui::BotVerifyDetails>(details);
+		session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+	} else if (*_botVerifyDetails != details) {
+		*_botVerifyDetails = details;
+		session().changes().peerUpdated(this, UpdateFlag::VerifyInfo);
+	}
+}
+
+void UserData::setBotVerifyDetailsIcon(DocumentId iconId) {
+	if (!iconId) {
+		setBotVerifyDetails({});
+	} else {
+		auto info = _botVerifyDetails
+			? *_botVerifyDetails
+			: Ui::BotVerifyDetails();
+		info.iconId = iconId;
+		setBotVerifyDetails(info);
+	}
 }
 
 const QString &UserData::phone() const {
@@ -512,7 +667,6 @@ void UserData::setCallsStatus(CallsStatus callsStatus) {
 		session().changes().peerUpdated(this, UpdateFlag::HasCalls);
 	}
 }
-
 
 Data::Birthday UserData::birthday() const {
 	return _birthday;
@@ -544,6 +698,13 @@ void UserData::setBirthday(const tl::conditional<MTPBirthday> &value) {
 bool UserData::hasCalls() const {
 	return (callsStatus() != CallsStatus::Disabled)
 		&& (callsStatus() != CallsStatus::Unknown);
+}
+
+void UserData::setDisallowedGiftTypes(Api::DisallowedGiftTypes types) {
+	if (_disallowedGiftTypes != types) {
+		_disallowedGiftTypes = types;
+		session().changes().peerUpdated(this, UpdateFlag::GiftSettings);
+	}
 }
 
 namespace Data {
@@ -580,9 +741,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	} else {
 		user->setBotInfoVersion(-1);
 	}
+	if (const auto info = user->botInfo.get()) {
+		info->canManageEmojiStatus = update.is_bot_can_manage_emoji_status();
+		user->setStarRefProgram(
+			Data::ParseStarRefProgram(update.vstarref_program()));
+	}
 	if (const auto pinned = update.vpinned_msg_id()) {
 		SetTopPinnedMessageId(user, pinned->v);
 	}
+	user->setStarsPerMessage(
+		update.vsend_paid_messages_stars().value_or_empty());
 	using Flag = UserDataFlag;
 	const auto mask = Flag::Blocked
 		| Flag::HasPhoneCalls
@@ -590,8 +758,12 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		| Flag::CanPinMessages
 		| Flag::VoiceMessagesForbidden
 		| Flag::ReadDatesPrivate
-		| Flag::RequirePremiumToWriteKnown
-		| Flag::MeRequiresPremiumToWrite;
+		| (update.is_contact_require_premium()
+			? Flag::HasRequirePremiumToWrite
+			: Flag())
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
+		| Flag::MessageMoneyRestrictionsKnown
+		| Flag::RequiresPremiumToWrite;
 	user->setFlags((user->flags() & ~mask)
 		| (update.is_phone_calls_private()
 			? Flag::PhoneCallsPrivate
@@ -603,9 +775,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			? Flag::VoiceMessagesForbidden
 			: Flag())
 		| (update.is_read_dates_private() ? Flag::ReadDatesPrivate : Flag())
-		| Flag::RequirePremiumToWriteKnown
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
+		| Flag::MessageMoneyRestrictionsKnown
 		| (update.is_contact_require_premium()
-			? Flag::MeRequiresPremiumToWrite
+			? (Flag::RequiresPremiumToWrite | Flag::HasRequirePremiumToWrite)
 			: Flag()));
 	user->setIsBlocked(update.is_blocked());
 	user->setCallsStatus(update.is_phone_calls_private()
@@ -617,7 +790,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	user->setCommonChatsCount(update.vcommon_chats_count().v);
 	user->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
 	user->checkFolder(update.vfolder_id().value_or_empty());
-	user->setThemeEmoji(qs(update.vtheme_emoticon().value_or_empty()));
+	if (const auto theme = update.vtheme()) {
+		theme->match([&](const MTPDchatTheme &data) {
+			user->setThemeToken(qs(data.vemoticon()));
+		}, [&](const MTPDchatThemeUniqueGift &data) {
+			user->setThemeToken(
+				user->owner().cloudThemes().processGiftThemeGetToken(data));
+		});
+	} else {
+		user->setThemeToken(QString());
+	}
 	user->setTranslationDisabled(update.is_translations_disabled());
 	user->setPrivateForwardName(
 		update.vprivate_forward_name().value_or_empty());
@@ -639,6 +821,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 				Data::PeerUpdate::Flag::Rights);
 		}
 		if (info->canEditInformation) {
+			static constexpr auto kTimeout = crl::time(60000);
 			const auto id = user->id;
 			const auto weak = base::make_weak(&user->session());
 			const auto creditsLoadLifetime
@@ -648,23 +831,30 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			creditsLoad->request({}, [=](Data::CreditsStatusSlice slice) {
 				if (const auto strong = weak.get()) {
 					strong->credits().apply(id, slice.balance);
-					creditsLoadLifetime->destroy();
 				}
+				creditsLoadLifetime->destroy();
 			});
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				creditsLoadLifetime->destroy();
+			}, *creditsLoadLifetime);
 			const auto currencyLoadLifetime
 				= std::make_shared<rpl::lifetime>();
 			const auto currencyLoad
 				= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
-			currencyLoad->request(
-			) | rpl::start_with_error_done([=](const QString &error) {
-				currencyLoadLifetime->destroy();
-			}, [=] {
+			const auto apply = [=](const CreditsAmount &balance) {
 				if (const auto strong = weak.get()) {
-					strong->credits().applyCurrency(
-						id,
-						currencyLoad->data().currentBalance);
-					currencyLoadLifetime->destroy();
+					strong->credits().applyCurrency(id, balance);
 				}
+				currencyLoadLifetime->destroy();
+			};
+			currencyLoad->request() | rpl::start_with_error_done(
+				[=](const QString &error) {
+					apply(CreditsAmount(0, CreditsType::Ton));
+				},
+				[=] { apply(currencyLoad->data().currentBalance); },
+				*currencyLoadLifetime);
+			base::timer_once(kTimeout) | rpl::start_with_next([=] {
+				currencyLoadLifetime->destroy();
 			}, *currencyLoadLifetime);
 		}
 	}
@@ -692,10 +882,73 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		user->owner().businessInfo().applyGreetingSettings(
 			FromMTP(&user->owner(), update.vbusiness_greeting_message()));
 	}
+	user->setBotVerifyDetails(
+		ParseBotVerifyDetails(update.vbot_verification()));
+	user->setStarsRating(ParseStarsRating(update.vstars_rating()));
+	if (user->isSelf()) {
+		user->owner().setPendingStarsRating({
+			.value = ParseStarsRating(update.vstars_my_pending_rating()),
+			.date = update.vstars_my_pending_rating_date().value_or_empty(),
+		});
+	}
+
+	if (const auto gifts = update.vdisallowed_gifts()) {
+		const auto &data = gifts->data();
+		user->setDisallowedGiftTypes(Api::DisallowedGiftType()
+			| (data.is_disallow_unlimited_stargifts()
+				? Api::DisallowedGiftType::Unlimited
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_limited_stargifts()
+				? Api::DisallowedGiftType::Limited
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_unique_stargifts()
+				? Api::DisallowedGiftType::Unique
+				: Api::DisallowedGiftType())
+			| (data.is_disallow_premium_gifts()
+				? Api::DisallowedGiftType::Premium
+				: Api::DisallowedGiftType())
+			| (update.is_display_gifts_button()
+				? Api::DisallowedGiftType::SendHide
+				: Api::DisallowedGiftType()));
+	} else {
+		user->setDisallowedGiftTypes(Api::DisallowedGiftTypes()
+			| (update.is_display_gifts_button()
+				? Api::DisallowedGiftType::SendHide
+				: Api::DisallowedGiftType()));
+	}
 
 	user->owner().stories().apply(user, update.vstories());
+	user->owner().savedMusic().apply(user, update.vsaved_music());
 
 	user->fullUpdated();
+}
+
+StarRefProgram ParseStarRefProgram(const MTPStarRefProgram *program) {
+	if (!program) {
+		return {};
+	}
+	auto result = StarRefProgram();
+	const auto &data = program->data();
+	result.commission = data.vcommission_permille().v;
+	result.durationMonths = data.vduration_months().value_or_empty();
+	result.revenuePerUser = CreditsAmountFromTL(
+		data.vdaily_revenue_per_user());
+	result.endDate = data.vend_date().value_or_empty();
+	return result;
+}
+
+Ui::BotVerifyDetails ParseBotVerifyDetails(const MTPBotVerification *info) {
+	if (!info) {
+		return {};
+	}
+	const auto &data = info->data();
+	const auto description = qs(data.vdescription());
+	const auto flags = TextParseLinks;
+	return {
+		.botId = UserId(data.vbot_id().v),
+		.iconId = DocumentId(data.vicon().v),
+		.description = TextUtilities::ParseEntities(description, flags),
+	};
 }
 
 } // namespace Data

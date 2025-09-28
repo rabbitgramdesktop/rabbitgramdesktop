@@ -221,16 +221,16 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap {
 		.type = SettingType::BoolSetting,
 		.defaultValue = false, }},
 	//     Sidebar
+	{ "sidebar_my_profile", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
+	{ "sidebar_bots", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
 	{ "sidebar_create_group", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = true, }},
 	{ "sidebar_create_channel", {
-		.type = SettingType::BoolSetting,
-		.defaultValue = true, }},
-	{ "sidebar_stories", {
-		.type = SettingType::BoolSetting,
-		.defaultValue = true, }},
-	{ "sidebar_bots", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = true, }},
 	{ "sidebar_contacts", {
@@ -771,21 +771,25 @@ rpl::producer<QString> EventsWithPending(const QString &key, uint64 accountId, b
 void Set(const QString &key, QVariant value, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->set(key, value, accountId, isTestAccount);
+	Write();
 }
 
 void SetAfterRestart(const QString &key, QVariant value, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->setAfterRestart(key, value, accountId, isTestAccount);
+	Write();
 }
 
 void Reset(const QString &key, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->reset(key, accountId, isTestAccount);
+	Write();
 }
 
 void ResetAfterRestart(const QString &key, uint64 accountId, bool isTestAccount) {
 	if (!Data) return;
 	Data->resetAfterRestart(key, accountId, isTestAccount);
+	Write();
 }
 
 } // namespace JsonSettings

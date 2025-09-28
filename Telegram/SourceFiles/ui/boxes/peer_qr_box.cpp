@@ -302,7 +302,7 @@ not_null<Ui::RpWidget*> PrepareQrWidget(
 		divider->resize(container->width(), result->height());
 		result->moveToLeft((container->width() - result->width()) / 2, 0);
 		topWidget->setVisible(userpicToggled);
-		topWidget->moveToLeft(0, -std::numeric_limits<int>::min());
+		topWidget->moveToLeft(0, std::numeric_limits<int>::min());
 		topWidget->raise();
 
 		aboutLabel->raise();
@@ -592,20 +592,25 @@ void FillPeerQrBox(
 				spacing + ((counter % kMaxInRow) * (size + spacing)),
 				0);
 			widget->show();
+
+			const auto cornersMask = Images::CornersMask(
+				st::roundRadiusLarge * style::DevicePixelRatio());
 			const auto back = [&] {
-				auto result = Images::Round(
-					Images::GenerateGradient(
-						Size(size - activewidth * 5),
-						colors,
-						0,
-						0),
-					ImageRoundRadius::Large);
+				auto gradient = Images::GenerateGradient(
+					Size(size - activewidth * 5) * style::DevicePixelRatio(),
+					colors,
+					0,
+					0);
+				gradient.setDevicePixelRatio(style::DevicePixelRatio());
+				auto result = Images::Round(std::move(gradient), cornersMask);
+				const auto rect = Rect(
+					result.size() / style::DevicePixelRatio());
 				auto colored = result;
 				colored.fill(Qt::transparent);
 				{
 					auto p = QPainter(&colored);
 					auto hq = PainterHighQualityEnabler(p);
-					st::profileQrIcon.paintInCenter(p, result.rect());
+					st::profileQrIcon.paintInCenter(p, rect);
 					p.setCompositionMode(QPainter::CompositionMode_SourceIn);
 					p.drawImage(0, 0, result);
 				}
@@ -617,8 +622,8 @@ void FillPeerQrBox(
 					p.setPen(st::premiumButtonFg);
 					p.setBrush(st::premiumButtonFg);
 					const auto size = st::profileQrIcon.width() * 1.5;
-					const auto margins = Margins((result.width() - size) / 2);
-					const auto inner = result.rect() - margins;
+					const auto margins = Margins((rect.width() - size) / 2);
+					const auto inner = rect - margins;
 					p.drawRoundedRect(
 						inner,
 						st::roundRadiusLarge,
@@ -838,19 +843,12 @@ void FillPeerQrBox(
 		if (state->saveButtonBusy.current()) {
 			return;
 		}
-		const auto buttonWidth = state->saveButton
-			? state->saveButton->width()
-			: 0;
 		state->saveButtonBusy = true;
-		if (state->saveButton) {
-			state->saveButton->resizeToWidth(buttonWidth);
-		}
-
 		const auto userpicToggled = state->userpicToggled.current();
 		const auto backgroundToggled = state->backgroundToggled.current();
 		const auto scale = style::kScaleDefault
 			* (kMaxQualities + int(state->scaleValue.current() * 2));
-		const auto divider = std::max(1, style::Scale())
+		const auto divider = std::max(100, style::Scale())
 			/ style::kScaleDefault;
 		const auto profileQrBackgroundRadius = style::ConvertScale(
 			st::profileQrBackgroundRadius / divider,
@@ -892,7 +890,7 @@ void FillPeerQrBox(
 		const auto top = photoSize
 			? userpicMedia->image(photoSize)
 			: QImage();
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 
 		crl::async([=] {
 			const auto qrImage = TelegramQr(
@@ -968,13 +966,6 @@ void FillPeerQrBox(
 		loadingAnimation->showOn(state->saveButtonBusy.value());
 	}
 
-	const auto buttonWidth = box->width()
-		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
-	state->saveButton->widthValue() | rpl::filter([=] {
-		return (state->saveButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=] {
-		state->saveButton->resizeToWidth(buttonWidth);
-	}, state->saveButton->lifetime());
 	box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 }
 

@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "dialogs/dialogs_common.h"
 #include "dialogs/dialogs_indexed_list.h"
 #include "dialogs/dialogs_pinned_list.h"
 

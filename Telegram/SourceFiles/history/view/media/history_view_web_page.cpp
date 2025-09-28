@@ -21,7 +21,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_session.h"
 #include "data/data_web_page.h"
 #include "history/view/media/history_view_media_common.h"
-#include "history/view/media/history_view_sticker.h"
+#include "history/view/media/history_view_media_generic.h"
+#include "history/view/media/history_view_unique_gift.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_reply.h"
@@ -49,6 +50,7 @@ constexpr auto kMaxOriginalEntryLines = 8192;
 constexpr auto kFactcheckCollapsedLines = 3;
 constexpr auto kStickerSetLines = 3;
 constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
+constexpr auto kSponsoredUserpicLines = 2;
 
 [[nodiscard]] int ArticleThumbWidth(not_null<PhotoData*> thumb, int height) {
 	const auto size = thumb->location(Data::PhotoSize::Thumbnail);
@@ -74,15 +76,11 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 	const auto spoiler = false;
 	for (const auto &item : data.items) {
 		if (const auto document = std::get_if<DocumentData*>(&item)) {
-			const auto hasQualitiesList = false;
-			const auto skipPremiumEffect = false;
-			result.push_back(std::make_unique<Data::MediaFile>(
-				parent,
-				*document,
-				skipPremiumEffect,
-				hasQualitiesList,
-				spoiler,
-				/*ttlSeconds = */0));
+			using MediaFile = Data::MediaFile;
+			using Args = MediaFile::Args;
+			const auto data = *document;
+			result.push_back(
+				std::make_unique<Data::MediaFile>(parent, data, Args{}));
 		} else if (const auto photo = std::get_if<PhotoData*>(&item)) {
 			result.push_back(std::make_unique<Data::MediaPhoto>(
 				parent,
@@ -196,6 +194,8 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 	const auto type = page->type;
 	const auto text = Ui::Text::Upper(page->iv
 		? tr::lng_view_button_iv(tr::now)
+		: page->uniqueGift
+		? tr::lng_view_button_collectible(tr::now)
 		: (type == WebPageType::Theme)
 		? tr::lng_view_button_theme(tr::now)
 		: (type == WebPageType::Story)
@@ -220,6 +220,8 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 		? tr::lng_view_button_voice_chat(tr::now)
 		: (type == WebPageType::Livestream)
 		? tr::lng_view_button_voice_chat_channel(tr::now)
+		: (type == WebPageType::ConferenceCall)
+		? tr::lng_view_button_call(tr::now)
 		: (type == WebPageType::Bot)
 		? tr::lng_view_button_bot(tr::now)
 		: (type == WebPageType::User)
@@ -230,14 +232,13 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 		? tr::lng_view_button_emojipack(tr::now)
 		: (type == WebPageType::StickerSet)
 		? tr::lng_view_button_stickerset(tr::now)
+		: (type == WebPageType::StoryAlbum)
+		? tr::lng_view_button_storyalbum(tr::now)
+		: (type == WebPageType::GiftCollection)
+		? tr::lng_view_button_collection(tr::now)
 		: QString());
 	if (page->iv) {
-		const auto manager = &page->owner().customEmojiManager();
-		const auto &icon = st::historyIvIcon;
-		const auto padding = st::historyIvIconPadding;
-		return Ui::Text::SingleCustomEmoji(
-			manager->registerInternalEmoji(icon, padding)
-		).append(text);
+		return Ui::Text::IconEmoji(&st::historyIvIcon).append(text);
 	}
 	return { text };
 }
@@ -245,6 +246,7 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 [[nodiscard]] bool HasButton(not_null<WebPageData*> webpage) {
 	const auto type = webpage->type;
 	return webpage->iv
+		|| webpage->uniqueGift
 		|| (type == WebPageType::Message)
 		|| (type == WebPageType::Group)
 		|| (type == WebPageType::GroupWithRequest)
@@ -257,6 +259,7 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 		|| (type == WebPageType::User)
 		|| (type == WebPageType::VoiceChat)
 		|| (type == WebPageType::Livestream)
+		|| (type == WebPageType::ConferenceCall)
 		|| (type == WebPageType::BotApp)
 		|| ((type == WebPageType::Theme)
 			&& webpage->document
@@ -266,7 +269,9 @@ constexpr auto kFactcheckAboutDuration = 5 * crl::time(1000);
 		|| ((type == WebPageType::WallPaper)
 			&& webpage->document
 			&& webpage->document->isWallPaper())
-		|| (type == WebPageType::StickerSet);
+		|| (type == WebPageType::StickerSet)
+		|| (type == WebPageType::StoryAlbum)
+		|| (type == WebPageType::GiftCollection);
 }
 
 } // namespace
@@ -281,9 +286,9 @@ WebPage::WebPage(
 	: st::historyPagePreview)
 , _data(data)
 , _flags(flags)
-, _siteName(st::msgMinWidth - _st.padding.left() - _st.padding.right())
-, _title(st::msgMinWidth - _st.padding.left() - _st.padding.right())
-, _description(st::msgMinWidth - _st.padding.left() - _st.padding.right()) {
+, _siteName(st::minPhotoSize - rect::m::sum::h(_st.padding))
+, _title(st::minPhotoSize - rect::m::sum::h(_st.padding))
+, _description(st::minPhotoSize - rect::m::sum::h(_st.padding)) {
 	history()->owner().registerWebPageView(_data, _parent);
 }
 
@@ -308,12 +313,12 @@ void WebPage::setupAdditionalData() {
 			UrlClickHandler::Open(link);
 		});
 		if (!_attach) {
-			const auto maybePhoto = details.mediaPhotoId
-				? session->data().photo(details.mediaPhotoId).get()
-				: nullptr;
 			const auto maybeDocument = details.mediaDocumentId
 				? session->data().document(
 					details.mediaDocumentId).get()
+				: nullptr;
+			const auto maybePhoto = (!maybeDocument && details.mediaPhotoId)
+				? session->data().photo(details.mediaPhotoId).get()
 				: nullptr;
 			_attach = CreateAttach(
 				_parent,
@@ -371,15 +376,17 @@ QSize WebPage::countOptimalSize() {
 
 	const auto sponsored = sponsoredData();
 	const auto factcheck = factcheckData();
+	const auto stickerSet = stickerSetData();
+	const auto specialRightPix = (stickerSet
+		|| (sponsored && !sponsored->hasMedia && _data->photo));
 
 	// Detect _openButtonWidth before counting paddings.
 	_openButton = Ui::Text::String();
 	if (HasButton(_data)) {
-		const auto context = Core::MarkedTextContext{
+		const auto context = Core::TextContext({
 			.session = &_data->session(),
-			.customEmojiRepaint = [] {},
 			.customEmojiLoopLimit = 1,
-		};
+		});
 		_openButton.setMarkedText(
 			st::semiboldTextStyle,
 			PageToPhrase(_data),
@@ -399,7 +406,7 @@ QSize WebPage::countOptimalSize() {
 		_attach = nullptr;
 		const auto item = _parent->data();
 		_collage = PrepareCollageMedia(item, _data->collage);
-		const auto min = st::msgMinWidth - rect::m::sum::h(_st.padding);
+		const auto min = st::minPhotoSize - rect::m::sum::h(_st.padding);
 		_siteName = Ui::Text::String(min);
 		_title = Ui::Text::String(min);
 		_description = Ui::Text::String(min);
@@ -501,35 +508,45 @@ QSize WebPage::countOptimalSize() {
 	}
 
 	// init attach
-	if (!_attach && !_asArticle) {
+	if (!_attach && _data->uniqueGift) {
+		_attach = std::make_unique<MediaGeneric>(
+			_parent,
+			GenerateUniqueGiftPreview(
+				_parent,
+				nullptr,
+				_data->uniqueGift),
+				MediaGenericDescriptor{
+					.maxWidth = st::msgServiceGiftPreview,
+					.paintBg = UniqueGiftBg(_parent, _data->uniqueGift),
+				});
+	} else if (!_attach && !_asArticle) {
 		_attach = CreateAttach(
 			_parent,
 			_data->document,
-			_data->photo,
+			((!_data->document || _data->photoIsVideoCover)
+				? _data->photo
+				: nullptr),
 			_collage,
 			_data->url);
 	}
 
 	// init strings
-	if (_description.isEmpty() && !_data->description.text.isEmpty()) {
+	if (_description.isEmpty()
+		&& !_data->description.text.isEmpty()
+		&& !_data->uniqueGift) {
 		const auto &text = _data->description;
-
-		if (isLogEntryOriginal()) {
-			// Fix layout for small bubbles
-			// (narrow media caption edit log entries).
-			_description = Ui::Text::String(st::minPhotoSize
-				- rect::m::sum::h(padding));
-		}
-		using MarkedTextContext = Core::MarkedTextContext;
-		auto context = MarkedTextContext{
+		using Type = Core::TextContextDetails::HashtagMentionType;
+		auto context = Core::TextContext({
 			.session = &history()->session(),
-			.customEmojiRepaint = [=] { _parent->customEmojiRepaint(); },
-		};
-		if (_data->siteName == u"Twitter"_q) {
-			context.type = MarkedTextContext::HashtagMentionType::Twitter;
-		} else if (_data->siteName == u"Instagram"_q) {
-			context.type = MarkedTextContext::HashtagMentionType::Instagram;
-		}
+			.details = {
+				.type = ((_data->siteName == u"Twitter"_q)
+					? Type::Twitter
+					: (_data->siteName == u"Instagram"_q)
+					? Type::Instagram
+					: Type::Telegram),
+			},
+			.repaint = [=] { _parent->customEmojiRepaint(); },
+		});
 		_description.setMarkedText(
 			st::webPageDescriptionStyle,
 			text,
@@ -560,7 +577,9 @@ QSize WebPage::countOptimalSize() {
 	}
 
 	// init dimensions
-	const auto skipBlockWidth = _parent->skipBlockWidth();
+	const auto skipBlockWidth = (sponsored && sponsored->hasMedia)
+		? 0
+		: _parent->skipBlockWidth();
 	auto maxWidth = skipBlockWidth;
 	auto minHeight = 0;
 
@@ -581,10 +600,16 @@ QSize WebPage::countOptimalSize() {
 		+ titleMinHeight
 		+ descriptionMinHeight;
 	const auto articlePhotoMaxWidth = _asArticle
-		? st::webPagePhotoDelta
+		? (st::webPagePhotoDelta
 			+ std::max(
 				ArticleThumbWidth(_data->photo, articleMinHeight),
-				lineHeight)
+				lineHeight))
+		: specialRightPix
+		? (st::webPagePhotoDelta
+			+ (lineHeight
+				* (stickerSet
+					? kStickerSetLines
+					: kSponsoredUserpicLines)))
 		: 0;
 
 	if (!_siteName.isEmpty()) {
@@ -628,8 +653,9 @@ QSize WebPage::countOptimalSize() {
 		_durationWidth = st::msgDateFont->width(_duration);
 	}
 	if (!_openButton.isEmpty()) {
-		maxWidth += rect::m::sum::h(st::historyPageButtonPadding)
+		const auto w = rect::m::sum::h(st::historyPageButtonPadding)
 			+ _openButton.maxWidth();
+		accumulate_max(maxWidth, w);
 	}
 	maxWidth += rect::m::sum::h(padding);
 	minHeight += rect::m::sum::v(padding);
@@ -663,8 +689,8 @@ QSize WebPage::countCurrentSize(int newWidth) {
 	const auto stickerSet = stickerSetData();
 	const auto factcheck = factcheckData();
 	const auto sponsored = sponsoredData();
-	const auto specialRightPix = ((sponsored && !sponsored->hasMedia)
-		|| stickerSet);
+	const auto specialRightPix = (stickerSet
+		|| (sponsored && !sponsored->hasMedia && _data->photo));
 	const auto lineHeight = UnitedLineHeight();
 	const auto factcheckMetrics = factcheck
 		? computeFactcheckMetrics(_description.countHeight(innerWidth))
@@ -678,14 +704,13 @@ QSize WebPage::countCurrentSize(int newWidth) {
 	}
 	const auto linesMax = factcheck
 		? (factcheckMetrics.lines + 1)
-		: (specialRightPix || isLogEntryOriginal())
+		: (sponsored || isLogEntryOriginal())
 		? kMaxOriginalEntryLines
 		: 5;
 	const auto siteNameHeight = _siteNameLines ? lineHeight : 0;
 	const auto twoTitleLines = 2 * st::webPageTitleFont->height;
 	const auto descriptionLineHeight = st::webPageDescriptionFont->height;
 	if (asArticle() || specialRightPix) {
-		constexpr auto kSponsoredUserpicLines = 2;
 		_pixh = lineHeight
 			* (stickerSet
 				? kStickerSetLines
@@ -711,7 +736,9 @@ QSize WebPage::countCurrentSize(int newWidth) {
 				newHeight += _titleLines * lineHeight;
 			}
 
-			const auto descriptionHeight = _description.countHeight(wleft);
+			const auto descriptionHeight = _description.countHeight(sponsored
+				? innerWidth
+				: wleft);
 			const auto restLines = (linesMax - _siteNameLines - _titleLines);
 			if (descriptionHeight < restLines * descriptionLineHeight) {
 				// We have height for all the lines.
@@ -1068,7 +1095,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			? _parent->skipBlockWidth()
 			: 0;
 		const auto titleWidth = sponsored
-			? (paintw - _pixh - st::webPagePhotoDelta)
+			? (paintw - (_pixh ? (_pixh + st::webPagePhotoDelta) : 0))
 			: paintw;
 		_title.drawLeftElided(
 			p,
@@ -1226,8 +1253,9 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			.position = QPoint(
 				inner.x() + (inner.width() - _openButton.maxWidth()) / 2,
 				end + st::historyPageButtonPadding.top()),
-			.availableWidth = paintw,
+			.availableWidth = inner.width(),
 			.now = context.now,
+			.elisionLines = 1,
 		});
 	}
 }
@@ -1510,7 +1538,7 @@ void WebPage::clickHandlerPressedChanged(
 		}
 		return;
 	}
-	if (p == _openl) {
+	if ((p == _openl) || (sponsoredData() && sponsoredData()->link == p)) {
 		if (pressed) {
 			if (!_ripple) {
 				const auto full = Rect(currentSize());

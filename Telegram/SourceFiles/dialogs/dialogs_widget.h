@@ -7,9 +7,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "api/api_peer_search.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
 #include "window/section_widget.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animations.h"
 #include "ui/userpic_view.h"
 #include "mtproto/sender.h"
@@ -51,6 +53,9 @@ class JumpDownButton;
 class ElasticScroll;
 template <typename Widget>
 class FadeWrapScaled;
+template <typename Widget>
+class SlideWrap;
+class VerticalLayout;
 } // namespace Ui
 
 namespace Window {
@@ -106,6 +111,8 @@ public:
 	void setInnerFocus(bool unfocusSearch = false);
 	[[nodiscard]] bool searchHasFocus() const;
 
+	[[nodiscard]] Data::Forum *openedForum() const;
+
 	void jumpToTop(bool belowPinned = false);
 	void raiseWithTooltip();
 
@@ -129,6 +136,7 @@ public:
 	[[nodiscard]] RowDescriptor resolveChatNext(RowDescriptor from = {}) const;
 	[[nodiscard]] RowDescriptor resolveChatPrevious(RowDescriptor from = {}) const;
 	void updateHasFocus(not_null<QWidget*> focused);
+	void toggleFiltersMenu(bool value);
 
 	// Float player interface.
 	bool floatPlayerHandleWheelEvent(QEvent *e) override;
@@ -186,9 +194,7 @@ private:
 		const MTPmessages_Messages &result,
 		not_null<SearchProcessState*> process,
 		bool cacheResults = false);
-	void peerSearchReceived(
-		const MTPcontacts_Found &result,
-		mtpRequestId requestId);
+	void peerSearchReceived(Api::PeerSearchResult result);
 	void escape();
 	void submit();
 	void cancelSearchRequest();
@@ -199,17 +205,20 @@ private:
 
 	void setupSupportMode();
 	void setupTouchChatPreview();
+	void setupFrozenAccountBar();
 	void setupConnectingWidget();
 	void setupMainMenuToggle();
 	void setupMoreChatsBar();
 	void setupDownloadBar();
 	void setupShortcuts();
 	void setupStories();
+	void setupSwipeBack();
+	void setupTopBarSuggestions(not_null<Ui::VerticalLayout*> dialogs);
 	void storiesExplicitCollapse();
 	void collectStoriesUserpicsViews(Data::StorySourcesList list);
 	void storiesToggleExplicitExpand(bool expand);
 	void trackScroll(not_null<Ui::RpWidget*> widget);
-	[[nodiscard]] bool searchForPeersRequired(const QString &query) const;
+	[[nodiscard]] bool peerSearchRequired() const;
 	[[nodiscard]] bool searchForTopicsRequired(const QString &query) const;
 
 	// Child list may be unable to set specific search state.
@@ -220,6 +229,8 @@ private:
 	void showMainMenu();
 	void clearSearchCache(bool clearPosts);
 	void setSearchQuery(const QString &query, int cursorPosition = -1);
+	void updateTopBarSuggestions();
+	void updateFrozenAccountBar();
 	void updateControlsVisibility(bool fast = false);
 	void updateLockUnlockVisibility(
 		anim::type animated = anim::type::instant);
@@ -262,11 +273,9 @@ private:
 		SearchRequestType type,
 		const MTP::Error &error,
 		not_null<SearchProcessState*> process);
-	void peerSearchFailed(const MTP::Error &error, mtpRequestId requestId);
 	void searchApplyEmpty(
 		SearchRequestType type,
 		not_null<SearchProcessState*> process);
-	void peerSearchApplyEmpty(mtpRequestId id);
 
 	void updateForceDisplayWide();
 	void scrollToDefault(bool verytop = false);
@@ -295,8 +304,11 @@ private:
 	bool _dragForward = false;
 	base::Timer _chooseByDragTimer;
 
-	Layout _layout = Layout::Main;
-	int _narrowWidth = 0;
+	const Layout _layout = Layout::Main;
+	const int _narrowWidth = 0;
+
+	std::unique_ptr<Ui::AbstractButton> _frozenAccountBar;
+
 	object_ptr<Ui::RpWidget> _searchControls;
 	object_ptr<HistoryView::TopBarWidget> _subsectionTopBar = { nullptr };
 	struct {
@@ -308,7 +320,7 @@ private:
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _chooseFromUser;
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _jumpToDate;
 	object_ptr<Ui::CrossButton> _cancelSearch;
-	object_ptr< Ui::FadeWrapScaled<Ui::IconButton>> _lockUnlock;
+	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _lockUnlock;
 
 	std::unique_ptr<Ui::MoreChatsBar> _moreChatsBar;
 
@@ -316,6 +328,13 @@ private:
 	std::unique_ptr<Ui::GroupCallBar> _forumGroupCallBar;
 	std::unique_ptr<Ui::RequestsBar> _forumRequestsBar;
 	std::unique_ptr<HistoryView::ContactStatus> _forumReportBar;
+
+	base::unique_qptr<Ui::RpWidget> _chatFilters;
+
+	QPointer<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
+	rpl::event_stream<int> _topBarSuggestionHeightChanged;
+	rpl::event_stream<bool> _searchStateForTopBarSuggestion;
+	rpl::event_stream<bool> _openedFolderOrForumChanges;
 
 	object_ptr<Ui::ElasticScroll> _scroll;
 	QPointer<InnerWidget> _inner;
@@ -363,10 +382,6 @@ private:
 
 	base::Timer _searchTimer;
 
-	QString _peerSearchQuery;
-	bool _peerSearchFull = false;
-	mtpRequestId _peerSearchRequest = 0;
-
 	QString _topicSearchQuery;
 	TimeId _topicSearchOffsetDate = 0;
 	MsgId _topicSearchOffsetId = 0;
@@ -378,15 +393,19 @@ private:
 	PeerData *_searchQueryFrom = nullptr;
 	std::vector<Data::ReactionId> _searchQueryTags;
 	ChatSearchTab _searchQueryTab = {};
+	ChatTypeFilter _searchQueryFilter = {};
+
+	Ui::Controls::SwipeBackResult _swipeBackData;
+	bool _swipeBackMirrored = false;
+	bool _swipeBackIconMirrored = false;
 
 	SearchProcessState _searchProcess;
 	SearchProcessState _migratedProcess;
 	SearchProcessState _postsProcess;
 	int _historiesRequest = 0; // Not real mtpRequestId.
 
+	Api::PeerSearch _peerSearch;
 	Api::SingleMessageSearch _singleMessageSearch;
-	base::flat_map<QString, MTPcontacts_Found> _peerSearchCache;
-	base::flat_map<mtpRequestId, QString> _peerSearchQueries;
 
 	QPixmap _widthAnimationCache;
 

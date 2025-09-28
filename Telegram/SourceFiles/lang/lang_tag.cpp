@@ -7,10 +7,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "lang/lang_tag.h"
 
+#include "core/credits_amount.h"
 #include "lang/lang_keys.h"
 #include "ui/text/text.h"
 #include "base/qt/qt_common_adapters.h"
 #include "base/qt/qt_string_view.h"
+
+#include <QtCore/QLocale>
 
 namespace Lang {
 namespace {
@@ -914,7 +917,7 @@ int NonZeroPartToInt(QString value) {
 		: (value.isEmpty() ? 0 : value.toInt());
 }
 
-ShortenedCount FormatCountToShort(int64 number) {
+ShortenedCount FormatCountToShort(int64 number, bool onlyK) {
 	auto result = ShortenedCount{ number };
 	const auto abs = std::abs(number);
 	const auto shorten = [&](int64 divider, char multiplier) {
@@ -929,8 +932,9 @@ ShortenedCount FormatCountToShort(int64 number) {
 		// Update given number.
 		// E.g. 12345 will be 12000.
 		result.number = rounded * divider;
+		result.shortened = true;
 	};
-	if (abs >= 1'000'000) {
+	if (!onlyK && abs >= 1'000'000) {
 		shorten(1'000'000, 'M');
 	} else if (abs >= 10'000) {
 		shorten(1'000, 'K');
@@ -941,7 +945,40 @@ ShortenedCount FormatCountToShort(int64 number) {
 }
 
 QString FormatCountDecimal(int64 number) {
-	return QString("%L1").arg(number);
+	return QLocale().toString(number);
+}
+
+QString FormatExactCountDecimal(float64 number) {
+	const auto locale = QLocale();
+	if (qFuzzyCompare(number, base::SafeRound(number))) {
+		return locale.toString(int64(base::SafeRound(number)));
+	}
+
+	// Somehow using QLocale::FloatingPointShortest sometimes produces
+	// "0.8500000000000001" on some systems / locales,
+	// so I want to stick to 6 digits max (default third argument value).
+	auto result = locale.toString(number, 'f');
+	const auto zero = locale.zeroDigit();
+	while (result.endsWith(zero)) {
+		result.chop(1);
+	}
+	return result;
+}
+
+ShortenedCount FormatCreditsAmountToShort(CreditsAmount amount) {
+	const auto attempt = FormatCountToShort(amount.whole());
+	return attempt.shortened ? attempt : ShortenedCount{
+		.string = FormatCreditsAmountDecimal(amount),
+	};
+}
+
+QString FormatCreditsAmountDecimal(CreditsAmount amount) {
+	return FormatExactCountDecimal(amount.value());
+}
+
+QString FormatCreditsAmountRounded(CreditsAmount amount) {
+	const auto value = amount.value();
+	return FormatExactCountDecimal(base::SafeRound(value * 100.) / 100.);
 }
 
 PluralResult Plural(
@@ -967,14 +1004,11 @@ PluralResult Plural(
 	const auto t = f;
 
 	const auto useNonDefaultPlural = (ChoosePlural != ChoosePluralDefault)
-		&& Lang::details::IsNonDefaultPlural(keyBase);
-	const auto shift = (useNonDefaultPlural ? ChoosePlural : ChoosePluralDefault)(
-		(integer ? i : -1),
-		i,
-		v,
-		w,
-		f,
-		t);
+		&& (keyBase == kPluralKeyBaseForCloudValue
+			|| Lang::details::IsNonDefaultPlural(keyBase));
+	const auto shift = (useNonDefaultPlural
+		? ChoosePlural
+		: ChoosePluralDefault)((integer ? i : -1), i, v, w, f, t);
 	if (integer) {
 		const auto round = qRound(value);
 		if (type == lt_count_short) {

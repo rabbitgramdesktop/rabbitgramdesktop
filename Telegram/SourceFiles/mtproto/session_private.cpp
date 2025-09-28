@@ -5,6 +5,7 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
+#include "base/options.h"
 #include "mtproto/session_private.h"
 
 #include "mtproto/details/mtproto_bound_key_creator.h"
@@ -138,7 +139,15 @@ void WrapInvokeAfter(
 	return different;
 }
 
+base::options::toggle OptionPreferIPv6({
+	.id = kOptionPreferIPv6,
+	.name = "Prefer IPv6",
+	.description = "Prefer IPv6 if it is available. Require \"Try connecting through IPv6\" to be enabled",
+});
+
 } // namespace
+
+const char kOptionPreferIPv6[] = "prefer-ipv6";
 
 SessionPrivate::SessionPrivate(
 	not_null<Instance*> instance,
@@ -187,7 +196,7 @@ void SessionPrivate::appendTestConnection(
 		const bytes::vector &protocolSecret) {
 	QWriteLocker lock(&_stateMutex);
 
-	const auto priority = (qthelp::is_ipv6(ip) ? 0 : 1)
+	const auto priority = (qthelp::is_ipv6(ip) ? (OptionPreferIPv6.value() ? 2 : 0) : 1)
 		+ (protocol == DcOptions::Variants::Tcp ? 1 : 0)
 		+ (protocolSecret.empty() ? 0 : 1);
 	_testConnections.push_back({
@@ -1379,9 +1388,10 @@ void SessionPrivate::handleReceived() {
 		auto sfrom = decryptedInts + 4U; // msg_id + seq_no + length + message
 		MTP_LOG(_shiftedDcId, ("Recv: ")
 			+ DumpToText(sfrom, end)
-			+ QString(" (dc:%1,key:%2)"
+			+ QString(" (dc:%1,key:%2,session:%3)"
 			).arg(AbstractConnection::ProtocolDcDebugId(getProtocolDcId())
-			).arg(_encryptionKey->keyId()));
+			).arg(_encryptionKey->keyId()
+			).arg(_sessionId));
 
 		const auto registered = _receivedMessageIds.registerMsgId(
 			msgId,
@@ -2654,9 +2664,10 @@ bool SessionPrivate::sendSecureRequest(
 	auto from = request->constData() + 4;
 	MTP_LOG(_shiftedDcId, ("Send: ")
 		+ DumpToText(from, from + messageSize)
-		+ QString(" (dc:%1,key:%2)"
+		+ QString(" (dc:%1,key:%2,session:%3)"
 		).arg(AbstractConnection::ProtocolDcDebugId(getProtocolDcId())
-		).arg(_encryptionKey->keyId()));
+		).arg(_encryptionKey->keyId()
+		).arg(_sessionId));
 
 	uchar encryptedSHA256[32];
 	MTPint128 &msgKey(*(MTPint128*)(encryptedSHA256 + 8));

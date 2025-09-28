@@ -276,10 +276,7 @@ struct MadePrivacyBadge {
 		not_null<Data::Session*> owner,
 		PeerData *peer,
 		QString name) {
-	auto result = Ui::Text::SingleCustomEmoji(
-		owner->customEmojiManager().registerInternalEmoji(
-			st::storiesRepostIcon,
-			st::storiesRepostIconPadding));
+	auto result = Ui::Text::IconEmoji(&st::storiesRepostIcon);
 	if (peer) {
 		result.append(Ui::Text::SingleCustomEmoji(
 			owner->customEmojiManager().peerUserpicEmojiData(
@@ -403,10 +400,7 @@ void Header::show(HeaderData data) {
 		const auto prefix = data.fromPeer ? data.fromPeer : data.repostPeer;
 		_repost->setMarkedText(
 			(prefix ? Ui::Text::Link(prefixName) : prefixName),
-			Core::MarkedTextContext{
-				.session = &data.peer->session(),
-				.customEmojiRepaint = [=] { _repost->update(); },
-			});
+			Core::TextContext({ .session = &data.peer->session() }));
 		if (prefix) {
 			_repost->setClickHandlerFilter([=](const auto &...) {
 				_controller->uiShow()->show(PrepareShortInfoBox(prefix));
@@ -744,9 +738,9 @@ void Header::toggleTooltip(Tooltip type, bool show) {
 			st::storiesInfoTooltipLabel),
 		st::storiesInfoTooltip);
 	const auto tooltip = _tooltip.get();
-	const auto weak = QPointer<QWidget>(tooltip);
+	const auto weak = base::make_weak(tooltip);
 	const auto destroy = [=] {
-		delete weak.data();
+		delete weak.get();
 	};
 	tooltip->setAttribute(Qt::WA_TransparentForMouseEvents);
 	tooltip->setHiddenCallback(destroy);

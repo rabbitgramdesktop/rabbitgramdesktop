@@ -8,8 +8,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #pragma once
 
 #include "base/unique_qptr.h"
-#include "ui/text/text_block.h"
 #include "ui/widgets/menu/menu_item_base.h"
+#include "ui/text/text_custom_emoji.h"
 
 namespace Ui {
 
@@ -37,6 +37,7 @@ enum class WhoReadType {
 	Watched,
 	Reacted,
 	Edited,
+	Original,
 };
 
 enum class WhoReadState : uchar {
@@ -74,6 +75,8 @@ enum class WhoReactedType : uchar {
 	Reposted,
 	Forwarded,
 	Preloader,
+	RefRecipient,
+	RefRecipientNow,
 };
 
 struct WhoReactedEntryData {

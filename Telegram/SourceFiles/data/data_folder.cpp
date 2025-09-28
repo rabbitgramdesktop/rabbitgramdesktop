@@ -271,7 +271,7 @@ void Folder::paintUserpic(
 	p.setBrush(overrideBg ? *overrideBg : st::historyPeerArchiveUserpicBg);
 	{
 		PainterHighQualityEnabler hq(p);
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, radius, radius);
 	}
 	if (size == st::defaultDialogRow.photoSize) {

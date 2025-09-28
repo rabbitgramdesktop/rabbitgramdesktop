@@ -10,49 +10,27 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "platform/platform_integration.h"
 #include "base/platform/base_platform_info.h"
 #include "base/platform/linux/base_linux_xdp_utilities.h"
-#include "window/notifications_manager.h"
 #include "core/sandbox.h"
 #include "core/application.h"
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 #include "core/core_settings.h"
+#endif
 #include "base/random.h"
 
 #include <QtCore/QAbstractEventDispatcher>
-#include <QtGui/QStyleHints>
 
 #include <gio/gio.hpp>
 #include <xdpinhibit/xdpinhibit.hpp>
+
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif // __GLIBC__
 
 namespace Platform {
 namespace {
 
 using namespace gi::repository;
 namespace GObject = gi::repository::GObject;
-
-std::vector<std::any> AnyVectorFromVariant(GLib::Variant value) {
-	std::vector<std::any> result;
-
-	GLib::VariantIter iter;
-	iter.allocate_();
-	iter.init(value);
-
-	const auto uint64Type = GLib::VariantType::new_("t");
-	const auto int64Type = GLib::VariantType::new_("x");
-
-	while (auto value = iter.next_value()) {
-		value = value.get_variant();
-		if (value.is_of_type(uint64Type)) {
-			result.push_back(std::make_any<uint64>(value.get_uint64()));
-		} else if (value.is_of_type(int64Type)) {
-			result.push_back(std::make_any<int64>(value.get_int64()));
-		} else if (value.is_container()) {
-			result.push_back(
-				std::make_any<std::vector<std::any>>(
-					AnyVectorFromVariant(value)));
-		}
-	}
-
-	return result;
-}
 
 class Application : public Gio::impl::ApplicationImpl {
 public:
@@ -126,41 +104,17 @@ Application::Application()
 	});
 	actionMap.add_action(quitAction);
 
-	using Window::Notifications::Manager;
-	using NotificationId = Manager::NotificationId;
-
-	const auto notificationIdVariantType = GLib::VariantType::new_("av");
+	const auto notificationIdVariantType = GLib::VariantType::new_("a{sv}");
 
 	auto notificationActivateAction = Gio::SimpleAction::new_(
 		"notification-activate",
 		notificationIdVariantType);
-
-	notificationActivateAction.signal_activate().connect([](
-			Gio::SimpleAction,
-			GLib::Variant parameter) {
-		Core::Sandbox::Instance().customEnterFromEventLoop([&] {
-			Core::App().notifications().manager().notificationActivated(
-				NotificationId::FromAnyVector(
-					AnyVectorFromVariant(parameter)));
-		});
-	});
 
 	actionMap.add_action(notificationActivateAction);
 
 	auto notificationMarkAsReadAction = Gio::SimpleAction::new_(
 		"notification-mark-as-read",
 		notificationIdVariantType);
-
-	notificationMarkAsReadAction.signal_activate().connect([](
-			Gio::SimpleAction,
-			GLib::Variant parameter) {
-		Core::Sandbox::Instance().customEnterFromEventLoop([&] {
-			Core::App().notifications().manager().notificationReplied(
-				NotificationId::FromAnyVector(
-					AnyVectorFromVariant(parameter)),
-				{});
-		});
-	});
 
 	actionMap.add_action(notificationMarkAsReadAction);
 }
@@ -190,30 +144,24 @@ private:
 
 	const gi::ref_ptr<Application> _application;
 	XdpInhibit::InhibitProxy _inhibitProxy;
-	rpl::variable<std::optional<bool>> _darkMode;
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 	base::Platform::XDP::SettingWatcher _darkModeWatcher;
-	rpl::lifetime _lifetime;
+#endif // Qt < 6.5.0
 };
 
 LinuxIntegration::LinuxIntegration()
 : _application(MakeApplication())
-, _darkMode([]() -> std::optional<bool> {
-	if (auto value = base::Platform::XDP::ReadSetting(
-			"org.freedesktop.appearance",
-			"color-scheme")) {
-		return value->get_uint32() == 1;
-	}
-	return std::nullopt;
-}())
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 , _darkModeWatcher(
 	"org.freedesktop.appearance",
 	"color-scheme",
-	[=](GLib::Variant value) {
+	[](GLib::Variant value) {
 		Core::Sandbox::Instance().customEnterFromEventLoop([&] {
-			_darkMode = value.get_uint32() == 1;
+			Core::App().settings().setSystemDarkMode(value.get_uint32() == 1);
 		});
-	}
-) {
+})
+#endif // Qt < 6.5.0
+{
 	LOG(("Icon theme: %1").arg(QIcon::themeName()));
 	LOG(("Fallback icon theme: %1").arg(QIcon::fallbackThemeName()));
 
@@ -222,6 +170,25 @@ LinuxIntegration::LinuxIntegration()
 		g_warning("Qt is running without GLib event loop integration, "
 			"expect various functionality to not to work.");
 	}
+
+#ifdef __GLIBC__
+	mallopt(M_ARENA_MAX, 1);
+	QObject::connect(
+		QCoreApplication::eventDispatcher(),
+		&QAbstractEventDispatcher::aboutToBlock,
+		[] {
+			static auto timer = [] {
+				QElapsedTimer timer;
+				timer.start();
+				return timer;
+			}();
+
+			if (timer.hasExpired(10000)) {
+				malloc_trim(0);
+				timer.start();
+			}
+		});
+#endif // __GLIBC__
 }
 
 void LinuxIntegration::init() {
@@ -237,30 +204,6 @@ void LinuxIntegration::init() {
 
 			initInhibit();
 		}));
-
-	_darkMode.value()
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-	| rpl::filter([] {
-		return QGuiApplication::styleHints()->colorScheme()
-			== Qt::ColorScheme::Unknown;
-	})
-#endif // Qt >= 6.5.0
-	| rpl::start_with_next([](std::optional<bool> value) {
-		Core::App().settings().setSystemDarkMode(value);
-	}, _lifetime);
-
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-	Core::App().settings().systemDarkModeValue(
-	) | rpl::filter([=](std::optional<bool> value) {
-		return !value && _darkMode.current();
-	}) | rpl::start_with_next([=] {
-		crl::on_main(this, [=] {
-			if (!Core::App().settings().systemDarkMode()) {
-				Core::App().settings().setSystemDarkMode(_darkMode.current());
-			}
-		});
-	}, _lifetime);
-#endif // Qt >= 6.5.0
 }
 
 void LinuxIntegration::initInhibit() {

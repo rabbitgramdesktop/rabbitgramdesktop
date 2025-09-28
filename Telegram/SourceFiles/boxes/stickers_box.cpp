@@ -1826,8 +1826,8 @@ void StickersBox::Inner::setPressed(SelectedRow pressed) {
 	if (_megagroupSet && pressedIndex >= 0 && pressedIndex < _rows.size()) {
 		update(0, _itemsTop + pressedIndex * _rowHeight, width(), _rowHeight);
 		auto &set = _rows[pressedIndex];
-		auto rippleMask = Ui::RippleAnimation::RectMask(QSize(width(), _rowHeight));
 		if (!set->ripple) {
+			auto rippleMask = Ui::RippleAnimation::RectMask(QSize(width(), _rowHeight));
 			set->ripple = std::make_unique<Ui::RippleAnimation>(st::defaultRippleAnimation, std::move(rippleMask), [this, pressedIndex] {
 				update(0, _itemsTop + pressedIndex * _rowHeight, width(), _rowHeight);
 			});
@@ -2058,7 +2058,7 @@ void StickersBox::Inner::checkGroupLevel(Fn<void()> done) {
 	}
 	_checkingGroupLevel = true;
 
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	CheckBoostLevel(_show, peer, [=](int level) {
 		if (!weak) {
 			return std::optional<Ui::AskBoostReason>();

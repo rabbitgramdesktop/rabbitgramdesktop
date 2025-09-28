@@ -59,6 +59,26 @@ struct FileReferenceAccumulator {
 			push(data.vdocuments());
 		}, [&](const MTPDwebPageAttributeStickerSet &data) {
 			push(data.vstickers());
+		}, [&](const MTPDwebPageAttributeUniqueStarGift &data) {
+			push(data.vgift());
+		}, [&](const MTPDwebPageAttributeStarGiftCollection &data) {
+			push(data.vicons());
+		});
+	}
+	void push(const MTPStarGift &data) {
+		data.match([&](const MTPDstarGift &data) {
+			push(data.vsticker());
+		}, [&](const MTPDstarGiftUnique &data) {
+			push(data.vattributes());
+		});
+	}
+	void push(const MTPStarGiftAttribute &data) {
+		data.match([&](const MTPDstarGiftAttributeModel &data) {
+			push(data.vdocument());
+		}, [&](const MTPDstarGiftAttributePattern &data) {
+			push(data.vdocument());
+		}, [&](const MTPDstarGiftAttributeBackdrop &data) {
+		}, [&](const MTPDstarGiftAttributeOriginalDetails &data) {
 		});
 	}
 	void push(const MTPWebPage &data) {
@@ -87,6 +107,7 @@ struct FileReferenceAccumulator {
 			push(data.vphoto());
 		}, [&](const MTPDmessageMediaDocument &data) {
 			push(data.vdocument());
+			push(data.vvideo_cover());
 			push(data.valt_documents());
 		}, [&](const MTPDmessageMediaWebPage &data) {
 			push(data.vwebpage());
@@ -183,6 +204,12 @@ struct FileReferenceAccumulator {
 	void push(const MTPstories_Stories &data) {
 		push(data.data().vstories());
 	}
+	void push(const MTPusers_SavedMusic &data) {
+		data.match([&](const MTPDusers_savedMusic &data) {
+			push(data.vdocuments());
+		}, [](const MTPDusers_savedMusicNotModified &data) {
+		});
+	}
 
 	UpdatedFileReferences result;
 };
@@ -249,6 +276,10 @@ UpdatedFileReferences GetFileReferences(const MTPmessages_WebPage &data) {
 }
 
 UpdatedFileReferences GetFileReferences(const MTPstories_Stories &data) {
+	return GetFileReferencesHelper(data);
+}
+
+UpdatedFileReferences GetFileReferences(const MTPusers_SavedMusic &data) {
 	return GetFileReferencesHelper(data);
 }
 

@@ -24,6 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "data/data_user.h"
+#include "data/components/promo_suggestions.h"
 #include "countries/countries_instance.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
@@ -237,6 +238,9 @@ void Widget::handleUpdate(const MTPUpdate &update) {
 		_account->mtp().dcOptions().addFromList(data.vdc_options());
 	}, [&](const MTPDupdateConfig &data) {
 		_account->mtp().requestConfig();
+		if (_account->sessionExists()) {
+			_account->session().promoSuggestions().invalidate();
+		}
 	}, [&](const MTPDupdateServiceNotification &data) {
 		const auto text = TextWithEntities{
 			qs(data.vmessage()),
@@ -399,7 +403,7 @@ void Widget::historyMove(StackAction action, Animate animate) {
 }
 
 void Widget::hideAndDestroy(object_ptr<Ui::FadeWrap<Ui::RpWidget>> widget) {
-	const auto weak = Ui::MakeWeak(widget.data());
+	const auto weak = base::make_weak(widget.data());
 	widget->hide(anim::type::normal);
 	widget->shownValue(
 	) | rpl::start_with_next([=](bool shown) {
@@ -621,7 +625,7 @@ void Widget::showTerms(Fn<void()> callback) {
 	if (getData()->termsLock.text.text.isEmpty()) {
 		return;
 	}
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto box = Ui::show(callback
 		? Box<Window::TermsBox>(
 			getData()->termsLock,

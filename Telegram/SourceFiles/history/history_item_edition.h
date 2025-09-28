@@ -20,6 +20,7 @@ struct HistoryMessageEdition {
 		const MTPDmessage &message);
 
 	bool isEditHide = false;
+	bool isMediaUnread = false;
 	int editDate = 0;
 	int views = -1;
 	int forwards = -1;
@@ -29,11 +30,13 @@ struct HistoryMessageEdition {
 	bool useSameReplies = false;
 	bool useSameMarkup = false;
 	bool useSameReactions = false;
+	bool useSameSuggest = false;
 	bool savePreviousMedia = false;
 	bool invertMedia = false;
 	TextWithEntities textWithEntities;
 	HistoryMessageMarkupData replyMarkup;
 	HistoryMessageRepliesData replies;
+	HistoryMessageSuggestInfo suggest;
 	const MTPMessageMedia *mtpMedia = nullptr;
 	const MTPMessageReactions *mtpReactions = nullptr;
 	const MTPFactCheck *mtpFactcheck = nullptr;

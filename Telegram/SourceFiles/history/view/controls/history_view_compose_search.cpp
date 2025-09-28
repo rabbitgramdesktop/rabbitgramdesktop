@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/shadow.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/painter.h"
+#include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
@@ -41,6 +42,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace HistoryView {
 namespace {
 
+using Activation = ComposeSearch::Activation;
 using SearchRequest = Api::MessagesSearchMerged::Request;
 
 [[nodiscard]] inline bool HasChooseFrom(not_null<History*> history) {
@@ -52,7 +54,9 @@ using SearchRequest = Api::MessagesSearchMerged::Request;
 
 class Row final : public PeerListRow {
 public:
-	explicit Row(std::unique_ptr<Dialogs::FakeRow> fakeRow);
+	explicit Row(
+		std::unique_ptr<Dialogs::FakeRow> fakeRow,
+		not_null<QString*> query);
 
 	[[nodiscard]] FullMsgId fullId() const;
 
@@ -71,15 +75,17 @@ public:
 private:
 	const std::unique_ptr<Dialogs::FakeRow> _fakeRow;
 
+	not_null<QString*> _query;
 	int _outerWidth = 0;
 
 };
 
-Row::Row(std::unique_ptr<Dialogs::FakeRow> fakeRow)
+Row::Row(std::unique_ptr<Dialogs::FakeRow> fakeRow, not_null<QString*> query)
 : PeerListRow(
 	fakeRow->searchInChat().history()->peer,
 	fakeRow->item()->fullId().msg.bare)
-, _fakeRow(std::move(fakeRow)) {
+, _fakeRow(std::move(fakeRow))
+, _query(query) {
 }
 
 FullMsgId Row::fullId() const {
@@ -114,9 +120,11 @@ void Row::elementsPaint(
 		.st = &st::defaultDialogRow,
 		.currentBg = st::dialogsBg,
 		.now = crl::now(),
+		.searchLowerText = QStringView(*_query),
 		.width = outerWidth,
 		.selected = selected,
 		.paused = p.inactive(),
+		.search = true,
 	});
 }
 
@@ -132,6 +140,7 @@ public:
 	void loadMoreRows() override;
 
 	void addItems(const MessageIdsList &ids, bool clear);
+	void setQuery(const QString &query);
 
 	[[nodiscard]] rpl::producer<FullMsgId> showItemRequests() const;
 	[[nodiscard]] rpl::producer<> searchMoreRequests() const;
@@ -142,6 +151,8 @@ private:
 	rpl::event_stream<FullMsgId> _showItemRequests;
 	rpl::event_stream<> _searchMoreRequests;
 	rpl::event_stream<> _resetScrollRequests;
+
+	QString _query;
 
 };
 
@@ -199,7 +210,8 @@ void ListController::addItems(const MessageIdsList &ids, bool clear) {
 				std::make_unique<Dialogs::FakeRow>(
 					key,
 					item,
-					[=] { delegate()->peerListUpdateRow(*shared); }));
+					[=] { delegate()->peerListUpdateRow(*shared); }),
+				&_query);
 			*shared = row.get();
 			delegate()->peerListAppendRow(std::move(row));
 		}
@@ -210,6 +222,10 @@ void ListController::addItems(const MessageIdsList &ids, bool clear) {
 	if (!delegate()->peerListFullRowsCount()) {
 		_showItemRequests.fire({});
 	}
+}
+
+void ListController::setQuery(const QString &query) {
+	_query = query;
 }
 
 struct List {
@@ -254,9 +270,9 @@ List CreateList(
 	}, list.container->lifetime());
 
 	list.container->paintRequest(
-	) | rpl::start_with_next([weak = Ui::MakeWeak(list.container.get())](
+	) | rpl::start_with_next([weak = base::make_weak(list.container.get())](
 			const QRect &r) {
-		auto p = QPainter(weak);
+		auto p = QPainter(weak.get());
 		p.fillRect(r, st::dialogsBg);
 	}, list.container->lifetime());
 
@@ -389,7 +405,9 @@ rpl::producer<not_null<QKeyEvent*>> TopBar::keyEvents() const {
 }
 
 void TopBar::setInnerFocus() {
-	_select->setInnerFocus();
+	if (Ui::AppInFocus() && Ui::InFocusChain(_select->window())) {
+		_select->setInnerFocus();
+	}
 }
 
 void TopBar::updateSize() {
@@ -836,8 +854,9 @@ public:
 	void hideAnimated();
 	void setInnerFocus();
 	void setQuery(const QString &query);
+	void setTopMsgId(MsgId topMsgId);
 
-	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> activations() const;
+	[[nodiscard]] rpl::producer<Activation> activations() const;
 	[[nodiscard]] rpl::producer<> destroyRequests() const;
 	[[nodiscard]] rpl::lifetime &lifetime();
 
@@ -861,7 +880,9 @@ private:
 		rpl::event_stream<BottomBar::Index> jumps;
 	} _pendingJump;
 
-	rpl::event_stream<not_null<HistoryItem*>> _activations;
+	MsgId _topMsgId;
+
+	rpl::event_stream<Activation> _activations;
 	rpl::event_stream<> _destroyRequests;
 
 };
@@ -897,14 +918,18 @@ ComposeSearch::Inner::Inner(
 	}, _topBar->lifetime());
 
 	_topBar->searchRequests(
-	) | rpl::start_with_next([=](const SearchRequest &search) {
+	) | rpl::start_with_next([=](SearchRequest search) {
 		if (search.query.isEmpty() && search.tags.empty()) {
 			if (!search.from || _history->peer->isSelf()) {
 				return;
 			}
 		}
+		search.topMsgId = _topMsgId;
 		_apiSearch.clear();
 		_apiSearch.search(search);
+
+		_list.controller->addItems({}, true);
+		_list.controller->setQuery(_apiSearch.request().query);
 	}, _topBar->lifetime());
 
 	_topBar->queryChanges(
@@ -929,7 +954,7 @@ ComposeSearch::Inner::Inner(
 	_apiSearch.newFounds(
 	) | rpl::start_with_next([=] {
 		const auto &apiData = _apiSearch.messages();
-		const auto weak = Ui::MakeWeak(_bottomBar.get());
+		const auto weak = base::make_weak(_bottomBar.get());
 		_bottomBar->setTotal(apiData.total);
 		if (weak) {
 			// Activating the first search result may switch the chat.
@@ -962,8 +987,8 @@ ComposeSearch::Inner::Inner(
 		_pendingJump.data = {};
 		const auto item = _history->owner().message(messages[index]);
 		if (item) {
-			const auto weak = Ui::MakeWeak(_topBar.get());
-			_activations.fire_copy(item);
+			const auto weak = base::make_weak(_topBar.get());
+			_activations.fire_copy({ item, _apiSearch.request().query });
 			if (weak) {
 				hideList();
 			}
@@ -1032,11 +1057,20 @@ ComposeSearch::Inner::Inner(
 }
 
 void ComposeSearch::Inner::setInnerFocus() {
-	_topBar->setInnerFocus();
+	if (Ui::AppInFocus() && Ui::InFocusChain(_topBar->window())) {
+		_topBar->setInnerFocus();
+	}
 }
 
 void ComposeSearch::Inner::setQuery(const QString &query) {
 	_topBar->setQuery(query);
+}
+
+void ComposeSearch::Inner::setTopMsgId(MsgId topMsgId) {
+	if (topMsgId) {
+		_apiSearch.disableMigrated();
+	}
+	_topMsgId = topMsgId;
 }
 
 void ComposeSearch::Inner::showAnimated() {
@@ -1058,8 +1092,7 @@ void ComposeSearch::Inner::hideList() {
 	}
 }
 
-auto ComposeSearch::Inner::activations() const
--> rpl::producer<not_null<HistoryItem*>> {
+rpl::producer<Activation> ComposeSearch::Inner::activations() const {
 	return _activations.events();
 }
 
@@ -1098,7 +1131,11 @@ void ComposeSearch::setQuery(const QString &query) {
 	_inner->setQuery(query);
 }
 
-rpl::producer<not_null<HistoryItem*>> ComposeSearch::activations() const {
+void ComposeSearch::setTopMsgId(MsgId topMsgId) {
+	_inner->setTopMsgId(topMsgId);
+}
+
+rpl::producer<ComposeSearch::Activation> ComposeSearch::activations() const {
 	return _inner->activations();
 }
 

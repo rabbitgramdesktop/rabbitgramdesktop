@@ -232,7 +232,7 @@ TranslateBar::TranslateBar(
 : _controller(controller)
 , _history(history)
 , _wrap(parent, object_ptr<Ui::AbstractButton>(parent))
-, _shadow(std::make_unique<Ui::PlainShadow>(_wrap.parentWidget())) {
+, _shadow(std::make_unique<Ui::PlainShadow>(parent)) {
 	_wrap.hide(anim::type::instant);
 	_shadow->hide();
 
@@ -372,10 +372,16 @@ void TranslateBar::setup(not_null<History*> history) {
 			const auto&,
 			const auto&) {
 		using Flag = PeerData::TranslationFlag;
+		const auto automatic = history->peer->autoTranslation();
 		return (history->peer->translationFlag() != Flag::Enabled)
 			? rpl::single(QString())
 			: history->translatedTo()
-			? tr::lng_translate_show_original()
+			? (automatic
+				? tr::lng_translate_return_original(
+					lt_language,
+					rpl::single(Ui::LanguageName(
+						history->translateOfferedFrom())))
+				: tr::lng_translate_show_original())
 			: history->translateOfferedFrom()
 			? Ui::TranslateBarTo(to)
 			: rpl::single(QString());
@@ -403,8 +409,8 @@ base::unique_qptr<Ui::PopupMenu> TranslateBar::createMenu(
 		st::popupMenuExpandedSeparator);
 	result->setDestroyedCallback([
 		this,
-		weak = Ui::MakeWeak(&_wrap),
-		weakButton = Ui::MakeWeak(button),
+		weak = base::make_weak(&_wrap),
+		weakButton = base::make_weak(button),
 		menu = result.get()
 	] {
 		if (weak && _menu == menu) {
@@ -424,7 +430,7 @@ void TranslateBar::showMenu(base::unique_qptr<Ui::PopupMenu> menu) {
 	_menu = std::move(menu);
 	_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 
-	const auto guard = Ui::MakeWeak(&_wrap);
+	const auto guard = base::make_weak(&_wrap);
 	const auto now = _history->translatedTo();
 	const auto to = now ? now : Ui::ChooseTranslateTo(_history);
 	const auto weak = base::make_weak(_controller);

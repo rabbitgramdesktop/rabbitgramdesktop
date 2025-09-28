@@ -9,7 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/application.h"
 #include "core/click_handler_types.h"
-#include "core/ui_integration.h" // Core::MarkedTextContext.
+#include "core/ui_integration.h" // TextContext
 #include "data/components/sponsored_messages.h"
 #include "data/data_session.h"
 #include "history/history_item_helpers.h"
@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animation_value.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/image/image_prepare.h"
+#include "ui/power_saving.h"
 #include "ui/rect.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
@@ -89,15 +90,10 @@ public:
 }
 
 [[nodiscard]] ColorFactory GenerateReplyColorCallback(
+		not_null<Window::SessionController*> controller,
 		not_null<RpWidget*> widget,
 		FullMsgId fullId,
 		int colorIndex) {
-	const auto controller = FindSessionController(widget);
-	if (!controller) {
-		return []() -> Colors {
-			return { st::windowBgActive->c, st::windowActiveTextFg->c };
-		};
-	}
 	const auto peer = controller->session().data().peer(fullId.peer);
 	struct State final {
 		std::shared_ptr<Ui::ChatTheme> theme;
@@ -112,7 +108,10 @@ public:
 
 	return [=]() -> Colors {
 		if (!state->theme) {
-			return { st::windowBgActive->c, st::windowActiveTextFg->c };
+			return {
+				anim::with_alpha(st::windowBgActive->c, .15),
+				st::windowActiveTextFg->c,
+			};
 		}
 		const auto context = controller->preparePaintContext({
 			.theme = state->theme.get(),
@@ -122,6 +121,33 @@ public:
 			selected,
 			colorIndex);
 		return { cache->bg, cache->icon };
+	};
+}
+
+[[nodiscard]] ColorFactory GenerateReplyColorCallback(
+		not_null<RpWidget*> widget,
+		FullMsgId fullId,
+		int colorIndex) {
+	if (const auto window = FindSessionController(widget)) {
+		return GenerateReplyColorCallback(window, widget, fullId, colorIndex);
+	}
+	const auto window
+		= widget->lifetime().make_state<Window::SessionController*>();
+	const auto callback = widget->lifetime().make_state<ColorFactory>();
+	return [=, color = colorIndex]() -> Colors {
+		if (*callback) {
+			return (*callback)();
+		}
+		*window = FindSessionController(widget);
+		if (const auto w = (*window)) {
+			*callback = GenerateReplyColorCallback(w, widget, fullId, color);
+			return (*callback)();
+		} else {
+			return {
+				anim::with_alpha(st::windowBgActive->c, .15),
+				st::windowActiveTextFg->c,
+			};
+		}
 	};
 }
 
@@ -177,10 +203,10 @@ void FillSponsoredMessageBar(
 		contentTextSt,
 		textWithEntities,
 		kMarkupTextOptions,
-		Core::MarkedTextContext{
+		Core::TextContext({
 			.session = session,
-			.customEmojiRepaint = [=] { widget->update(); },
-		});
+			.repaint = [=] { widget->update(); },
+		}));
 	const auto hostedClick = [=](ClickHandlerPtr handler) {
 		return [=] {
 			if (const auto controller = FindSessionController(widget)) {
@@ -193,6 +219,13 @@ void FillSponsoredMessageBar(
 				});
 			}
 		};
+	};
+	const auto paused = [=]() -> Fn<bool()> {
+		if (const auto c = FindSessionController(widget)) {
+			using Gif = Window::GifPauseReason;
+			return [=] { return c->isGifPausedAtLeastFor(Gif::Any); };
+		}
+		return [] { return false; };
 	};
 	const auto kLinesForPhoto = 3;
 	const auto rightPhotoSize = titleSt.font->ascent * kLinesForPhoto;
@@ -332,6 +365,8 @@ void FillSponsoredMessageBar(
 				.geometry = Ui::Text::GeometryDescriptor{
 					.layout = std::move(lineLayout),
 				},
+				.pausedEmoji = On(PowerSaving::kEmojiChat) || paused(),
+				.pausedSpoiler = On(PowerSaving::kChatSpoiler) || paused(),
 			});
 			state->lastPaintedContentTop = top;
 			state->lastPaintedContentLineAmount = lastContentLineAmount;

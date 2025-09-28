@@ -26,12 +26,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_item.h"
 #include "history/history_unread_things.h"
 #include "history/view/history_view_item_preview.h"
-#include "history/view/history_view_replies_section.h"
+#include "history/view/history_view_chat_section.h"
 #include "main/main_session.h"
 #include "base/unixtime.h"
 #include "ui/painter.h"
 #include "ui/color_int_conversion.h"
 #include "ui/text/text_custom_emoji.h"
+#include "ui/text/text_utilities.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_chat_helpers.h"
 
@@ -152,10 +153,10 @@ QImage ForumTopicGeneralIconFrame(int size, const QColor &color) {
 	result.setDevicePixelRatio(ratio);
 	result.fill(Qt::transparent);
 
-	const auto use = size * 0.8;
-	const auto skip = size * 0.1;
+	const auto use = size * 1.;
+	const auto skip = size * 0.;
 	auto p = QPainter(&result);
-	svg.render(&p, QRectF(skip, 0, use, use));
+	svg.render(&p, QRectF(skip, skip, use, use));
 	p.end();
 
 	return style::colorizeImage(result, color);
@@ -362,8 +363,8 @@ void ForumTopic::subscribeToUnreadChanges() {
 	) | rpl::filter([=] {
 		return inChatList();
 	}) | rpl::start_with_next([=](
-		std::optional<int> previous,
-		std::optional<int> now) {
+			std::optional<int> previous,
+			std::optional<int> now) {
 		if (previous.value_or(0) != now.value_or(0)) {
 			_forum->recentTopicsInvalidate(this);
 		}
@@ -406,6 +407,7 @@ void ForumTopic::applyTopic(const MTPDforumTopic &data) {
 					&session(),
 					channel()->id,
 					_rootId,
+					PeerId(),
 					data);
 			}, [](const MTPDdraftMessageEmpty&) {});
 		}
@@ -709,7 +711,7 @@ void ForumTopic::requestChatListMessage() {
 
 TimeId ForumTopic::adjustedChatListTimeId() const {
 	const auto result = chatListTimeId();
-	if (const auto draft = history()->cloudDraft(_rootId)) {
+	if (const auto draft = history()->cloudDraft(_rootId, PeerId())) {
 		if (!Data::DraftIsNull(draft) && !session().supportMode()) {
 			return std::max(result, draft->date);
 		}
@@ -753,6 +755,16 @@ QString ForumTopic::title() const {
 
 TextWithEntities ForumTopic::titleWithIcon() const {
 	return ForumTopicIconWithTitle(_rootId, _iconId, _title);
+}
+
+TextWithEntities ForumTopic::titleWithIconOrLogo() const {
+	if (_iconId || isGeneral()) {
+		return titleWithIcon();
+	}
+	return Ui::Text::SingleCustomEmoji(Data::TopicIconEmojiEntity({
+		.title = _title,
+		.colorId = _colorId,
+	})).append(' ').append(_title);
 }
 
 int ForumTopic::titleVersion() const {
@@ -867,7 +879,7 @@ void ForumTopic::setMuted(bool muted) {
 	session().changes().topicUpdated(this, UpdateFlag::Notifications);
 }
 
-not_null<HistoryView::SendActionPainter*> ForumTopic::sendActionPainter() {
+HistoryView::SendActionPainter *ForumTopic::sendActionPainter() {
 	return _sendActionPainter.get();
 }
 

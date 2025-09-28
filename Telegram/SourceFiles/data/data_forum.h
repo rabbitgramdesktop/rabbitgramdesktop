@@ -96,6 +96,14 @@ public:
 	[[nodiscard]] auto recentTopics() const
 		-> const std::vector<not_null<ForumTopic*>> &;
 
+	void saveActiveSubsectionThread(not_null<Thread*> thread);
+	[[nodiscard]] Thread *activeSubsectionThread() const;
+
+	void markUnreadCountsUnknown(MsgId readTillId);
+	void updateUnreadCounts(
+		MsgId readTillId,
+		const base::flat_map<not_null<ForumTopic*>, int> &counts);
+
 	[[nodiscard]] rpl::lifetime &lifetime() {
 		return _lifetime;
 	}
@@ -128,6 +136,8 @@ private:
 
 	std::vector<not_null<ForumTopic*>> _lastTopics;
 	int _lastTopicsVersion = 0;
+
+	ForumTopic *_activeSubsectionTopic = nullptr;
 
 	rpl::event_stream<> _chatsListChanges;
 	rpl::event_stream<> _chatsListLoadedEvents;

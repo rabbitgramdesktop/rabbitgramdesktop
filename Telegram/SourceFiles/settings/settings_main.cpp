@@ -13,6 +13,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_credits.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/settings_advanced.h"
 #include "settings/settings_business.h"
 #include "settings/settings_calls.h"
@@ -39,20 +40,25 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/new_badges.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+#include "info/channel_statistics/earn/earn_icons.h"
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "data/components/credits.h"
+#include "data/components/promo_suggestions.h"
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_chat_filters.h"
 #include "lang/lang_cloud_manager.h"
 #include "lang/lang_instance.h"
+#include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
 #include "storage/localstorage.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -70,8 +76,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_session_controller.h"
 #include "base/call_delayed.h"
 #include "base/platform/base_platform_info.h"
+#include "styles/style_chat.h"
 #include "styles/style_settings.h"
 #include "styles/style_info.h"
+#include "styles/style_layers.h" // boxLabel
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QGuiApplication>
@@ -80,6 +88,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Settings {
 namespace {
+
+constexpr auto kSugValidatePhone = "VALIDATE_PHONE_NUMBER"_cs;
 
 class Cover final : public Ui::FixedHeightWidget {
 public:
@@ -123,7 +133,8 @@ Cover::Cover(
 , _badge(
 	this,
 	st::infoPeerBadge,
-	user,
+	&user->session(),
+	Info::Profile::BadgeContentForPeer(user),
 	&_emojiStatusPanel,
 	[=] {
 		return controller->isGifPausedAtLeastFor(
@@ -231,6 +242,9 @@ void Cover::initViewers() {
 	}, lifetime());
 
 	_username->overrideLinkClickHandler([=] {
+		if (_controller->showFrozenError()) {
+			return;
+		}
 		const auto username = _user->username();
 		if (username.isEmpty()) {
 			_controller->show(Box(UsernamesBox, _user));
@@ -280,7 +294,8 @@ void Cover::refreshUsernameGeometry(int newWidth) {
 
 [[nodiscard]] not_null<Ui::SettingsButton*> AddPremiumStar(
 		not_null<Ui::SettingsButton*> button,
-		bool credits) {
+		bool credits,
+		Fn<bool()> isPaused) {
 	const auto stops = credits
 		? Ui::Premium::CreditsIconGradientStops()
 		: Ui::Premium::ButtonGradientStops();
@@ -295,8 +310,15 @@ void Cover::refreshUsernameGeometry(int newWidth) {
 		false);
 	ministars->setColorOverride(stops);
 
+	const auto isPausedValue
+		= button->lifetime().make_state<rpl::variable<bool>>(isPaused());
+	isPausedValue->value() | rpl::start_with_next([=](bool value) {
+		ministars->setPaused(value);
+	}, ministarsContainer->lifetime());
+
 	ministarsContainer->paintRequest(
 	) | rpl::start_with_next([=] {
+		(*isPausedValue) = isPaused();
 		auto p = QPainter(ministarsContainer);
 		{
 			constexpr auto kScale = 0.35;
@@ -388,12 +410,210 @@ void SetupLanguageButton(
 	});
 }
 
+void SetupValidatePhoneNumberSuggestion(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container,
+		Fn<void(Type)> showOther) {
+	if (!controller->session().promoSuggestions().current(
+			kSugValidatePhone.utf8())) {
+		return;
+	}
+	const auto mainWrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	const auto content = mainWrap->entity();
+	Ui::AddSubsectionTitle(
+		content,
+		tr::lng_settings_suggestion_phone_number_title(
+			lt_phone,
+			rpl::single(
+				Ui::FormatPhone(controller->session().user()->phone()))),
+		QMargins(
+			st::boxRowPadding.left()
+				- st::defaultSubsectionTitlePadding.left(),
+			0,
+			0,
+			0));
+	const auto label = content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			tr::lng_settings_suggestion_phone_number_about(
+				lt_link,
+				tr::lng_collectible_learn_more(
+				) | Ui::Text::ToLink(
+					tr::lng_settings_suggestion_phone_number_about_link(
+						tr::now)),
+				Ui::Text::WithEntities),
+			st::boxLabel),
+		st::boxRowPadding);
+	label->setClickHandlerFilter([=, weak = base::make_weak(controller)](
+			const auto &...) {
+		UrlClickHandler::Open(
+			tr::lng_settings_suggestion_phone_number_about_link(tr::now),
+			QVariant::fromValue(ClickHandlerContext{
+				.sessionWindow = weak,
+			}));
+		return false;
+	});
+
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+
+	const auto wrap = content->add(
+		object_ptr<Ui::FixedHeightWidget>(
+			content,
+			st::inviteLinkButton.height),
+		st::inviteLinkButtonsPadding);
+	const auto yes = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_box_yes(),
+		st::inviteLinkButton);
+	yes->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	yes->setClickedCallback([=] {
+		controller->session().promoSuggestions().dismiss(
+			kSugValidatePhone.utf8());
+		mainWrap->toggle(false, anim::type::normal);
+	});
+	const auto no = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_box_no(),
+		st::inviteLinkButton);
+	no->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	no->setClickedCallback([=] {
+		const auto sharedLabel = std::make_shared<base::weak_qptr<Ui::FlatLabel>>();
+		const auto height = st::boxLabel.style.font->height;
+		const auto customEmojiFactory = [=](
+			QStringView data,
+			const Ui::Text::MarkedContext &context
+		) -> std::unique_ptr<Ui::Text::CustomEmoji> {
+			auto repaint = [=] {
+				if (*sharedLabel) {
+					(*sharedLabel)->update();
+				}
+			};
+			return Lottie::MakeEmoji(
+				{ .name = u"change_number"_q, .sizeOverride = Size(height) },
+				std::move(repaint));
+		};
+
+		controller->uiShow()->show(Box([=](not_null<Ui::GenericBox*> box) {
+			box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+			*sharedLabel = box->verticalLayout()->add(
+				object_ptr<Ui::FlatLabel>(
+					box->verticalLayout(),
+					tr::lng_settings_suggestion_phone_number_change(
+						lt_emoji,
+						rpl::single(Ui::Text::SingleCustomEmoji(u"@"_q)),
+						Ui::Text::WithEntities),
+					st::boxLabel,
+					st::defaultPopupMenu,
+					Ui::Text::MarkedContext{
+						.customEmojiFactory = customEmojiFactory,
+					}),
+				st::boxPadding);
+		}));
+	});
+
+	wrap->widthValue() | rpl::start_with_next([=](int width) {
+		const auto buttonWidth = (width - st::inviteLinkButtonsSkip) / 2;
+		yes->setFullWidth(buttonWidth);
+		no->setFullWidth(buttonWidth);
+		yes->moveToLeft(0, 0, width);
+		no->moveToRight(0, 0, width);
+	}, wrap->lifetime());
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+	Ui::AddDivider(content);
+	Ui::AddSkip(content);
+}
+
+void SetupValidatePasswordSuggestion(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container,
+		Fn<void(Type)> showOther) {
+	if (!controller->session().promoSuggestions().current(
+			Data::PromoSuggestions::SugValidatePassword())
+		|| controller->session().promoSuggestions().current(
+			kSugValidatePhone.utf8())) {
+		return;
+	}
+	const auto mainWrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	const auto content = mainWrap->entity();
+	Ui::AddSubsectionTitle(
+		content,
+		tr::lng_settings_suggestion_password_title(),
+		QMargins(
+			st::boxRowPadding.left()
+				- st::defaultSubsectionTitlePadding.left(),
+			0,
+			0,
+			0));
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			tr::lng_settings_suggestion_password_about(),
+			st::boxLabel),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+
+	const auto wrap = content->add(
+		object_ptr<Ui::FixedHeightWidget>(
+			content,
+			st::inviteLinkButton.height),
+		st::inviteLinkButtonsPadding);
+	const auto yes = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_settings_suggestion_password_yes(),
+		st::inviteLinkButton);
+	yes->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	yes->setClickedCallback([=] {
+		controller->session().promoSuggestions().dismiss(
+			Data::PromoSuggestions::SugValidatePassword());
+		mainWrap->toggle(false, anim::type::normal);
+	});
+	const auto no = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_settings_suggestion_password_no(),
+		st::inviteLinkButton);
+	no->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	no->setClickedCallback([=] {
+		showOther(Settings::CloudPasswordSuggestionInputId());
+	});
+
+	wrap->widthValue() | rpl::start_with_next([=](int width) {
+		const auto buttonWidth = (width - st::inviteLinkButtonsSkip) / 2;
+		yes->setFullWidth(buttonWidth);
+		no->setFullWidth(buttonWidth);
+		yes->moveToLeft(0, 0, width);
+		no->moveToRight(0, 0, width);
+	}, wrap->lifetime());
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+	Ui::AddDivider(content);
+	Ui::AddSkip(content);
+}
+
 void SetupSections(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container,
 		Fn<void(Type)> showOther) {
 	Ui::AddDivider(container);
 	Ui::AddSkip(container);
+
+	SetupValidatePhoneNumberSuggestion(
+		controller,
+		container,
+		showOther);
+	SetupValidatePasswordSuggestion(
+		controller,
+		container,
+		showOther);
 
 	const auto addSection = [&](
 			rpl::producer<QString> label,
@@ -511,12 +731,17 @@ void SetupPremium(
 	Ui::AddDivider(container);
 	Ui::AddSkip(container);
 
+	const auto isPaused = Window::PausedIn(
+		controller,
+		Window::GifPauseReason::Any);
+
 	AddPremiumStar(
 		AddButtonWithIcon(
 			container,
 			tr::lng_premium_summary_title(),
 			st::settingsButton),
-		false
+		false,
+		isPaused
 	)->addClickHandler([=] {
 		controller->setPremiumRef("settings");
 		showOther(PremiumId());
@@ -528,14 +753,43 @@ void SetupPremium(
 				container,
 				tr::lng_settings_credits(),
 				controller->session().credits().balanceValue(
-				) | rpl::map([=](uint64 c) {
-					return c ? Lang::FormatCountToShort(c).string : QString{};
+				) | rpl::map([=](CreditsAmount c) {
+					return c
+						? Lang::FormatCreditsAmountToShort(c).string
+						: QString();
 				}),
 				st::settingsButton),
-			true
+			true,
+			isPaused
 		)->addClickHandler([=] {
 			controller->setPremiumRef("settings");
 			showOther(CreditsId());
+		});
+	}
+	{
+		const auto wrap = container->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				container,
+				object_ptr<Ui::VerticalLayout>(container)));
+		wrap->toggleOn(
+			controller->session().credits().tonBalanceValue(
+			) | rpl::map([](CreditsAmount c) -> bool { return !c.empty(); }));
+		wrap->finishAnimating();
+		controller->session().credits().tonLoad();
+		const auto button = AddButtonWithLabel(
+			wrap->entity(),
+			tr::lng_settings_currency(),
+			controller->session().credits().tonBalanceValue(
+			) | rpl::map([=](CreditsAmount c) {
+				return c
+					? Lang::FormatCreditsAmountToShort(c).string
+					: QString();
+			}),
+			st::settingsButton,
+			{ &st::menuIconTon });
+		button->addClickHandler([=] {
+			controller->setPremiumRef("settings");
+			showOther(CurrencyId());
 		});
 	}
 	const auto button = AddButtonWithIcon(
@@ -546,7 +800,6 @@ void SetupPremium(
 	button->addClickHandler([=] {
 		showOther(BusinessId());
 	});
-	Ui::NewBadge::AddToRight(button);
 
 	if (controller->session().premiumCanBuy()) {
 		const auto button = AddButtonWithIcon(
@@ -555,6 +808,8 @@ void SetupPremium(
 			st::settingsButton,
 			{ .icon = &st::menuIconGiftPremium }
 		);
+		Ui::NewBadge::AddToRight(button);
+
 		button->addClickHandler([=] {
 			Ui::ChooseStarGiftRecipient(controller);
 		});
@@ -811,7 +1066,7 @@ void Main::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		addAction(
 			tr::lng_settings_information(tr::now),
 			[=] { showOther(Information::Id()); },
-			&st::menuIconInfo);
+			&st::menuIconEdit);
 	}
 	const auto window = &_controller->window();
 	addAction({

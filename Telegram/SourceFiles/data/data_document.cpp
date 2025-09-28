@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_streaming.h"
 #include "data/data_document_media.h"
 #include "data/data_reply_preview.h"
+#include "data/data_web_page.h"
 #include "lang/lang_keys.h"
 #include "inline_bots/inline_bot_layout_item.h"
 #include "main/main_session.h"
@@ -745,6 +746,14 @@ bool DocumentData::emojiUsesTextColor() const {
 	return (_flags & Flag::UseTextColor);
 }
 
+void DocumentData::overrideEmojiUsesTextColor(bool value) {
+	if (value) {
+		_flags |= Flag::UseTextColor;
+	} else {
+		_flags &= ~Flag::UseTextColor;
+	}
+}
+
 bool DocumentData::hasThumbnail() const {
 	return _thumbnail.location.valid()
 		&& !thumbnailFailed()
@@ -1420,6 +1429,17 @@ Image *DocumentData::getReplyPreview(
 		Data::FileOrigin origin,
 		not_null<PeerData*> context,
 		bool spoiler) {
+	if (v::is<Data::FileOriginMessage>(origin.data)) {
+		if (const auto item = _owner->message(
+				v::get<FullMsgId>(origin.data))) {
+			if (const auto cover = LookupVideoCover(this, item)) {
+				return cover->getReplyPreview(
+					std::move(origin),
+					context,
+					spoiler);
+			}
+		}
+	}
 	if (!hasThumbnail()) {
 		return nullptr;
 	} else if (!_replyPreview) {
@@ -1692,6 +1712,10 @@ void DocumentData::forceIsStreamedAnimation() {
 	setMaybeSupportsStreaming(true);
 }
 
+bool DocumentData::isMusicForProfile() const {
+	return isSong();
+}
+
 bool DocumentData::isVoiceMessage() const {
 	return (type == VoiceDocument);
 }
@@ -1720,6 +1744,7 @@ bool DocumentData::isTheme() const {
 		|| _filename.endsWith(u".tdesktop-palette"_q, Qt::CaseInsensitive)
 		|| (hasMimeType(u"application/x-tgtheme-tdesktop"_q)
 			&& (_filename.isEmpty()
+				|| !_filename.contains('.')
 				|| _nameType == Core::NameType::ThemeFile));
 }
 
@@ -1872,4 +1897,19 @@ void DocumentData::collectLocalData(not_null<DocumentData*> local) {
 		_location = local->_location;
 		session().local().writeFileLocation(mediaKey(), _location);
 	}
+}
+
+PhotoData *LookupVideoCover(
+		not_null<DocumentData*> document,
+		HistoryItem *item) {
+	const auto media = item ? item->media() : nullptr;
+	if (const auto webpage = media ? media->webpage() : nullptr) {
+		if (webpage->document == document && webpage->photoIsVideoCover) {
+			return webpage->photo;
+		}
+		return nullptr;
+	}
+	return (media && media->document() == document)
+		? media->videoCover()
+		: nullptr;
 }

@@ -40,6 +40,7 @@ enum class WriteRestrictionType {
 	None,
 	Rights,
 	PremiumRequired,
+	Frozen,
 };
 
 struct WriteRestriction {
@@ -48,6 +49,7 @@ struct WriteRestriction {
 	QString text;
 	QString button;
 	Type type = Type::None;
+	int boostsToLift = false;
 
 	[[nodiscard]] bool empty() const {
 		return (type == Type::None);
@@ -64,6 +66,7 @@ struct WriteRestriction {
 struct SetHistoryArgs {
 	required<History*> history;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 	Fn<bool()> showSlowmodeError;
 	Fn<Api::SendAction()> sendActionFactory;
 	rpl::producer<int> slowmodeSecondsLeft;

@@ -35,7 +35,7 @@ const QVector<QString> icons{
 	RabbitAssets::TWITCH_ICON,
 };
 
-const auto rows = icons.size() / 4 + std::min(1, icons.size()) % 4;
+const auto rows = icons.size() / 4 + std::min(1, static_cast<int>(icons.size())) % 4;
 
 void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float strokeOpacity) {
 	xOffset += st::cpPadding;
@@ -118,7 +118,7 @@ void IconPicker::paintEvent(QPaintEvent *e) {
 }
 
 void IconPicker::mousePressEvent(QMouseEvent *e) {
-    auto appIcon = RabbitSettings::JsonSettings::GetString("app_icon");
+    auto appIcon = RabbitSettings::appIcon();
 	auto changed = false;
 
 	auto x = e->pos().x();
@@ -149,7 +149,7 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 						anim::easeOutCubic
 					);
  
-                    RabbitSettings::JsonSettings::Set("app_icon", iconName);
+                    RabbitSettings::setAppIcon(iconName);
 					changed = true;
 					break;
 				}
@@ -158,7 +158,6 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 	}
 
 	if (changed) {
-		RabbitSettings::JsonSettings::Write();
 		applyIcon();
 
 		repaint();

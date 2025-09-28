@@ -46,7 +46,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
 }) | rpl::start_with_next([](bool enabled) { \
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
-	RabbitSettings::JsonSettings::Write(); \
 }, container->lifetime());
 
 namespace Settings {

@@ -11,6 +11,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Ui {
 
+enum class AttachActionType {
+	ToggleSpoiler,
+	EditCover,
+	ClearCover,
+};
+
 enum class AttachButtonType {
 	Edit,
 	Delete,

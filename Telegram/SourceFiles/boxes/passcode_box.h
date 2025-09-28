@@ -53,7 +53,7 @@ public:
 		// Check cloud password for some action.
 		using CustomCheck = Fn<void(
 			const Core::CloudPasswordResult &,
-			QPointer<PasscodeBox>)>;
+			base::weak_qptr<PasscodeBox>)>;
 		CustomCheck customCheckCallback;
 		rpl::producer<QString> customTitle;
 		std::optional<QString> customDescription;
@@ -154,10 +154,11 @@ private:
 
 	Main::Session *_session = nullptr;
 	MTP::Sender _api;
+	const int _textWidth;
 
 	QString _pattern;
 
-	QPointer<Ui::BoxContent> _replacedBy;
+	base::weak_qptr<Ui::BoxContent> _replacedBy;
 	bool _turningOff = false;
 	bool _cloudPwd = false;
 	CloudFields _cloudFields;
@@ -219,17 +220,18 @@ private:
 	void proceedToChange(const QString &code);
 	void checkSubmitFail(const MTP::Error &error);
 	void setError(const QString &error);
+	void updateHeight();
 
 	Main::Session *_session = nullptr;
 	MTP::Sender _api;
+	const int _textWidth;
 	mtpRequestId _submitRequest = 0;
-
-	QString _pattern;
 
 	PasscodeBox::CloudFields _cloudFields;
 
 	object_ptr<Ui::InputField> _recoverCode;
 	object_ptr<Ui::LinkButton> _noEmailAccess;
+	object_ptr<Ui::FlatLabel> _patternLabel;
 	Fn<void()> _closeParent;
 
 	QString _error;

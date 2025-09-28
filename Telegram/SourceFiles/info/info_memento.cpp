@@ -7,13 +7,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "info/info_memento.h"
 
+#include "info/global_media/info_global_media_widget.h"
 #include "info/profile/info_profile_widget.h"
 #include "info/media/info_media_widget.h"
 #include "info/members/info_members_widget.h"
 #include "info/common_groups/info_common_groups_widget.h"
 #include "info/saved/info_saved_sublists_widget.h"
 #include "info/settings/info_settings_widget.h"
-#include "info/similar_channels/info_similar_channels_widget.h"
+#include "info/similar_peers/info_similar_peers_widget.h"
+#include "info/reactions_list/info_reactions_list_widget.h"
+#include "info/requests_list/info_requests_list_widget.h"
 #include "info/peer_gifts/info_peer_gifts_widget.h"
 #include "info/polls/info_polls_results_widget.h"
 #include "info/info_section_widget.h"
@@ -24,6 +27,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_forum_topic.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 
@@ -45,6 +49,14 @@ Memento::Memento(not_null<Data::ForumTopic*> topic, Section section)
 : Memento(DefaultStack(topic, section)) {
 }
 
+Memento::Memento(not_null<Data::SavedSublist*> sublist)
+: Memento(sublist, Section::Type::Profile) {
+}
+
+Memento::Memento(not_null<Data::SavedSublist*> sublist, Section section)
+: Memento(DefaultStack(sublist, section)) {
+}
+
 Memento::Memento(Settings::Tag settings, Section section)
 : Memento(DefaultStack(settings, section)) {
 }
@@ -53,12 +65,22 @@ Memento::Memento(not_null<PollData*> poll, FullMsgId contextId)
 : Memento(DefaultStack(poll, contextId)) {
 }
 
+Memento::Memento(
+	std::shared_ptr<Api::WhoReadList> whoReadIds,
+	FullMsgId contextId,
+	Data::ReactionId selected)
+: Memento(DefaultStack(std::move(whoReadIds), contextId, selected)) {
+}
+
 Memento::Memento(std::vector<std::shared_ptr<ContentMemento>> stack)
 : _stack(std::move(stack)) {
 	auto topics = base::flat_set<not_null<Data::ForumTopic*>>();
+	auto sublists = base::flat_set<not_null<Data::SavedSublist*>>();
 	for (auto &entry : _stack) {
 		if (const auto topic = entry->topic()) {
 			topics.emplace(topic);
+		} else if (const auto sublist = entry->sublist()) {
+			sublists.emplace(sublist);
 		}
 	}
 	for (const auto &topic : topics) {
@@ -66,6 +88,21 @@ Memento::Memento(std::vector<std::shared_ptr<ContentMemento>> stack)
 		) | rpl::start_with_next([=] {
 			for (auto i = begin(_stack); i != end(_stack);) {
 				if (i->get()->topic() == topic) {
+					i = _stack.erase(i);
+				} else {
+					++i;
+				}
+			}
+			if (_stack.empty()) {
+				_removeRequests.fire({});
+			}
+		}, _lifetime);
+	}
+	for (const auto &sublist : sublists) {
+		sublist->destroyed(
+		) | rpl::start_with_next([=] {
+			for (auto i = begin(_stack); i != end(_stack);) {
+				if (i->get()->sublist() == sublist) {
 					i = _stack.erase(i);
 				} else {
 					++i;
@@ -95,6 +132,14 @@ std::vector<std::shared_ptr<ContentMemento>> Memento::DefaultStack(
 }
 
 std::vector<std::shared_ptr<ContentMemento>> Memento::DefaultStack(
+		not_null<Data::SavedSublist*> sublist,
+		Section section) {
+	auto result = std::vector<std::shared_ptr<ContentMemento>>();
+	result.push_back(DefaultContent(sublist, section));
+	return result;
+}
+
+std::vector<std::shared_ptr<ContentMemento>> Memento::DefaultStack(
 		Settings::Tag settings,
 		Section section) {
 	auto result = std::vector<std::shared_ptr<ContentMemento>>();
@@ -109,6 +154,18 @@ std::vector<std::shared_ptr<ContentMemento>> Memento::DefaultStack(
 		FullMsgId contextId) {
 	auto result = std::vector<std::shared_ptr<ContentMemento>>();
 	result.push_back(std::make_shared<Polls::Memento>(poll, contextId));
+	return result;
+}
+
+std::vector<std::shared_ptr<ContentMemento>> Memento::DefaultStack(
+		std::shared_ptr<Api::WhoReadList> whoReadIds,
+		FullMsgId contextId,
+		Data::ReactionId selected) {
+	auto result = std::vector<std::shared_ptr<ContentMemento>>();
+	result.push_back(std::make_shared<ReactionsList::Memento>(
+		std::move(whoReadIds),
+		contextId,
+		selected));
 	return result;
 }
 
@@ -144,13 +201,16 @@ std::shared_ptr<ContentMemento> Memento::DefaultContent(
 			peer,
 			migratedPeerId,
 			section.mediaType());
+	case Section::Type::GlobalMedia:
+		return std::make_shared<GlobalMedia::Memento>(
+			peer->asUser(),
+			section.mediaType());
 	case Section::Type::CommonGroups:
 		return std::make_shared<CommonGroups::Memento>(peer->asUser());
-	case Section::Type::SimilarChannels:
-		return std::make_shared<SimilarChannels::Memento>(
-			peer->asChannel());
-	case Section::Type::PeerGifts:
-		return std::make_shared<PeerGifts::Memento>(peer->asUser());
+	case Section::Type::SimilarPeers:
+		return std::make_shared<SimilarPeers::Memento>(peer);
+	case Section::Type::RequestsList:
+		return std::make_shared<RequestsList::Memento>(peer);
 	case Section::Type::SavedSublists:
 		return std::make_shared<Saved::SublistsMemento>(&peer->session());
 	case Section::Type::Members:
@@ -174,6 +234,20 @@ std::shared_ptr<ContentMemento> Memento::DefaultContent(
 		return std::make_shared<Media::Memento>(topic, section.mediaType());
 	case Section::Type::Members:
 		return std::make_shared<Members::Memento>(peer, migratedPeerId);
+	}
+	Unexpected("Wrong section type in Info::Memento::DefaultContent()");
+}
+
+std::shared_ptr<ContentMemento> Memento::DefaultContent(
+		not_null<Data::SavedSublist*> sublist,
+		Section section) {
+	switch (section.type()) {
+	case Section::Type::Profile:
+		return std::make_shared<Profile::Memento>(sublist);
+	case Section::Type::Media:
+		return std::make_shared<Media::Memento>(
+			sublist,
+			section.mediaType());
 	}
 	Unexpected("Wrong section type in Info::Memento::DefaultContent()");
 }

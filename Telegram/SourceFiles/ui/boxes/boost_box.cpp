@@ -143,6 +143,7 @@ void AddFeaturesList(
 	const auto proj = &Ui::Text::RichLangValue;
 	const auto lowMax = std::max({
 		features.linkLogoLevel,
+		features.autotranslateLevel,
 		features.transcribeLevel,
 		features.emojiPackLevel,
 		features.emojiStatusLevel,
@@ -208,6 +209,11 @@ void AddFeaturesList(
 				st::boostFeatureCustomEmoji);
 		}
 		if (!group) {
+			if (i >= features.autotranslateLevel) {
+				add(
+					tr::lng_feature_autotranslate(proj),
+					st::boostFeatureAutoTranslate);
+			}
 			if (const auto j = features.linkStylesByLevel.find(i)
 				; j != end(features.linkStylesByLevel)) {
 				linkStyles += j->second;
@@ -325,8 +331,14 @@ void BoostBox(
 		return (counters.mine > 1) ? u"x%1"_q.arg(counters.mine) : u""_q;
 	});
 
+	const auto wasMine = state->data.current().mine;
+	const auto wasLifting = data.lifting;
 	auto text = state->data.value(
 	) | rpl::map([=](BoostCounters counters) {
+		const auto lifting = wasLifting
+			? (wasLifting
+				- std::clamp(counters.mine - wasMine, 0, wasLifting - 1))
+			: 0;
 		const auto bold = Ui::Text::Bold(name);
 		const auto now = counters.boosts;
 		const auto full = !counters.nextLevelBoosts;
@@ -337,7 +349,14 @@ void BoostBox(
 			lt_count,
 			rpl::single(float64(counters.level + (left ? 1 : 0))),
 			Ui::Text::RichLangValue);
-		return (counters.mine || full)
+		return (lifting > 1)
+			? tr::lng_boost_group_lift_restrictions_many(
+				lt_count,
+				rpl::single(float64(lifting)),
+				Ui::Text::RichLangValue)
+			: lifting
+			? tr::lng_boost_group_lift_restrictions(Ui::Text::RichLangValue)
+			: (counters.mine || full)
 			? (left
 				? tr::lng_boost_channel_needs_unlock(
 					lt_count,
@@ -365,6 +384,14 @@ void BoostBox(
 				rpl::single(bold),
 				Ui::Text::RichLangValue);
 	}) | rpl::flatten_latest();
+	if (wasLifting) {
+		state->data.value(
+		) | rpl::start_with_next([=](BoostCounters counters) {
+			if (counters.mine - wasMine >= wasLifting) {
+				box->closeBox();
+			}
+		}, box->lifetime());
+	}
 
 	auto faded = object_ptr<Ui::FadeWrap<>>(
 		close->parentWidget(),
@@ -424,7 +451,7 @@ void BoostBox(
 			: tr::lng_boost_channel_button();
 	}) | rpl::flatten_latest();
 
-	const auto button = box->addButton(rpl::duplicate(submit), [=] {
+	box->addButton(rpl::duplicate(submit), [=] {
 		if (state->submitted) {
 			return;
 		} else if (state->data.current().nextLevelBoosts > 0
@@ -492,17 +519,6 @@ void BoostBox(
 			box->closeBox();
 		}
 	});
-
-	rpl::combine(
-		std::move(submit),
-		box->widthValue()
-	) | rpl::start_with_next([=](const QString &, int width) {
-		const auto &padding = st::boostBox.buttonPadding;
-		button->resizeToWidth(width
-			- padding.left()
-			- padding.right());
-		button->moveToLeft(padding.left(), button->y());
-	}, button->lifetime());
 }
 
 object_ptr<Ui::RpWidget> MakeLinkLabel(
@@ -644,6 +660,8 @@ void AskBoostBox(
 		Fn<void()> startGiveaway) {
 	box->setWidth(st::boxWideWidth);
 	box->setStyle(st::boostBox);
+	box->setNoContentMargin(true);
+	box->addSkip(st::boxRowPadding.left());
 
 	FillBoostLimit(
 		BoxShowFinishes(box),
@@ -655,6 +673,8 @@ void AskBoostBox(
 
 	auto title = v::match(data.reason.data, [](AskBoostChannelColor) {
 		return tr::lng_boost_channel_title_color();
+	}, [](AskBoostAutotranslate) {
+		return tr::lng_boost_channel_title_autotranslate();
 	}, [](AskBoostWallpaper) {
 		return tr::lng_boost_channel_title_wallpaper();
 	}, [](AskBoostEmojiStatus) {
@@ -665,14 +685,23 @@ void AskBoostBox(
 		return tr::lng_boost_channel_title_reactions();
 	}, [](AskBoostCpm) {
 		return tr::lng_boost_channel_title_cpm();
+	}, [](AskBoostWearCollectible) {
+		return tr::lng_boost_channel_title_wear();
 	});
+	auto isGroup = false;
 	auto reasonText = v::match(data.reason.data, [&](
 			AskBoostChannelColor data) {
 		return tr::lng_boost_channel_needs_level_color(
 			lt_count,
 			rpl::single(float64(data.requiredLevel)),
 			Ui::Text::RichLangValue);
+	}, [&](AskBoostAutotranslate data) {
+		return tr::lng_boost_channel_needs_level_autotranslate(
+			lt_count,
+			rpl::single(float64(data.requiredLevel)),
+			Ui::Text::RichLangValue);
 	}, [&](AskBoostWallpaper data) {
+		isGroup = data.group;
 		return (data.group
 			? tr::lng_boost_group_needs_level_wallpaper
 			: tr::lng_boost_channel_needs_level_wallpaper)(
@@ -680,6 +709,7 @@ void AskBoostBox(
 				rpl::single(float64(data.requiredLevel)),
 				Ui::Text::RichLangValue);
 	}, [&](AskBoostEmojiStatus data) {
+		isGroup = data.group;
 		return (data.group
 			? tr::lng_boost_group_needs_level_status
 			: tr::lng_boost_channel_needs_level_status)(
@@ -687,6 +717,7 @@ void AskBoostBox(
 				rpl::single(float64(data.requiredLevel)),
 				Ui::Text::RichLangValue);
 	}, [&](AskBoostEmojiPack data) {
+		isGroup = true;
 		return tr::lng_boost_group_needs_level_emoji(
 			lt_count,
 			rpl::single(float64(data.requiredLevel)),
@@ -703,10 +734,16 @@ void AskBoostBox(
 			lt_count,
 			rpl::single(float64(data.requiredLevel)),
 			Ui::Text::RichLangValue);
+	}, [&](AskBoostWearCollectible data) {
+		return tr::lng_boost_channel_needs_level_wear(
+			lt_count,
+			rpl::single(float64(data.requiredLevel)),
+			Ui::Text::RichLangValue);
 	});
 	auto text = rpl::combine(
 		std::move(reasonText),
-		tr::lng_boost_channel_ask(Ui::Text::RichLangValue)
+		(isGroup ? tr::lng_boost_group_ask : tr::lng_boost_channel_ask)(
+			Ui::Text::RichLangValue)
 	) | rpl::map([](TextWithEntities &&text, TextWithEntities &&ask) {
 		return text.append(u"\n\n"_q).append(std::move(ask));
 	});
@@ -715,14 +752,16 @@ void AskBoostBox(
 			box,
 			std::move(title),
 			st::boostCenteredTitle),
-		st::boxRowPadding + QMargins(0, st::boostTitleSkip, 0, 0));
+		st::boxRowPadding + QMargins(0, st::boostTitleSkip, 0, 0),
+		style::al_top);
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
 			std::move(text),
 			st::boostText),
 		(st::boxRowPadding
-			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)));
+			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)),
+		style::al_top);
 
 	auto stats = object_ptr<Ui::IconButton>(box, st::boostLinkStatsButton);
 	stats->setClickedCallback(openStatistics);
@@ -733,21 +772,17 @@ void AskBoostBox(
 		box->uiShow(),
 		std::move(stats)));
 
+	AddFeaturesList(
+		box->verticalLayout(),
+		data.features,
+		data.boost.level + (data.boost.nextLevelBoosts ? 1 : 0),
+		data.group);
+
 	auto submit = tr::lng_boost_channel_ask_button();
-	const auto button = box->addButton(rpl::duplicate(submit), [=] {
+	box->addButton(rpl::duplicate(submit), [=] {
 		QGuiApplication::clipboard()->setText(data.link);
 		box->uiShow()->showToast(tr::lng_username_copied(tr::now));
 	});
-	rpl::combine(
-		std::move(submit),
-		box->widthValue()
-	) | rpl::start_with_next([=](const QString &, int width) {
-		const auto &padding = st::boostBox.buttonPadding;
-		button->resizeToWidth(width
-			- padding.left()
-			- padding.right());
-		button->moveToLeft(padding.left(), button->y());
-	}, button->lifetime());
 }
 
 void FillBoostLimit(

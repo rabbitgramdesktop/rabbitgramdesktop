@@ -28,15 +28,20 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/unixtime.h"
 #include "lang/lang_keys.h"
 #include "window/window_session_controller.h"
+#include "storage/storage_account.h"
 #include "storage/storage_media_prepare.h"
 #include "storage/localimageloader.h"
 #include "core/launcher.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "main/main_account.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
+
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonArray>
 
 namespace Main {
 class Session;
@@ -49,6 +54,7 @@ constexpr auto kOccupyFor = TimeId(60);
 constexpr auto kReoccupyEach = 30 * crl::time(1000);
 constexpr auto kMaxSupportInfoLength = MaxMessageSize * 4;
 constexpr auto kTopicRootId = MsgId(0);
+constexpr auto kMonoforumPeerId = PeerId(0);
 
 class EditInfoBox : public Ui::BoxContent {
 public:
@@ -160,6 +166,7 @@ Data::Draft OccupiedDraft(const QString &normalizedName) {
 			+ ";n:"
 			+ normalizedName },
 		FullReplyTo(),
+		SuggestPostOptions(),
 		MessageCursor(),
 		Data::WebPageDraft()
 	};
@@ -178,7 +185,7 @@ uint32 ParseOccupationTag(History *history) {
 	if (!TrackHistoryOccupation(history)) {
 		return 0;
 	}
-	const auto draft = history->cloudDraft(kTopicRootId);
+	const auto draft = history->cloudDraft(kTopicRootId, kMonoforumPeerId);
 	if (!draft) {
 		return 0;
 	}
@@ -204,7 +211,7 @@ QString ParseOccupationName(History *history) {
 	if (!TrackHistoryOccupation(history)) {
 		return QString();
 	}
-	const auto draft = history->cloudDraft(kTopicRootId);
+	const auto draft = history->cloudDraft(kTopicRootId, kMonoforumPeerId);
 	if (!draft) {
 		return QString();
 	}
@@ -230,7 +237,7 @@ TimeId OccupiedBySomeoneTill(History *history) {
 	if (!TrackHistoryOccupation(history)) {
 		return 0;
 	}
-	const auto draft = history->cloudDraft(kTopicRootId);
+	const auto draft = history->cloudDraft(kTopicRootId, kMonoforumPeerId);
 	if (!draft) {
 		return 0;
 	}
@@ -254,6 +261,12 @@ TimeId OccupiedBySomeoneTill(History *history) {
 		}
 	}
 	return valid ? result : 0;
+}
+
+QString FastButtonModeIdsPath(not_null<Main::Session*> session) {
+	const auto base = session->account().local().supportModePath();
+	QDir().mkpath(base);
+	return base + u"/fast_button_mode_ids.json"_q;
 }
 
 } // namespace
@@ -342,7 +355,7 @@ void Helper::updateOccupiedHistory(
 		not_null<Window::SessionController*> controller,
 		History *history) {
 	if (isOccupiedByMe(_occupiedHistory)) {
-		_occupiedHistory->clearCloudDraft(kTopicRootId);
+		_occupiedHistory->clearCloudDraft(kTopicRootId, kMonoforumPeerId);
 		_session->api().saveDraftToCloudDelayed(_occupiedHistory);
 	}
 	_occupiedHistory = history;
@@ -366,7 +379,10 @@ void Helper::occupyInDraft() {
 		&& !isOccupiedBySomeone(_occupiedHistory)
 		&& !_supportName.isEmpty()) {
 		const auto draft = OccupiedDraft(_supportNameNormalized);
-		_occupiedHistory->createCloudDraft(kTopicRootId, &draft);
+		_occupiedHistory->createCloudDraft(
+			kTopicRootId,
+			kMonoforumPeerId,
+			&draft);
 		_session->api().saveDraftToCloudDelayed(_occupiedHistory);
 		_reoccupyTimer.callEach(kReoccupyEach);
 	}
@@ -375,7 +391,10 @@ void Helper::occupyInDraft() {
 void Helper::reoccupy() {
 	if (isOccupiedByMe(_occupiedHistory)) {
 		const auto draft = OccupiedDraft(_supportNameNormalized);
-		_occupiedHistory->createCloudDraft(kTopicRootId, &draft);
+		_occupiedHistory->createCloudDraft(
+			kTopicRootId,
+			kMonoforumPeerId,
+			&draft);
 		_session->api().saveDraftToCloudDelayed(_occupiedHistory);
 	}
 }
@@ -538,6 +557,83 @@ void Helper::saveInfo(
 
 Templates &Helper::templates() {
 	return _templates;
+}
+
+FastButtonsBots::FastButtonsBots(not_null<Main::Session*> session)
+: _session(session) {
+}
+
+bool FastButtonsBots::enabled(not_null<PeerData*> peer) const {
+	if (!_read) {
+		const_cast<FastButtonsBots*>(this)->read();
+	}
+	return _bots.contains(peer->id);
+}
+
+rpl::producer<bool> FastButtonsBots::enabledValue(
+		not_null<PeerData*> peer) const {
+	return rpl::single(
+		enabled(peer)
+	) | rpl::then(_changes.events(
+	) | rpl::filter([=](PeerId id) {
+		return (peer->id == id);
+	}) | rpl::map([=] {
+		return enabled(peer);
+	}));
+}
+
+void FastButtonsBots::setEnabled(not_null<PeerData*> peer, bool value) {
+	if (value == enabled(peer)) {
+		return;
+	} else if (value) {
+		_bots.emplace(peer->id);
+	} else {
+		_bots.remove(peer->id);
+	}
+	if (_bots.empty()) {
+		QFile(FastButtonModeIdsPath(_session)).remove();
+	} else {
+		write();
+	}
+	_changes.fire_copy(peer->id);
+	if (const auto history = peer->owner().history(peer)) {
+		if (const auto item = history->lastMessage()) {
+			history->owner().requestItemRepaint(item);
+		}
+	}
+}
+
+void FastButtonsBots::write() {
+	auto array = QJsonArray();
+	for (const auto &id : _bots) {
+		array.append(QString::number(id.value));
+	}
+	auto object = QJsonObject();
+	object[u"ids"_q] = array;
+	auto f = QFile(FastButtonModeIdsPath(_session));
+	if (f.open(QIODevice::WriteOnly)) {
+		f.write(QJsonDocument(object).toJson(QJsonDocument::Indented));
+	}
+}
+
+void FastButtonsBots::read() {
+	_read = true;
+
+	auto f = QFile(FastButtonModeIdsPath(_session));
+	if (!f.open(QIODevice::ReadOnly)) {
+		return;
+	}
+	const auto data = f.readAll();
+	const auto json = QJsonDocument::fromJson(data);
+	if (!json.isObject()) {
+		return;
+	}
+	const auto object = json.object();
+	const auto array = object.value(u"ids"_q).toArray();
+	for (const auto &value : array) {
+		const auto bareId = value.toString().toULongLong();
+		_bots.emplace(PeerId(bareId));
+	}
 }
 
 QString ChatOccupiedString(not_null<History*> history) {

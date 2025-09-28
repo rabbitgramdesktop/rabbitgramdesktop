@@ -5,6 +5,7 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
+#define _GLIBCXX_USE_CXX11_ABI 0
 #include <cstdio>
 #include <sys/stat.h>
 #include <sys/types.h>

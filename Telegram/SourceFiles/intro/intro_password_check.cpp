@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/passcode_box.h"
 #include "lang/lang_keys.h"
 #include "intro/intro_signup.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/password_input.h"
@@ -229,7 +230,7 @@ void PasswordCheckWidget::codeSubmitDone(
 	fields.mtp.curRequest = {};
 	fields.hasPassword = false;
 	auto box = Box<PasscodeBox>(&api().instance(), nullptr, fields);
-	const auto boxShared = std::make_shared<QPointer<PasscodeBox>>();
+	const auto boxShared = std::make_shared<base::weak_qptr<PasscodeBox>>();
 
 	box->newAuthorization(
 	) | rpl::start_with_next([=](const MTPauth_Authorization &result) {
@@ -350,8 +351,11 @@ void PasswordCheckWidget::updateDescriptionText() {
 	auto pwdHidden = _pwdField->isHidden();
 	auto emailPattern = _emailPattern;
 	setDescriptionText(pwdHidden
-		? tr::lng_signin_recover_desc(lt_email, rpl::single(emailPattern))
-		: tr::lng_signin_desc());
+		? tr::lng_signin_recover_desc(
+			lt_email,
+			rpl::single(Ui::Text::WrapEmailPattern(emailPattern)),
+			Ui::Text::WithEntities)
+		: tr::lng_signin_desc(Ui::Text::WithEntities));
 }
 
 void PasswordCheckWidget::submit() {

@@ -18,13 +18,29 @@ void PaintOutlineSegments(
 		float64 fromFullProgress) {
 	Expects(!segments.empty());
 
-	auto radius = ellipse.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") * .0102;
+	auto radius = ellipse.height() * RabbitSettings::userpicRoundness() * .0102;
 
 	p.setBrush(Qt::NoBrush);
 	p.setPen(QPen(segments.front().brush, segments.front().width));
 	p.drawRoundedRect(
 		ellipse, radius, radius);
 	return;
+}
+
+void PaintOutlineSegments(
+		QPainter &p,
+		QRectF rect,
+		float64 radius,
+		const std::vector<OutlineSegment> &segments) {
+	Expects(!segments.empty());
+
+	p.setBrush(Qt::NoBrush);
+	const auto count = std::min(int(segments.size()), kOutlineSegmentsMax);
+	if (count == 1 || true) {
+		p.setPen(QPen(segments.back().brush, segments.back().width));
+		p.drawRoundedRect(rect, radius, radius);
+		return;
+	}
 }
 
 QLinearGradient UnreadStoryOutlineGradient(QRectF rect) {

@@ -18,6 +18,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_menu_activate" = "Use this account";
 "lng_menu_set_status" = "Set Emoji Status";
 "lng_menu_change_status" = "Change Emoji Status";
+"lng_menu_my_profile" = "My Profile";
 "lng_menu_my_stories" = "My Stories";
 "lng_menu_my_groups" = "My Groups";
 "lng_menu_my_channels" = "My Channels";
@@ -163,11 +164,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_chat_status_members_online" = "{members_count}, {online_count}";
 "lng_chat_status_subscribers#one" = "{count} subscriber";
 "lng_chat_status_subscribers#other" = "{count} subscribers";
+"lng_chat_status_direct" = "Direct messages";
 
 "lng_channel_status" = "channel";
 "lng_group_status" = "group";
 "lng_scam_badge" = "SCAM";
 "lng_fake_badge" = "FAKE";
+"lng_direct_badge" = "DIRECT";
 
 "lng_remember" = "Remember this choice";
 
@@ -288,8 +291,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_error_cant_add_member" = "Sorry, you can't add the bot to this group. Ask a group admin to do it.";
 "lng_error_cant_add_bot" = "Sorry, this bot can't be added to groups.";
 "lng_error_cant_add_admin_invite" = "You can't add this user as an admin because they are not a member of this group and you are not allowed to add them.";
+"lng_error_you_blocked_user" = "Sorry, you can't add this user or bot to groups because you've blocked them. Please unblock to proceed.";
+"lng_error_add_admin_not_member" = "You can't add this user as an admin because they are not a member of this group and you are not allowed to add them.";
+"lng_error_user_admin_invalid" = "You can't ban this user because they are an admin in this group and you are not allowed to demote them.";
+"lng_error_channel_bots_too_much" = "Sorry, this channel has too many bots.";
+"lng_error_group_bots_too_much" = "There are too many bots in this group. Please remove some of the bots you're not using first.";
 "lng_error_cant_add_admin_unban" = "Sorry, you can't add this user as an admin because they are in the Removed Users list and you can't unban them.";
 "lng_error_cant_ban_admin" = "You can't ban this user because they are an admin in this group and you are not allowed to demote them.";
+"lng_error_cant_reply_other" = "This message can't be replied in another chat.";
 "lng_error_admin_limit" = "Sorry, you've reached the maximum number of admins for this group.";
 "lng_error_admin_limit_channel" = "Sorry, you've reached the maximum number of admins for this channel.";
 "lng_error_post_link_invalid" = "Unfortunately, you can't access this message. You aren't a member of the chat where it was posted.";
@@ -298,6 +307,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_error_nocopy_group" = "Sorry, copying from this group is disabled by admins.";
 "lng_error_nocopy_channel" = "Sorry, copying from this channel is disabled by admins.";
 "lng_error_nocopy_story" = "Sorry, the creator of this story disabled copying.";
+"lng_error_schedule_limit" = "Sorry, you can't schedule more than 100 messages.";
 "lng_sure_add_admin_invite" = "This user is not a member of this group. Add them to the group and promote them to admin?";
 "lng_sure_add_admin_invite_channel" = "This user is not a subscriber of this channel. Add them to the channel and promote them to admin?";
 "lng_sure_add_admin_unremove" = "This user is currently restricted or removed. Are you sure you want to promote them?";
@@ -367,6 +377,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_intro_fragment_about" = "Get the code for {phone_number} in the Anonymous Numbers section on Fragment.";
 "lng_intro_fragment_button" = "Open Fragment";
 
+"lng_intro_email_setup_title" = "Choose a login email";
+"lng_intro_email_confirm_subtitle" = "Please check your email {email} (don't forget the spam folder) and enter the code we just sent you.";
+
 "lng_phone_title" = "Your Phone Number";
 "lng_phone_desc" = "Please confirm your country code\nand enter your phone number.";
 "lng_phone_to_qr" = "Quick log in using QR code";
@@ -424,6 +437,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_dlg_new_channel_name" = "Channel name";
 "lng_dlg_new_bot_name" = "Bot name";
 "lng_no_chats" = "Your chats will be here";
+"lng_no_conversations" = "You have no\nconversations yet.";
+"lng_no_conversations_button" = "New Message";
+"lng_no_conversations_subtitle" = "Your contacts on Telegram";
 "lng_no_chats_filter" = "No chats currently belong to this folder.";
 "lng_no_saved_sublists" = "You can save messages from other chats here.";
 "lng_contacts_loading" = "Loading...";
@@ -499,6 +515,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_notify_global" = "Global settings";
 "lng_settings_notify_title" = "Notifications for chats";
 "lng_settings_desktop_notify" = "Desktop notifications";
+"lng_settings_master_volume_notifications" = "Volume";
 "lng_settings_native_title" = "System integration";
 "lng_settings_use_windows" = "Use Windows notifications";
 "lng_settings_skip_in_focus" = "Respect system Focus mode";
@@ -539,12 +556,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_notification_title_private_chats" = "Notifications for private chats";
 "lng_notification_about_private_chats#one" = "Please note that **{count} chat** is listed as an exception and won't be affected by this change.";
 "lng_notification_about_private_chats#other" = "Please note that **{count} chats** are listed as exceptions and won't be affected by this change.";
+"lng_notification_volume_private_chats" = "Notifications volume for private chats";
 "lng_notification_title_groups" = "Notifications for groups";
 "lng_notification_about_groups#one" = "Please note that **{count} group** is listed as an exception and won't be affected by this change.";
 "lng_notification_about_groups#other" = "Please note that **{count} groups** are listed as exceptions and won't be affected by this change.";
+"lng_notification_volume_groups" = "Notifications volume for groups";
 "lng_notification_title_channels" = "Notifications for channels";
 "lng_notification_about_channels#one" = "Please note that **{count} channel** is listed as an exception and won't be affected by this change.";
 "lng_notification_about_channels#other" = "Please note that **{count} channels** are listed as exceptions and won't be affected by this change.";
+"lng_notification_volume_channel" = "Notifications volume for channels";
 "lng_notification_exceptions_view" = "View exceptions";
 "lng_notification_enable" = "Enable notifications";
 "lng_notification_sound" = "Sound";
@@ -596,6 +616,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_update_fail" = "Update check failed :(";
 "lng_settings_workmode_tray" = "Show tray icon";
 "lng_settings_workmode_window" = "Show taskbar icon";
+"lng_settings_window_close" = "When window closed";
+"lng_settings_run_in_background" = "Run in the background";
+"lng_settings_quit_on_close" = "Quit the application";
 "lng_settings_close_to_taskbar" = "Close to taskbar";
 "lng_settings_monochrome_icon" = "Use monochrome icon";
 "lng_settings_window_system" = "Window title bar";
@@ -630,6 +653,49 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_chat_quick_action_reply" = "Reply with double click";
 "lng_settings_chat_quick_action_react" = "Send reaction with double click";
 "lng_settings_chat_corner_reaction" = "Reaction button on messages";
+
+"lng_settings_shortcuts" = "Keyboard shortcuts";
+
+"lng_shortcuts_reset" = "Reset to default";
+"lng_shortcuts_recording" = "Recording...";
+"lng_shortcuts_add_another" = "Add another";
+
+"lng_shortcuts_close" = "Close the window";
+"lng_shortcuts_lock" = "Lock the application";
+"lng_shortcuts_minimize" = "Minimize the window";
+"lng_shortcuts_quit" = "Quit the application";
+"lng_shortcuts_media_play" = "Play the media";
+"lng_shortcuts_media_pause" = "Pause the media";
+"lng_shortcuts_media_play_pause" = "Toggle media playback";
+"lng_shortcuts_media_stop" = "Stop media playback";
+"lng_shortcuts_media_previous" = "Previous track";
+"lng_shortcuts_media_next" = "Next track";
+"lng_shortcuts_search" = "Search messages";
+"lng_shortcuts_chat_previous" = "Previous chat";
+"lng_shortcuts_chat_next" = "Next chat";
+"lng_shortcuts_chat_first" = "First chat";
+"lng_shortcuts_chat_last" = "Last chat";
+"lng_shortcuts_chat_self" = "Saved Messages";
+"lng_shortcuts_chat_pinned_n" = "Pinned chat #{index}";
+"lng_shortcuts_show_account_n" = "Account #{index}";
+"lng_shortcuts_show_all_chats" = "All Chats folder";
+"lng_shortcuts_show_folder_n" = "Folder #{index}";
+"lng_shortcuts_show_folder_last" = "Last folder";
+"lng_shortcuts_folder_next" = "Next folder";
+"lng_shortcuts_folder_previous" = "Previous folder";
+"lng_shortcuts_scheduled" = "Scheduled messages";
+"lng_shortcuts_archive" = "Archived chats";
+"lng_shortcuts_contacts" = "Contacts list";
+"lng_shortcuts_just_send" = "Just send";
+"lng_shortcuts_silent_send" = "Silent send";
+"lng_shortcuts_schedule" = "Schedule";
+"lng_shortcuts_read_chat" = "Mark chat as read";
+"lng_shortcuts_archive_chat" = "Archive chat";
+"lng_shortcuts_media_fullscreen" = "Toggle video fullscreen";
+"lng_shortcuts_show_chat_menu" = "Show chat menu";
+"lng_shortcuts_show_chat_preview" = "Show chat preview";
+"lng_shortcuts_record_voice_message" = "Record Voice Message";
+"lng_shortcuts_record_round_message" = "Record Round Message";
 
 "lng_settings_chat_reactions_title" = "Quick Reaction";
 "lng_settings_chat_reactions_subtitle" = "Choose your favorite reaction";
@@ -682,6 +748,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_messages_privacy" = "Messages";
 "lng_settings_voices_privacy" = "Voice messages";
 "lng_settings_bio_privacy" = "Bio";
+"lng_settings_gifts_privacy" = "Gifts";
 "lng_settings_birthday_privacy" = "Date of Birth";
 "lng_settings_privacy_premium" = "Only subscribers of {link} can restrict receiving voice messages.";
 "lng_settings_privacy_premium_link" = "Telegram Premium";
@@ -783,6 +850,19 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_disconnect" = "Disconnect";
 "lng_settings_connected_title" = "Connected websites";
 
+"lng_settings_suggestion_phone_number_title" = "Is {phone} still your number?";
+"lng_settings_suggestion_phone_number_about" = "Keep your number up to date to ensure you can always log into Telegram. {link}";
+"lng_settings_suggestion_phone_number_about_link" = "https://telegram.org/faq#q-i-have-a-new-phone-number-what-do-i-do";
+"lng_settings_suggestion_phone_number_change" = "Please change your phone number in the official Telegram app on your phone as soon as possible. {emoji}";
+"lng_settings_suggestion_password_title" = "Your password";
+"lng_settings_suggestion_password_about" = "Your account is protected by 2-Step Veritifaction. Do you still remember your password?";
+"lng_settings_suggestion_password_yes" = "Yes, definitely";
+"lng_settings_suggestion_password_no" = "Not sure";
+"lng_settings_suggestion_password_step_input_title" = "Enter your password";
+"lng_settings_suggestion_password_step_input_about" = "Do you still remember your password?";
+"lng_settings_suggestion_password_step_finish_title" = "Perfect!";
+"lng_settings_suggestion_password_step_finish_about" = "You still remember your password.";
+
 "lng_settings_power_menu" = "Battery and Animations";
 "lng_settings_power_title" = "Power Usage";
 "lng_settings_power_subtitle" = "Power saving options";
@@ -828,6 +908,18 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_cloud_password_save" = "Save and Finish";
 "lng_settings_cloud_password_email_confirm" = "Confirm and Finish";
 "lng_settings_cloud_password_reset_in" = "You can reset your password in {duration}.";
+
+"lng_settings_cloud_login_email_section_title" = "Login Email";
+"lng_settings_cloud_login_email_box_about" = "This email address will be used every time you log in to your Telegram account from a new device.";
+"lng_settings_cloud_login_email_box_ok" = "Change email";
+"lng_settings_cloud_login_email_title" = "Enter New Email";
+"lng_settings_cloud_login_email_placeholder" = "Enter Login Email";
+"lng_settings_cloud_login_email_about" = "You will receive Telegram login codes via email and not SMS. Please enter an email address to which you have access.";
+"lng_settings_cloud_login_email_confirm" = "Confirm";
+"lng_settings_cloud_login_email_code_title" = "Check Your New Email";
+"lng_settings_cloud_login_email_code_about" = "Please enter the code we have sent to your new email {email}";
+"lng_settings_cloud_login_email_success" = "Your email has been changed.";
+"lng_settings_error_email_not_alowed" = "Sorry, this email is not allowed";
 
 "lng_settings_ttl_title" = "Auto-Delete Messages";
 "lng_settings_ttl_about" = "Automatically delete messages for everyone after a period of time in all new chats you start.";
@@ -1082,6 +1174,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_proxy_menu_delete" = "Delete";
 "lng_proxy_menu_restore" = "Restore";
 "lng_proxy_edit_share" = "Share";
+"lng_proxy_edit_share_qr_box_title" = "Share proxy with QR code";
+"lng_proxy_edit_share_list_button" = "Share Proxy List";
+"lng_proxy_edit_share_list_toast" = "Proxy List copied to clipboard.";
 "lng_proxy_address_label" = "Socket address";
 "lng_proxy_credentials_optional" = "Credentials (optional)";
 "lng_proxy_credentials" = "Credentials";
@@ -1120,12 +1215,52 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_settings_faq_link" = "https://telegram.org/faq#general-questions";
 "lng_settings_features" = "Telegram Features";
 "lng_settings_credits" = "My Stars";
+"lng_settings_currency" = "My TON";
 "lng_settings_logout" = "Log out";
 "lng_sure_logout" = "Are you sure you want to log out?";
 
 "lng_settings_need_restart" = "You need to restart for applying some of the new settings. Restart now?";
 "lng_settings_restart_now" = "Restart";
 "lng_settings_restart_later" = "Later";
+
+"lng_settings_quick_dialog_action_title" = "Chat list quick action";
+"lng_settings_quick_dialog_action_about" = "Choose the action you want to perform when you middle-click or swipe left in the chat list.";
+"lng_settings_quick_dialog_action_both" = "Swipe left and Middle-click";
+"lng_settings_quick_dialog_action_swipe" = "Swipe left";
+"lng_settings_quick_dialog_action_mute" = "Mute";
+"lng_settings_quick_dialog_action_unmute" = "Unmute";
+"lng_settings_quick_dialog_action_pin" = "Pin";
+"lng_settings_quick_dialog_action_unpin" = "Unpin";
+"lng_settings_quick_dialog_action_read" = "Read";
+"lng_settings_quick_dialog_action_unread" = "Unread";
+"lng_settings_quick_dialog_action_archive" = "Archive";
+"lng_settings_quick_dialog_action_unarchive" = "Unarchive";
+"lng_settings_quick_dialog_action_delete" = "Delete";
+"lng_settings_quick_dialog_action_disabled" = "Change folder";
+
+"lng_quick_dialog_action_toast_mute_success" = "Notifications for this chat have been muted.";
+"lng_quick_dialog_action_toast_unmute_success" = "Notifications enabled for this chat.";
+"lng_quick_dialog_action_toast_pin_success" = "The chat has been pinned.";
+"lng_quick_dialog_action_toast_unpin_success" = "The chat has been unpinned.";
+"lng_quick_dialog_action_toast_read_success" = "The chat has been marked as read.";
+"lng_quick_dialog_action_toast_unread_success" = "The chat has been marked as unread.";
+"lng_quick_dialog_action_toast_archive_success" = "The chat has been archived.";
+"lng_quick_dialog_action_toast_unarchive_success" = "The chat has been unarchived.";
+
+"lng_archive_hint_title" = "This is your Archive";
+"lng_archive_hint_about" = "Archived chats will remain in the Archive when you receive a new message. {link}";
+"lng_archive_hint_about_unmuted" = "When you receive a new message, muted chats will remain in the Archive, while unmuted chats will be moved to Chats. {link}";
+"lng_archive_hint_about_link" = "Tap to change {emoji}";
+"lng_archive_hint_section_1" = "Archived Chats";
+"lng_archive_hint_section_1_info" = "Move any chat into your Archive and back by swiping on it.";
+"lng_archive_hint_section_2" = "Hiding Archive";
+"lng_archive_hint_section_2_info" = "Hide the Archive from your Main screen by swiping on it.";
+"lng_archive_hint_section_3" = "Stories";
+"lng_archive_hint_section_3_info" = "Archive Stories from your contacts separately from chats with them.";
+"lng_archive_hint_button" = "Got it";
+
+"lng_settings_generic_subscribe" = "Subscribe to {link} to use this setting.";
+"lng_settings_generic_subscribe_link" = "Telegram Premium";
 
 "lng_sessions_header" = "This device";
 "lng_sessions_other_header" = "Active Devices";
@@ -1162,19 +1297,25 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_blocked_list_subtitle#other" = "{count} blocked users";
 
 "lng_edit_privacy_everyone" = "Everybody";
+"lng_edit_privacy_no_miniapps" = "Not Mini Apps";
 "lng_edit_privacy_contacts" = "My contacts";
 "lng_edit_privacy_close_friends" = "Close friends";
 "lng_edit_privacy_contacts_and_premium" = "Contacts & Premium";
+"lng_edit_privacy_paid" = "Paid";
+"lng_edit_privacy_contacts_and_miniapps" = "Contacts & Mini Apps";
 "lng_edit_privacy_nobody" = "Nobody";
 "lng_edit_privacy_premium" = "Premium users";
+"lng_edit_privacy_miniapps" = "Mini Apps";
 "lng_edit_privacy_exceptions" = "Add exceptions";
 "lng_edit_privacy_user_types" = "User types";
 "lng_edit_privacy_users_and_groups" = "Users and groups";
 "lng_edit_privacy_premium_status" = "all Telegram Premium subscribers";
+"lng_edit_privacy_miniapps_status" = "web mini apps that you use";
 
 "lng_edit_privacy_exceptions_count#one" = "{count} user";
 "lng_edit_privacy_exceptions_count#other" = "{count} users";
 "lng_edit_privacy_exceptions_premium_and" = "Premium & {users}";
+"lng_edit_privacy_exceptions_miniapps_and" = "Mini Apps & {users}";
 "lng_edit_privacy_exceptions_add" = "Add users";
 
 "lng_edit_privacy_phone_number_title" = "Phone number privacy";
@@ -1227,6 +1368,24 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_edit_privacy_birthday_never_title" = "Never allow";
 "lng_edit_privacy_birthday_yet" = "You haven't entered your date of birth yet.\n{link}";
 "lng_edit_privacy_birthday_yet_link" = "Add my birthday >";
+
+"lng_edit_privacy_gifts_title" = "Gifts";
+"lng_edit_privacy_gifts_header" = "Who can display gifts on my profile";
+"lng_edit_privacy_gifts_always_empty" = "Always allow";
+"lng_edit_privacy_gifts_never_empty" = "Never allow";
+"lng_edit_privacy_gifts_exceptions" = "Choose whether gifts from specific senders need your approval before they're visible to others on your profile.";
+"lng_edit_privacy_gifts_always_title" = "Always allow";
+"lng_edit_privacy_gifts_never_title" = "Never allow";
+
+"lng_edit_privacy_gifts_types" = "Accepted Gift Types";
+"lng_edit_privacy_gifts_premium" = "Premium Subscriptions";
+"lng_edit_privacy_gifts_unlimited" = "Unlimited";
+"lng_edit_privacy_gifts_limited" = "Limited-Edition";
+"lng_edit_privacy_gifts_unique" = "Unique";
+"lng_edit_privacy_gifts_types_about" = "Choose the types of gifts that you accept.";
+"lng_edit_privacy_gifts_show_icon" = "Show Gift Icon in Chats";
+"lng_edit_privacy_gifts_show_icon_about" = "Display the {emoji}Gift icon in the message input field for both participants in all chats.";
+"lng_edit_privacy_gifts_restricted" = "This user doesn't accept gifts.";
 
 "lng_edit_privacy_calls_title" = "Calls";
 "lng_edit_privacy_calls_header" = "Who can call me";
@@ -1291,6 +1450,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_messages_privacy_premium_about" = "Subscribe now to change this setting and get access to other exclusive features of Telegram Premium.";
 "lng_messages_privacy_premium" = "Only subscribers of {link} can select this option.";
 "lng_messages_privacy_premium_link" = "Telegram Premium";
+"lng_messages_privacy_charge" = "Charge for messages";
+"lng_messages_privacy_charge_about" = "Charge a fee for messages from people outside your contacts or those you haven't messaged first.";
+"lng_messages_privacy_price" = "Set your price per message";
+"lng_messages_privacy_price_about" = "You will receive {percent} of the selected fee ({amount}) for each incoming message.";
+"lng_messages_privacy_exceptions" = "Exceptions";
+"lng_messages_privacy_remove_fee" = "Remove Fee";
+"lng_messages_privacy_remove_about" = "Add users or entire groups who won't be charged for sending messages to you.";
 
 "lng_self_destruct_title" = "Account self-destruction";
 "lng_self_destruct_description" = "If you don't come online at least once within this period, your account will be deleted along with all groups, messages and contacts.";
@@ -1324,6 +1490,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_profile_common_groups#other" = "{count} groups in common";
 "lng_profile_similar_channels#one" = "{count} similar channel";
 "lng_profile_similar_channels#other" = "{count} similar channels";
+"lng_profile_similar_bots#one" = "{count} similar bot";
+"lng_profile_similar_bots#other" = "{count} similar bots";
 "lng_profile_saved_messages#one" = "{count} saved message";
 "lng_profile_saved_messages#other" = "{count} saved messages";
 "lng_profile_peer_gifts#one" = "{count} gift";
@@ -1351,6 +1519,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_profile_hide_participants_about" = "Switch this on to hide the list of members in this group. Admins will remain visible.";
 "lng_profile_view_channel" = "View Channel";
 "lng_profile_view_discussion" = "View discussion";
+"lng_profile_direct_messages" = "Direct messages";
 "lng_profile_join_channel" = "Join Channel";
 "lng_profile_join_group" = "Join Group";
 "lng_profile_apply_to_join_group" = "Apply to Join Group";
@@ -1459,13 +1628,19 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_profile_enable_notifications" = "Notifications";
 "lng_profile_send_message" = "Send Message";
 "lng_profile_open_app" = "Open App";
+"lng_profile_open_app_short" = "Open";
 "lng_profile_open_app_about" = "By launching this mini app, you agree to the {terms}.";
 "lng_profile_open_app_terms" = "Terms of Service for Mini Apps";
+"lng_profile_bot_permissions_title" = "Allow access to";
+"lng_profile_bot_emoji_status_access" = "Emoji Status";
 "lng_info_add_as_contact" = "Add to contacts";
 "lng_profile_shared_media" = "Shared media";
 "lng_profile_suggest_photo" = "Suggest Profile Photo";
+"lng_profile_suggest_photo_from_clipboard" = "Suggest From Clipboard";
 "lng_profile_set_photo_for" = "Set Profile Photo";
+"lng_profile_set_photo_for_from_clipboard" = "Set From Clipboard";
 "lng_profile_photo_reset" = "Reset to Original";
+"lng_profile_photo_from_clipboard" = "From clipboard";
 "lng_profile_suggest_sure" = "You can suggest {user} to set this photo for their Telegram profile.";
 "lng_profile_suggest_button" = "Suggest";
 "lng_profile_set_personal_sure" = "Only you will see this photo and it will replace any photo {user} sets for themselves.";
@@ -1484,6 +1659,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_media_type_audios" = "Voice messages";
 "lng_media_type_links" = "Shared links";
 "lng_media_type_rounds" = "Video messages";
+"lng_media_saved_music_your" = "Your playlist";
+"lng_media_saved_music_title" = "Playlist";
 "lng_profile_common_groups_section" = "Groups in common";
 "lng_info_edit_contact" = "Edit contact";
 "lng_info_delete_contact" = "Delete contact";
@@ -1523,6 +1700,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_manage_channel_title" = "Manage Channel";
 "lng_manage_bot_title" = "Manage Bot";
 "lng_manage_peer_recent_actions" = "Recent actions";
+"lng_manage_peer_star_ref" = "Affiliate programs";
 "lng_manage_peer_members" = "Members";
 "lng_manage_peer_subscribers" = "Subscribers";
 "lng_manage_peer_administrators" = "Administrators";
@@ -1596,11 +1774,154 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_manage_peer_bot_balance" = "Balance";
 "lng_manage_peer_bot_balance_currency" = "Toncoin";
 "lng_manage_peer_bot_balance_credits" = "Stars";
+"lng_manage_peer_bot_star_ref" = "Affiliate Program";
+"lng_manage_peer_bot_star_ref_off" = "Off";
+"lng_manage_peer_bot_star_ref_about" = "Share a link to {bot} with your friends and earn {amount} of their spending there.";
+"lng_manage_peer_bot_verify" = "Verify Accounts";
 "lng_manage_peer_bot_edit_intro" = "Edit Intro";
 "lng_manage_peer_bot_edit_commands" = "Edit Commands";
 "lng_manage_peer_bot_edit_settings" = "Change Bot Settings";
 "lng_manage_peer_bot_about" = "Use {bot} to manage this bot.";
 
+"lng_bot_verify_title" = "Choose Chat to Verify";
+"lng_bot_verify_bot_title" = "Verify Bot";
+"lng_bot_verify_bot_text" = "Do you want to verify {name} with your verification mark and description?";
+"lng_bot_verify_bot_about" = "You can customize your description for each bot.";
+"lng_bot_verify_bot_submit" = "Verify Bot";
+"lng_bot_verify_bot_sent" = "{name} has been notified and will receive your verification mark and description upon accepting.";
+"lng_bot_verify_bot_remove" = "This bot is already verified by you. Do you want to remove verification?";
+"lng_bot_verify_user_title" = "Verify User";
+"lng_bot_verify_user_text" = "Do you want to verify {name} with your verification mark and description?";
+"lng_bot_verify_user_about" = "You can customize your description for each account.";
+"lng_bot_verify_user_submit" = "Verify User";
+"lng_bot_verify_user_sent" = "{name} has been notified and will receive your verification mark and description upon accepting.";
+"lng_bot_verify_user_remove" = "This account is already verified by you. Do you want to remove verification?";
+"lng_bot_verify_channel_title" = "Verify Channel";
+"lng_bot_verify_channel_text" = "Do you want to verify {name} with your verification mark and description?";
+"lng_bot_verify_channel_about" = "You can customize your description for each channel.";
+"lng_bot_verify_channel_submit" = "Verify Channel";
+"lng_bot_verify_channel_sent" = "{name} has been notified and will receive your verification mark and description upon accepting.";
+"lng_bot_verify_channel_remove" = "This channel is already verified by you. Do you want to remove verification?";
+"lng_bot_verify_group_title" = "Verify Group";
+"lng_bot_verify_group_text" = "Do you want to verify {name} with your verification mark and description?";
+"lng_bot_verify_group_about" = "You can customize your description for each group.";
+"lng_bot_verify_group_submit" = "Verify Group";
+"lng_bot_verify_group_sent" = "{name} has been notified and will receive your verification mark and description upon accepting.";
+"lng_bot_verify_group_remove" = "This group is already verified by you. Do you want to remove verification?";
+"lng_bot_verify_description_label" = "Description";
+"lng_bot_verify_remove_title" = "Remove verification";
+"lng_bot_verify_remove_submit" = "Remove";
+"lng_bot_verify_remove_done" = "You've removed this verification.";
+
+"lng_star_ref_title" = "Affiliate Program";
+"lng_star_ref_about" = "Reward those who help grow your user base.";
+"lng_star_ref_share_title" = "Share revenue with affiliates";
+"lng_star_ref_share_about" = "Set the commission for revenue generated by users referred to you.";
+"lng_star_ref_launch_title" = "Launch your affiliate program";
+"lng_star_ref_launch_about" = "Telegram will feature your program for millions of potential affiliates.";
+"lng_star_ref_let_title" = "Let affiliate promote you";
+"lng_star_ref_let_about" = "Affiliates will share your referral link with their audience.";
+"lng_star_ref_commission_title" = "Commission";
+"lng_star_ref_commission_about" = "Define the percentage of star revenue your affiliates earn for referring users to your bot.";
+"lng_star_ref_duration_title" = "Duration";
+"lng_star_ref_duration_about" = "Set the duration for which affiliates will earn commissions from referred users.";
+"lng_star_ref_existing_title" = "View existing programs";
+"lng_star_ref_existing_about" = "Explore what other mini apps offer.";
+"lng_star_ref_add_bot" = "Add {bot}";
+"lng_star_ref_end" = "End Affiliate Program";
+"lng_star_ref_start" = "Start Affiliate Program";
+"lng_star_ref_start_disabled" = "Available in {time}";
+"lng_star_ref_start_info" = "By creating an affiliate program, you agree to the {terms} of Affiliate Programs.";
+"lng_star_ref_update" = "Update Affiliate Program";
+"lng_star_ref_update_info" = "By updating an affiliate program, you agree to the {terms} of Affiliate Programs.";
+"lng_star_ref_button_link" = "terms and conditions";
+"lng_star_ref_tos_url" = "https://telegram.org/tos/mini-apps";
+"lng_star_ref_warning_title" = "Warning";
+"lng_star_ref_warning_text" = "Once you start the affiliate program, you won't be able to decrease its commission or duration. You can only increase these parameters or end the program, which will disable all previously distributed referral links.";
+"lng_star_ref_warning_change" = "This change is irreversible. You won't be able to reduce commission or duration. You can only increase these parameters or end the program, which will disable all previously shared referral links.";
+"lng_star_ref_warning_start" = "Start";
+"lng_star_ref_warning_update" = "Update";
+"lng_star_ref_warning_if_end" = "If you end your affiliate program:";
+"lng_star_ref_warning_if_end1" = "Any referral links already shared will be disabled in **24** hours.";
+"lng_star_ref_warning_if_end2" = "All participating affiliates will be notified.";
+"lng_star_ref_warning_if_end3" = "You will be able to start a new affiliate program only in **24** hours.";
+"lng_star_ref_warning_end" = "End Anyway";
+"lng_star_ref_created_title" = "Affiliate program started";
+"lng_star_ref_created_text" = "Any Telegram user, channel owner or mini app developer can now join your program.";
+"lng_star_ref_updated_title" = "Affiliate program updated";
+"lng_star_ref_updated_text" = "Any Telegram user, channel owner or mini app developer can join your program.";
+"lng_star_ref_ended_title" = "Affiliate program ended";
+"lng_star_ref_ended_text" = "Participating affiliates have been notified. All referral links will be disabled in **24** hours.";
+"lng_star_ref_list_title" = "Affiliate Programs";
+"lng_star_ref_list_about_channel" = "Promote mini apps to your subscribers and earn a share of their revenue in Stars.";
+"lng_star_ref_list_text" = "Earn a commission each time a user who first accessed a mini app through your referral link spends **Stars** within it.";
+"lng_star_ref_list_my" = "My Programs";
+"lng_star_ref_list_my_open" = "Open App";
+"lng_star_ref_list_my_copy" = "Copy Link";
+"lng_star_ref_list_my_leave" = "Leave";
+"lng_star_ref_list_subtitle" = "Programs";
+"lng_star_ref_sort_text" = "Sort by {sort}";
+"lng_star_ref_sort_profitability" = "Profitability";
+"lng_star_ref_sort_date" = "Date";
+"lng_star_ref_sort_revenue" = "Revenue";
+"lng_star_ref_reliable_title" = "Reliable";
+"lng_star_ref_reliable_about" = "Receive guaranteed commissions for spending by users you refer.";
+"lng_star_ref_transparent_title" = "Transparent";
+"lng_star_ref_transparent_about" = "Track your commissions from referred users in real time.";
+"lng_star_ref_simple_title" = "Simple";
+"lng_star_ref_simple_about" = "Choose a mini app below, get your referral link, and start earning Stars.";
+"lng_star_ref_duration_forever" = "Forever";
+"lng_star_ref_one_about" = "{app} will share {amount} of the revenue from each user you refer to it {duration}.";
+"lng_star_ref_one_about_for_forever" = "for **lifetime**";
+"lng_star_ref_one_about_for_months#one" = "for **{count} month**";
+"lng_star_ref_one_about_for_months#other" = "for **{count} months**";
+"lng_star_ref_one_about_for_years#one" = "for **{count} year**";
+"lng_star_ref_one_about_for_years#other" = "for **{count} years**";
+"lng_star_ref_one_daily_revenue" = "Daily revenue per user: {amount}";
+"lng_star_ref_one_join" = "Join Program";
+"lng_star_ref_one_join_text" = "By joining this program, you agree to the {terms} of Affiliate Programs.";
+"lng_star_ref_joined_title" = "Program joined";
+"lng_star_ref_joined_text" = "You can now copy the referral link.";
+"lng_star_ref_link_title" = "Referral Link";
+"lng_star_ref_link_about_channel" = "Share this link with your subscribers to earn a {amount} commission on their spending in {app} {duration}.";
+"lng_star_ref_link_about_user" = "Share this link with your friends to earn a {amount} commission on their spending in {app} {duration}.";
+"lng_star_ref_link_about_bot" = "Share this link with your users to earn a {amount} commission on their spending in {app} {duration}.";
+"lng_star_ref_link_recipient" = "Commissions will be sent to:";
+"lng_star_ref_link_copy" = "Copy Link";
+"lng_star_ref_link_copy_none" = "No one have opened {app} through this link.";
+"lng_star_ref_link_copy_users#one" = "{count} user have opened {app} through this link.";
+"lng_star_ref_link_copy_users#other" = "{count} users have opened {app} through this link.";
+"lng_star_ref_link_copied_title" = "Link copied to clipboard";
+"lng_star_ref_link_copied_text" = "Share this link and earn {amount} of what people who use it spend in {app}!";
+"lng_star_ref_stopped" = "This affiliate link is no longer active.";
+"lng_star_ref_revoke_title" = "Revoke Link";
+"lng_star_ref_revoke_text" = "Are you sure you want to revoke the link of {bot}?";
+"lng_star_ref_revoked_title" = "Link removed";
+"lng_star_ref_revoked_text" = "It will no longer work.";
+
+"lng_stars_rating_title" = "Rating";
+"lng_stars_rating_future" = "Future Rating";
+"lng_stars_rating_updates#one" = "in {count} day";
+"lng_stars_rating_updates#other" = "in {count} days";
+"lng_stars_rating_pending#one" = "The rating will update {when}.\n{count} point is pending. {link}";
+"lng_stars_rating_pending#other" = "The rating will update {when}.\n{count} points are pending. {link}";
+"lng_stars_rating_pending_preview" = "Preview {arrow}";
+"lng_stars_rating_pending_back" = "Back {arrow}";
+"lng_stars_rating_negative_label" = "Negative Rating";
+"lng_stars_rating_negative" = "A negative rating indicates that **{name}'s** payments are unreliable.";
+"lng_stars_rating_negative_your#one" = "A negative rating indicates that your payments are unreliable. Spend **{count} Star** to fix this issue.";
+"lng_stars_rating_negative_your#other" = "A negative rating indicates that your payments are unreliable. Spend **{count} Stars** to fix this issue.";
+"lng_stars_rating_about" = "This rating reflects **{name}'s** activity on Telegram. What affects it:";
+"lng_stars_rating_about_your" = "This rating reflects your activity on Telegram. What affects it:";
+"lng_stars_title_gifts_telegram" = "Gifts from Telegram";
+"lng_stars_about_gifts_telegram" = "{emoji} 100% of the Stars spent on gifts purchased from Telegram.";
+"lng_stars_title_gifts_users" = "Gifts and Posts from Users";
+"lng_stars_about_gifts_users" = "{emoji} 20% of the Stars spent on resold gifts, paid messages and channel posts.";
+"lng_stars_title_refunds" = "Refunds and Conversions";
+"lng_stars_about_refunds" = "{emoji} 10x of refunded Stars and 85% of bought gifts converted to Stars.";
+"lng_stars_rating_added" = "Added";
+"lng_stars_rating_deducted" = "Deducted";
+"lng_stars_rating_understood" = "Understood";
 
 "lng_manage_discussion_group" = "Discussion";
 "lng_manage_discussion_group_add" = "Add a group";
@@ -1621,6 +1942,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_manage_linked_channel_unlink" = "Unlink channel";
 "lng_manage_linked_channel_posted" = "All new posts from this channel are forwarded to the group.";
 "lng_manage_discussion_group_warning" = "\"Chat history for new members\" will be switched to **Visible**.";
+
+"lng_manage_monoforum" = "Direct Messages";
+"lng_manage_monoforum_off" = "Off";
+"lng_manage_monoforum_free" = "Free";
+"lng_manage_monoforum_allow" = "Allow Channel Messages";
+"lng_manage_monoforum_price" = "Price for each message";
+"lng_manage_monoforum_about" = "Allow users to send messages to your channel, with the option to charge a fee for each message.";
+"lng_manage_monoforum_price_about" = "Your channel will receive {percent} of the selected fee ({amount}) for each incoming message.";
+"lng_manage_monoforum_link_subtitle" = "Link to direct messages";
 
 "lng_manage_history_visibility_title" = "Chat history for new members";
 "lng_manage_history_visibility_shown" = "Visible";
@@ -1749,6 +2079,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_sure_delete_contact" = "Are you sure you want to delete {contact} from your contact list?";
 "lng_sure_delete_history" = "Are you sure you want to delete all message history with {contact}?\n\nThis action cannot be undone.";
 "lng_sure_delete_group_history" = "Are you sure you want to delete all messages in \"{group}\"?\n\nThis action cannot be undone.";
+"lng_sure_delete_channel_history" = "Are you sure you want to delete all messages in \"{channel}\"?\n\n**This action cannot be undone.**";
 "lng_sure_delete_and_exit" = "Are you sure you want to delete all message history and leave «{group}»?\n\nThis action cannot be undone.";
 "lng_sure_leave_channel" = "Are you sure you want to leave\nthis channel?";
 "lng_sure_delete_channel" = "Are you sure you want to delete this channel? All subscribers will be removed and all messages will be lost.";
@@ -1805,6 +2136,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_action_changed_title" = "{from} changed group name to «{title}»";
 "lng_action_changed_title_channel" = "Channel name was changed to «{title}»";
 "lng_action_created_chat" = "{from} created the group «{title}»";
+"lng_action_created_monoforum" = "Direct messages were enabled in this channel.";
 "lng_action_ttl_changed" = "{from} set messages to auto-delete in {duration}";
 "lng_action_ttl_changed_you" = "You set messages to auto-delete in {duration}";
 "lng_action_ttl_changed_channel" = "Messages in this channel will be automatically deleted after {duration}";
@@ -1842,6 +2174,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_action_payment_init_recurring_for" = "You successfully transferred {amount} to {user} for {invoice} and allowed future recurring payments";
 "lng_action_payment_init_recurring" = "You successfully transferred {amount} to {user} and allowed future recurring payments";
 "lng_action_payment_used_recurring" = "You were charged {amount} via recurring payment";
+"lng_action_payment_bot_done" = "Bot connected to this account received {amount}";
+"lng_action_payment_bot_recurring" = "Bot connected to this account received {amount} via recurring payment";
 "lng_action_took_screenshot" = "{from} took a screenshot!";
 "lng_action_you_took_screenshot" = "You took a screenshot!";
 "lng_action_bot_allowed_from_domain" = "You allowed this bot to message you when you logged in on {domain}.";
@@ -1858,6 +2192,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_action_you_proximity_reached" = "You are now within {distance} from {user}";
 "lng_action_you_theme_changed" = "You changed the chat theme to {emoji}";
 "lng_action_theme_changed" = "{from} changed the chat theme to {emoji}";
+"lng_action_you_gift_theme_changed" = "You set {name} as a new theme for this chat.";
+"lng_action_gift_theme_changed" = "{from} set {name} as a new theme for this chat.";
 "lng_action_you_theme_disabled" = "You disabled the chat theme";
 "lng_action_theme_disabled" = "{from} disabled the chat theme";
 "lng_action_proximity_distance_m#one" = "{count} meter";
@@ -1866,20 +2202,60 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_action_proximity_distance_km#other" = "{count} km";
 "lng_action_webview_data_done" = "Data from the \"{text}\" button was transferred to the bot.";
 "lng_action_gift_received" = "{user} sent you a gift for {cost}";
+"lng_action_gift_unique_received" = "{user} sent you a unique collectible item";
 "lng_action_gift_sent" = "You sent a gift for {cost}";
+"lng_action_gift_unique_sent" = "You sent a unique collectible item";
+"lng_action_gift_upgraded" = "{user} turned the gift from you into a unique collectible";
+"lng_action_gift_upgraded_channel" = "{user} turned this gift to {channel} into a unique collectible";
+"lng_action_gift_upgraded_self_channel" = "You turned this gift to {channel} into a unique collectible";
+"lng_action_gift_upgraded_mine" = "You turned the gift from {user} into a unique collectible";
+"lng_action_gift_upgraded_self" = "You turned this gift into a unique collectible";
+"lng_action_gift_sent_upgrade_other" = "{from} sent an upgrade worth {cost} for the gift you received from {user}.";
+"lng_action_gift_sent_upgrade_self_other" = "You sent an upgrade worth {cost} for the gift {name} received from {user}.";
+"lng_action_gift_sent_upgrade" = "{from} sent an upgrade worth {cost} for your gift.";
+"lng_action_gift_sent_upgrade_self" = "You sent an upgrade worth {cost} for this gift.";
+"lng_action_gift_sent_upgrade_self_channel" = "You sent an upgrade worth {cost} for your gift to {name}.";
+"lng_action_gift_upgraded_helped" = "{user} unpacked the gift that you helped to upgrade.";
+"lng_action_gift_upgraded_helped_self" = "You unpacked the gift that {user} helped to upgrade.";
+"lng_action_gift_transferred" = "{user} transferred you a gift";
+"lng_action_gift_transferred_channel" = "{user} transferred a gift to {channel}";
+"lng_action_gift_transferred_unknown" = "Someone transferred you a gift";
+"lng_action_gift_transferred_unknown_channel" = "Someone transferred a gift to {channel}";
+"lng_action_gift_transferred_self" = "You transferred a unique collectible";
+"lng_action_gift_transferred_self_channel" = "You transferred a gift to {channel}";
+"lng_action_gift_transferred_mine" = "You transferred a gift to {user}";
 "lng_action_gift_received_anonymous" = "Unknown user sent you a gift for {cost}";
+"lng_action_gift_sent_channel" = "{user} sent a gift to {name} for {cost}";
+"lng_action_gift_sent_self_channel" = "You sent a gift to {name} for {cost}";
+"lng_action_gift_self_bought" = "You bought a gift for {cost}";
+"lng_action_gift_self_subtitle" = "Saved Gift";
+"lng_action_gift_self_about#one" = "Display this gift on your page or convert it to **{count}** Star.";
+"lng_action_gift_self_about#other" = "Display this gift on your page or convert it to **{count}** Stars.";
+"lng_action_gift_self_about_unique" = "You can display this gift on your page or turn it into unique collectible and send to others.";
+"lng_action_gift_channel_about#one" = "Display this gift in channel's Gifts or convert it to **{count}** Star.";
+"lng_action_gift_channel_about#other" = "Display this gift in channel's Gifts or convert it to **{count}** Stars.";
+"lng_action_gift_channel_about_unique" = "You can display this gift in channel's Gifts or turn it into unique collectible.";
 "lng_action_gift_for_stars#one" = "{count} Star";
 "lng_action_gift_for_stars#other" = "{count} Stars";
+"lng_action_gift_for_ton#one" = "{count} TON";
+"lng_action_gift_for_ton#other" = "{count} TON";
 "lng_action_gift_got_subtitle" = "Gift from {user}";
 "lng_action_gift_got_stars_text#one" = "Display this gift on your page or convert it to **{count}** Star.";
 "lng_action_gift_got_stars_text#other" = "Display this gift on your page or convert it to **{count}** Stars.";
+"lng_action_gift_got_upgradable_text" = "Upgrade this gift to a unique collectible.";
 "lng_action_gift_got_gift_text" = "You can keep this gift on your page.";
+"lng_action_gift_can_remove_text" = "You can remove this gift from your page.";
+"lng_action_gift_got_gift_channel" = "You can keep this gift in channel's Gifts.";
+"lng_action_gift_can_remove_channel" = "You can remove this gift from channel's Gifts.";
 "lng_action_gift_sent_subtitle" = "Gift for {user}";
 "lng_action_gift_sent_text#one" = "{user} can display this gift on their page or convert it to {count} Star.";
 "lng_action_gift_sent_text#other" = "{user} can display this gift on their page or convert it to {count} Stars.";
+"lng_action_gift_sent_upgradable" = "{user} can upgrade this gift to a unique collectible.";
 "lng_action_gift_premium_months#one" = "{count} Month Premium";
 "lng_action_gift_premium_months#other" = "{count} Months Premium";
 "lng_action_gift_premium_about" = "Subscription for exclusive Telegram features.";
+"lng_action_gift_refunded" = "This gift was downgraded because a request to refund the payment related to this gift was made, and the money was returned.";
+"lng_action_gift_got_ton" = "Use TON to suggest posts to channels.";
 "lng_action_suggested_photo_me" = "You suggested this photo for {user}'s Telegram profile.";
 "lng_action_suggested_photo" = "{user} suggests this photo for your Telegram profile.";
 "lng_action_suggested_photo_button" = "View Photo";
@@ -1928,10 +2304,51 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_action_giveaway_results_credits#other" = "{count} winners of the giveaway were randomly selected by Telegram and received their prize.";
 "lng_action_giveaway_results_credits_some" = "Some winners of the giveaway were randomly selected by Telegram and received their prize.";
 "lng_action_giveaway_results_none" = "No winners of the giveaway could be selected.";
+"lng_action_boost_apply_me" = "You boosted the group";
 "lng_action_boost_apply#one" = "{from} boosted the group";
 "lng_action_boost_apply#other" = "{from} boosted the group {count} times";
 "lng_action_set_chat_intro" = "{from} added the message below for all empty chats. How?";
 "lng_action_payment_refunded" = "{peer} refunded {amount}";
+"lng_action_paid_message_sent#one" = "You paid {count} Star to {action}";
+"lng_action_paid_message_sent#other" = "You paid {count} Stars to {action}";
+"lng_action_paid_message_one" = "send a message";
+"lng_action_paid_message_some#one" = "send {count} message";
+"lng_action_paid_message_some#other" = "send {count} messages";
+"lng_action_paid_message_got#one" = "You received {count} Star from {name}";
+"lng_action_paid_message_got#other" = "You received {count} Stars from {name}";
+"lng_action_paid_message_refund#one" = "{from} refunded {count} Star to you";
+"lng_action_paid_message_refund#other" = "{from} refunded {count} Stars to you";
+"lng_action_paid_message_refund_self#one" = "You refunded {count} Star to {name}";
+"lng_action_paid_message_refund_self#other" = "You refunded {count} Stars to {name}";
+"lng_action_message_price_free" = "Messages are now free in this group.";
+"lng_action_message_price_paid#one" = "Messages now cost {count} Star each in this group.";
+"lng_action_message_price_paid#other" = "Messages now cost {count} Stars each in this group.";
+"lng_action_direct_messages_enabled" = "Channel enabled Direct Messages.";
+"lng_action_direct_messages_paid#one" = "Channel allows Direct Messages for {count} Star each.";
+"lng_action_direct_messages_paid#other" = "Channel allows Direct Messages for {count} Stars each.";
+"lng_action_direct_messages_disabled" = "Channel disabled Direct Messages.";
+"lng_action_todo_marked_done" = "{from} marked {tasks} as done.";
+"lng_action_todo_marked_done_self" = "You marked {tasks} as done.";
+"lng_action_todo_marked_not_done" = "{from} marked {tasks} as not done.";
+"lng_action_todo_marked_not_done_self" = "You marked {tasks} as not done.";
+"lng_action_todo_added" = "{from} added {tasks} to the list.";
+"lng_action_todo_added_self" = "You added {tasks} to the list.";
+"lng_action_todo_tasks_fallback#one" = "task";
+"lng_action_todo_tasks_fallback#other" = "{count} tasks";
+"lng_action_todo_tasks_and_one" = "{tasks}, {task}";
+"lng_action_todo_tasks_and_last" = "{tasks} and {task}";
+"lng_action_suggest_success_stars#one" = "{from} has received {count} Star for publishing post.";
+"lng_action_suggest_success_stars#other" = "{from} has received {count} Stars for publishing post.";
+"lng_action_suggest_success_ton#one" = "{from} has received {count} TON for publishing post.";
+"lng_action_suggest_success_ton#other" = "{from} has received {count} TON for publishing post.";
+"lng_action_suggest_refund_user" = "User refunded the Stars so that post was deleted.";
+"lng_action_suggest_refund_admin" = "Admin deleted the post early so that the price was refunded to the user.";
+"lng_action_post_rejected" = "The post was rejected.";
+"lng_action_not_enough_funds" = "Transaction failed.";
+"lng_you_paid_stars#one" = "You paid {count} Star.";
+"lng_you_paid_stars#other" = "You paid {count} Stars.";
+
+"lng_you_joined_group" = "You joined this group";
 
 "lng_similar_channels_title" = "Similar channels";
 "lng_similar_channels_view_all" = "View all";
@@ -1941,9 +2358,26 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_similar_channels_premium_all_link" = "Telegram Premium";
 "lng_similar_channels_show_more" = "Show more channels";
 
+"lng_similar_bots_title" = "Similar bots";
+"lng_similar_bots_premium_all#one" = "Subscribe to {link} to unlock up to **{count}** similar bot.";
+"lng_similar_bots_premium_all#other" = "Subscribe to {link} to unlock up to **{count}** similar bots.";
+"lng_similar_bots_show_more" = "Show more bots";
+
 "lng_peer_gifts_title" = "Gifts";
 "lng_peer_gifts_about" = "These gifts were sent to {user} by other users.";
 "lng_peer_gifts_about_mine" = "These gifts were sent to you by other users. Click on a gift to convert it to Stars or change its privacy settings.";
+"lng_peer_gifts_empty_search" = "No matching gifts";
+"lng_peer_gifts_view_all" = "View All Gifts";
+"lng_peer_gifts_notify" = "Notify About New Gifts";
+"lng_peer_gifts_notify_enabled" = "You will receive a message from Telegram when your channel receives a gift.";
+"lng_peer_gifts_filter_by_value" = "Sort by Value";
+"lng_peer_gifts_filter_by_date" = "Sort by Date";
+"lng_peer_gifts_filter_unlimited" = "Unlimited";
+"lng_peer_gifts_filter_upgradable" = "Upgradeable";
+"lng_peer_gifts_filter_limited" = "Limited";
+"lng_peer_gifts_filter_unique" = "Unique";
+"lng_peer_gifts_filter_saved" = "Displayed";
+"lng_peer_gifts_filter_unsaved" = "Hidden";
 
 "lng_premium_gift_duration_months#one" = "for {count} month";
 "lng_premium_gift_duration_months#other" = "for {count} months";
@@ -2101,6 +2535,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 "lng_channel_public_link_copied" = "Link copied to clipboard.";
 "lng_context_about_private_link" = "This link will only work for members of this chat.";
+"lng_public_post_private_hint_ctrl" = "Use Ctrl+Click to copy a non-public link.";
+"lng_public_post_private_hint_cmd" = "Use Cmd+Click to copy a non-public link.";
 
 "lng_forwarded" = "Forwarded from {user}";
 "lng_forwarded_story" = "Story from {user}";
@@ -2204,6 +2640,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_group_stickers_add" = "Choose sticker set";
 "lng_group_emoji" = "Select Emoji Pack";
 "lng_group_emoji_description" = "Choose an emoji pack that will be available to all members within the group.";
+"lng_collectible_emoji" = "Collectibles";
 
 "lng_premium" = "Premium";
 "lng_premium_free" = "Free";
@@ -2213,6 +2650,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_premium_unlock_emoji" = "Unlock Animated Emoji";
 "lng_premium_unlock_status" = "Unlock Emoji Status";
 
+"lng_premium_subscribe_months_24" = "2-Year";
 "lng_premium_subscribe_months_12" = "Annual";
 "lng_premium_subscribe_months_6" = "Semiannual";
 "lng_premium_subscribe_months_1" = "Monthly";
@@ -2274,11 +2712,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_premium_summary_about_business" = "Upgrade your account with business features such as location, opening hours and quick replies.";
 "lng_premium_summary_subtitle_effects" = "Message Effects";
 "lng_premium_summary_about_effects" = "Add over 500 animated effects to private messages.";
+"lng_premium_summary_subtitle_filter_tags" = "Tag Your Chats";
+"lng_premium_summary_about_filter_tags" = "Display folder names for each chat in the chat list.";
+"lng_premium_summary_subtitle_todo_lists" = "Checklists";
+"lng_premium_summary_about_todo_lists" = "Plan, assign, and complete tasks - seamlessly and efficiently.";
 "lng_premium_summary_bottom_subtitle" = "About Telegram Premium";
 "lng_premium_summary_bottom_about" = "While the free version of Telegram already gives its users more than any other messaging application, **Telegram Premium** pushes its capabilities even further.\n\n**Telegram Premium** is a paid option, because most Premium Features require additional expenses from Telegram to third parties such as data center providers and server manufacturers. Contributions from **Telegram Premium** users allow us to cover such costs and also help Telegram stay free for everyone.";
 "lng_premium_summary_button" = "Subscribe for {cost} per month";
 
 "lng_premium_summary_new_badge" = "NEW";
+"lng_soon_badge" = "Soon";
 
 "lng_premium_success" = "You've successfully subscribed to Telegram Premium!";
 "lng_premium_unavailable" = "This feature requires subscription to **Telegram Premium**.\n\nUnfortunately, **Telegram Premium** is not available in your region.";
@@ -2345,6 +2788,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_premium_double_limits_subtitle_accounts" = "Connected Accounts";
 "lng_premium_double_limits_about_accounts#one" = "Connect {count} account with different mobile numbers";
 "lng_premium_double_limits_about_accounts#other" = "Connect {count} accounts with different mobile numbers";
+
+"lng_premium_double_limits_subtitle_similar_channels" = "Similar Channel";
+"lng_premium_double_limits_about_similar_channels#one" = "View up to {count} similar channel";
+"lng_premium_double_limits_about_similar_channels#other" = "View up to {count} similar channels";
 //
 
 "lng_premium_gift_title" = "Gift Telegram Premium";
@@ -2399,6 +2846,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 "lng_credits_summary_title" = "Telegram Stars";
 "lng_credits_summary_about" = "Buy Stars to unlock content and services in miniapps on Telegram.";
+"lng_credits_currency_summary_title" = "TON Balance";
+"lng_credits_currency_summary_about" = "Offer TON to submit post suggestions to channels on Telegram.";
+"lng_credits_currency_summary_subtitle" = "You can withdraw your TON using Fragment.";
+"lng_credits_currency_summary_in_button" = "Top-up via Fragment";
+"lng_credits_currency_summary_in_subtitle" = "You can top-up your TON balance via Fragment.";
 "lng_credits_summary_options_subtitle" = "Choose package";
 "lng_credits_summary_options_credits#one" = "{count} Star";
 "lng_credits_summary_options_credits#other" = "{count} Stars";
@@ -2406,12 +2858,30 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_summary_options_about" = "By proceeding and purchasing Stars, you agree with the {link}.";
 "lng_credits_summary_options_about_link" = "Terms and Conditions";
 "lng_credits_summary_options_about_url" = "https://telegram.org/tos/stars";
+"lng_credits_summary_earn_title" = "Earn Stars";
+"lng_credits_summary_earn_about" = "Distribute links to mini apps and earn a share of their revenue in Stars.";
 "lng_credits_summary_history_tab_full" = "All Transactions";
 "lng_credits_summary_history_tab_in" = "Incoming";
 "lng_credits_summary_history_tab_out" = "Outgoing";
 "lng_credits_summary_history_entry_inner_in" = "In-App Purchase";
 "lng_credits_summary_balance" = "Balance";
+"lng_credits_commission" = "{amount} commission";
+"lng_credits_paid_messages_fee#one" = "Fee for {count} Message";
+"lng_credits_paid_messages_fee#other" = "Fee for {count} Messages";
+"lng_credits_paid_messages_fee_about" = "You receive {percent} of the price that you charge for each incoming message. {link}";
+"lng_credits_paid_messages_fee_about_link" = "Change Fee {emoji}";
+"lng_credits_paid_messages_full" = "Full Price";
+"lng_credits_premium_gift_duration" = "Duration";
+"lng_credits_more_options" = "More Options";
+"lng_credits_balance_me" = "your balance";
+"lng_credits_balance_me_count" = "Your balance: {emoji} {amount}";
+"lng_credits_buy_button" = "Top Up Balance";
+"lng_credits_topup_button" = "{emoji} Top Up Balance";
+"lng_credits_buy_button_short" = "Top Up";
+"lng_credits_stats_button_short" = "Stats";
+"lng_credits_stats_button" = "View Statistics";
 "lng_credits_gift_button" = "Gift Stars to Friends";
+"lng_credits_earn_button" = "Earn Stars from Mini Apps";
 "lng_credits_box_out_title" = "Confirm Your Purchase";
 "lng_credits_box_out_sure#one" = "Do you want to buy **\"{text}\"** in **{bot}** for **{count} Star**?";
 "lng_credits_box_out_sure#other" = "Do you want to buy **\"{text}\"** in **{bot}** for **{count} Stars**?";
@@ -2419,6 +2889,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_box_out_media#other" = "Do you want to unlock {media} in {chat} for **{count} Stars**?";
 "lng_credits_box_out_media_user#one" = "Do you want to unlock {media} from {user} for **{count} Star**?";
 "lng_credits_box_out_media_user#other" = "Do you want to unlock {media} from {user} for **{count} Stars**?";
+"lng_credits_box_out_subscription_bot#one" = "Do you want to subscribe to **{title}** in **{recipient}** for **{count}** star per month?";
+"lng_credits_box_out_subscription_bot#other" = "Do you want to subscribe to **{title}** in **{recipient}** for **{count}** stars per month?";
+"lng_credits_box_out_subscription_business#one" = "Do you want to subscribe to **{title}** from **{recipient}** for **{count}** star per month?";
+"lng_credits_box_out_subscription_business#other" = "Do you want to subscribe to **{title}** from **{recipient}** for **{count}** stars per month?";
+"lng_credits_box_out_subscription_confirm#one" = "Subscribe for {emoji} {count} / month";
+"lng_credits_box_out_subscription_confirm#other" = "Subscribe for {emoji} {count} / month";
 "lng_credits_box_out_photo" = "a photo";
 "lng_credits_box_out_photos#one" = "{count} photo";
 "lng_credits_box_out_photos#other" = "{count} photos";
@@ -2440,6 +2916,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_summary_in_toast_about#other" = "**{count}** Stars added to your balance.";
 "lng_credits_box_history_entry_peer" = "Recipient";
 "lng_credits_box_history_entry_peer_in" = "From";
+"lng_credits_box_history_entry_gift_from" = "Gift From";
 "lng_credits_box_history_entry_via" = "Via";
 "lng_credits_box_history_entry_play_market" = "Play Store";
 "lng_credits_box_history_entry_app_store" = "App Store";
@@ -2449,7 +2926,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_box_history_entry_giveaway_name" = "Received Prize";
 "lng_credits_box_history_entry_gift_sent" = "Sent Gift";
 "lng_credits_box_history_entry_gift_converted" = "Converted Gift";
+"lng_credits_box_history_entry_gift_transfer" = "Gift Transfer";
 "lng_credits_box_history_entry_gift_unavailable" = "Unavailable";
+"lng_credits_box_history_entry_gift_released" = "released by {name}";
 "lng_credits_box_history_entry_gift_sold_out" = "This gift has sold out";
 "lng_credits_box_history_entry_gift_out_about" = "With Stars, **{user}** will be able to unlock content and services on Telegram.\n{link}";
 "lng_credits_box_history_entry_gift_in_about" = "Use Stars to unlock content and services on Telegram. {link}";
@@ -2457,6 +2936,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_box_history_entry_gift_examples" = "Examples";
 "lng_credits_box_history_entry_ads" = "Ads Platform";
 "lng_credits_box_history_entry_premium_bot" = "Stars Top-Up";
+"lng_credits_box_history_entry_currency_in" = "TON Top-Up";
+"lng_credits_box_history_entry_posts_search" = "Posts Search";
 "lng_credits_box_history_entry_api" = "Paid Broadcast";
 "lng_credits_box_history_entry_floodskip_about#one" = "{count} Message";
 "lng_credits_box_history_entry_floodskip_about#other" = "{count} Messages";
@@ -2464,13 +2945,24 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_box_history_entry_via_premium_bot" = "Premium Bot";
 "lng_credits_box_history_entry_id" = "Transaction ID";
 "lng_credits_box_history_entry_id_copied" = "Transaction ID copied to clipboard.";
+"lng_credits_box_history_entry_reason_star_ref" = "Affiliate Program";
+"lng_credits_box_history_entry_affiliate" = "Affiliate";
+"lng_credits_box_history_entry_miniapp" = "Mini App";
+"lng_credits_box_history_entry_referred" = "Referred User";
 "lng_credits_box_history_entry_success_date" = "Transaction date";
 "lng_credits_box_history_entry_success_url" = "Transaction link";
 "lng_credits_box_history_entry_media" = "Media";
+"lng_credits_box_history_entry_message" = "Message";
 "lng_credits_box_history_entry_about" = "You can dispute this transaction {link}.";
 "lng_credits_box_history_entry_about_link" = "here";
 "lng_credits_box_history_entry_reaction_name" = "Star Reaction";
 "lng_credits_box_history_entry_subscription" = "Monthly subscription fee";
+"lng_credits_box_history_entry_gift_upgrade" = "Collectible Upgrade";
+"lng_credits_box_history_entry_gift_sold" = "Gift Sale";
+"lng_credits_box_history_entry_gift_bought" = "Gift Purchase";
+"lng_credits_box_history_entry_gift_sold_to" = "To";
+"lng_credits_box_history_entry_gift_full_price" = "Full Price";
+"lng_credits_box_history_entry_gift_bought_from" = "From";
 
 "lng_credits_subscription_section" = "My subscriptions";
 "lng_credits_box_subscription_title" = "Subscription";
@@ -2478,6 +2970,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_subscriber_subtitle" = "appx. {total} per month";
 
 "lng_credits_subscription_row_to" = "Subscription";
+"lng_credits_subscription_row_to_bot" = "Bot";
+"lng_credits_subscription_row_to_business" = "Business";
 "lng_credits_subscription_row_from" = "Subscribed";
 
 "lng_credits_subscription_row_next_on" = "Renews";
@@ -2488,13 +2982,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_subscription_on_about" = "If you cancel now, you will still be able to access your subscription until {date}.";
 
 "lng_credits_subscription_off_button" = "Renew Subscription";
+"lng_credits_subscription_off_rejoin_button" = "Subscribe again";
 "lng_credits_subscription_off_about" = "You have canceled your subscription.";
+"lng_credits_subscription_off_by_bot_about" = "{bot} has canceled your subscription.";
 
 "lng_credits_subscription_status_on" = "renews on {date}";
 "lng_credits_subscription_status_off" = "expires on {date}";
 "lng_credits_subscription_status_none" = "expired on {date}";
 "lng_credits_subscription_status_off_right" = "canceled";
 "lng_credits_subscription_status_none_right" = "expired";
+"lng_credits_subscription_status_off_by_bot_right" = "canceled\nby bot";
 
 "lng_credits_small_balance_title#one" = "{count} Star Needed";
 "lng_credits_small_balance_title#other" = "{count} Stars Needed";
@@ -2502,6 +2999,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_credits_small_balance_reaction" = "Buy **Stars** and send them to {channel} to support their posts.";
 "lng_credits_small_balance_subscribe" = "Buy **Stars** and subscribe to **{channel}** and other channels.";
 "lng_credits_small_balance_star_gift" = "Buy **Stars** to send gifts to {user} and other contacts.";
+"lng_credits_small_balance_for_message" = "Buy **Stars** to send messages to {user}.";
+"lng_credits_small_balance_for_messages" = "Buy **Stars** to send messages.";
+"lng_credits_small_balance_for_suggest" = "Buy **Stars** to suggest post to {channel}.";
+"lng_credits_small_balance_for_search" = "Buy **Stars** to search through public posts.";
 "lng_credits_small_balance_fallback" = "Buy **Stars** to unlock content and services on Telegram.";
 "lng_credits_purchase_blocked" = "Sorry, you can't purchase this item with Telegram Stars.";
 "lng_credits_enough" = "You have enough stars at the moment. {link}";
@@ -2606,8 +3107,34 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_chatbots_include_button" = "Select Chats";
 "lng_chatbots_exclude_about" = "Select chats or entire chat categories which the bot will not have access to.";
 "lng_chatbots_permissions_title" = "Bot permissions";
+"lng_chatbots_warning_title" = "Warning";
+"lng_chatbots_warning_both_text" = "The bot {bot} will be able to **manage your gifts and stars**, including giving them away to other users.";
+"lng_chatbots_warning_gifts_text" = "The bot {bot} will be able to **manage your gifts**, including giving them away to other users.";
+"lng_chatbots_warning_stars_text" = "The bot {bot} will be able to **transfer your stars**.";
+"lng_chatbots_warning_username_text" = "The bot {bot} will be able to **set and remove usernames** for your account, which may result in the loss of your current username.";
+
+"lng_chatbots_manage_messages" = "Manage Messages";
+"lng_chatbots_read" = "Read Messages";
 "lng_chatbots_reply" = "Reply to Messages";
-"lng_chatbots_reply_about" = "The bot can only reply on your behalf in chats that were active during the last 24h.";
+"lng_chatbots_mark_as_read" = "Mark Messages as Read";
+"lng_chatbots_delete_sent" = "Delete Sent Messages";
+"lng_chatbots_delete_received" = "Delete Received Messages";
+
+"lng_chatbots_manage_profile" = "Manage Profile";
+"lng_chatbots_edit_name" = "Edit Name";
+"lng_chatbots_edit_bio" = "Edit Bio";
+"lng_chatbots_edit_userpic" = "Edit Profile Picture";
+"lng_chatbots_edit_username" = "Edit Username";
+
+"lng_chatbots_manage_gifts" = "Manage Gifts and Stars";
+"lng_chatbots_view_gifts" = "View Gifts";
+"lng_chatbots_sell_gifts" = "Sell Gifts";
+"lng_chatbots_gift_settings" = "Change Gift Settings";
+"lng_chatbots_transfer_gifts" = "Transfer and Upgrade Gifts";
+"lng_chatbots_transfer_stars" = "Transfer Stars";
+
+"lng_chatbots_manage_stories" = "Manage Stories";
+
 "lng_chatbots_remove" = "Remove Bot";
 "lng_chatbots_not_found" = "Chatbot not found.";
 "lng_chatbots_not_supported" = "This bot doesn't support Telegram Business yet.";
@@ -2763,11 +3290,21 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_boost_group_needs_level_emoji#one" = "Your group needs to reach **Level {count}** to set emoji pack.";
 "lng_boost_group_needs_level_emoji#other" = "Your group needs to reach **Level {count}** to set emoji pack.";
 
+"lng_boost_channel_title_wear" = "Wear Item";
+"lng_boost_channel_needs_level_wear#one" = "Your channel needs **Level {count}** to wear collectibles.";
+"lng_boost_channel_needs_level_wear#other" = "Your channel needs **Level {count}** to wear collectibles.";
+
 "lng_boost_channel_ask" = "Ask your **Premium** subscribers to boost your channel with this link:";
 "lng_boost_channel_ask_button" = "Copy Link";
-"lng_boost_channel_or" = "or";
-"lng_boost_channel_gifting" = "Boost your channel by gifting your subscribers Telegram Premium. {link}";
-"lng_boost_channel_gifting_link" = "Get boosts >";
+//"lng_boost_channel_or" = "or";
+//"lng_boost_channel_gifting" = "Boost your channel by gifting your subscribers Telegram Premium. {link}";
+//"lng_boost_channel_gifting_link" = "Get boosts >";
+"lng_boost_group_ask" = "Ask your **Premium** members to boost your group with this link:";
+//"lng_boost_group_gifting" = "Boost your group by gifting your members Telegram Premium. {link}";
+
+"lng_boost_channel_title_autotranslate" = "Autotranslation of Messages";
+"lng_boost_channel_needs_level_autotranslate#one" = "Your channel needs to reach **Level {count}** to enable autotranslation of messages.";
+"lng_boost_channel_needs_level_autotranslate#other" = "Your channel needs to reach **Level {count}** to enable autotranslation of messages.";
 
 "lng_feature_stories#one" = "**{count}** Story Per Day";
 "lng_feature_stories#other" = "**{count}** Stories Per Day";
@@ -2787,6 +3324,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_feature_custom_background_group" = "Custom Group Background";
 "lng_feature_custom_emoji_pack" = "Custom Emoji Pack";
 "lng_feature_transcribe" = "Voice-to-Text Conversion";
+"lng_feature_autotranslate" = "Autotranslation of Messages";
+
+"lng_edit_topics_enable" = "Enable Topics";
+"lng_edit_topics_about" = "The group chat will be divided into topics created by admins or users.";
+"lng_edit_topics_layout" = "Topics layout";
+"lng_edit_topics_layout_about" = "Choose how topics appear for all members.";
+"lng_edit_topics_tabs" = "Tabs";
+"lng_edit_topics_list" = "List";
 
 "lng_giveaway_new_title" = "Boosts via Gifts";
 "lng_giveaway_new_about" = "Get more boosts for your channel by gifting Premium to your subscribers.";
@@ -3024,58 +3569,310 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_gift_stars_incoming" = "Use Stars to unlock content and services on Telegram.";
 "lng_gift_until" = "Until";
 
+"lng_gift_ton_amount#one" = "{count} TON";
+"lng_gift_ton_amount#other" = "{count} TON";
+
+"lng_gift_premium_title" = "Premium Gift";
+"lng_gift_premium_text#one" = "Subscribe to **Telegram Premium** to send up to **{count}** of these gifts and unlock access to multiple additional features.";
+"lng_gift_premium_text#other" = "Subscribe to **Telegram Premium** to send up to **{count}** of these gifts and unlock access to multiple additional features.";
 "lng_gift_premium_or_stars" = "Gift Premium or Stars";
 "lng_gift_premium_subtitle" = "Gift Premium";
 "lng_gift_premium_about" = "Give {name} access to exclusive features with Telegram Premium. {features}";
 "lng_gift_premium_features" = "See Features >";
 "lng_gift_premium_label" = "Premium";
+"lng_gift_premium_by_stars" = "or {amount}";
 "lng_gift_stars_subtitle" = "Gift Stars";
 "lng_gift_stars_about" = "Give {name} gifts that can be kept on your profile or converted to Stars. {link}";
 "lng_gift_stars_link" = "What are Stars >";
 "lng_gift_stars_limited" = "limited";
 "lng_gift_stars_sold_out" = "sold out";
+"lng_gift_stars_resale" = "resale";
+"lng_gift_stars_on_sale" = "on sale";
+"lng_gift_stars_premium" = "premium";
 "lng_gift_stars_tabs_all" = "All Gifts";
+"lng_gift_stars_tabs_my" = "My Gifts";
 "lng_gift_stars_tabs_limited" = "Limited";
+"lng_gift_stars_tabs_in_stock" = "In Stock";
+"lng_gift_stars_tabs_resale" = "Resale";
 "lng_gift_send_title" = "Send a Gift";
 "lng_gift_send_message" = "Enter Message";
 "lng_gift_send_anonymous" = "Hide My Name";
+"lng_gift_send_pay_with_stars" = "Pay with {amount}";
+"lng_gift_send_stars_balance" = "Your balance is {amount}. {link}";
+"lng_gift_send_stars_balance_link" = "Get More Stars >";
+"lng_gift_send_anonymous_self" = "Hide my name and message from visitors to my profile.";
 "lng_gift_send_anonymous_about" = "You can hide your name and message from visitors to {user}'s profile. {recipient} will still see your name and message.";
+"lng_gift_send_anonymous_about_paid" = "You can hide your name from visitors to {user}'s profile. {recipient} will still see your name.";
+"lng_gift_send_anonymous_about_channel" = "You can hide your name and message from all visitors of this channel except its admins.";
+"lng_gift_send_unique" = "Make Unique for {price}";
+"lng_gift_send_unique_about" = "Enable this to let {user} turn your gift into a unique collectible. {link}";
+"lng_gift_send_unique_about_channel" = "Enable this to let the admins of {name} turn your gift into a unique collectible. {link}";
+"lng_gift_send_unique_link" = "Learn More >";
 "lng_gift_send_premium_about" = "Only {user} will see your message.";
+"lng_gift_send_limited_sold#one" = "{count} sold";
+"lng_gift_send_limited_sold#other" = "{count} sold";
+"lng_gift_send_limited_left#one" = "{count} left";
+"lng_gift_send_limited_left#other" = "{count} left";
 "lng_gift_send_button" = "Send a Gift for {cost}";
+"lng_gift_send_button_self" = "Buy a Gift for {cost}";
+"lng_gift_buy_resale_title" = "Buy {name}";
+"lng_gift_buy_resale_button" = "Buy for {cost}";
+"lng_gift_buy_resale_equals" = "Equals to {cost}";
+"lng_gift_buy_resale_only_ton" = "The seller only accepts TON as payment.";
+"lng_gift_buy_resale_pay_stars" = "Pay in Stars";
+"lng_gift_buy_resale_pay_ton" = "Pay in TON";
+"lng_gift_buy_resale_confirm" = "Do you want to buy {name} for {price} and gift it to {user}?";
+"lng_gift_buy_resale_confirm_self" = "Do you want to buy {name} for {price}?";
+"lng_gift_buy_price_change_title" = "Price change!";
+"lng_gift_buy_price_change_text" = "This gift price was changed and now is {price}. Do you still want to buy?";
 "lng_gift_sent_title" = "Gift Sent!";
+"lng_gift_sent_resale_done" = "{user} has been notified about your gift.";
+"lng_gift_sent_resale_done_self" = "{gift} is now yours.";
 "lng_gift_sent_about#one" = "You spent **{count}** Star from your balance.";
 "lng_gift_sent_about#other" = "You spent **{count}** Stars from your balance.";
+"lng_gift_sent_finished#one" = "You've already sent **{count}** of these gifts, and it's the limit.";
+"lng_gift_sent_finished#other" = "You've already sent **{count}** of these gifts, and it's the limit.";
+"lng_gift_sent_remains#one" = "You can send **{count}** more.";
+"lng_gift_sent_remains#other" = "You can send **{count}** more.";
 "lng_gift_limited_of_one" = "unique";
 "lng_gift_limited_of_count" = "1 of {amount}";
+"lng_gift_collectible_tag" = "gift";
+"lng_gift_view_unpack" = "Unpack";
 "lng_gift_anonymous_hint" = "Only you can see the sender's name.";
+"lng_gift_anonymous_hint_channel" = "Only admins of this channel can see the sender's name.";
 "lng_gift_hidden_hint" = "This gift is hidden. Only you can see it.";
-"lng_gift_visible_hint" = "This gift is visible to visitors of your page.";
+"lng_gift_hidden_unique" = "This gift is not displayed on your page.";
+"lng_gift_visible_hint" = "This gift is visible on your page.";
+"lng_gift_hidden_hint_channel" = "This gift is hidden from visitors of your channel.";
+"lng_gift_visible_hint_channel" = "This gift is visible in your channel's Gifts.";
+"lng_gift_in_blockchain" = "This gift is in TON blockchain. {link}";
+"lng_gift_in_blockchain_link_arrow" = "View {arrow}";
+"lng_gift_visible_hide_arrow" = "Hide {arrow}";
+"lng_gift_visible_show_arrow" = "Show {arrow}";
+"lng_gift_show_on_page" = "Display on my Page";
+"lng_gift_show_on_channel" = "Display in channel's Gifts";
 "lng_gift_availability" = "Availability";
 "lng_gift_from_hidden" = "Hidden User";
+"lng_gift_subtitle_birthdays" = "Birthdays";
+"lng_gift_list_birthday_status_today" = "{emoji} Birthday today";
+"lng_gift_list_birthday_status_yesterday" = "Birthday yesterday";
+"lng_gift_list_birthday_status_tomorrow" = "Birthday tomorrow";
+"lng_gift_self_status" = "buy yourself a gift";
+"lng_gift_self_title" = "Buy a Gift";
+"lng_gift_self_about" = "Buy yourself a gift to display on your page or reserve for later.\n\nLimited-edition gifts upgraded to collectibles can be gifted to others later.";
+"lng_gift_channel_title" = "Send a Gift";
+"lng_gift_channel_about" = "Select a gift to show appreciation for {name}.";
+"lng_gift_released_by" = "Released by {name}";
+"lng_gift_unique_owner" = "Owner";
+"lng_gift_unique_address_copied" = "Address copied to clipboard.";
+"lng_gift_unique_status" = "Status";
+"lng_gift_unique_status_non" = "Non-Unique";
+"lng_gift_unique_upgrade" = "Upgrade";
+"lng_gift_unique_upgrade_next" = "Upgrade Next Gift";
+"lng_gift_unique_gift_upgrade" = "Gift an Upgrade";
+"lng_gift_unique_number" = "Collectible #{index}";
+"lng_gift_unique_number_by" = "Collectible #{index} by {name}";
+"lng_gift_unique_model" = "Model";
+"lng_gift_unique_backdrop" = "Backdrop";
+"lng_gift_unique_symbol" = "Symbol";
+"lng_gift_unique_rarity" = "Only {percent} of such collectibles have this attribute.";
+"lng_gift_unique_availability_label" = "Quantity";
+"lng_gift_unique_availability#one" = "{count} of {amount} issued";
+"lng_gift_unique_availability#other" = "{count} of {amount} issued";
+"lng_gift_unique_value" = "Value";
+"lng_gift_unique_value_learn_more" = "learn more";
+"lng_gift_unique_info" = "Gifted to {recipient} on {date}.";
+"lng_gift_unique_info_sender" = "Gifted by {from} to {recipient} on {date}.";
+"lng_gift_unique_info_sender_comment" = "Gifted by {from} to {recipient} on {date} with the comment \"{text}\".";
+"lng_gift_unique_info_reciever" = "Gifted to {recipient} on {date}.";
+"lng_gift_unique_info_reciever_comment" = "Gifted to {recipient} on {date} with the comment \"{text}\".";
 "lng_gift_availability_left#one" = "{count} of {amount} left";
 "lng_gift_availability_left#other" = "{count} of {amount} left";
 "lng_gift_availability_none" = "None of {amount} left";
-"lng_gift_display_on_page" = "Display on my Page";
-"lng_gift_display_on_page_hide" = "Hide from my Page";
+"lng_gift_value_about_average" = "This is the average sale price of {gift} gifts on Telegram and Fragment over the past month.";
+"lng_gift_value_about_last" = "This is the price at which {gift} was last sold on {platform}.";
+"lng_gift_value_initial_sale" = "Initial Sale";
+"lng_gift_value_initial_price" = "Initial Price";
+"lng_gift_value_initial_price_value" = "{stars} ({amount})";
+"lng_gift_value_last_sale" = "Last Sale";
+"lng_gift_value_last_price" = "Last Price";
+"lng_gift_value_minimum_price" = "Minimum Price";
+"lng_gift_value_minimum_price_tooltip" = "{amount} is the floor price for {gift} gifts listed on Telegram and Fragment.";
+"lng_gift_vlaue_average_price" = "Average Price";
+"lng_gift_value_average_price_tooltip" = "{amount} is the average sale price of {gift} gifts on Telegram and Fragment over the past month.";
+"lng_gift_value_availability#one" = "{count} {emoji} for sale on {platform} {arrow}";
+"lng_gift_value_availability#other" = "{count} {emoji} for sale on {platform} {arrow}";
+"lng_gift_value_telegram" = "Telegram";
+"lng_gift_value_fragment" = "Fragment";
 "lng_gift_convert_to_stars#one" = "Convert to {count} Star";
 "lng_gift_convert_to_stars#other" = "Convert to {count} Stars";
 "lng_gift_convert_sure_title" = "Convert Gift to Stars";
 "lng_gift_convert_sure_confirm#one" = "Do you want to convert this gift from {user} to **{count} Star**?";
 "lng_gift_convert_sure_confirm#other" = "Do you want to convert this gift from {user} to **{count} Stars**?";
+"lng_gift_convert_sure_confirm_channel#one" = "Do you want to convert this gift to {channel} to **{count} Star**?";
+"lng_gift_convert_sure_confirm_channel#other" = "Do you want to convert this gift to {channel} to **{count} Stars**?";
 "lng_gift_convert_sure_limit#one" = "Conversion is available for the next **{count} day**.";
 "lng_gift_convert_sure_limit#other" = "Conversion is available for the next **{count} days**.";
 "lng_gift_convert_sure_caution" = "This action cannot be undone. This will permanently destroy the gift.";
 "lng_gift_convert_sure" = "Convert";
 "lng_gift_display_done" = "The gift is now shown on your profile page.";
+"lng_gift_display_done_channel" = "The gift is now shown in channel's Gifts.";
 "lng_gift_display_done_hide" = "The gift is now hidden from your profile page.";
+"lng_gift_display_done_hide_channel" = "The gift is now hidden from channel's Gifts.";
+"lng_gift_pinned_done_title" = "{gift} pinned";
+"lng_gift_pinned_done" = "The gift will always be shown on top.";
+"lng_gift_pinned_done_replaced" = "replacing {gift}";
 "lng_gift_got_stars#one" = "You got **{count} Star** for this gift.";
 "lng_gift_got_stars#other" = "You got **{count} Stars** for this gift.";
+"lng_gift_channel_got#one" = "Channel got **{count} Star** for this gift.";
+"lng_gift_channel_got#other" = "Channel got **{count} Stars** for this gift.";
 "lng_gift_sold_out_title" = "Sold Out!";
 "lng_gift_sold_out_text#one" = "All {count} gift was already sold.";
 "lng_gift_sold_out_text#other" = "All {count} gifts were already sold.";
 "lng_gift_send_small" = "send a gift";
 "lng_gift_sell_small#one" = "sell for {count} Star";
 "lng_gift_sell_small#other" = "sell for {count} Stars";
+"lng_gift_upgrade_title" = "Upgrade Gift";
+"lng_gift_upgrade_about" = "Turn your gift into a unique collectible\nthat you can transfer or auction.";
+"lng_gift_upgrade_preview_title" = "Make Unique";
+"lng_gift_upgrade_preview_about" = "Let {name} turn your gift into a unique collectible.";
+"lng_gift_upgrade_preview_about_channel" = "Let the admins of {name} turn your gift into a unique collectible.";
+"lng_gift_upgrade_unique_title" = "Unique";
+"lng_gift_upgrade_unique_about" = "Get a unique number, model, backdrop and symbol for your gift.";
+"lng_gift_upgrade_unique_about_user" = "{name} will get a unique number, model, backdrop and symbol for your gift.";
+"lng_gift_upgrade_unique_about_channel" = "Admins of {name} will get a unique number, model, backdrop and symbol for your gift.";
+"lng_gift_upgrade_transferable_title" = "Transferable";
+"lng_gift_upgrade_transferable_about" = "Send your upgraded gift to any of your friends on Telegram.";
+"lng_gift_upgrade_transferable_about_user" = "{name} will be able to send the gift to anyone on Telegram.";
+"lng_gift_upgrade_transferable_about_channel" = "Admins of {name} will be able to send the gift to anyone on Telegram.";
+"lng_gift_upgrade_tradable_title" = "Tradable";
+"lng_gift_upgrade_tradable_about" = "Sell or auction your gift on third-party NFT marketplaces.";
+"lng_gift_upgrade_tradable_about_user" = "{name} will be able to sell the gift on Telegram and NFT marketplaces.";
+"lng_gift_upgrade_tradable_about_channel" = "Admins of {name} will be able to sell the gift on Telegram and NFT marketplaces.";
+"lng_gift_upgrade_button" = "Upgrade for {price}";
+"lng_gift_upgrade_free" = "Upgrade for Free";
+"lng_gift_upgrade_confirm" = "Confirm";
+"lng_gift_upgrade_add_my" = "Add my name to the gift";
+"lng_gift_upgrade_add_my_comment" = "Add my name and comment";
+"lng_gift_upgrade_add_sender" = "Add sender's name to the gift";
+"lng_gift_upgrade_add_comment" = "Add sender's name and comment";
+"lng_gift_upgraded_title" = "Gift Upgraded";
+"lng_gift_upgraded_about" = "Your gift {name} now has unique attributes and can be transferred to others";
+"lng_gift_upgrade_gifted_title" = "Upgrade Gifted";
+"lng_gift_upgrade_gifted_about" = "Now {name} can turn your gift into a unique collectible.";
+"lng_gift_upgrade_gifted_about_channel" = "Now the admins of {name} can turn your gift into a unique collectible.";
+"lng_gift_transferred_title" = "Gift Transferred";
+"lng_gift_transferred_about" = "{name} was successfully transferred to {recipient}.";
+"lng_gift_transfer_title" = "Transfer {name}";
+"lng_gift_transfer_via_blockchain" = "Send via Blockchain";
+"lng_gift_transfer_password_title" = "Two-step verification";
+"lng_gift_transfer_password_description" = "Please enter your password to transfer.";
+"lng_gift_transfer_password_about" = "You can withdraw only if you have:";
+"lng_gift_transfer_confirm_title" = "Manage with Fragment";
+"lng_gift_transfer_confirm_text" = "You can use Fragment, a third-party service, to transfer {name} to your TON account. After that, you can manage it as an NFT with any TON wallet outside Telegram.\n\nYou can also move such NFTs back to your Telegram account via Fragment.";
+"lng_gift_transfer_confirm_button" = "Open Fragment";
+"lng_gift_transfer_unlocks_days#one" = "unlocks in {count} day";
+"lng_gift_transfer_unlocks_days#other" = "unlocks in {count} days";
+"lng_gift_transfer_unlocks_hours#one" = "unlocks in {count} hour";
+"lng_gift_transfer_unlocks_hours#other" = "unlocks in {count} hours";
+"lng_gift_transfer_unlocks_title" = "Unlocking in progress";
+"lng_gift_transfer_unlocks_about" = "{when}, you'll be able to send this collectible to any TON blockchain address outside Telegram for sale or auction.";
+"lng_gift_transfer_unlocks_when_days#one" = "In {count} day";
+"lng_gift_transfer_unlocks_when_days#other" = "In {count} days";
+"lng_gift_transfer_unlocks_when_hours#one" = "In {count} hour";
+"lng_gift_transfer_unlocks_when_hours#other" = "In {count} hours";
+"lng_gift_transfer_unlocks_update_title" = "Update required";
+"lng_gift_transfer_unlocks_update_about" = "Please update your Telegram application to the latest version.";
+"lng_gift_transfer_sure" = "Do you want to transfer ownership of {name} to {recipient}?";
+"lng_gift_transfer_sure_for" = "Do you want to transfer ownership of {name} to {recipient} for {price}?";
+"lng_gift_transfer_button" = "Transfer";
+"lng_gift_transfer_button_for" = "Transfer for {price}";
+"lng_gift_transfer_set_theme" = "Set as Theme in...";
+"lng_gift_transfer_choose" = "Choose Chat";
+"lng_gift_transfer_wear" = "Wear";
+"lng_gift_transfer_take_off" = "Take Off";
+"lng_gift_transfer_sell" = "Sell";
+"lng_gift_transfer_update" = "Change Price";
+"lng_gift_transfer_unlist" = "Unlist";
+"lng_gift_sell_unlist_title" = "Unlist {name}";
+"lng_gift_sell_unlist_sure" = "Are you sure you want to unlist your gift?";
+"lng_gift_sell_title" = "Price in Stars";
+"lng_gift_sell_about" = "You will receive {percent} of the selected amount.";
+"lng_gift_sell_amount#one" = "You will receive **{count}** Star.";
+"lng_gift_sell_amount#other" = "You will receive **{count}** Stars.";
+"lng_gift_sell_min_price#one" = "Minimum price is {count} Star.";
+"lng_gift_sell_min_price#other" = "Minimum price is {count} Stars.";
+"lng_gift_sell_only_ton" = "Only Accept TON";
+"lng_gift_sell_only_ton_about" = "If the buyer pays you in TON, there's no risk of refunds, unlike Stars payments.";
+"lng_gift_sell_amount_ton#one" = "You will receive **{count}** TON.";
+"lng_gift_sell_amount_ton#other" = "You will receive **{count}** TON.";
+"lng_gift_sell_min_price_ton#one" = "Minimum price is {count} TON.";
+"lng_gift_sell_min_price_ton#other" = "Minimum price is {count} TON.";
+"lng_gift_sell_title_ton" = "Price in TON";
+"lng_gift_sell_put" = "Put for Sale";
+"lng_gift_sell_update" = "Update the Price";
+"lng_gift_sell_toast" = "{name} is now for sale!";
+"lng_gift_sell_updated" = "Sale price for {name} was updated.";
+"lng_gift_sell_removed" = "{name} is removed from sale.";
+"lng_gift_menu_show" = "Show";
+"lng_gift_menu_hide" = "Hide";
+"lng_gift_wear_title" = "Wear {name}";
+"lng_gift_wear_about" = "and get these benefits:";
+"lng_gift_wear_badge_title" = "Radiant Badge";
+"lng_gift_wear_badge_about" = "The glittering icon of this item will be displayed next to your name.";
+"lng_gift_wear_badge_about_channel" = "The glittering icon of this item will be displayed next to channel's name.";
+"lng_gift_wear_proof_title" = "Proof of Ownership";
+"lng_gift_wear_proof_about" = "Clicking the icon of this item next to your name will show its info and owner.";
+"lng_gift_wear_proof_about_channel" = "Clicking the icon of this item next to channel's name will show its info and owner.";
+"lng_gift_wear_start" = "Start Wearing";
+"lng_gift_wear_subscribe" = "Subscribe to {link} to wear collectibles.";
+"lng_gift_wear_start_toast" = "You put on {name}";
+"lng_gift_wear_end_toast" = "You took off {name}";
+"lng_gift_many_pinned_title" = "Too Many Pinned Gifts";
+"lng_gift_many_pinned_choose" = "Select a gift to unpin below";
+"lng_gift_resale_price" = "Price";
+"lng_gift_resale_number" = "Number";
+"lng_gift_resale_date" = "Date";
+"lng_gift_resale_count#one" = "{count} gift in resale";
+"lng_gift_resale_count#other" = "{count} gifts in resale";
+"lng_gift_resale_sort_price" = "Sort by Price";
+"lng_gift_resale_sort_date" = "Sort by Date";
+"lng_gift_resale_sort_number" = "Sort by Number";
+"lng_gift_resale_filter_all" = "Select All";
+"lng_gift_resale_model" = "Model";
+"lng_gift_resale_models#one" = "{count} Model";
+"lng_gift_resale_models#other" = "{count} Models";
+"lng_gift_resale_backdrop" = "Backdrop";
+"lng_gift_resale_backdrops#one" = "{count} Backdrop";
+"lng_gift_resale_backdrops#other" = "{count} Backdrops";
+"lng_gift_resale_symbol" = "Symbol";
+"lng_gift_resale_symbols#one" = "{count} Symbol";
+"lng_gift_resale_symbols#other" = "{count} Symbols";
+"lng_gift_resale_switch_to_ton" = "Switch to Ton";
+"lng_gift_resale_switch_to_stars" = "Switch to Stars";
+"lng_gift_resale_early" = "You will be able to resell this gift in {duration}.";
+"lng_gift_transfer_early" = "You will be able to transfer this gift in {duration}.";
+"lng_gift_resale_transfer_early_title" = "Try Later";
+"lng_gift_collection_add" = "Add Collection";
+"lng_gift_collection_new_title" = "Create a New Collection";
+"lng_gift_collection_new_button" = "New Collection";
+"lng_gift_collection_new_text" = "Choose a name for your collection and start adding your gifts there.";
+"lng_gift_collection_new_ph" = "Title";
+"lng_gift_collection_new_create" = "Create";
+"lng_gift_collection_empty_title" = "Organize Your Gifts";
+"lng_gift_collection_empty_text" = "Add some of your gifts to this collection.";
+"lng_gift_collection_all" = "All Gifts";
+"lng_gift_collection_add_title" = "Add Gifts";
+"lng_gift_collection_add_button" = "Add Gifts";
+"lng_gift_collection_share" = "Share Collection";
+"lng_gift_collection_edit" = "Edit Name";
+"lng_gift_collection_limit_title" = "Limit Reached";
+"lng_gift_collection_limit_text" = "Please remove one of the existing collections to add a new one.";
+"lng_gift_collection_delete" = "Delete Collection";
+"lng_gift_collection_delete_sure" = "Are you sure you want to delete this collection?";
+"lng_gift_collection_delete_button" = "Delete";
+"lng_gift_collection_add_to" = "Add to Collection";
+"lng_gift_locked_title" = "Gift Locked";
 
 "lng_accounts_limit_title" = "Limit Reached";
 "lng_accounts_limit1#one" = "You have reached the limit of **{count}** connected account.";
@@ -3174,6 +3971,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_in_dlg_sticker_emoji" = "{emoji} Sticker";
 "lng_in_dlg_poll" = "Poll";
 "lng_in_dlg_story" = "Story";
+"lng_in_dlg_todo_list" = "Checklist";
 "lng_in_dlg_story_expired" = "Expired story";
 "lng_in_dlg_media_count#one" = "{count} media";
 "lng_in_dlg_media_count#other" = "{count} media";
@@ -3191,6 +3989,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_restrict_users" = "Restrict users";
 "lng_delete_all_from_user" = "Delete all from {user}";
 "lng_delete_all_from_users" = "Delete all from users";
+"lng_restrict_user#one" = "Restrict user";
+"lng_restrict_user#other" = "Restrict users";
 "lng_restrict_user_part" = "Partially restrict this user {emoji}";
 "lng_restrict_users_part" = "Partially restrict users {emoji}";
 "lng_restrict_user_full" = "Fully ban this user {emoji}";
@@ -3217,6 +4017,22 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_new_contact_from_request_group" = "{user} is an admin of {name}, a group you requested to join.";
 "lng_new_contact_about_status" = "This account uses {emoji} as a custom status next to its\nname. Such emoji statuses are available to all\nsubscribers of {link}.";
 "lng_new_contact_about_status_link" = "Telegram Premium";
+"lng_new_contact_not_contact" = "Not a contact";
+"lng_new_contact_phone_number" = "Phone number";
+"lng_new_contact_registration" = "Registration";
+"lng_new_contact_common_groups" = "Common groups";
+"lng_new_contact_groups#one" = "{count} group {emoji} {arrow}";
+"lng_new_contact_groups#other" = "{count} groups {emoji} {arrow}";
+"lng_new_contact_not_official" = "Not an official account";
+"lng_new_contact_updated_name" = "User updated name {when}";
+"lng_new_contact_updated_photo" = "User updated photo {when}";
+"lng_new_contact_updated_now" = "less than an hour ago";
+"lng_new_contact_updated_hours#one" = "{count} hour ago";
+"lng_new_contact_updated_hours#other" = "{count} hours ago";
+"lng_new_contact_updated_days#one" = "{count} day ago";
+"lng_new_contact_updated_days#other" = "{count} days ago";
+"lng_new_contact_updated_months#one" = "{count} month ago";
+"lng_new_contact_updated_months#other" = "{count} months ago";
 "lng_from_request_title_channel" = "Response to your join request";
 "lng_from_request_title_group" = "Response to your join request";
 "lng_from_request_body" = "You received this message because you requested to join {name} on {date}.";
@@ -3245,6 +4061,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_send_anonymous_ph" = "Send anonymously...";
 "lng_story_reply_ph" = "Reply privately...";
 "lng_story_comment_ph" = "Comment story...";
+"lng_message_stars_ph#one" = "Message for {count} Star";
+"lng_message_stars_ph#other" = "Message for {count} Stars";
 "lng_send_text_no" = "Text not allowed.";
 "lng_send_text_no_about" = "The admins of this group only allow sending {types}.";
 "lng_send_text_type_and_last" = "{types} and {last}";
@@ -3332,6 +4150,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_replies_no_comments" = "No comments here yet...";
 
 "lng_verification_codes" = "Verification Codes";
+"lng_verification_codes_about" = "Third-party services, like websites and stores, can send verification codes to your phone number via Telegram instead of SMS. Such codes will appear in this chat.\n\nIf you didn't request any codes — don't worry! Most likely, someone made a mistake when entering their number.";
 
 "lng_archived_name" = "Archived chats";
 "lng_archived_add" = "Archive";
@@ -3349,6 +4168,44 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_dialogs_text_from_in_topic" = "{from} {topic}";
 "lng_dialogs_skip_archive_in_search" = "Skip results from archive";
 "lng_dialogs_show_archive_in_search" = "With results from archive";
+
+"lng_dialogs_suggestions_birthday_title" = "Add your birthday! 🎂";
+"lng_dialogs_suggestions_birthday_about" = "Let your contacts know when you’re celebrating.";
+"lng_dialogs_suggestions_birthday_contact_title" = "It’s {text}'s **birthday** today! 🎂";
+"lng_dialogs_suggestions_birthday_contact_about" = "Send them a Gift.";
+"lng_dialogs_suggestions_birthday_contacts_title#one" = "{count} contact have **birthdays** today! 🎂";
+"lng_dialogs_suggestions_birthday_contacts_title#other" = "{count} contacts have **birthdays** today! 🎂";
+"lng_dialogs_suggestions_birthday_contacts_about" = "Send them a Gift.";
+"lng_dialogs_suggestions_birthday_contact_dismiss" = "You can send a Gift later in Settings";
+"lng_dialogs_suggestions_premium_annual_title" = "Telegram Premium with a {text} discount";
+"lng_dialogs_suggestions_premium_annual_about" = "Sign up for the annual payment plan for Telegram Premium now to get the discount.";
+"lng_dialogs_suggestions_premium_upgrade_title" = "Telegram Premium with a {text} discount";
+"lng_dialogs_suggestions_premium_upgrade_about" = "Upgrade to the annual payment plan for Telegram Premium now to get the discount.";
+"lng_dialogs_suggestions_premium_restore_title" = "Get Premium back with up to {text} off";
+"lng_dialogs_suggestions_premium_restore_about" = "Your Telegram Premium has recently expired. Tap here to extend it.";
+"lng_dialogs_suggestions_premium_grace_title" = "⚠️ Your Premium subscription is expiring!";
+"lng_dialogs_suggestions_premium_grace_about" = "Don’t lose access to exclusive features.";
+"lng_dialogs_suggestions_userpics_title" = "Add your photo! 📸";
+"lng_dialogs_suggestions_userpics_about" = "Help your friends spot you easily.";
+"lng_dialogs_suggestions_credits_sub_low_title#one" = "{emoji} {count} Star needed for {channels}";
+"lng_dialogs_suggestions_credits_sub_low_title#other" = "{emoji} {count} Stars needed for {channels}";
+"lng_dialogs_suggestions_credits_sub_low_about" = "Insufficient funds to cover your subscription.";
+
+"lng_unconfirmed_auth_title" = "Someone just got access to your messages!";
+"lng_unconfirmed_auth_confirm" = "Yes, it’s me";
+"lng_unconfirmed_auth_deny" = "No, it’s not me!";
+"lng_unconfirmed_auth_single" = "We detected a new login to your account from {from}, {country}. Is it you?";
+"lng_unconfirmed_auth_multiple#one" = "We detected new {count} login to your account. Is it you?";
+"lng_unconfirmed_auth_multiple#other" = "We detected new {count} logins to your account. Is it you?";
+"lng_unconfirmed_auth_multiple_from#one" = "We detected new {count} login to your account from {country}. Is it you?";
+"lng_unconfirmed_auth_multiple_from#other" = "We detected new {count} logins to your account from {country}. Is it you?";
+"lng_unconfirmed_auth_denied_title#one" = "New Login Prevented";
+"lng_unconfirmed_auth_denied_title#other" = "New Logins Prevented";
+"lng_unconfirmed_auth_denied_single" = "We have terminated the login attempt from {country}.";
+"lng_unconfirmed_auth_denied_multiple" = "We have terminated the login attempts from: {country}";
+"lng_unconfirmed_auth_denied_warning" = "Never send your login code to anyone or you can lose your Telegram account!";
+"lng_unconfirmed_auth_confirmed" = "New Login Allowed";
+"lng_unconfirmed_auth_confirmed_message" = "You can check the list of your active logins in {link}.";
 
 "lng_about_random" = "Send a {emoji} emoji to any chat to try your luck.";
 "lng_about_random_send" = "Send";
@@ -3409,6 +4266,20 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_bot_add_to_side_menu_done" = "Bot added to the main menu.";
 "lng_bot_no_scan_qr" = "QR Codes for bots are not supported on Desktop. Please use one of Telegram's mobile apps.";
 "lng_bot_no_share_story" = "Sharing to Stories is not supported on Desktop. Please use one of Telegram's mobile apps.";
+"lng_bot_emoji_status_confirm" = "Confirm";
+"lng_bot_emoji_status_title" = "Set Emoji Status";
+"lng_bot_emoji_status_text" = "Do you want to set this emoji status suggested by {bot}?";
+"lng_bot_emoji_status_access_text" = "{bot} requests access to set your **emoji status**. You will be able to revoke this access in the profile page of {name}.";
+"lng_bot_emoji_status_access_allow" = "Allow";
+"lng_bot_share_prepared_title" = "Share Message";
+"lng_bot_share_prepared_about" = "{bot} mini app suggests you to send this message to a chat you select.";
+"lng_bot_share_prepared_button" = "Share With...";
+"lng_bot_download_file" = "Download File";
+"lng_bot_download_file_sure" = "{bot} suggests you download the following file:";
+"lng_bot_download_file_button" = "Download";
+"lng_bot_download_starting" = "Starting...";
+"lng_bot_download_failed" = "Failed. {retry}";
+"lng_bot_download_retry" = "Retry";
 
 "lng_bot_status_users#one" = "{count} monthly user";
 "lng_bot_status_users#other" = "{count} monthly users";
@@ -3476,6 +4347,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_choose_image" = "Choose an image";
 "lng_choose_file" = "Choose a file";
 "lng_choose_files" = "Choose Files";
+"lng_choose_cover" = "Choose video cover";
+"lng_choose_cover_bad" = "Can't use this file as a caption.";
 "lng_game_tag" = "Game";
 
 "lng_context_new_window" = "Open in new window";
@@ -3492,6 +4365,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_mark_read_sure" = "Are you sure you want to mark all chats from this folder as read?";
 "lng_context_mark_read_all" = "Mark all chats as read";
 "lng_context_mark_read_all_sure" = "Are you sure you want to mark all chats as read?";
+"lng_context_mark_read_all_sure_2" = "**This action cannot be undone.**";
 "lng_context_mark_read_mentions_all" = "Mark all mentions as read";
 "lng_context_mark_read_reactions_all" = "Read all reactions";
 "lng_context_archive_expand" = "Expand";
@@ -3500,6 +4374,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_archive_to_list" = "Move to chat list";
 "lng_context_archive_to_menu_info" = "Archive moved to the main menu!\nRight click the archive button to return the Archive to your chat list.";
 "lng_context_archive_settings" = "Archive settings";
+"lng_context_archive_how_does_it_work" = "How does it work?";
 
 "lng_context_mute" = "Mute notifications";
 "lng_context_unmute" = "Unmute";
@@ -3510,6 +4385,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_ban_user" = "Ban";
 "lng_context_remove_from_group" = "Remove from group";
 "lng_context_add_to_group" = "Add to group";
+
+"lng_context_rate_transcription" = "Rate transcription";
+"lng_toast_sent_rate_transcription" = "Thank you for your feedback!";
 
 "lng_context_copy_link" = "Copy Link";
 "lng_context_copy_message_link" = "Copy Message Link";
@@ -3530,6 +4408,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_pack_info" = "View Sticker Set";
 "lng_context_pack_add" = "Add Stickers";
 "lng_context_save_file" = "Save As...";
+"lng_context_save_music_to" = "Save to...";
+"lng_context_save_music_profile" = "... Profile";
+"lng_context_save_music_saved" = "... Saved Messages";
+"lng_context_save_music_folder" = "... Downloads";
+"lng_context_save_music_about" = "Choose where you want this audio to be saved.";
 "lng_context_copy_text" = "Copy Text";
 "lng_context_open_gif" = "Open GIF";
 "lng_context_save_gif" = "Add to GIFs";
@@ -3540,9 +4423,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_to_msg" = "Go To Message";
 "lng_context_reply_msg" = "Reply";
 "lng_context_quote_and_reply" = "Quote & Reply";
+"lng_context_reply_to_task" = "Reply to Task";
 "lng_context_edit_msg" = "Edit";
 "lng_context_add_factcheck" = "Add Fact Check";
 "lng_context_edit_factcheck" = "Edit Fact Check";
+"lng_context_add_offer" = "Add Offer";
 "lng_context_forward_msg" = "Forward";
 "lng_context_send_now_msg" = "Send Now";
 "lng_context_reschedule" = "Reschedule";
@@ -3554,6 +4439,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_pin_msg" = "Pin";
 "lng_context_unpin_msg" = "Unpin";
 "lng_context_cancel_upload" = "Cancel Upload";
+"lng_context_upload_edit_caption" = "Edit Caption";
 "lng_context_copy_selected" = "Copy Selected Text";
 "lng_context_copy_selected_items" = "Copy Selected as Text";
 "lng_context_forward_selected" = "Forward Selected";
@@ -3577,6 +4463,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_seen_reacted#other" = "{count} Reacted";
 "lng_context_seen_reacted_none" = "Nobody Reacted";
 "lng_context_seen_reacted_all" = "Show All Reactions";
+"lng_context_sent_by" = "Sent by {user}";
 "lng_context_set_as_quick" = "Set As Quick";
 "lng_context_filter_by_tag" = "Filter by Tag";
 "lng_context_tag_add_name" = "Add Name";
@@ -3591,6 +4478,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_read_show" = "show when";
 "lng_context_edit_shortcut" = "Edit Shortcut";
 "lng_context_delete_shortcut" = "Delete Quick Reply";
+"lng_context_gift_send" = "Send Another Gift";
+"lng_context_charge_fee" = "Charge Fee";
+"lng_context_remove_fee" = "Remove Fee";
+"lng_context_fee_now" = "{name} pays {amount} per message.";
+"lng_context_fee_free" = "{name} can send messages for free.";
 
 "lng_add_tag_about" = "Tag this message with an emoji for quick search.";
 "lng_subscribe_tag_about" = "Organize your Saved Messages with tags. {link}";
@@ -3619,6 +4511,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_disable_spoiler" = "Remove Spoiler";
 "lng_context_make_paid" = "Make This Content Paid";
 "lng_context_change_price" = "Change Price";
+"lng_context_edit_cover" = "Edit Cover";
+"lng_context_clear_cover" = "Clear Cover";
+
+"lng_context_mention" = "Mention";
+"lng_context_search_from" = "Search messages";
 
 "lng_factcheck_title" = "Fact Check";
 "lng_factcheck_placeholder" = "Add Facts or Context";
@@ -3648,6 +4545,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_paid_react_agree_link" = "Terms of Service";
 "lng_paid_react_toast#one" = "Star Sent!";
 "lng_paid_react_toast#other" = "Stars Sent!";
+"lng_paid_react_toast_anonymous#one" = "Star sent anonymously!";
+"lng_paid_react_toast_anonymous#other" = "Stars sent anonymously!";
 "lng_paid_react_toast_text#one" = "You reacted with **{count} Star**.";
 "lng_paid_react_toast_text#other" = "You reacted with **{count} Stars**.";
 "lng_paid_react_undo" = "Undo";
@@ -3662,6 +4561,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_sensitive_toast" = "You can update the visibility of sensitive media in **Settings > Chat Settings > Sensitive content**";
 
 "lng_translate_show_original" = "Show Original";
+"lng_translate_return_original" = "View Original ({language})";
 "lng_translate_bar_to" = "Translate to {name}";
 "lng_translate_bar_to_other" = "Translate to {name}";
 "lng_translate_menu_to" = "Translate To";
@@ -3714,6 +4614,114 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_inline_switch_cant" = "Sorry, no way to write here :(";
 "lng_preview_reply_to" = "Reply to {name}";
 "lng_preview_reply_to_quote" = "Reply to quote from {name}";
+"lng_preview_reply_to_task" = "Reply to task from {title}";
+
+"lng_suggest_bar_title" = "Suggest a Post Below";
+"lng_suggest_bar_text" = "Click to offer a price for publishing.";
+"lng_suggest_bar_priced" = "{amount} for publishing anytime.";
+"lng_suggest_bar_dated" = "Publish on {date}";
+"lng_suggest_options_title" = "Suggest a Message";
+"lng_suggest_options_change" = "Suggest Changes";
+"lng_suggest_options_stars_offer" = "Offer Stars";
+"lng_suggest_options_stars_request" = "Request Stars";
+"lng_suggest_options_stars_price" = "Enter Price in Stars";
+"lng_suggest_options_stars_price_about" = "Choose how many Stars to pay to publish this message.";
+"lng_suggest_options_ton_offer" = "Offer TON";
+"lng_suggest_options_ton_request" = "Request TON";
+"lng_suggest_options_ton_price" = "Enter Price in TON";
+"lng_suggest_options_ton_price_about" = "Choose how many TON to pay to publish this message.";
+"lng_suggest_options_date" = "Time";
+"lng_suggest_options_date_any" = "Anytime";
+"lng_suggest_options_date_publish" = "Publish";
+"lng_suggest_options_date_now" = "Publish Now";
+"lng_suggest_options_date_about" = "Select the date and time you want the message to be published. The post will remain available for at least 24 hours from this date.";
+"lng_suggest_options_you_get_stars#one" = "You will receive {count} Star ({percent}) for publishing this post.";
+"lng_suggest_options_you_get_stars#other" = "You will receive {count} Stars ({percent}) for publishing this post.";
+"lng_suggest_options_you_get_ton#one" = "You will receive {count} TON ({percent}) for publishing this post.";
+"lng_suggest_options_you_get_ton#other" = "You will receive {count} TON ({percent}) for publishing this post.";
+"lng_suggest_options_stars_warning" = "Transactions in **Stars** may be reversed by the payment provider within **21** days. Only accept Stars from people you trust.";
+"lng_suggest_options_offer" = "Offer {amount}";
+"lng_suggest_options_offer_free" = "Offer for Free";
+"lng_suggest_options_update" = "Update Terms";
+"lng_suggest_options_update_date" = "Update Time";
+
+"lng_suggest_action_decline" = "Decline";
+"lng_suggest_action_accept" = "Accept";
+"lng_suggest_action_change" = "Suggest Changes";
+"lng_suggest_action_your" = "You suggest to post this message.";
+"lng_suggest_action_his" = "{from} suggests to post this message.";
+"lng_suggest_action_price_label" = "Price";
+"lng_suggest_action_price_free" = "Free";
+"lng_suggest_action_time_label" = "Time";
+"lng_suggest_action_time_any" = "Anytime";
+"lng_suggest_action_agreement" = "Agreement reached!";
+"lng_suggest_action_agree_date" = "The post will be automatically published on {channel} {date}.";
+"lng_suggest_action_your_charged_stars#one" = "You have been charged **{count} Star**.";
+"lng_suggest_action_your_charged_stars#other" = "You have been charged **{count} Stars**.";
+"lng_suggest_action_your_charged_ton#one" = "You have been charged **{count} TON**.";
+"lng_suggest_action_your_charged_ton#other" = "You have been charged **{count} TON**.";
+"lng_suggest_action_his_charged_stars#one" = "{from} has been charged **{count} Star**.";
+"lng_suggest_action_his_charged_stars#other" = "{from} has been charged **{count} Stars**.";
+"lng_suggest_action_his_charged_ton#one" = "{from} has been charged **{count} TON**.";
+"lng_suggest_action_his_charged_ton#other" = "{from} has been charged **{count} TON**.";
+"lng_suggest_action_agree_receive_stars" = "{channel} will receive the Stars once the post has been live for 24 hours.";
+"lng_suggest_action_agree_receive_ton" = "{channel} will receive TON once the post has been live for 24 hours.";
+"lng_suggest_action_agree_removed_stars" = "If {channel} removes the post before it has been live for 24 hours, the Stars will be refunded.";
+"lng_suggest_action_agree_removed_ton" = "If {channel} removes the post before it has been live for 24 hours, TON will be refunded.";
+"lng_suggest_action_your_not_enough_stars" = "**Transaction failed** because you didn't have enough Stars.";
+"lng_suggest_action_your_not_enough_ton" = "**Transaction failed** because you didn't have enough TON.";
+"lng_suggest_action_his_not_enough_stars" = "**Transaction failed** because the user didn't have enough Stars.";
+"lng_suggest_action_his_not_enough_ton" = "**Transaction failed** because the user didn't have enough TON.";
+"lng_suggest_action_declined" = "{from} rejected the message.";
+"lng_suggest_action_declined_reason" = "{from} rejected the message with the comment.";
+"lng_suggest_change_price" = "{from} suggests a new price for the message.";
+"lng_suggest_change_time" = "{from} suggests a new time for the message.";
+"lng_suggest_change_price_time" = "{from} suggests a new price and time for the message.";
+"lng_suggest_change_content" = "{from} suggests changes for the message.";
+"lng_suggest_change_price_label" = "New Price";
+"lng_suggest_change_time_label" = "New Time";
+"lng_suggest_change_text_label" = "Check the suggested message below";
+"lng_suggest_menu_edit_message" = "Edit Message";
+"lng_suggest_menu_edit_price" = "Edit Price";
+"lng_suggest_menu_edit_time" = "Edit Time";
+"lng_suggest_decline_title" = "Decline";
+"lng_suggest_decline_text" = "Do you want to decline publishing this post from {from}?";
+"lng_suggest_decline_text_to" = "Do you want to decline publishing this post to {channel}?";
+"lng_suggest_decline_reason" = "Add a reason (optional)";
+"lng_suggest_accept_title" = "Accept Terms";
+"lng_suggest_accept_text" = "Do you want to publish this post from {from}?";
+"lng_suggest_accept_text_to" = "Do you want to publish this post to {channel}?";
+"lng_suggest_accept_receive_stars#one" = "{channel} will receive **{count} Star** ({percent}) for publishing {date}.";
+"lng_suggest_accept_receive_stars#other" = "{channel} will receive **{count} Stars** ({percent}) for publishing {date}.";
+"lng_suggest_accept_receive_ton#one" = "{channel} will receive **{count} TON** ({percent}) for publishing {date}.";
+"lng_suggest_accept_receive_ton#other" = "{channel} will receive **{count} TON** ({percent}) for publishing {date}.";
+"lng_suggest_accept_receive_now_stars#one" = "{channel} will receive **{count} Star** ({percent}) for publishing right now.";
+"lng_suggest_accept_receive_now_stars#other" = "{channel} will receive **{count} Stars** ({percent}) for publishing right now.";
+"lng_suggest_accept_receive_now_ton#one" = "{channel} will receive **{count} TON** ({percent}) for publishing right now.";
+"lng_suggest_accept_receive_now_ton#other" = "{channel} will receive **{count} TON** ({percent}) for publishing right now.";
+"lng_suggest_accept_receive_if" = "It must remain visible for at least **24** hours after publication.";
+"lng_suggest_accept_pay_stars#one" = "You will pay **{count} Star** for publishing {date}.";
+"lng_suggest_accept_pay_stars#other" = "You will pay **{count} Stars** for publishing {date}.";
+"lng_suggest_accept_pay_ton#one" = "You will pay **{count} TON** for publishing {date}.";
+"lng_suggest_accept_pay_ton#other" = "You will pay **{count} TON** for publishing {date}.";
+"lng_suggest_accept_pay_now_stars#one" = "You will pay **{count} Star** for publishing right now.";
+"lng_suggest_accept_pay_now_stars#other" = "You will pay **{count} Stars** for publishing right now.";
+"lng_suggest_accept_pay_now_ton#one" = "You will pay **{count} TON** for publishing right now.";
+"lng_suggest_accept_pay_now_ton#other" = "You will pay **{count} TON** for publishing right now.";
+"lng_suggest_accept_send" = "Publish";
+"lng_suggest_stars_amount#one" = "{count} Star";
+"lng_suggest_stars_amount#other" = "{count} Stars";
+"lng_suggest_ton_amount#one" = "{count} TON";
+"lng_suggest_ton_amount#other" = "{count} TON";
+"lng_suggest_warn_title_stars" = "Stars will be lost";
+"lng_suggest_warn_title_ton" = "TON will be lost";
+"lng_suggest_warn_text_stars" = "You won't receive **Stars** for the post if you delete it now. The post must remain visible for at least **24 hours** after it was published.";
+"lng_suggest_warn_text_ton" = "You won't receive **TON** for the post if you delete it now. The post must remain visible for at least **24 hours** after it was published.";
+"lng_suggest_warn_delete_anyway" = "Delete Anyway";
+"lng_suggest_low_ton_title" = "{amount} TON Needed";
+"lng_suggest_low_ton_text" = "You can add funds to your balance via the third-party platform Fragment.";
+"lng_suggest_low_ton_fragment" = "Add Funds via Fragment";
+"lng_suggest_low_ton_fragment_url" = "https://fragment.com/ads/topup";
 
 "lng_reply_in_another_title" = "Reply in...";
 "lng_reply_in_another_chat" = "Reply in Another Chat";
@@ -3743,6 +4751,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_reply_cant_forward" = "Sorry, you can't reply to a message that was sent before the group was upgraded to a supergroup. Do you wish to forward it and add your comment?";
 
 "lng_share_title" = "Share to";
+"lng_share_at_time_title" = "Share at {time} to";
 "lng_share_copy_link" = "Copy share link";
 "lng_share_confirm" = "Send";
 "lng_share_wrong_user" = "This game was opened from a different user.";
@@ -3768,6 +4777,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_edit_contact_title" = "Edit contact";
 "lng_edit_channel_title" = "Edit channel";
 "lng_edit_bot_title" = "Edit bot";
+"lng_edit_autotranslate" = "Auto-translate messages";
 "lng_edit_sign_messages" = "Sign messages";
 "lng_edit_sign_messages_about" = "Add names of admins to the messages they post.";
 "lng_edit_sign_profiles" = "Show authors' profiles";
@@ -3817,6 +4827,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_selected_delete_sure_this" = "Do you want to delete this message?";
 "lng_selected_delete_sure#one" = "Do you want to delete {count} message?";
 "lng_selected_delete_sure#other" = "Do you want to delete {count} messages?";
+"lng_selected_remove_saved_music" = "Do you want to remove this file from your profile?";
+"lng_saved_music_added" = "Audio added to your Profile.";
+"lng_saved_music_removed" = "Audio removed from your Profile.";
 "lng_delete_photo_sure" = "Do you want to delete this photo?";
 "lng_delete_for_everyone_hint#one" = "This will delete it for everyone in this chat.";
 "lng_delete_for_everyone_hint#other" = "This will delete them for everyone in this chat.";
@@ -3858,11 +4871,18 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_search_messages_from" = "Show messages from";
 "lng_search_messages_n_of_amount" = "{n} of {amount}";
 "lng_search_messages_none" = "No results";
+"lng_search_filter_all" = "All chats";
+"lng_search_filter_private" = "Private chats";
+"lng_search_filter_group" = "Group chats";
+"lng_search_filter_channel" = "Channels";
+"lng_search_sponsored_button" = "Ad ⋮";
 
 "lng_media_save_progress" = "{ready} of {total} {mb}";
 "lng_mediaview_save_as" = "Save As...";
 "lng_mediaview_copy" = "Copy";
+"lng_mediaview_copy_frame" = "Copy Frame";
 "lng_mediaview_forward" = "Forward";
+"lng_mediaview_share_at_time" = "Share at {time}";
 "lng_mediaview_delete" = "Delete";
 "lng_mediaview_save_to_profile" = "Post to Profile";
 "lng_mediaview_pin_story_done" = "Story pinned";
@@ -4069,6 +5089,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_call_status_failed" = "failed to connect";
 "lng_call_status_ringing" = "ringing...";
 "lng_call_status_busy" = "line busy";
+"lng_call_status_group_invite" = "Telegram Group Call";
 "lng_call_status_sure" = "Click on the Camera icon if you want to start a video call.";
 "lng_call_fingerprint_tooltip" = "If the emoji on {user}'s screen are the same, this call is 100% secure";
 
@@ -4078,6 +5099,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_call_error_camera_not_started" = "You can switch to video call once you're connected.";
 "lng_call_error_camera_outdated" = "{user}'s app does not support video calls. They need to update their app before you can call them.";
 "lng_call_error_audio_io" = "There seems to be a problem with your sound card. Please make sure that your computer's speakers and microphone are working and try again.";
+"lng_call_error_add_not_started" = "You can add more people once you're connected.";
 
 "lng_call_bar_hangup" = "End call";
 "lng_call_leave_to_other_sure" = "End your active call and join this video chat?";
@@ -4096,16 +5118,22 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 "lng_call_outgoing" = "Outgoing call";
 "lng_call_video_outgoing" = "Outgoing video call";
+"lng_call_group_outgoing" = "Outgoing group call";
 "lng_call_incoming" = "Incoming call";
 "lng_call_video_incoming" = "Incoming video call";
+"lng_call_group_incoming" = "Incoming group call";
 "lng_call_missed" = "Missed call";
 "lng_call_video_missed" = "Missed video call";
+"lng_call_group_missed" = "Missed group call";
 "lng_call_cancelled" = "Canceled call";
 "lng_call_video_cancelled" = "Canceled video call";
 "lng_call_declined" = "Declined call";
 "lng_call_video_declined" = "Declined video call";
+"lng_call_group_declined" = "Declined group call";
 "lng_call_duration_info" = "{time}, {duration}";
 "lng_call_type_and_duration" = "{type} ({duration})";
+"lng_call_invitation" = "Group call invitation";
+"lng_call_ongoing" = "Ongoing group call";
 
 "lng_call_rate_label" = "Please rate the quality of your call";
 "lng_call_rate_comment" = "Comment (optional)";
@@ -4114,6 +5142,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_call_start_video" = "Start Video";
 "lng_call_stop_video" = "Stop Video";
 "lng_call_screencast" = "Screencast";
+"lng_call_add_people" = "Add People";
 "lng_call_end_call" = "End Call";
 "lng_call_mute_audio" = "Mute";
 "lng_call_unmute_audio" = "Unmute";
@@ -4145,8 +5174,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_group_call_connecting" = "Connecting...";
 "lng_group_call_leave" = "Leave";
 "lng_group_call_leave_title" = "Leave video chat";
+"lng_group_call_leave_title_call" = "Leave group call";
 "lng_group_call_leave_title_channel" = "Leave live stream";
 "lng_group_call_leave_sure" = "Do you want to leave this video chat?";
+"lng_group_call_leave_sure_call" = "Do you want to leave this group call?";
 "lng_group_call_leave_sure_channel" = "Are you sure you want to leave this live stream?";
 "lng_group_call_close" = "Close";
 "lng_group_call_close_sure" = "Video chat is scheduled. You can abort it or just close this panel.";
@@ -4176,15 +5207,20 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_group_call_also_end_channel" = "End live stream";
 "lng_group_call_settings_title" = "Settings";
 "lng_group_call_invite" = "Invite Members";
+"lng_group_call_invite_conf" = "Add People";
 "lng_group_call_invited_status" = "invited";
+"lng_group_call_calling_status" = "calling...";
+"lng_group_call_blockchain_only_status" = "listening";
 "lng_group_call_muted_by_me_status" = "muted for you";
 "lng_group_call_invite_title" = "Invite members";
 "lng_group_call_invite_button" = "Invite";
+"lng_group_call_confcall_add" = "Call";
 "lng_group_call_add_to_group_one" = "{user} isn't a member of «{group}». Add them to the group?";
 "lng_group_call_add_to_group_some" = "Some of those users aren't members of «{group}». Add them to the group?";
 "lng_group_call_add_to_group_all" = "Those users aren't members of «{group}». Add them to the group?";
 "lng_group_call_invite_members" = "Group members";
 "lng_group_call_invite_search_results" = "Search results";
+"lng_group_call_invite_limit" = "This is currently the maximum allowed number of participants.";
 "lng_group_call_new_muted" = "Mute new participants";
 "lng_group_call_speakers" = "Speakers";
 "lng_group_call_microphone" = "Microphone";
@@ -4223,6 +5259,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_group_call_context_pin_screen" = "Pin screencast";
 "lng_group_call_context_unpin_screen" = "Unpin screencast";
 "lng_group_call_context_remove" = "Remove";
+"lng_group_call_context_cancel_invite" = "Discard invite";
+"lng_group_call_context_stop_ringing" = "Stop calling";
+"lng_group_call_context_ban_from_call" = "Ban from call";
 "lng_group_call_remove_channel" = "Remove {channel} from the video chat and ban them?";
 "lng_group_call_remove_channel_from_channel" = "Remove {channel} from the live stream?";
 "lng_group_call_mac_access" = "Telegram Desktop does not have access to system wide keyboard input required for Push to Talk.";
@@ -4331,6 +5370,54 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_group_call_rtmp_viewers#one" = "{count} viewer";
 "lng_group_call_rtmp_viewers#other" = "{count} viewers";
 
+"lng_confcall_join_title" = "Group Call";
+"lng_confcall_join_text" = "You are invited to join a Telegram Call.";
+"lng_confcall_join_text_inviter" = "{user} is inviting you to join a Telegram Call.";
+"lng_confcall_already_joined_one" = "{user} already joined this call.";
+"lng_confcall_already_joined_two" = "{user} and {other} already joined this call.";
+"lng_confcall_already_joined_three" = "{user}, {other} and {third} already joined this call.";
+"lng_confcall_already_joined_many#one" = "{user}, {other} and **{count}** other person already joined this call.";
+"lng_confcall_already_joined_many#other" = "{user}, {other} and **{count}** other people already joined this call.";
+"lng_confcall_join_button" = "Join Group Call";
+"lng_confcall_create_call" = "Start New Call";
+"lng_confcall_create_call_description#one" = "You can add up to {count} participant to a call.";
+"lng_confcall_create_call_description#other" = "You can add up to {count} participants to a call.";
+"lng_confcall_create_title" = "New Call";
+"lng_confcall_create_link" = "Create Call Link";
+"lng_confcall_create_link_description" = "You can create a link that will allow your friends on Telegram to join the call.";
+"lng_confcall_link_revoke" = "Revoke link";
+"lng_confcall_link_revoked_title" = "Link Revoked";
+"lng_confcall_link_inactive" = "This link is no longer active.";
+"lng_confcall_link_revoked_text" = "A new link has been generated.";
+"lng_confcall_link_title" = "Call Link";
+"lng_confcall_link_about" = "Anyone on Telegram can join your call by following the link below.";
+"lng_confcall_link_or" = "or";
+"lng_confcall_link_join" = "Be the first to join the call and add people from there. {link}";
+"lng_confcall_link_join_link" = "Open call {arrow}";
+"lng_confcall_inactive_title" = "Start Group Call";
+"lng_confcall_inactive_about" = "This call is no longer active.\nYou can start a new one.";
+"lng_confcall_invite_done_user" = "You're calling {user} to join.";
+"lng_confcall_invite_done_many#one" = "You're calling **{count} person** to join.";
+"lng_confcall_invite_done_many#other" = "You're calling **{count} people** to join.";
+"lng_confcall_invite_already_user" = "{user} is already in the call.";
+"lng_confcall_invite_already_many#one" = "**{count} person** is already in the call.";
+"lng_confcall_invite_already_many#other" = "**{count} people** are already in the call.";
+"lng_confcall_invite_privacy_user" = "You cannot call {user} because of their privacy settings.";
+"lng_confcall_invite_privacy_many#one" = "You cannot call **{count} person** because of their privacy settings.";
+"lng_confcall_invite_privacy_many#other" = "You cannot call **{count} people** because of their privacy settings.";
+"lng_confcall_invite_fail_user" = "Couldn't call {user} to join.";
+"lng_confcall_invite_fail_many#one" = "Couldn't call **{count} person** to join.";
+"lng_confcall_invite_fail_many#other" = "Couldn't call **{count} people** to join.";
+"lng_confcall_invite_kicked_user" = "{user} was banned from the call.";
+"lng_confcall_invite_kicked_many#one" = "**{count} person** was removed from the call.";
+"lng_confcall_invite_kicked_many#other" = "**{count} people** were removed from the call.";
+"lng_confcall_not_accessible" = "This call is no longer accessible.";
+"lng_confcall_participants_limit" = "This call reached the participants limit.";
+"lng_confcall_sure_remove" = "Remove {user} from the call?";
+"lng_confcall_e2e_badge" = "End-to-End Encrypted";
+"lng_confcall_e2e_badge_small" = "E2E Encrypted";
+"lng_confcall_e2e_about" = "These four emoji represent the call's encryption key. They must match for all participants and change when someone joins or leaves.";
+
 "lng_no_mic_permission" = "Telegram needs microphone access so that you can make calls and record voice messages.";
 
 "lng_player_message_today" = "today at {time}";
@@ -4350,7 +5437,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_rights_edit_admin_rank_about" = "A title that members will see instead of '{title}'.";
 "lng_rights_about_add_admins_yes" = "This admin will be able to add new admins with equal or fewer rights.";
 "lng_rights_about_add_admins_no" = "This admin will not be able to add new admins.";
-"lng_rights_about_by" = "This admin promoted by {user} at {date}.";
+"lng_rights_about_by" = "This admin promoted by {user} on {date}.";
 
 "lng_rights_about_admin_cant_edit" = "You can't edit the rights of this admin.";
 "lng_rights_about_restriction_cant_edit" = "You cannot change the restrictions for this user.";
@@ -4373,12 +5460,39 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_rights_boosts_no_restrict" = "Do not restrict boosters";
 "lng_rights_boosts_about" = "Turn this on to always allow users who boosted your group to send messages and media.";
 "lng_rights_boosts_about_on" = "Choose how many boosts a user must give to the group to bypass restrictions on sending messages.";
+"lng_rights_charge_stars" = "Charge Stars for Messages";
+"lng_rights_charge_stars_about" = "If you turn this on, regular members of the group will have to pay Stars to send messages.";
+"lng_rights_charge_price" = "Set price per message";
+"lng_rights_charge_price_about" = "Your group will receive {percent} of the selected fee ({amount}) for each incoming message.";
 
 "lng_slowmode_enabled" = "Slow Mode is active.\nYou can send your next message in {left}.";
 "lng_slowmode_no_many" = "Slow mode is enabled. You can't send more than one message at a time.";
 "lng_slowmode_too_long" = "This text is too long to send as one message.\n\nSlow mode is active. You can't send more than one message at once.";
 "lng_slowmode_seconds#one" = "{count} second";
 "lng_slowmode_seconds#other" = "{count} seconds";
+
+"lng_payment_confirm_title" = "Confirm payment";
+"lng_payment_confirm_text#one" = "{name} charges **{count}** Star per message.";
+"lng_payment_confirm_text#other" = "{name} charges **{count}** Stars per message.";
+"lng_payment_confirm_amount#one" = "**{count}** Star";
+"lng_payment_confirm_amount#other" = "**{count}** Stars";
+"lng_payment_confirm_users#one" = "You selected **{count}** user who charge Stars for messages.";
+"lng_payment_confirm_users#other" = "You selected **{count}** users who charge Stars for messages.";
+"lng_payment_confirm_chats#one" = "You selected **{count}** chat where you pay Stars for messages.";
+"lng_payment_confirm_chats#other" = "You selected **{count}** chats where you pay Stars for messages.";
+"lng_payment_confirm_sure#one" = "Would you like to pay {amount} to send **{count}** message?";
+"lng_payment_confirm_sure#other" = "Would you like to pay {amount} to send **{count}** messages?";
+"lng_payment_confirm_dont_ask" = "Don't ask me again";
+"lng_payment_confirm_button#one" = "Pay for {count} Message";
+"lng_payment_confirm_button#other" = "Pay for {count} Messages";
+"lng_payment_bar_text" = "{name} must pay {cost} for each message to you.";
+"lng_payment_bar_button" = "Remove Fee";
+"lng_payment_refund_title" = "Remove Fee";
+"lng_payment_refund_text" = "Are you sure you want to allow {name} to message you for free?";
+"lng_payment_refund_channel" = "Do you want to allow {name} to message the channel for free?";
+"lng_payment_refund_also#one" = "Refund already paid {count} Star";
+"lng_payment_refund_also#other" = "Refund already paid {count} Stars";
+"lng_payment_refund_confirm" = "Confirm";
 
 "lng_rights_gigagroup_title" = "Broadcast group";
 "lng_rights_gigagroup_convert" = "Convert to Broadcast Group";
@@ -4405,6 +5519,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_rights_channel_edit_stories" = "Edit stories of others";
 "lng_rights_channel_delete_stories" = "Delete stories of others";
 "lng_rights_channel_manage_calls" = "Manage live streams";
+"lng_rights_channel_manage_direct" = "Manage direct messages";
 "lng_rights_group_info" = "Change group info";
 "lng_rights_group_ban" = "Ban users";
 "lng_rights_group_invite_link" = "Invite users via link";
@@ -4429,8 +5544,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_rights_chat_files" = "Files";
 "lng_rights_chat_voice_messages" = "Voice messages";
 "lng_rights_chat_video_messages" = "Video messages";
-"lng_rights_chat_restricted_by" = "Restricted by {user} at {date}.";
-"lng_rights_chat_banned_by" = "Banned by {user} at {date}.";
+"lng_rights_chat_restricted_by" = "Restricted by {user} on {date}.";
+"lng_rights_chat_banned_by" = "Banned by {user} on {date}.";
 "lng_rights_chat_banned_until_header" = "Restricted until";
 "lng_rights_chat_banned_forever" = "Forever";
 "lng_rights_chat_banned_day#one" = "For {count} day";
@@ -4497,6 +5612,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_restricted_send_polls_all" = "Sorry, sending polls is not allowed in this group.";
 
 "lng_restricted_send_public_polls" = "Sorry, polls with visible votes can't be forwarded to channels.";
+"lng_restricted_send_todo_lists" = "Sorry, Checklists can't be forwarded to channels.";
 "lng_restricted_send_paid_media" = "Sorry, paid media can't be sent to this channel.";
 
 "lng_restricted_send_voice_messages" = "{user} doesn't accept voice messages.";
@@ -4511,6 +5627,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_send_non_premium_message_toast" = "**{user}** only accepts messages from contacts and {link} subscribers.";
 "lng_send_non_premium_message_toast_link" = "Telegram Premium";
 
+"lng_send_charges_stars_channel" = "{channel} charges {amount} per message to its admin.";
+"lng_send_free_channel" = "Send a direct message to the administrator of {channel}.";
+"lng_send_charges_stars_text" = "{user} charges {amount} for each message.";
+"lng_send_charges_stars_go" = "Buy Stars";
+
 "lng_exceptions_list_title" = "Exceptions";
 "lng_removed_list_title" = "Removed users";
 
@@ -4521,10 +5642,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_admin_log_filter_all_actions" = "All actions";
 "lng_admin_log_filter_actions_type_subtitle" = "Filter actions by type";
 "lng_admin_log_filter_actions_member_section" = "Members And Admins";
+"lng_admin_log_filter_actions_subscriber_section" = "Subscribers And Admins";
 "lng_admin_log_filter_restrictions" = "New restrictions";
 "lng_admin_log_filter_admins_new" = "Admin rights";
 "lng_admin_log_filter_members_new" = "New members";
+"lng_admin_log_filter_subscribers_new" = "New subscribers";
 "lng_admin_log_filter_actions_settings_section" = "Group Settings";
+"lng_admin_log_filter_actions_channel_settings_section" = "Channel Settings";
 "lng_admin_log_filter_info_group" = "Group info";
 "lng_admin_log_filter_info_channel" = "Channel info";
 "lng_admin_log_filter_actions_messages_section" = "Messages";
@@ -4535,6 +5659,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_admin_log_filter_voice_chats_channel" = "Live stream";
 "lng_admin_log_filter_invite_links" = "Invite links";
 "lng_admin_log_filter_members_removed" = "Members leaving";
+"lng_admin_log_filter_subscribers_removed" = "Subscribers leaving";
 "lng_admin_log_filter_topics" = "Topics";
 "lng_admin_log_filter_sub_extend" = "Subscription Renewals";
 "lng_admin_log_filter_all_admins" = "All users and admins";
@@ -4645,6 +5770,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_admin_log_participant_volume_channel" = "{from} changed live stream volume for {user} to {percent}";
 "lng_admin_log_antispam_enabled" = "{from} enabled aggressive anti-spam";
 "lng_admin_log_antispam_disabled" = "{from} disabled aggressive anti-spam";
+"lng_admin_log_autotranslate_enabled" = "{from} enabled automatic translation";
+"lng_admin_log_autotranslate_disabled" = "{from} disabled automatic translation";
 "lng_admin_log_change_color" = "{from} changed channel color from {previous} to {color}";
 "lng_admin_log_set_background_emoji" = "{from} set channel background emoji to {emoji}";
 "lng_admin_log_change_background_emoji" = "{from} changed channel background emoji from {previous} to {emoji}";
@@ -4717,6 +5844,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_admin_log_admin_create_topics" = "Create topics";
 "lng_admin_log_admin_manage_calls" = "Manage video chats";
 "lng_admin_log_admin_manage_calls_channel" = "Manage live streams";
+"lng_admin_log_admin_manage_direct" = "Manage direct messages";
 "lng_admin_log_admin_add_admins" = "Add new admins";
 "lng_admin_log_subscription_extend" = "{name} renewed subscription until {date}";
 
@@ -4754,6 +5882,17 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_forward_show_captions" = "Show captions";
 "lng_forward_change_recipient" = "Change recipient";
 "lng_forward_sender_names_removed" = "Sender names removed";
+"lng_forward_header_short" = "Forward";
+"lng_forward_action_show_sender" = "Show Sender Name";
+"lng_forward_action_show_senders" = "Show Sender Names";
+"lng_forward_action_hide_sender" = "Hide Sender Name";
+"lng_forward_action_hide_senders" = "Hide Sender Names";
+"lng_forward_action_show_caption" = "Show Caption";
+"lng_forward_action_show_captions" = "Show Captions";
+"lng_forward_action_hide_caption" = "Hide Caption";
+"lng_forward_action_hide_captions" = "Hide Captions";
+"lng_forward_action_change_recipient" = "Change Recipient";
+"lng_forward_action_remove" = "Do Not Forward";
 
 "lng_passport_title" = "Telegram Passport";
 "lng_passport_request1" = "{bot} requests access to your personal data";
@@ -5005,6 +6144,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_polls_stop" = "Stop poll";
 "lng_polls_stop_warning" = "If you stop this poll now, nobody will be able to vote in it anymore. This action cannot be undone.";
 "lng_polls_stop_sure" = "Stop";
+"lng_polls_menu_item" = "Poll";
 "lng_polls_create" = "Create poll";
 "lng_polls_create_title" = "New poll";
 "lng_polls_create_question" = "Question";
@@ -5033,12 +6173,42 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_polls_show_more#other" = "Show more ({count})";
 "lng_polls_votes_collapse" = "Collapse";
 
+"lng_todo_title" = "Checklist";
+"lng_todo_title_group" = "Group Checklist";
+"lng_todo_completed#one" = "{count} of {total} completed";
+"lng_todo_completed#other" = "{count} of {total} completed";
+"lng_todo_completed_none" = "None of {total} completed";
+"lng_todo_menu_item" = "Checklist";
+"lng_todo_create" = "Create Checklist";
+"lng_todo_create_title" = "New Checklist";
+"lng_todo_create_title_placeholder" = "Title";
+"lng_todo_create_list" = "Tasks List";
+"lng_todo_create_list_add" = "Add a task...";
+"lng_todo_create_limit#one" = "You can add {count} more task.";
+"lng_todo_create_limit#other" = "You can add {count} more tasks.";
+"lng_todo_create_maximum" = "You have added the maximum number of tasks.";
+"lng_todo_create_settings" = "Settings";
+"lng_todo_create_allow_add" = "Allow Others to Add Tasks";
+"lng_todo_create_allow_mark" = "Allow Others to Mark As Done";
+"lng_todo_create_button" = "Create";
+"lng_todo_choose_title" = "Please enter a title.";
+"lng_todo_choose_tasks" = "Please enter at least one task.";
+
+"lng_todo_add_title" = "Add Tasks";
+"lng_todo_create_premium" = "Only subscribers of {link} can create Checklists.";
+"lng_todo_add_premium" = "Only subscribers of {link} can add tasks.";
+"lng_todo_mark_premium" = "Only subscribers of {link} can mark tasks as done.";
+"lng_todo_premium_link" = "Telegram Premium";
+"lng_todo_mark_restricted" = "{user} has restricted others from marking tasks as done.";
+"lng_todo_mark_forwarded" = "You can't change forwarded checklists.";
+
 "lng_outdated_title" = "PLEASE UPDATE YOUR OPERATING SYSTEM.";
 "lng_outdated_title_bits" = "PLEASE SWITCH TO A 64-BIT OPERATING SYSTEM.";
 "lng_outdated_soon" = "Otherwise, Telegram Desktop will stop updating on {date}.";
 "lng_outdated_now" = "So Telegram Desktop can update to newer versions.";
 
 "lng_filters_all" = "All chats";
+"lng_filters_all_short" = "All";
 "lng_filters_setup" = "Edit";
 "lng_filters_title" = "Folders";
 "lng_filters_subtitle" = "My folders";
@@ -5054,6 +6224,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_filters_edit" = "Edit Folder";
 "lng_filters_setup_menu" = "Edit Folders";
 "lng_filters_new_name" = "Folder name";
+"lng_filters_enable_animations" = "Enable animations";
+"lng_filters_disable_animations" = "Disable animations";
 "lng_filters_add_chats" = "Add Chats";
 "lng_filters_remove_chats" = "Add Chats to Exclude";
 "lng_filters_include" = "Included chats";
@@ -5093,10 +6265,23 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_filters_toast_add" = "{chat} added to {folder} folder";
 "lng_filters_toast_remove" = "{chat} removed from {folder} folder";
 "lng_filters_shareable_status" = "shareable folder";
+"lng_filters_view_subtitle" = "Tabs view";
+"lng_filters_vertical" = "Tabs on the left";
+"lng_filters_horizontal" = "Tabs at the top";
+"lng_filters_enable_tags" = "Show Folder Tags";
+"lng_filters_enable_tags_about" = "Display folder names for each chat in the chat list.";
+"lng_filters_enable_tags_about_premium" = "Subscribe to **{link}** to display folder names for each chat in the chat list.";
+"lng_filters_tag_color_subtitle" = "Folder color in chat list";
+"lng_filters_tag_color_about" = "Choose a color for the tag of this folder.";
+"lng_filters_tag_color_no" = "No Tag";
 
 "lng_filters_delete_sure" = "Are you sure you want to delete this folder? This will also deactivate all the invite links created to share this folder.";
 "lng_filters_link" = "Share Folder";
 "lng_filters_link_has" = "Invite links";
+
+"lng_filters_checkbox_remove_bot" = "Remove bot from all folders";
+"lng_filters_checkbox_remove_group" = "Remove group from all folders";
+"lng_filters_checkbox_remove_channel" = "Remove channel from all folders";
 
 "lng_filters_link_create" = "Create an Invite Link";
 "lng_filters_link_cant" = "You can’t share folders which include or exclude specific chat types like 'Groups', 'Contacts', etc.";
@@ -5170,6 +6355,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_chat_theme_change_wallpaper" = "Change Wallpaper";
 "lng_chat_theme_title" = "Select theme";
 "lng_chat_theme_cant_voice" = "Sorry, you can't change the chat theme while you have an unsent voice message.";
+"lng_chat_theme_gift_replace" = "This gift is already your theme in the chat with {name}. Remove it there and use it here instead?";
 
 "lng_photo_editor_menu_delete" = "Delete";
 "lng_photo_editor_menu_flip" = "Flip";
@@ -5200,10 +6386,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_view_button_iv" = "Instant View";
 "lng_view_button_stickerset" = "View stickers";
 "lng_view_button_emojipack" = "View emoji";
+"lng_view_button_collectible" = "View collectible";
+"lng_view_button_call" = "Join call";
+"lng_view_button_storyalbum" = "View Album";
+"lng_view_button_collection" = "View Collection";
 
 "lng_sponsored_hide_ads" = "Hide";
 "lng_sponsored_title" = "What are sponsored messages?";
-"lng_sponsored_info_description1" = "Unlike other apps, Telegram never uses your private data to target ads. Sponsored messages on Telegram are based solely on the topic of the public channels in which they are shown. This means that no user data is mined or analyzed to display ads, and every user viewing a channel on Telegram sees the same sponsored messages.\n\nUnlike other apps, Telegram doesn't track whether you tapped on a sponsored message and doesn't profile you based on your activity. We also prevent external links in sponsored messages to ensure that third parties can’t spy on our users. We believe that everyone has the right to privacy, and technological platforms should respect that.\n\nTelegram offers a free and unlimited service to hundreds of millions of users, which involves significant server and traffic costs. In order to remain independent and stay true to its values, Telegram developed a paid tool to promote messages with user privacy in mind. We welcome responsible advertisers at:";
+"lng_sponsored_info_description1_linked" = "Unlike other apps, Telegram never uses your private data to target ads. {link}\n\nUnlike other apps, Telegram doesn't track whether you tapped on a sponsored message and doesn't profile you based on your activity. We also prevent external links in sponsored messages to ensure that third parties can’t spy on our users. We believe that everyone has the right to privacy, and technological platforms should respect that.\n\nTelegram offers free and unlimited service to hundreds of millions of users, which involves significant server and traffic costs. In order to remain independent and stay true to its values, Telegram developed a paid tool to promote messages with user privacy in mind. We welcome responsible advertisers at:";
+"lng_sponsored_info_description1_link" = "Learn more in the Privacy Policy";
+"lng_sponsored_info_description1_url" = "https://telegram.org/privacy#5-6-no-ads-based-on-user-data";
 "lng_sponsored_info_description2" = "Sponsored Messages are currently in test mode. Once they are fully launched and allow Telegram to cover its basic costs, we will start sharing ad revenue with the owners of public channels in which sponsored messages are displayed.\n\nOnline ads should no longer be synonymous with abuse of user privacy. Let us redefine how a tech company should operate – together.";
 "lng_sponsored_info_menu" = "Advertiser info";
 "lng_sponsored_info_submenu" = "Advertiser: {text}";
@@ -5213,16 +6405,21 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_sponsored_revenued_info1_title" = "Respect Your Privacy";
 "lng_sponsored_revenued_info1_description" = "Ads on Telegram do not use your personal information and are based on the channel in which you see them.";
 "lng_sponsored_revenued_info1_bot_description" = "Ads on Telegram do not use your personal information and are based on the mini app in which you see them.";
+"lng_sponsored_revenued_info1_search_description" = "Ads on Telegram do not use your personal information and are based on the search query you entered.";
 "lng_sponsored_revenued_info2_title" = "Help the Channel Creator";
+"lng_sponsored_revenued_info2_bot_title" = "Help the Bot Developer";
 "lng_sponsored_revenued_info2_description" = "50% of the revenue from Telegram Ads goes to the owner of the channel where they are displayed.";
 "lng_sponsored_revenued_info2_bot_description" = "50% of the revenue from Telegram Ads goes to the developer of the mini app where they are displayed.";
 "lng_sponsored_revenued_info3_title" = "Can Be Removed";
 "lng_sponsored_revenued_info3_description#one" = "You can turn off ads by subscribing to {link}, and Level {count} channels can remove them for their subscribers.";
 "lng_sponsored_revenued_info3_description#other" = "You can turn off ads by subscribing to {link}, and Level {count} channels can remove them for their subscribers.";
 "lng_sponsored_revenued_info3_bot_description" = "You can turn off ads in mini apps by subscribing to {link}.";
+"lng_sponsored_revenued_info3_search_description" = "You can turn off ads by subscribing to Telegram Premium. {link}";
+"lng_sponsored_revenued_info3_search_link" = "Subscribe {arrow}";
 "lng_sponsored_revenued_footer_title" = "Can I Launch an Ad?";
 "lng_sponsored_revenued_footer_description" = "Anyone can create an ad to display in this channel — with minimal budgets. Check out the **Telegram Ad Platform** for details. {link}";
 "lng_sponsored_revenued_footer_bot_description" = "Anyone can create an ad to display in this bot — with minimal budgets. Check out the **Telegram Ad Platform** for details. {link}";
+"lng_sponsored_revenued_footer_search_description" = "Anyone can create an ad to display in search results for any query. Check out the **Telegram Ad Platform** for details. {link}";
 "lng_sponsored_top_bar_hide" = "remove";
 
 "lng_telegram_features_url" = "https://t.me/TelegramTips";
@@ -5235,6 +6432,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 "lng_ringtones_box_title" = "Notification Sound";
 "lng_ringtones_box_cloud_subtitle" = "Choose your tone";
+"lng_ringtones_box_volume" = "Volume";
 "lng_ringtones_box_upload_choose" = "Choose a tone";
 "lng_ringtones_box_upload_button" = "Upload Sound";
 "lng_ringtones_box_about" = "Right click on any short voice note or MP3 file in chat and select \"Save for Notifications\". It will appear here.";
@@ -5273,6 +6471,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_forum_messages#one" = "{count} message";
 "lng_forum_messages#other" = "{count} messages";
 "lng_forum_show_topics_list" = "Show Topics List";
+
+"lng_monoforum_choose_to_reply" = "Choose a message to reply.";
 
 "lng_request_peer_requirements" = "Requirements";
 "lng_request_peer_rights" = "You must have these admin rights: {rights}.";
@@ -5320,6 +6520,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_request_channel_delete_messages" = "delete messages";
 "lng_request_channel_add_subscribers" = "add subscribers";
 "lng_request_channel_manage_livestreams" = "manage live streams";
+"lng_request_channel_manage_direct" = "manage direct messages";
 "lng_request_channel_add_admins" = "add new admins";
 "lng_request_channel_create" = "Create a New Channel for This";
 
@@ -5356,6 +6557,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_stories_archive_title" = "Story Archive";
 "lng_stories_archive_about" = "Only you can see archived stories unless you choose to post them to your profile.";
 "lng_stories_channel_archive_about" = "Only admins of the channel can see archived stories unless they are posted to the channel page.";
+"lng_stories_empty" = "Your stories will be here.";
+"lng_stories_empty_channel" = "Channel posts will be here.";
 "lng_stories_reply_sent" = "Message sent.";
 "lng_stories_hidden_to_contacts" = "Stories from {user} were moved to the **Archive**.";
 "lng_stories_shown_in_chats" = "Stories from {user} were returned from the **Archive**.";
@@ -5390,6 +6593,26 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_stories_channel_archive_done_many#other" = "{count} stories are hidden from the channel page.";
 "lng_stories_save_promo" = "Subscribe to {link} to save other people's stories that are not protected.";
 "lng_stories_reaction_as_message" = "Send reaction as a private message";
+
+"lng_stories_album_add" = "Add Album";
+"lng_stories_album_new_title" = "Create a New Album";
+"lng_stories_album_new_button" = "New Album";
+"lng_stories_album_new_text" = "Choose a name for your album and start adding your stories there.";
+"lng_stories_album_new_ph" = "Title";
+"lng_stories_album_new_create" = "Create";
+"lng_stories_album_empty_title" = "Organize Your Stories";
+"lng_stories_album_empty_text" = "Add some of your stories to this album.";
+"lng_stories_album_all" = "All Stories";
+"lng_stories_album_add_title" = "Add Stories";
+"lng_stories_album_add_button" = "Add Stories";
+"lng_stories_album_share" = "Share Album";
+"lng_stories_album_edit" = "Edit Name";
+"lng_stories_album_limit_title" = "Limit Reached";
+"lng_stories_album_limit_text" = "Please remove one of the existing albums to add a new one.";
+"lng_stories_album_delete" = "Delete Album";
+"lng_stories_album_delete_sure" = "Are you sure you want to delete this album?";
+"lng_stories_album_delete_button" = "Delete";
+"lng_stories_album_add_to" = "Add to Album";
 
 "lng_stealth_mode_menu_item" = "Hide My View";
 "lng_stealth_mode_title" = "Stealth Mode";
@@ -5515,6 +6738,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_boosts_list_tab_gifts#other" = "{count} Gifts";
 
 "lng_boosts_prepaid_giveaway_title" = "Prepaid giveaways";
+"lng_boosts_prepaid_giveaway_title_subtext" = "Select a giveaway you already paid for to set it up.";
 "lng_boosts_prepaid_giveaway_single" = "Prepaid giveaway";
 "lng_boosts_prepaid_giveaway_quantity#one" = "{count} Telegram Premium";
 "lng_boosts_prepaid_giveaway_quantity#other" = "{count} Telegram Premium";
@@ -5574,6 +6798,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_channel_earn_learn_coin_link" = "https://telegram.org/blog/monetization-for-channels";
 "lng_channel_earn_chart_top_hours" = "Ad impressions";
 "lng_channel_earn_chart_revenue" = "Ad rewards";
+"lng_channel_earn_chart_overriden_detail_credits" = "Rewards in Stars";
 "lng_channel_earn_chart_overriden_detail_currency" = "Rewards in TON";
 "lng_channel_earn_chart_overriden_detail_usd" = "Rewards in USD";
 "lng_channel_earn_currency_history" = "TON Transactions";
@@ -5584,6 +6809,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_bot_earn_chart_revenue" = "Revenue";
 "lng_bot_earn_overview_title" = "Proceeds overview";
 "lng_bot_earn_available" = "Available balance";
+"lng_bot_earn_reward" = "Total balance";
 "lng_bot_earn_total" = "Total lifetime proceeds";
 "lng_bot_earn_balance_title" = "Available balance";
 "lng_bot_earn_balance_about" = "Stars from your total balance can be used for ads or withdrawn as rewards 21 days after they are earned.";
@@ -5594,12 +6820,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_bot_earn_balance_button_locked" = "Withdraw";
 "lng_bot_earn_balance_button_buy_ads" = "Buy Ads";
 "lng_bot_earn_learn_credits_out_about" = "You can withdraw Stars using Fragment, or use Stars to advertise your bot. {link}";
+"lng_self_earn_learn_credits_out_about" = "You can withdraw from 10 Stars using Fragment. {link}";
 "lng_bot_earn_out_ph" = "Enter amount to withdraw";
+"lng_bot_earn_out_ph_max" = "Enter amount to withdraw (max. {amount})";
 "lng_bot_earn_balance_password_title" = "Two-step verification";
 "lng_bot_earn_balance_password_description" = "Please enter your password to collect.";
 "lng_bot_earn_credits_out_minimal" = "You cannot withdraw less than {link}.";
 "lng_bot_earn_credits_out_minimal_link#one" = "{count} star";
 "lng_bot_earn_credits_out_minimal_link#other" = "{count} stars";
+"lng_bot_copy_text_tooltip" = "Copy to Clipboard: {text}";
 
 "lng_contact_add" = "Add";
 "lng_contact_send_message" = "Message";
@@ -5641,6 +6870,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_recent_chats" = "Chats";
 "lng_recent_channels" = "Channels";
 "lng_recent_apps" = "Apps";
+"lng_recent_posts" = "Posts";
+"lng_all_photos" = "Photos";
+"lng_all_videos" = "Videos";
+"lng_all_downloads" = "Downloads";
+"lng_all_links" = "Links";
+"lng_all_files" = "Files";
+"lng_all_music" = "Music";
+"lng_all_voice" = "Voice";
 "lng_channels_none_title" = "No channels yet...";
 "lng_channels_none_about" = "You are not currently subscribed to any channels.";
 "lng_channels_your_title" = "Channels you joined";
@@ -5651,6 +6888,22 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_bot_apps_popular" = "Grossing apps";
 "lng_bot_apps_which" = "Which apps are included here? {link}";
 "lng_bot_apps_which_link" = "Learn >";
+"lng_posts_title" = "Global Search";
+"lng_posts_start" = "Type a keyword to search all posts from public channels.";
+"lng_posts_subscribe" = "Subscribe to Premium";
+"lng_posts_need_subscribe" = "Global search is a Premium feature.";
+"lng_posts_search_button" = "Search {query}";
+"lng_posts_remaining#one" = "{count} free search remaining today";
+"lng_posts_remaining#other" = "{count} free searches remaining today";
+"lng_posts_subtitle_empty" = "Telegram News";
+"lng_posts_subtitle" = "Public posts";
+"lng_posts_limit_reached" = "Limit Reached";
+"lng_posts_limit_about#one" = "You can make up to {count} search query per day.";
+"lng_posts_limit_about#other" = "You can make up to {count} search queries per day.";
+"lng_posts_limit_search_paid" = "Search for {cost}";
+"lng_posts_limit_unlocks" = "free search unlocks in {duration}";
+"lng_posts_paid_spent#one" = "**{count} Star** spent on extra search.";
+"lng_posts_paid_spent#other" = "**{count} Stars** spent on extra search.";
 
 "lng_popular_apps_info_title" = "Top Mini Apps";
 "lng_popular_apps_info_text" = "This catalogue ranks mini apps based on their daily revenue, measured in Stars. To be listed, developers must set their main mini apps in {bot} (as described {link}), have over **1,000** daily users, and earn a daily revenue above **1,000** Stars, based on the weekly average.";
@@ -5674,6 +6927,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_search_tab_no_results_text" = "There were no results for \"{query}\".";
 "lng_search_tab_no_results_retry" = "Try another hashtag.";
 "lng_search_tab_by_hashtag" = "Enter a hashtag to find messages containing it.";
+"lng_search_tab_try_in_all" = "Search in All Messages";
 
 "lng_contact_details_button" = "View Contact";
 "lng_contact_details_title" = "Contact details";
@@ -5696,6 +6950,29 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_qr_box_quality3" = "Very High";
 "lng_qr_box_transparent_background" = "Transparent Background";
 "lng_qr_box_font_size" = "Font size";
+
+"lng_frozen_bar_title" = "Your account is frozen!";
+"lng_frozen_bar_text" = "Click to view details {arrow}";
+"lng_frozen_restrict_title" = "Your account is frozen";
+"lng_frozen_restrict_text" = "Click to view details";
+"lng_frozen_title" = "Your Account is Frozen";
+"lng_frozen_subtitle1" = "Violation of Terms";
+"lng_frozen_text1" = "Your account was frozen for breaking Telegram's Terms and Conditions.";
+"lng_frozen_subtitle2" = "Read-Only Mode";
+"lng_frozen_text2" = "You can access your account but can't send messages or take actions.";
+"lng_frozen_subtitle3" = "Appeal Before Deactivation";
+"lng_frozen_text3" = "Appeal via {link} before {date}, or your account will be deleted.";
+"lng_frozen_appeal_button" = "Submit an Appeal";
+
+"lng_age_verify_title" = "Age Verification";
+"lng_age_verify_mobile" = "Please open this media in the official Telegram app for Android or iOS to verify your age.";
+"lng_age_verify_here" = "This is a one-time process using your phone's camera. Your selfie will not be stored by Telegram.";
+"lng_age_verify_button" = "Verify My Age";
+"lng_age_verify_sorry_title" = "Age Check Failed";
+"lng_age_verify_sorry_text" = "Sorry, you can't view 18+ content.";
+
+"lng_context_bank_card_copy" = "Copy Card Number";
+"lng_context_bank_card_copied" = "Card number copied to clipboard.";
 
 // Wnd specific
 
@@ -5751,6 +7028,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_mac_menu_new_channel" = "New Channel";
 "lng_mac_menu_show" = "Show Telegram";
 "lng_mac_menu_emoji_and_symbols" = "Emoji & Symbols";
+"lng_mac_menu_fullscreen" = "Toggle Full Screen";
 
 "lng_mac_menu_player_pause" = "Pause";
 "lng_mac_menu_player_resume" = "Resume";

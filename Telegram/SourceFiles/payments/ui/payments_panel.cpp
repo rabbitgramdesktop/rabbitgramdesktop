@@ -550,7 +550,7 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 	_webview = std::make_unique<WebviewWithLifetime>(
 		container,
 		Webview::WindowConfig{
-			.opaqueBg = params.opaqueBg,
+			.opaqueBg = params.bodyBg,
 			.storageId = _delegate->panelWebviewStorageId(),
 		});
 
@@ -881,10 +881,13 @@ void Panel::showCriticalError(const TextWithEntities &text) {
 	_progress = nullptr;
 	_webviewProgress = false;
 	if (!_weakFormSummary || !_weakFormSummary->showCriticalError(text)) {
-		auto error = base::make_unique_q<PaddingWrap<FlatLabel>>(
-			_widget.get(),
+		auto wrap = base::make_unique_q<RpWidget>(_widget.get());
+		const auto raw = wrap.get();
+
+		const auto error = CreateChild<PaddingWrap<FlatLabel>>(
+			raw,
 			object_ptr<FlatLabel>(
-				_widget.get(),
+				raw,
 				rpl::single(text),
 				st::paymentsCriticalError),
 			st::paymentsCriticalErrorPadding);
@@ -898,7 +901,13 @@ void Panel::showCriticalError(const TextWithEntities &text) {
 			_delegate->panelOpenUrl(entity.data);
 			return false;
 		});
-		_widget->showInner(std::move(error));
+
+		raw->widthValue() | rpl::start_with_next([=](int width) {
+			error->resizeToWidth(width);
+			raw->resize(width, error->height());
+		}, raw->lifetime());
+
+		_widget->showInner(std::move(wrap));
 	}
 }
 
@@ -919,7 +928,7 @@ void Panel::updateThemeParams(const Webview::ThemeParams &params) {
 		return;
 	}
 	_webview->window.updateTheme(
-		params.opaqueBg,
+		params.bodyBg,
 		params.scrollBg,
 		params.scrollBgOver,
 		params.scrollBarBg,

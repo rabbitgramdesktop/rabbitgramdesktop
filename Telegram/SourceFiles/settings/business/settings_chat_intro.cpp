@@ -303,9 +303,7 @@ rpl::producer<std::shared_ptr<StickerPlayer>> IconPlayerValue(
 	}, right->lifetime());
 
 	raw->setClickedCallback([=] {
-		const auto controller = show->resolveWindow(
-			ChatHelpers::WindowUsage::PremiumPromo);
-		if (controller) {
+		if (const auto controller = show->resolveWindow()) {
 			state->panel.show({
 				.controller = controller,
 				.button = right,
@@ -562,7 +560,7 @@ void ChatIntro::setupContent(
 			content,
 			session,
 			IntroWithRandomSticker(session, _intro.value())),
-		{});
+		style::margins());
 
 	const auto title = AddPartInput(
 		content,

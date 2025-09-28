@@ -63,7 +63,6 @@ public:
 
 	void setTitle(TitleDescriptor descriptor);
 	void setStories(rpl::producer<Dialogs::Stories::Content> content);
-	void setStoriesArchive(bool archive);
 	void enableBackButton();
 	void highlight();
 
@@ -103,6 +102,8 @@ public:
 
 	void showSearch();
 
+	void checkBeforeCloseByEscape(Fn<void()> close);
+
 protected:
 	int resizeGetHeight(int newWidth) override;
 	void paintEvent(QPaintEvent *e) override;
@@ -129,6 +130,7 @@ private:
 	[[nodiscard]] bool computeCanForward() const;
 	[[nodiscard]] bool computeCanUnpinStories() const;
 	[[nodiscard]] bool computeCanToggleStoryPin() const;
+	[[nodiscard]] bool computeAllStoriesInProfile() const;
 	void updateSelectionState();
 	void createSelectionControls();
 
@@ -176,7 +178,7 @@ private:
 	bool _canForward = false;
 	bool _canToggleStoryPin = false;
 	bool _canUnpinStories = false;
-	bool _storiesArchive = false;
+	bool _allStoriesInProfile = false;
 	QPointer<Ui::FadeWrap<Ui::IconButton>> _cancelSelection;
 	QPointer<Ui::FadeWrap<Ui::LabelWithNumbers>> _selectionText;
 	QPointer<Ui::FadeWrap<Ui::IconButton>> _forward;

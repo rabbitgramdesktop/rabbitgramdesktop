@@ -15,6 +15,8 @@ class HistoryItem;
 struct HistoryMessageEdited;
 struct HistoryMessageForwarded;
 struct HistoryMessageReplyMarkup;
+struct HistoryMessageSuggestedPost;
+struct HistoryMessageReply;
 
 namespace Data {
 struct ReactionId;
@@ -35,8 +37,7 @@ class InlineList;
 } // namespace Reactions
 
 // Special type of Component for the channel actions log.
-struct LogEntryOriginal
-	: public RuntimeComponent<LogEntryOriginal, Element> {
+struct LogEntryOriginal : RuntimeComponent<LogEntryOriginal, Element> {
 	LogEntryOriginal();
 	LogEntryOriginal(LogEntryOriginal &&other);
 	LogEntryOriginal &operator=(LogEntryOriginal &&other);
@@ -45,13 +46,12 @@ struct LogEntryOriginal
 	std::unique_ptr<WebPage> page;
 };
 
-struct Factcheck
-: public RuntimeComponent<Factcheck, Element> {
+struct Factcheck : RuntimeComponent<Factcheck, Element> {
 	std::unique_ptr<WebPage> page;
 	bool expanded = false;
 };
 
-struct PsaTooltipState : public RuntimeComponent<PsaTooltipState, Element> {
+struct PsaTooltipState : RuntimeComponent<PsaTooltipState, Element> {
 	QString type;
 	mutable ClickHandlerPtr link;
 	mutable Ui::Animations::Simple buttonVisibleAnimation;
@@ -78,7 +78,7 @@ public:
 	[[nodiscard]] const HistoryMessageEdited *displayedEditBadge() const;
 	[[nodiscard]] HistoryMessageEdited *displayedEditBadge();
 
-	[[nodiscard]] bool embedReactionsInBubble() const;
+	bool embedReactionsInBubble() const override;
 
 	int marginTop() const override;
 	int marginBottom() const override;
@@ -129,8 +129,6 @@ public:
 	TopicButton *displayedTopicButton() const override;
 	bool unwrapped() const override;
 	int minWidthForMedia() const override;
-	bool hasFastReply() const override;
-	bool displayFastReply() const override;
 	bool displayRightActionComments() const;
 	std::optional<QSize> rightActionSize() const override;
 	void drawRightAction(
@@ -159,10 +157,6 @@ public:
 		const base::flat_set<UserId> &changes) override;
 
 	void animateReaction(Ui::ReactionFlyAnimationArgs &&args) override;
-	auto takeReactionAnimations()
-	-> base::flat_map<
-		Data::ReactionId,
-		std::unique_ptr<Ui::ReactionFlyAnimation>> override;
 
 	void animateEffect(Ui::ReactionFlyAnimationArgs &&args) override;
 	auto takeEffectAnimation()
@@ -180,6 +174,13 @@ private:
 	struct FromNameStatus;
 	struct RightAction;
 
+	bool updateBottomInfo();
+
+	void initPaidInformation();
+	void refreshSuggestedInfo(
+		not_null<HistoryItem*> item,
+		not_null<const HistoryMessageSuggestedPost*> suggest,
+		const HistoryMessageReply *reply);
 	void initLogEntryOriginal();
 	void initPsa();
 	void fromNameUpdated(int width) const;
@@ -276,6 +277,10 @@ private:
 	[[nodiscard]] int visibleMediaTextLength() const;
 	[[nodiscard]] bool needInfoDisplay() const;
 	[[nodiscard]] bool invertMedia() const;
+	[[nodiscard]] bool hasFastReply() const;
+	[[nodiscard]] bool hasFastForward() const;
+	[[nodiscard]] bool displayFastReply() const;
+	[[nodiscard]] bool displayFastForward() const;
 
 	[[nodiscard]] bool isPinnedContext() const;
 
@@ -300,15 +305,13 @@ private:
 	[[nodiscard]] ClickHandlerPtr psaTooltipLink() const;
 	void psaTooltipToggled(bool shown) const;
 
-	void setReactions(std::unique_ptr<Reactions::InlineList> list);
 	void refreshRightBadge();
-	void refreshReactions();
 	void validateFromNameText(PeerData *from) const;
+	void ensureFromNameStatusLink(not_null<PeerData*> peer) const;
 
 	mutable std::unique_ptr<RightAction> _rightAction;
 	mutable ClickHandlerPtr _fastReplyLink;
 	mutable std::unique_ptr<ViewButton> _viewButton;
-	std::unique_ptr<Reactions::InlineList> _reactions;
 	std::unique_ptr<TopicButton> _topicButton;
 	mutable std::unique_ptr<CommentsButton> _comments;
 

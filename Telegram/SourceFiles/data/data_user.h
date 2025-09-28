@@ -7,17 +7,51 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "core/credits_amount.h"
+#include "data/components/credits.h"
 #include "data/data_birthday.h"
 #include "data/data_peer.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_lastseen_status.h"
 #include "data/data_user_names.h"
 #include "dialogs/dialogs_key.h"
+#include "base/flags.h"
 
 namespace Data {
 struct BotCommand;
 struct BusinessDetails;
 } // namespace Data
+
+namespace Api {
+enum class DisallowedGiftType : uchar;
+using DisallowedGiftTypes = base::flags<DisallowedGiftType>;
+} // namespace Api
+
+struct StarRefProgram {
+	CreditsAmount revenuePerUser;
+	TimeId endDate = 0;
+	ushort commission = 0;
+	uint8 durationMonths = 0;
+
+	friend inline constexpr bool operator==(
+		StarRefProgram,
+		StarRefProgram) = default;
+};
+
+struct BotVerifierSettings {
+	DocumentId iconId = 0;
+	QString company;
+	QString customDescription;
+	bool canModifyDescription = false;
+
+	explicit operator bool() const {
+		return iconId != 0;
+	}
+
+	friend inline bool operator==(
+		const BotVerifierSettings &a,
+		const BotVerifierSettings &b) = default;
+};
 
 struct BotInfo {
 	BotInfo();
@@ -33,11 +67,19 @@ struct BotInfo {
 	QString botMenuButtonUrl;
 	QString privacyPolicyUrl;
 
+	QColor botAppColorTitleDay = QColor(0, 0, 0, 0);
+	QColor botAppColorTitleNight = QColor(0, 0, 0, 0);
+	QColor botAppColorBodyDay = QColor(0, 0, 0, 0);
+	QColor botAppColorBodyNight = QColor(0, 0, 0, 0);
+
 	QString startToken;
 	Dialogs::EntryState inlineReturnTo;
 
 	ChatAdminRights groupAdminRights;
 	ChatAdminRights channelAdminRights;
+
+	StarRefProgram starRefProgram;
+	std::unique_ptr<BotVerifierSettings> verifierSettings;
 
 	int version = 0;
 	int descriptionVersion = 0;
@@ -47,6 +89,7 @@ struct BotInfo {
 	bool cantJoinGroups : 1 = false;
 	bool supportsAttachMenu : 1 = false;
 	bool canEditInformation : 1 = false;
+	bool canManageEmojiStatus : 1 = false;
 	bool supportsBusiness : 1 = false;
 	bool hasMainApp : 1 = false;
 };
@@ -73,10 +116,12 @@ enum class UserDataFlag : uint32 {
 	StoriesHidden = (1 << 18),
 	HasActiveStories = (1 << 19),
 	HasUnreadStories = (1 << 20),
-	MeRequiresPremiumToWrite = (1 << 21),
-	SomeRequirePremiumToWrite = (1 << 22),
-	RequirePremiumToWriteKnown = (1 << 23),
-	ReadDatesPrivate = (1 << 24),
+	RequiresPremiumToWrite = (1 << 21),
+	HasRequirePremiumToWrite = (1 << 22),
+	HasStarsPerMessage = (1 << 23),
+	MessageMoneyRestrictionsKnown = (1 << 24),
+	ReadDatesPrivate = (1 << 25),
+	StoriesCorrespondent = (1 << 26),
 };
 inline constexpr bool is_flag_type(UserDataFlag) { return true; };
 using UserDataFlags = base::flags<UserDataFlag>;
@@ -137,11 +182,21 @@ public:
 	[[nodiscard]] bool applyMinPhoto() const;
 	[[nodiscard]] bool hasPersonalPhoto() const;
 	[[nodiscard]] bool hasStoriesHidden() const;
-	[[nodiscard]] bool someRequirePremiumToWrite() const;
-	[[nodiscard]] bool meRequiresPremiumToWrite() const;
-	[[nodiscard]] bool requirePremiumToWriteKnown() const;
-	[[nodiscard]] bool canSendIgnoreRequirePremium() const;
+	[[nodiscard]] bool hasRequirePremiumToWrite() const;
+	[[nodiscard]] bool hasStarsPerMessage() const;
+	[[nodiscard]] bool requiresPremiumToWrite() const;
+	[[nodiscard]] bool messageMoneyRestrictionsKnown() const;
+	[[nodiscard]] bool canSendIgnoreMoneyRestrictions() const;
 	[[nodiscard]] bool readDatesPrivate() const;
+
+	void setStoriesCorrespondent(bool is);
+	[[nodiscard]] bool storiesCorrespondent() const;
+
+	void setStarsPerMessage(int stars);
+	[[nodiscard]] int starsPerMessage() const;
+
+	void setStarsRating(Data::StarsRating value);
+	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] bool canShareThisContact() const;
 	[[nodiscard]] bool canAddContact() const;
@@ -156,6 +211,12 @@ public:
 	[[nodiscard]] QString editableUsername() const;
 	[[nodiscard]] const std::vector<QString> &usernames() const;
 	[[nodiscard]] bool isUsernameEditable(QString username) const;
+
+	void setBotVerifyDetails(Ui::BotVerifyDetails details);
+	void setBotVerifyDetailsIcon(DocumentId iconId);
+	[[nodiscard]] Ui::BotVerifyDetails *botVerifyDetails() const {
+		return _botVerifyDetails.get();
+	}
 
 	enum class ContactStatus : char {
 		Unknown,
@@ -200,6 +261,8 @@ public:
 	[[nodiscard]] const Data::BusinessDetails &businessDetails() const;
 	void setBusinessDetails(Data::BusinessDetails details);
 
+	void setStarRefProgram(StarRefProgram program);
+
 	[[nodiscard]] ChannelId personalChannelId() const;
 	[[nodiscard]] MsgId personalChannelMessageId() const;
 	void setPersonalChannel(ChannelId channelId, MsgId messageId);
@@ -211,6 +274,11 @@ public:
 	QString nameOrPhone;
 
 	std::unique_ptr<BotInfo> botInfo;
+
+	[[nodiscard]] Api::DisallowedGiftTypes disallowedGiftTypes() const {
+		return _disallowedGiftTypes;
+	}
+	void setDisallowedGiftTypes(Api::DisallowedGiftTypes types);
 
 private:
 	auto unavailableReasons() const
@@ -224,6 +292,7 @@ private:
 	Data::Birthday _birthday;
 	int _commonChatsCount = 0;
 	int _peerGiftsCount = 0;
+	int _starsPerMessage = 0;
 	ContactStatus _contactStatus = ContactStatus::Unknown;
 	CallsStatus _callsStatus = CallsStatus::Unknown;
 
@@ -233,6 +302,8 @@ private:
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	QString _phone;
 	QString _privateForwardName;
+	std::unique_ptr<Ui::BotVerifyDetails> _botVerifyDetails;
+	Data::StarsRating _starsRating;
 
 	ChannelId _personalChannelId = 0;
 	MsgId _personalChannelMessageId = 0;
@@ -241,10 +312,18 @@ private:
 	static constexpr auto kInaccessibleAccessHashOld
 		= 0xFFFFFFFFFFFFFFFFULL;
 
+	Api::DisallowedGiftTypes _disallowedGiftTypes;
+
 };
 
 namespace Data {
 
 void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update);
+
+[[nodiscard]] StarRefProgram ParseStarRefProgram(
+	const MTPStarRefProgram *program);
+
+[[nodiscard]] Ui::BotVerifyDetails ParseBotVerifyDetails(
+	const MTPBotVerification *info);
 
 } // namespace Data

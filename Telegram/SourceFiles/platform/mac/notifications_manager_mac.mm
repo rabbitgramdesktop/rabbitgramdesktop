@@ -14,6 +14,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/random.h"
 #include "data/data_forum_topic.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_peer.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "ui/empty_userpic.h"
@@ -131,6 +133,12 @@ using Manager = Platform::Notifications::Manager;
 		return;
 	}
 	const auto notificationTopicRootId = [topicObject longLongValue];
+	NSNumber *monoforumPeerObject = [notificationUserInfo objectForKey:@"monoforumpeer"];
+	if (!monoforumPeerObject) {
+		LOG(("App Error: A notification with unknown monoforum peer was received"));
+		return;
+	}
+	const auto notificationMonoforumPeerId = [monoforumPeerObject unsignedLongLongValue];
 
 	NSNumber *msgObject = [notificationUserInfo objectForKey:@"msgid"];
 	const auto notificationMsgId = msgObject ? [msgObject longLongValue] : 0LL;
@@ -140,6 +148,7 @@ using Manager = Platform::Notifications::Manager;
 			.sessionId = notificationSessionId,
 			.peerId = PeerId(notificationPeerId),
 			.topicRootId = MsgId(notificationTopicRootId),
+			.monoforumPeerId = PeerId(notificationMonoforumPeerId),
 		},
 		.msgId = notificationMsgId,
 	};
@@ -196,12 +205,12 @@ bool ByDefault() {
 	return Supported();
 }
 
+bool VolumeSupported() {
+	return false;
+}
+
 void Create(Window::Notifications::System *system) {
-	if (Supported()) {
-		system->setManager(std::make_unique<Manager>(system));
-	} else {
-		system->setManager(nullptr);
-	}
+	system->setManager([=] { return std::make_unique<Manager>(system); });
 }
 
 class Manager::Private : public QObject {
@@ -209,22 +218,15 @@ public:
 	Private(Manager *manager);
 
 	void showNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options);
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView);
 	void clearAll();
 	void clearFromItem(not_null<HistoryItem*> item);
 	void clearFromTopic(not_null<Data::ForumTopic*> topic);
+	void clearFromSublist(not_null<Data::SavedSublist*> sublist);
 	void clearFromHistory(not_null<History*> history);
 	void clearFromSession(not_null<Main::Session*> session);
 	void updateDelegate();
-
-	void invokeIfNotFocused(Fn<void()> callback);
 
 	~Private();
 
@@ -233,7 +235,6 @@ private:
 	void putClearTask(Task task);
 
 	void clearingThreadLoop();
-	void checkFocusState();
 
 	const uint64 _managerId = 0;
 	QString _managerIdString;
@@ -250,6 +251,9 @@ private:
 	struct ClearFromTopic {
 		ContextId contextId;
 	};
+	struct ClearFromSublist {
+		ContextId contextId;
+	};
 	struct ClearFromHistory {
 		ContextId partialContextId;
 	};
@@ -263,28 +267,34 @@ private:
 	using ClearTask = std::variant<
 		ClearFromItem,
 		ClearFromTopic,
+		ClearFromSublist,
 		ClearFromHistory,
 		ClearFromSession,
 		ClearAll,
 		ClearFinish>;
 	std::vector<ClearTask> _clearingTasks;
 
-	QProcess _dnd;
-	QProcess _focus;
-	std::vector<Fn<void()>> _focusedCallbacks;
-	bool _waitingDnd = false;
-	bool _waitingFocus = false;
-	bool _focused = false;
-	bool _processesInited = false;
+	Media::Audio::LocalDiskCache _sounds;
 
 	rpl::lifetime _lifetime;
 
 };
 
+[[nodiscard]] QString ResolveSoundsFolder() {
+	NSArray *paths = NSSearchPathForDirectoriesInDomains(
+		NSLibraryDirectory,
+		NSUserDomainMask,
+		YES);
+	NSString *library = [paths firstObject];
+	NSString *sounds = [library stringByAppendingPathComponent : @"Sounds"];
+	return NS2QString(sounds);
+}
+
 Manager::Private::Private(Manager *manager)
 : _managerId(base::RandomValue<uint64>())
 , _managerIdString(QString::number(_managerId))
-, _delegate([[NotificationDelegate alloc] initWithManager:manager managerId:_managerId]) {
+, _delegate([[NotificationDelegate alloc] initWithManager:manager managerId:_managerId])
+, _sounds(ResolveSoundsFolder()) {
 	Core::App().settings().workModeValue(
 	) | rpl::start_with_next([=](Core::Settings::WorkMode mode) {
 		// We need to update the delegate _after_ the tray icon change was done in Qt.
@@ -296,23 +306,18 @@ Manager::Private::Private(Manager *manager)
 }
 
 void Manager::Private::showNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options) {
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView) {
 	@autoreleasepool {
 
+	const auto peer = info.peer;
 	NSUserNotification *notification = [[[NSUserNotification alloc] init] autorelease];
 	if ([notification respondsToSelector:@selector(setIdentifier:)]) {
 		auto identifier = _managerIdString
 			+ '_'
 			+ QString::number(peer->id.value)
 			+ '_'
-			+ QString::number(msgId.bare);
+			+ QString::number(info.itemId.bare);
 		auto identifierValue = Q2NSString(identifier);
 		[notification setIdentifier:identifierValue];
 	}
@@ -322,30 +327,37 @@ void Manager::Private::showNotification(
 			@"session",
 			[NSNumber numberWithUnsignedLongLong:peer->id.value],
 			@"peer",
-			[NSNumber numberWithLongLong:topicRootId.bare],
+			[NSNumber numberWithLongLong:info.topicRootId.bare],
 			@"topic",
-			[NSNumber numberWithLongLong:msgId.bare],
+			[NSNumber numberWithUnsignedLongLong:info.monoforumPeerId.value],
+			@"monoforumpeer",
+			[NSNumber numberWithLongLong:info.itemId.bare],
 			@"msgid",
 			[NSNumber numberWithUnsignedLongLong:_managerId],
 			@"manager",
 			nil]];
 
-	[notification setTitle:Q2NSString(title)];
-	[notification setSubtitle:Q2NSString(subtitle)];
-	[notification setInformativeText:Q2NSString(msg)];
-	if (!options.hideNameAndPhoto
+	[notification setTitle:Q2NSString(info.title)];
+	[notification setSubtitle:Q2NSString(info.subtitle)];
+	[notification setInformativeText:Q2NSString(info.message)];
+	if (!info.options.hideNameAndPhoto
 		&& [notification respondsToSelector:@selector(setContentImage:)]) {
 		NSImage *img = Q2NSImage(
 			Window::Notifications::GenerateUserpic(peer, userpicView));
 		[notification setContentImage:img];
 	}
 
-	if (!options.hideReplyButton
+	if (!info.options.hideReplyButton
 		&& [notification respondsToSelector:@selector(setHasReplyButton:)]) {
 		[notification setHasReplyButton:YES];
 	}
 
-	[notification setSoundName:nil];
+	const auto sound = info.sound ? info.sound() : Media::Audio::LocalSound();
+	if (sound) {
+		[notification setSoundName:Q2NSString(_sounds.name(sound))];
+	} else {
+		[notification setSoundName:nil];
+	}
 
 	NSUserNotificationCenter *center = [NSUserNotificationCenter defaultUserNotificationCenter];
 	[center deliverNotification:notification];
@@ -359,6 +371,7 @@ void Manager::Private::clearingThreadLoop() {
 		auto clearAll = false;
 		auto clearFromItems = base::flat_set<NotificationId>();
 		auto clearFromTopics = base::flat_set<ContextId>();
+		auto clearFromSublists = base::flat_set<ContextId>();
 		auto clearFromHistories = base::flat_set<ContextId>();
 		auto clearFromSessions = base::flat_set<uint64>();
 		{
@@ -376,6 +389,8 @@ void Manager::Private::clearingThreadLoop() {
 					clearFromItems.emplace(value.id);
 				}, [&](const ClearFromTopic &value) {
 					clearFromTopics.emplace(value.contextId);
+				}, [&](const ClearFromSublist &value) {
+					clearFromSublists.emplace(value.contextId);
 				}, [&](const ClearFromHistory &value) {
 					clearFromHistories.emplace(value.partialContextId);
 				}, [&](const ClearFromSession &value) {
@@ -403,21 +418,35 @@ void Manager::Private::clearingThreadLoop() {
 				return true;
 			}
 			const auto notificationTopicRootId = [topicObject longLongValue];
+			NSNumber *monoforumPeerObject = [notificationUserInfo objectForKey:@"monoforumpeer"];
+			if (!monoforumPeerObject) {
+				return true;
+			}
+			const auto notificationMonoforumPeerId = [monoforumPeerObject unsignedLongLongValue];
 			NSNumber *msgObject = [notificationUserInfo objectForKey:@"msgid"];
 			const auto msgId = msgObject ? [msgObject longLongValue] : 0LL;
 			const auto partialContextId = ContextId{
 				.sessionId = notificationSessionId,
 				.peerId = PeerId(notificationPeerId),
 			};
-			const auto contextId = ContextId{
+			const auto contextId = notificationTopicRootId
+			? ContextId{
 				.sessionId = notificationSessionId,
 				.peerId = PeerId(notificationPeerId),
 				.topicRootId = MsgId(notificationTopicRootId),
-			};
+			}
+			: notificationMonoforumPeerId
+			? ContextId{
+				.sessionId = notificationSessionId,
+				.peerId = PeerId(notificationPeerId),
+				.monoforumPeerId = PeerId(notificationMonoforumPeerId),
+			}
+			: partialContextId;
 			const auto id = NotificationId{ contextId, MsgId(msgId) };
 			return clearFromSessions.contains(notificationSessionId)
 				|| clearFromHistories.contains(partialContextId)
 				|| clearFromTopics.contains(contextId)
+				|| clearFromSublists.contains(contextId)
 				|| (msgId && clearFromItems.contains(id));
 		};
 
@@ -458,6 +487,7 @@ void Manager::Private::clearFromItem(not_null<HistoryItem*> item) {
 		.sessionId = item->history()->session().uniqueId(),
 		.peerId = item->history()->peer->id,
 		.topicRootId = item->topicRootId(),
+		.monoforumPeerId = item->sublistPeerId(),
 	}, item->id });
 }
 
@@ -466,6 +496,15 @@ void Manager::Private::clearFromTopic(not_null<Data::ForumTopic*> topic) {
 		.sessionId = topic->session().uniqueId(),
 		.peerId = topic->history()->peer->id,
 		.topicRootId = topic->rootId(),
+	} });
+}
+
+void Manager::Private::clearFromSublist(
+		not_null<Data::SavedSublist*> sublist) {
+	putClearTask(ClearFromSublist{ ContextId{
+		.sessionId = sublist->session().uniqueId(),
+		.peerId = sublist->owningHistory()->peer->id,
+		.monoforumPeerId = sublist->sublistPeer()->id,
 	} });
 }
 
@@ -485,77 +524,7 @@ void Manager::Private::updateDelegate() {
 	[center setDelegate:_delegate];
 }
 
-void Manager::Private::invokeIfNotFocused(Fn<void()> callback) {
-	if (!Platform::IsMac11_0OrGreater()) {
-		queryDoNotDisturbState();
-		if (!DoNotDisturbEnabled) {
-			callback();
-		}
-	} else if (Platform::IsMacStoreBuild() || LibraryPath().isEmpty()) {
-		callback();
-	} else if (!_focusedCallbacks.empty()) {
-		_focusedCallbacks.push_back(std::move(callback));
-	} else if (!ShouldQuerySettings()) {
-		if (!_focused) {
-			callback();
-		}
-	} else {
-		if (!_processesInited) {
-			_processesInited = true;
-			QObject::connect(&_dnd, &QProcess::finished, [=] {
-				_waitingDnd = false;
-				checkFocusState();
-			});
-			QObject::connect(&_focus, &QProcess::finished, [=] {
-				_waitingFocus = false;
-				checkFocusState();
-			});
-		}
-		const auto start = [](QProcess &process, QString keys) {
-			auto arguments = QStringList()
-				<< "-extract"
-				<< keys
-				<< "raw"
-				<< "-o"
-				<< "-"
-				<< "--"
-				<< (LibraryPath() + "/Preferences/com.apple.controlcenter.plist");
-			DEBUG_LOG(("Focus Check: Started %1.").arg(u"plutil"_q + arguments.join(' ')));
-			process.start(u"plutil"_q, arguments);
-		};
-		_focusedCallbacks.push_back(std::move(callback));
-		_waitingFocus = _waitingDnd = true;
-		start(_focus, u"NSStatusItem Visible FocusModes"_q);
-		start(_dnd, u"NSStatusItem Visible DoNotDisturb"_q);
-	}
-}
-
-void Manager::Private::checkFocusState() {
-	if (_waitingFocus || _waitingDnd) {
-		return;
-	}
-	const auto istrue = [](QProcess &process) {
-		const auto output = process.readAllStandardOutput();
-		DEBUG_LOG(("Focus Check: %1").arg(output));
-		const auto result = (output.trimmed() == u"true"_q);
-		return result;
-	};
-	_focused = istrue(_focus) || istrue(_dnd);
-	auto callbacks = base::take(_focusedCallbacks);
-	if (!_focused) {
-		for (const auto &callback : callbacks) {
-			callback();
-		}
-	}
-}
-
 Manager::Private::~Private() {
-	if (_waitingDnd) {
-		_dnd.kill();
-	}
-	if (_waitingFocus) {
-		_focus.kill();
-	}
 	if (_clearingThread.joinable()) {
 		putClearTask(ClearFinish());
 		_clearingThread.join();
@@ -572,23 +541,9 @@ Manager::Manager(Window::Notifications::System *system) : NativeManager(system)
 Manager::~Manager() = default;
 
 void Manager::doShowNativeNotification(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		Ui::PeerUserpicView &userpicView,
-		MsgId msgId,
-		const QString &title,
-		const QString &subtitle,
-		const QString &msg,
-		DisplayOptions options) {
-	_private->showNotification(
-		peer,
-		topicRootId,
-		userpicView,
-		msgId,
-		title,
-		subtitle,
-		msg,
-		options);
+		NotificationInfo &&info,
+		Ui::PeerUserpicView &userpicView) {
+	_private->showNotification(std::move(info), userpicView);
 }
 
 void Manager::doClearAllFast() {
@@ -601,6 +556,10 @@ void Manager::doClearFromItem(not_null<HistoryItem*> item) {
 
 void Manager::doClearFromTopic(not_null<Data::ForumTopic*> topic) {
 	_private->clearFromTopic(topic);
+}
+
+void Manager::doClearFromSublist(not_null<Data::SavedSublist*> sublist) {
+	_private->clearFromSublist(sublist);
 }
 
 void Manager::doClearFromHistory(not_null<History*> history) {
@@ -620,11 +579,11 @@ bool Manager::doSkipToast() const {
 }
 
 void Manager::doMaybePlaySound(Fn<void()> playSound) {
-	_private->invokeIfNotFocused(std::move(playSound));
+	playSound();
 }
 
 void Manager::doMaybeFlashBounce(Fn<void()> flashBounce) {
-	_private->invokeIfNotFocused(std::move(flashBounce));
+	flashBounce();
 }
 
 } // namespace Notifications

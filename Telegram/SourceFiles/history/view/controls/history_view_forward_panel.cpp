@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_item_helpers.h"
 #include "history/history_item_components.h"
 #include "history/view/history_view_item_preview.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_media_types.h"
 #include "data/data_forum_topic.h"
@@ -44,19 +45,6 @@ constexpr auto kUnknownVersion = -1;
 constexpr auto kNameWithCaptionsVersion = -2;
 constexpr auto kNameNoCaptionsVersion = -3;
 
-[[nodiscard]] bool HasOnlyForcedForwardedInfo(const HistoryItemsList &list) {
-	for (const auto &item : list) {
-		if (const auto media = item->media()) {
-			if (!media->forceForwardedInfo()) {
-				return false;
-			}
-		} else {
-			return false;
-		}
-	}
-	return true;
-}
-
 } // namespace
 
 ForwardPanel::ForwardPanel(Fn<void()> repaint)
@@ -84,6 +72,11 @@ void ForwardPanel::update(
 
 		if (const auto topic = _to->asTopic()) {
 			topic->destroyed(
+			) | rpl::start_with_next([=] {
+				update(nullptr, {});
+			}, _dataLifetime);
+		} else if (const auto sublist = _to->asSublist()) {
+			sublist->destroyed(
 			) | rpl::start_with_next([=] {
 				update(nullptr, {});
 			}, _dataLifetime);
@@ -115,7 +108,7 @@ void ForwardPanel::checkTexts() {
 		for (const auto item : _data.items) {
 			if (const auto from = item->originalSender()) {
 				version += from->nameVersion();
-			} else if (const auto info = item->originalHiddenSenderInfo()) {
+			} else if (item->originalHiddenSenderInfo()) {
 				++version;
 			} else {
 				Unexpected("Corrupt forwarded information in message.");
@@ -166,7 +159,7 @@ void ForwardPanel::updateTexts() {
 				Unexpected("Corrupt forwarded information in message.");
 			}
 		}
-		if (!keepNames) {
+		if (!keepNames || HasOnlyDroppedForwardedInfo(_data.items)) {
 			from = tr::lng_forward_sender_names_removed(tr::now);
 		} else if (names.size() > 2) {
 			from = tr::lng_forwarding_from(
@@ -203,10 +196,10 @@ void ForwardPanel::updateTexts() {
 		}
 	}
 	_from.setText(st::msgNameStyle, from, Ui::NameTextOptions());
-	const auto context = Core::MarkedTextContext{
+	const auto context = Core::TextContext({
 		.session = &_to->session(),
-		.customEmojiRepaint = _repaint,
-	};
+		.repaint = _repaint,
+	});
 	_text.setMarkedText(
 		st::defaultTextStyle,
 		text,
@@ -228,6 +221,10 @@ void ForwardPanel::itemRemoved(not_null<const HistoryItem*> item) {
 	}
 }
 
+const Data::ResolvedForwardDraft &ForwardPanel::draft() const {
+	return _data;
+}
+
 const HistoryItemsList &ForwardPanel::items() const {
 	return _data.items;
 }
@@ -236,63 +233,19 @@ bool ForwardPanel::empty() const {
 	return _data.items.empty();
 }
 
-void ForwardPanel::editOptions(std::shared_ptr<ChatHelpers::Show> show) {
-	using Options = Data::ForwardOptions;
-	const auto now = _data.options;
-	const auto count = _data.items.size();
-	const auto dropNames = (now != Options::PreserveInfo);
-	const auto sendersCount = ItemsForwardSendersCount(_data.items);
-	const auto captionsCount = ItemsForwardCaptionsCount(_data.items);
-	const auto hasOnlyForcedForwardedInfo = !captionsCount
-		&& HasOnlyForcedForwardedInfo(_data.items);
-	const auto dropCaptions = (now == Options::NoNamesAndCaptions);
-	const auto weak = base::make_weak(this);
-	const auto changeRecipient = crl::guard(this, [=] {
-		if (_data.items.empty()) {
-			return;
-		}
-		auto data = base::take(_data);
-		_to->owningHistory()->setForwardDraft(_to->topicRootId(), {});
-		Window::ShowForwardMessagesBox(show, {
-			.ids = _to->owner().itemsToIds(data.items),
-			.options = data.options,
-		});
-	});
-	if (hasOnlyForcedForwardedInfo) {
-		changeRecipient();
+void ForwardPanel::applyOptions(Data::ForwardOptions options) {
+	if (_data.items.empty()) {
 		return;
+	} else if (_data.options != options) {
+		const auto topicRootId = _to->topicRootId();
+		const auto monoforumPeerId = _to->monoforumPeerId();
+		_data.options = options;
+		_to->owningHistory()->setForwardDraft(topicRootId, monoforumPeerId, {
+			.ids = _to->owner().itemsToIds(_data.items),
+			.options = options,
+		});
+		_repaint();
 	}
-	const auto optionsChanged = crl::guard(weak, [=](
-			Ui::ForwardOptions options) {
-		if (_data.items.empty()) {
-			return;
-		}
-		const auto newOptions = (options.captionsCount
-			&& options.dropCaptions)
-			? Options::NoNamesAndCaptions
-			: options.dropNames
-			? Options::NoSenderNames
-			: Options::PreserveInfo;
-		if (_data.options != newOptions) {
-			_data.options = newOptions;
-			_to->owningHistory()->setForwardDraft(_to->topicRootId(), {
-				.ids = _to->owner().itemsToIds(_data.items),
-				.options = newOptions,
-			});
-			_repaint();
-		}
-	});
-	show->showBox(Box(
-		Ui::ForwardOptionsBox,
-		count,
-		Ui::ForwardOptions{
-			.sendersCount = sendersCount,
-			.captionsCount = captionsCount,
-			.dropNames = dropNames,
-			.dropCaptions = dropCaptions,
-		},
-		optionsChanged,
-		changeRecipient));
 }
 
 void ForwardPanel::editToNextOption() {
@@ -311,7 +264,9 @@ void ForwardPanel::editToNextOption() {
 		? Options::NoNamesAndCaptions
 		: Options::PreserveInfo;
 
-	_to->owningHistory()->setForwardDraft(_to->topicRootId(), {
+	const auto topicRootId = _to->topicRootId();
+	const auto monoforumPeerId = _to->monoforumPeerId();
+	_to->owningHistory()->setForwardDraft(topicRootId, monoforumPeerId, {
 		.ids = _to->owner().itemsToIds(_data.items),
 		.options = next,
 	});
@@ -387,20 +342,26 @@ void ForwardPanel::paint(
 void ClearDraftReplyTo(
 		not_null<History*> history,
 		MsgId topicRootId,
+		PeerId monoforumPeerId,
 		FullMsgId equalTo) {
-	const auto local = history->localDraft(topicRootId);
+	const auto local = history->localDraft(topicRootId, monoforumPeerId);
 	if (!local || (equalTo && local->reply.messageId != equalTo)) {
 		return;
 	}
 	auto draft = *local;
-	draft.reply = { .topicRootId = topicRootId };
+	draft.reply = {
+		.topicRootId = topicRootId,
+		.monoforumPeerId = monoforumPeerId,
+	};
+	draft.suggest = SuggestPostOptions();
 	if (Data::DraftIsNull(&draft)) {
-		history->clearLocalDraft(topicRootId);
+		history->clearLocalDraft(topicRootId, monoforumPeerId);
 	} else {
 		history->setLocalDraft(
 			std::make_unique<Data::Draft>(std::move(draft)));
 	}
-	if (const auto thread = history->threadFor(topicRootId)) {
+	const auto thread = history->threadFor(topicRootId, monoforumPeerId);
+	if (thread) {
 		history->session().api().saveDraftToCloudDelayed(thread);
 	}
 }
@@ -473,11 +434,11 @@ void EditWebPageOptions(
 		});
 
 		box->addButton(tr::lng_settings_save(), [=] {
-			const auto weak = Ui::MakeWeak(box.get());
+			const auto weak = base::make_weak(box.get());
 			auto result = state->result.current();
 			result.manual = true;
 			done(result);
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		});
@@ -485,7 +446,37 @@ void EditWebPageOptions(
 			box->closeBox();
 		});
 	}));
+}
 
+bool HasOnlyForcedForwardedInfo(const HistoryItemsList &list) {
+	for (const auto &item : list) {
+		if (const auto media = item->media()) {
+			if (!media->forceForwardedInfo()) {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool HasOnlyDroppedForwardedInfo(const HistoryItemsList &list) {
+	for (const auto &item : list) {
+		if (item->isSavedMusicItem() || !item->computeDropForwardedInfo()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool HasDropForwardedInfoSetting(const HistoryItemsList &list) {
+	for (const auto &item : list) {
+		if (!item->computeDropForwardedInfo()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace HistoryView::Controls

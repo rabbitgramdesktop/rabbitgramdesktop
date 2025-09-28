@@ -388,6 +388,12 @@ ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
 		st::historyCallCameraOutIcon,
 		st::historyCallCameraOutIconSelected);
 	make(
+		&MessageStyle::historyCallGroupIcon,
+		st::historyCallGroupInIcon,
+		st::historyCallGroupInIconSelected,
+		st::historyCallGroupOutIcon,
+		st::historyCallGroupOutIconSelected);
+	make(
 		&MessageStyle::historyFilePlay,
 		st::historyFileInPlay,
 		st::historyFileInPlaySelected,
@@ -607,7 +613,7 @@ std::span<Text::SpecialColor> ChatStyle::highlightColors() const {
 		// constant, symbol, deleted
 		push(statisticsChartLineRed());
 
-		// selector, attr-name, string, char, builtin, inserted
+		// selector, attr-name, string, char, builtin
 		push(statisticsChartLineOrange());
 
 		// operator, entity, url
@@ -619,8 +625,9 @@ std::span<Text::SpecialColor> ChatStyle::highlightColors() const {
 		// class-name
 		push(statisticsChartLinePurple());
 
+		// inserted
+		push(statisticsChartLineGreen());
 		//push(statisticsChartLineLightgreen());
-		//push(statisticsChartLineGreen());
 		//push(statisticsChartLineGolden());
 	}
 	return _highlightColors;

@@ -11,12 +11,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/local_url_handlers.h"
 #include "core/file_utilities.h"
 #include "core/application.h"
+#include "core/bank_card_click_handler.h"
 #include "core/sandbox.h"
 #include "core/click_handler_types.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_session.h"
 #include "iv/iv_instance.h"
 #include "ui/text/text_custom_emoji.h"
+#include "ui/text/text_utilities.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/emoji_config.h"
 #include "lang/lang_keys.h"
@@ -108,6 +110,40 @@ const auto kBadPrefix = u"http://"_q;
 
 } // namespace
 
+Ui::Text::MarkedContext TextContext(TextContextArgs &&args) {
+	using Context = Ui::Text::MarkedContext;
+	using Factory = Ui::Text::CustomEmojiFactory;
+
+	const auto session = args.session;
+	auto simple = [session](QStringView data, const Context &context) {
+		return session->data().customEmojiManager().create(
+			data,
+			context.repaint);
+	};
+	auto factory = !args.customEmojiLoopLimit
+		? Factory(simple)
+		: (args.customEmojiLoopLimit > 0)
+		? Factory([simple, loop = args.customEmojiLoopLimit](
+				QStringView data,
+				const Context &context) {
+			return std::make_unique<Ui::Text::LimitedLoopsEmoji>(
+				simple(data, context),
+				loop);
+		})
+		: Factory([simple](
+				QStringView data,
+				const Context &context) {
+			return std::make_unique<Ui::Text::FirstFrameEmoji>(
+				simple(data, context));
+		});
+	args.details.session = session;
+	return {
+		.repaint = std::move(args.repaint),
+		.customEmojiFactory = std::move(factory),
+		.other = std::move(args.details),
+	};
+}
+
 void UiIntegration::postponeCall(FnMut<void()> &&callable) {
 	Sandbox::Instance().postponeCall(std::move(callable));
 }
@@ -148,8 +184,8 @@ bool UiIntegration::screenIsLocked() {
 
 std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 		const EntityLinkData &data,
-		const std::any &context) {
-	const auto my = std::any_cast<MarkedTextContext>(&context);
+		const Ui::Text::MarkedContext &context) {
+	const auto my = std::any_cast<Core::TextContextDetails>(&context.other);
 	switch (data.type) {
 	case EntityType::Url:
 		return (!data.data.isEmpty()
@@ -166,7 +202,7 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 		return std::make_shared<BotCommandClickHandler>(data.data);
 
 	case EntityType::Hashtag:
-		using HashtagMentionType = MarkedTextContext::HashtagMentionType;
+		using HashtagMentionType = TextContextDetails::HashtagMentionType;
 		if (my && my->type == HashtagMentionType::Twitter) {
 			return std::make_shared<UrlClickHandler>(
 				(u"https://twitter.com/hashtag/"_q
@@ -186,7 +222,7 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 		return std::make_shared<CashtagClickHandler>(data.data);
 
 	case EntityType::Mention:
-		using HashtagMentionType = MarkedTextContext::HashtagMentionType;
+		using HashtagMentionType = TextContextDetails::HashtagMentionType;
 		if (my && my->type == HashtagMentionType::Twitter) {
 			return std::make_shared<UrlClickHandler>(
 				u"https://twitter.com/"_q + data.data.mid(1),
@@ -218,7 +254,13 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 	case EntityType::Pre:
 		return std::make_shared<MonospaceClickHandler>(data.text, data.type);
 	case EntityType::Phone:
-		return std::make_shared<PhoneClickHandler>(my->session, data.text);
+		return (my && my->session)
+			? std::make_shared<PhoneClickHandler>(my->session, data.text)
+			: nullptr;
+	case EntityType::BankCard:
+		return (my && my->session)
+			? std::make_shared<BankCardClickHandler>(my->session, data.text)
+			: nullptr;
 	}
 	return Integration::createLinkHandler(data, context);
 }
@@ -270,29 +312,6 @@ bool UiIntegration::copyPreOnClick(const QVariant &context) {
 		my.show->showToast(tr::lng_code_copied(tr::now));
 	}
 	return true;
-}
-
-std::unique_ptr<Ui::Text::CustomEmoji> UiIntegration::createCustomEmoji(
-		QStringView data,
-		const std::any &context) {
-	const auto my = std::any_cast<MarkedTextContext>(&context);
-	if (!my || !my->session) {
-		return nullptr;
-	}
-	auto result = my->session->data().customEmojiManager().create(
-		data,
-		my->customEmojiRepaint);
-	if (my->customEmojiLoopLimit > 0) {
-		return std::make_unique<Ui::Text::LimitedLoopsEmoji>(
-			std::move(result),
-			my->customEmojiLoopLimit);
-	}
-	return result;
-}
-
-Fn<void()> UiIntegration::createSpoilerRepaint(const std::any &context) {
-	const auto my = std::any_cast<MarkedTextContext>(&context);
-	return my ? my->customEmojiRepaint : nullptr;
 }
 
 rpl::producer<> UiIntegration::forcePopupMenuHideRequests() {

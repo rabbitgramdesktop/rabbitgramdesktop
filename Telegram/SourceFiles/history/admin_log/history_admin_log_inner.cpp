@@ -273,13 +273,13 @@ InnerWidget::InnerWidget(
 	_scrollDateHideTimer.setCallback([=] { scrollDateHideByTimer(); });
 	session().data().viewRepaintRequest(
 	) | rpl::start_with_next([=](auto view) {
-		if (view->delegate() == this) {
+		if (myView(view)) {
 			repaintItem(view);
 		}
 	}, lifetime());
 	session().data().viewResizeRequest(
 	) | rpl::start_with_next([=](auto view) {
-		if (view->delegate() == this) {
+		if (myView(view)) {
 			resizeItem(view);
 		}
 	}, lifetime());
@@ -291,7 +291,7 @@ InnerWidget::InnerWidget(
 	}, lifetime());
 	session().data().viewLayoutChanged(
 	) | rpl::start_with_next([=](auto view) {
-		if (view->delegate() == this) {
+		if (myView(view)) {
 			if (view->isUnderCursor()) {
 				updateSelected();
 			}
@@ -331,6 +331,10 @@ InnerWidget::InnerWidget(
 	_antiSpamValidator.resolveUser(crl::guard(
 		this,
 		[=] { requestAdmins(); }));
+}
+
+bool InnerWidget::myView(not_null<const HistoryView::Element*> view) const {
+	return !_items.empty() && (view->delegate().get() == this);
 }
 
 Main::Session &InnerWidget::session() const {
@@ -662,7 +666,8 @@ bool InnerWidget::elementUnderCursor(
 	return (Element::Hovered() == view);
 }
 
-HistoryView::SelectionModeResult InnerWidget::elementInSelectionMode() {
+HistoryView::SelectionModeResult InnerWidget::elementInSelectionMode(
+		const HistoryView::Element *) {
 	return {};
 }
 
@@ -735,8 +740,9 @@ void InnerWidget::elementSearchInList(
 void InnerWidget::elementHandleViaClick(not_null<UserData*> bot) {
 }
 
-bool InnerWidget::elementIsChatWide() {
-	return _isChatWide;
+HistoryView::ElementChatMode InnerWidget::elementChatMode() {
+	using Mode = HistoryView::ElementChatMode;
+	return _isChatWide ? Mode::Wide : Mode::Default;
 }
 
 not_null<Ui::PathShiftGradient*> InnerWidget::elementPathShiftGradient() {
@@ -790,11 +796,16 @@ void InnerWidget::saveState(not_null<SectionMemento*> memento) {
 }
 
 void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
-	_items = memento->takeItems();
-	for (auto &item : _items) {
+	// OwnedItem::refreshView may call requestItemResize.
+	// So we postpone resizing until all views are created.
+	_items.clear();
+	auto items = memento->takeItems();
+	for (auto &item : items) {
 		item.refreshView(this);
 		_itemsByData.emplace(item->data(), item.get());
 	}
+	_items = std::move(items);
+
 	_eventIds = memento->takeEventIds();
 	_admins = memento->takeAdmins();
 	_adminsCanEdit = memento->takeAdminsCanEdit();
@@ -997,7 +1008,7 @@ void InnerWidget::itemsAdded(Direction direction, int addedCount) {
 }
 
 void InnerWidget::updateSize() {
-	TWidget::resizeToWidth(width());
+	RpWidget::resizeToWidth(width());
 	restoreScrollPosition();
 	updateVisibleTopItem();
 	checkPreloadMore();
@@ -1029,6 +1040,16 @@ void InnerWidget::restoreScrollPosition() {
 	_scrollToSignal.fire_copy(newVisibleTop);
 }
 
+Ui::ChatPaintContext InnerWidget::preparePaintContext(QRect clip) const {
+	return _controller->preparePaintContext({
+		.theme = _theme.get(),
+		.clip = clip,
+		.visibleAreaPositionGlobal = mapToGlobal(QPoint(0, _visibleTop)),
+		.visibleAreaTop = _visibleTop,
+		.visibleAreaWidth = width(),
+	});
+}
+
 void InnerWidget::paintEvent(QPaintEvent *e) {
 	if (_controller->contentOverlapped(this, e)) {
 		return;
@@ -1041,13 +1062,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	auto clip = e->rect();
-	auto context = _controller->preparePaintContext({
-		.theme = _theme.get(),
-		.clip = clip,
-		.visibleAreaPositionGlobal = mapToGlobal(QPoint(0, _visibleTop)),
-		.visibleAreaTop = _visibleTop,
-		.visibleAreaWidth = width(),
-	});
+	auto context = preparePaintContext(clip);
 	if (_items.empty() && _upLoaded && _downLoaded) {
 		paintEmpty(p, context.st);
 	} else {
@@ -1515,7 +1530,7 @@ void InnerWidget::suggestRestrictParticipant(
 				UserData *by,
 				TimeId since) {
 			auto weak = QPointer<InnerWidget>(this);
-			auto weakBox = std::make_shared<QPointer<Ui::BoxContent>>();
+			auto weakBox = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 			auto box = Box<EditRestrictedBox>(
 				_channel,
 				user,
@@ -1545,7 +1560,7 @@ void InnerWidget::suggestRestrictParticipant(
 					tr::now,
 					lt_user,
 					participant->name());
-			auto weakBox = std::make_shared<QPointer<Ui::BoxContent>>();
+			auto weakBox = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 			const auto sure = crl::guard(this, [=] {
 				restrictParticipant(
 					participant,
@@ -1669,7 +1684,7 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 
 void InnerWidget::enterEventHook(QEnterEvent *e) {
 	mouseActionUpdate(QCursor::pos());
-	return TWidget::enterEventHook(e);
+	return RpWidget::enterEventHook(e);
 }
 
 void InnerWidget::leaveEventHook(QEvent *e) {
@@ -1683,7 +1698,7 @@ void InnerWidget::leaveEventHook(QEvent *e) {
 		_cursor = style::cur_default;
 		setCursor(_cursor);
 	}
-	return TWidget::leaveEventHook(e);
+	return RpWidget::leaveEventHook(e);
 }
 
 void InnerWidget::mouseActionStart(const QPoint &screenPos, Qt::MouseButton button) {
@@ -1795,10 +1810,8 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 		ActivateClickHandler(window(), activated, {
 			button,
 			QVariant::fromValue(ClickHandlerContext{
-				.elementDelegate = [weak = Ui::MakeWeak(this)] {
-					return weak
-						? (ElementDelegate*)weak
-						: nullptr;
+				.elementDelegate = [weak = base::make_weak(this)] {
+					return (ElementDelegate*)weak.get();
 				},
 				.sessionWindow = base::make_weak(_controller),
 			})

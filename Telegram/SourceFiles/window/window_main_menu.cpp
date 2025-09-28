@@ -10,22 +10,27 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings/rabbit_settings.h"
 
 #include "apiwrap.h"
+#include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "boxes/about_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/premium_preview_box.h"
+#include "calls/group/calls_group_common.h"
 #include "calls/calls_box_controller.h"
+#include "calls/calls_instance.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "data/data_changes.h"
 #include "data/data_document_media.h"
 #include "data/data_folder.h"
+#include "data/data_group_call.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"
 #include "info/info_memento.h"
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
+#include "info/profile/info_profile_icon.h"
 #include "info/stories/info_stories_widget.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
@@ -39,14 +44,18 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "support/support_templates.h"
+#include "tde2e/tde2e_api.h"
+#include "tde2e/tde2e_integration.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/controls/swipe_handler.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/snowflakes.h"
 #include "ui/effects/toggle_arrow.h"
 #include "ui/painter.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
+#include "ui/ui_utility.h"
 #include "ui/unread_badge_paint.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -91,89 +100,6 @@ constexpr auto kPlayStatusLimit = 2;
 		|| (now.month() == 1 && now.day() == 1);
 }
 
-void ShowCallsBox(not_null<Window::SessionController*> window) {
-	struct State {
-		State(not_null<Window::SessionController*> window)
-		: callsController(window)
-		, groupCallsController(window) {
-		}
-		Calls::BoxController callsController;
-		PeerListContentDelegateSimple callsDelegate;
-
-		Calls::GroupCalls::ListController groupCallsController;
-		PeerListContentDelegateSimple groupCallsDelegate;
-
-		base::unique_qptr<Ui::PopupMenu> menu;
-	};
-
-	window->show(Box([=](not_null<Ui::GenericBox*> box) {
-		const auto state = box->lifetime().make_state<State>(window);
-
-		const auto groupCalls = box->addRow(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				box,
-				object_ptr<Ui::VerticalLayout>(box)),
-			{});
-		groupCalls->hide(anim::type::instant);
-		groupCalls->toggleOn(state->groupCallsController.shownValue());
-
-		Ui::AddSubsectionTitle(
-			groupCalls->entity(),
-			tr::lng_call_box_groupcalls_subtitle());
-		state->groupCallsDelegate.setContent(groupCalls->entity()->add(
-			object_ptr<PeerListContent>(box, &state->groupCallsController),
-			{}));
-		state->groupCallsController.setDelegate(&state->groupCallsDelegate);
-		Ui::AddSkip(groupCalls->entity());
-		Ui::AddDivider(groupCalls->entity());
-		Ui::AddSkip(groupCalls->entity());
-
-		const auto content = box->addRow(
-			object_ptr<PeerListContent>(box, &state->callsController),
-			{});
-		state->callsDelegate.setContent(content);
-		state->callsController.setDelegate(&state->callsDelegate);
-
-		box->setWidth(state->callsController.contentWidth());
-		state->callsController.boxHeightValue(
-		) | rpl::start_with_next([=](int height) {
-			box->setMinHeight(height);
-		}, box->lifetime());
-		box->setTitle(tr::lng_call_box_title());
-		box->addButton(tr::lng_close(), [=] {
-			box->closeBox();
-		});
-		const auto menuButton = box->addTopButton(st::infoTopBarMenu);
-		menuButton->setClickedCallback([=] {
-			state->menu = base::make_unique_q<Ui::PopupMenu>(
-				menuButton,
-				st::popupMenuWithIcons);
-			const auto showSettings = [=] {
-				window->showSettings(
-					Settings::Calls::Id(),
-					Window::SectionShow(anim::type::instant));
-			};
-			const auto clearAll = crl::guard(box, [=] {
-				box->uiShow()->showBox(Box(Calls::ClearCallsBox, window));
-			});
-			state->menu->addAction(
-				tr::lng_settings_section_call_settings(tr::now),
-				showSettings,
-				&st::menuIconSettings);
-			if (state->callsDelegate.peerListFullRowsCount() > 0) {
-				Ui::Menu::CreateAddActionCallback(state->menu)({
-					.text = tr::lng_call_box_clear_all(tr::now),
-					.handler = clearAll,
-					.icon = &st::menuIconDeleteAttention,
-					.isAttention = true,
-				});
-			}
-			state->menu->popup(QCursor::pos());
-			return true;
-		});
-	}));
-}
-
 [[nodiscard]] rpl::producer<TextWithEntities> SetStatusLabel(
 		not_null<Main::Session*> session) {
 	const auto self = session->user();
@@ -181,7 +107,7 @@ void ShowCallsBox(not_null<Window::SessionController*> window) {
 		self,
 		Data::PeerUpdate::Flag::EmojiStatus
 	) | rpl::map([=] {
-		return (self->emojiStatusId() != 0);
+		return !!self->emojiStatusId();
 	}) | rpl::distinct_until_changed() | rpl::map([](bool has) {
 		const auto makeLink = [](const QString &text) {
 			return Ui::Text::Link(text);
@@ -393,7 +319,8 @@ MainMenu::MainMenu(
 , _badge(std::make_unique<Info::Profile::Badge>(
 	this,
 	st::settingsInfoPeerBadge,
-	controller->session().user(),
+	&controller->session(),
+	Info::Profile::BadgeContentForPeer(controller->session().user()),
 	_emojiStatusPanel.get(),
 	[=] { return controller->isGifPausedAtLeastFor(GifPauseReason::Layer); },
 	kPlayStatusLimit,
@@ -478,7 +405,7 @@ MainMenu::MainMenu(
 	_version->setLink(
 		2,
 		std::make_shared<LambdaClickHandler>([=] {
-			controller->show(Box<AboutBox>());
+			controller->show(Box(AboutBox));
 		}));
 
 	rpl::combine(
@@ -533,6 +460,8 @@ MainMenu::MainMenu(
 			}
 		}, lifetime());
 	}
+
+	setupSwipe();
 }
 
 MainMenu::~MainMenu() = default;
@@ -724,7 +653,34 @@ void MainMenu::setupMenu() {
 			std::move(descriptor));
 	};
 	if (!_controller->session().supportMode()) {
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_create_group")) {
+		bool addSkip = false;
+		
+		if (RabbitSettings::sidebarMyProfile()) {
+			_menu->add(
+				CreateButtonWithIcon(
+					_menu,
+					tr::lng_menu_my_profile(),
+					st::mainMenuButton,
+					{ &st::menuIconProfile })
+			)->setClickedCallback([=] {
+				controller->showSection(
+					Info::Stories::Make(controller->session().user()));
+			});
+			addSkip = true;
+		}
+
+		if (RabbitSettings::sidebarBots()) {
+			SetupMenuBots(_menu, controller);
+			addSkip = true;
+		}
+
+		if (addSkip) {
+			_menu->add(
+				object_ptr<Ui::PlainShadow>(_menu),
+				{ 0, st::mainMenuSkip, 0, st::mainMenuSkip });
+		}
+
+		if (RabbitSettings::sidebarCreateGroup()) {
 			AddMyChannelsBox(addAction(
 				tr::lng_create_group_title(),
 				{ &st::menuIconGroups }
@@ -735,7 +691,7 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_create_channel")) {
+		if (RabbitSettings::sidebarCreateChannel()) {
 			AddMyChannelsBox(addAction(
 				tr::lng_create_channel_title(),
 				{ &st::menuIconChannel }
@@ -746,60 +702,25 @@ void MainMenu::setupMenu() {
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_stories")) {
-			const auto wrap = _menu->add(
-				object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
-					_menu,
-					CreateButtonWithIcon(
-						_menu,
-						tr::lng_menu_my_stories(),
-						st::mainMenuButton,
-						IconDescriptor{ &st::menuIconStoriesSavedSection })));
-			const auto selfId = controller->session().userPeerId();
-			const auto stories = &controller->session().data().stories();
-			if (stories->archiveCount(selfId) > 0) {
-				wrap->toggle(true, anim::type::instant);
-			} else {
-				wrap->toggle(false, anim::type::instant);
-				if (!stories->archiveCountKnown(selfId)) {
-					stories->archiveLoadMore(selfId);
-					wrap->toggleOn(stories->archiveChanged(
-					) | rpl::filter(
-						rpl::mappers::_1 == selfId
-					) | rpl::map([=] {
-						return stories->archiveCount(selfId) > 0;
-					}) | rpl::filter(rpl::mappers::_1) | rpl::take(1));
-				}
-			}
-			wrap->entity()->setClickedCallback([=] {
-				controller->showSection(
-					Info::Stories::Make(controller->session().user()));
-			});
-		}
-
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_bots")) {
-			SetupMenuBots(_menu, controller);
-		}
-
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_contacts")) {
+		if (RabbitSettings::sidebarContacts()) {
 			addAction(
 				tr::lng_menu_contacts(),
-				{ &st::menuIconProfile }
+				{ &st::menuIconUserShow }
 			)->setClickedCallback([=] {
 				controller->show(PrepareContactsBox(controller));
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_calls")) {
+		if (RabbitSettings::sidebarCalls()) {
 			addAction(
 				tr::lng_menu_calls(),
 				{ &st::menuIconPhone }
 			)->setClickedCallback([=] {
-				ShowCallsBox(controller);
+				::Calls::ShowCallsBox(controller);
 			});
 		}
 
-		if (RabbitSettings::JsonSettings::GetBool("sidebar_saved_messages")) {
+		if (RabbitSettings::sidebarSavedMessages()) {
 			addAction(
 				tr::lng_saved_messages(),
 				{ &st::menuIconSavedMessages }
@@ -838,7 +759,7 @@ void MainMenu::setupMenu() {
 		controller->showSettings();
 	});
 
-	if (RabbitSettings::JsonSettings::GetBool("sidebar_night_mode")) {
+	if (RabbitSettings::sidebarNightMode()) {
 		_nightThemeToggle = addAction(
 			tr::lng_menu_night_mode(),
 			{ &st::menuIconNightMode }
@@ -855,7 +776,7 @@ void MainMenu::setupMenu() {
 					tr::lng_theme_editor_cant_change_theme()));
 				return;
 			}
-			const auto weak = MakeWeak(this);
+			const auto weak = base::make_weak(this);
 			const auto toggle = [=] {
 				if (!weak) {
 					Window::Theme::ToggleNightMode();
@@ -922,11 +843,24 @@ void MainMenu::updateInnerControlsGeometry() {
 }
 
 void MainMenu::chooseEmojiStatus() {
-	if (const auto widget = _badge->widget()) {
+	if (_controller->showFrozenError()) {
+		return;
+	} else if (const auto widget = _badge->widget()) {
 		_emojiStatusPanel->show(_controller, widget, _badge->sizeTag());
 	} else {
 		ShowPremiumPreviewBox(_controller, PremiumFeature::EmojiStatus);
 	}
+}
+
+bool MainMenu::eventHook(QEvent *event) {
+	const auto type = event->type();
+	if (type == QEvent::TouchBegin
+		|| type == QEvent::TouchUpdate
+		|| type == QEvent::TouchEnd
+		|| type == QEvent::TouchCancel) {
+		QGuiApplication::sendEvent(_inner, event);
+	}
+	return RpWidget::eventHook(event);
 }
 
 void MainMenu::paintEvent(QPaintEvent *e) {
@@ -1026,6 +960,81 @@ rpl::producer<OthersUnreadState> OtherAccountsUnreadState(
 		Core::App().unreadBadgeChanges()
 	) | rpl::map([=] {
 		return OtherAccountsUnreadStateCurrent(current);
+	});
+}
+
+base::EventFilterResult MainMenu::redirectToInnerChecked(not_null<QEvent*> e) {
+	if (_insideEventRedirect) {
+		return base::EventFilterResult::Continue;
+	}
+	const auto weak = base::make_weak(this);
+	_insideEventRedirect = true;
+	QGuiApplication::sendEvent(_inner, e);
+	if (weak) {
+		_insideEventRedirect = false;
+	}
+	return base::EventFilterResult::Cancel;
+}
+
+void MainMenu::setupSwipe() {
+	const auto outer = _controller->widget()->body();
+	base::install_event_filter(this, outer, [=](not_null<QEvent*> e) {
+		const auto type = e->type();
+		if (type == QEvent::TouchBegin
+			|| type == QEvent::TouchUpdate
+			|| type == QEvent::TouchEnd
+			|| type == QEvent::TouchCancel) {
+			return redirectToInnerChecked(e);
+		} else if (type == QEvent::Wheel) {
+			const auto w = static_cast<QWheelEvent*>(e.get());
+			const auto d = Ui::ScrollDeltaF(w);
+			if (std::abs(d.x()) > std::abs(d.y())) {
+				return redirectToInnerChecked(e);
+			}
+		}
+		return base::EventFilterResult::Continue;
+	});
+	const auto handles = outer->testAttribute(Qt::WA_AcceptTouchEvents);
+	if (!handles) {
+		outer->setAttribute(Qt::WA_AcceptTouchEvents);
+		lifetime().add([=] {
+			outer->setAttribute(Qt::WA_AcceptTouchEvents, false);
+		});
+	}
+
+	auto update = [=](Ui::Controls::SwipeContextData data) {
+		if (data.translation < 0) {
+			if (!_swipeBackData.callback) {
+				_swipeBackData = Ui::Controls::SetupSwipeBack(
+					this,
+					[=]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			_swipeBackData.callback(data);
+			return;
+		} else if (_swipeBackData.lifetime) {
+			_swipeBackData = {};
+		}
+	};
+
+	auto init = [=](int, Qt::LayoutDirection direction) {
+		if (direction != Qt::LeftToRight) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
+		return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+			closeLayer();
+		});
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = _inner,
+		.scroll = _scroll.data(),
+		.update = std::move(update),
+		.init = std::move(init),
 	});
 }
 

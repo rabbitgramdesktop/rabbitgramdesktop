@@ -232,12 +232,14 @@ EditCaptionBox::EditCaptionBox(
 	not_null<Window::SessionController*> controller,
 	not_null<HistoryItem*> item,
 	TextWithTags &&text,
+	SuggestPostOptions suggest,
 	bool spoilered,
 	bool invertCaption,
 	Ui::PreparedList &&list,
 	Fn<void()> saved)
 : _controller(controller)
 , _historyItem(item)
+, _suggest(suggest)
 , _isAllowedEditMedia(item->allowsEditMedia())
 , _albumType(ComputeAlbumType(item))
 , _controls(base::make_unique_q<Ui::VerticalLayout>(this))
@@ -254,7 +256,7 @@ EditCaptionBox::EditCaptionBox(
 , _initialList(std::move(list))
 , _saved(std::move(saved)) {
 	Expects(!_initialList.files.empty());
-	Expects(!item->media() || item->media()->allowsEditCaption());
+	Expects(item->allowsEditMedia());
 
 	_mediaEditManager.start(item, spoilered, invertCaption);
 
@@ -271,6 +273,7 @@ void EditCaptionBox::StartMediaReplace(
 		not_null<Window::SessionController*> controller,
 		FullMsgId itemId,
 		TextWithTags text,
+		SuggestPostOptions suggest,
 		bool spoilered,
 		bool invertCaption,
 		Fn<void()> saved) {
@@ -284,6 +287,7 @@ void EditCaptionBox::StartMediaReplace(
 			controller,
 			item,
 			std::move(text),
+			suggest,
 			spoilered,
 			invertCaption,
 			std::move(list),
@@ -300,6 +304,7 @@ void EditCaptionBox::StartMediaReplace(
 		FullMsgId itemId,
 		Ui::PreparedList &&list,
 		TextWithTags text,
+		SuggestPostOptions suggest,
 		bool spoilered,
 		bool invertCaption,
 		Fn<void()> saved) {
@@ -335,6 +340,7 @@ void EditCaptionBox::StartMediaReplace(
 			controller,
 			item,
 			std::move(text),
+			suggest,
 			spoilered,
 			invertCaption,
 			std::move(list),
@@ -347,6 +353,7 @@ void EditCaptionBox::StartPhotoEdit(
 		std::shared_ptr<Data::PhotoMedia> media,
 		FullMsgId itemId,
 		TextWithTags text,
+		SuggestPostOptions suggest,
 		bool spoilered,
 		bool invertCaption,
 		Fn<void()> saved) {
@@ -365,6 +372,7 @@ void EditCaptionBox::StartPhotoEdit(
 			controller,
 			item,
 			std::move(text),
+			suggest,
 			spoilered,
 			invertCaption,
 			std::move(list),
@@ -467,13 +475,16 @@ void EditCaptionBox::rebuildPreview() {
 		}
 	} else {
 		const auto &file = _preparedList.files.front();
-
+		const auto isVideoFile = file.isVideoFile();
 		const auto media = Ui::SingleMediaPreview::Create(
 			this,
 			st::defaultComposeControls,
 			gifPaused,
 			file,
-			[] { return true; },
+			[=](Ui::AttachActionType type) {
+				return (type != Ui::AttachActionType::EditCover)
+					|| isVideoFile;
+			},
 			Ui::AttachControls::Type::EditOnly);
 		_isPhoto = (media && media->isPhoto());
 		const auto withCheckbox = _isPhoto && CanBeCompressed(_albumType);
@@ -719,7 +730,7 @@ void EditCaptionBox::setupPhotoEditorEventHandler() {
 				controller->uiShow(),
 				&_preparedList.files.front(),
 				st::sendMediaPreviewSize,
-				[=] { rebuildPreview(); });
+				[=](bool ok) { if (ok) rebuildPreview(); });
 		} else {
 			EditPhotoImage(_controller, _photoMedia, hasSpoiler(), [=](
 					Ui::PreparedList &&list) {
@@ -998,6 +1009,7 @@ void EditCaptionBox::save() {
 	};
 
 	auto options = Api::SendOptions();
+	options.suggest = _suggest;
 	options.scheduled = item->isScheduled() ? item->date() : 0;
 	options.shortcutId = item->shortcutId();
 	options.invertCaption = _mediaEditManager.invertCaption();
@@ -1063,7 +1075,7 @@ void EditCaptionBox::save() {
 }
 
 void EditCaptionBox::closeAfterSave() {
-	const auto weak = MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	if (_saved) {
 		_saved();
 	}

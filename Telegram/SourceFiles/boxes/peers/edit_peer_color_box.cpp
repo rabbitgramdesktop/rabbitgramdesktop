@@ -15,7 +15,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/background_box.h"
 #include "boxes/stickers_box.h"
 #include "chat_helpers/compose/compose_show.h"
-#include "core/ui_integration.h" // Core::MarkedTextContext.
 #include "data/stickers/data_custom_emoji.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_changes.h"
@@ -82,7 +81,6 @@ public:
 		bool selected);
 
 	[[nodiscard]] uint8 index() const;
-	int naturalWidth() const override;
 
 	void setSelected(bool selected);
 
@@ -164,8 +162,7 @@ private:
 	void updateText();
 
 	const uint32 _level;
-	const TextWithEntities _icon;
-	const Core::MarkedTextContext _context;
+	const Ui::Text::MarkedContext _context;
 	Ui::Text::String _text;
 	bool _minimal = false;
 
@@ -183,6 +180,15 @@ ColorSample::ColorSample(
 		colorIndex
 	) | rpl::start_with_next([=](uint8 index) {
 		_index = index;
+		setNaturalWidth([&] {
+			if (_name.isEmpty() || _style->colorPatternIndex(_index)) {
+				return st::settingsColorSampleSize;
+			}
+			const auto padding = st::settingsColorSamplePadding;
+			return std::max(
+				padding.left() + _name.maxWidth() + padding.right(),
+				padding.top() + st::semiboldFont->height + padding.bottom());
+		}());
 		update();
 	}, lifetime());
 }
@@ -197,6 +203,7 @@ ColorSample::ColorSample(
 , _index(colorIndex)
 , _selected(selected)
 , _simple(true) {
+	setNaturalWidth(st::settingsColorSampleSize);
 }
 
 void ColorSample::setSelected(bool selected) {
@@ -278,16 +285,6 @@ uint8 ColorSample::index() const {
 	return _index;
 }
 
-int ColorSample::naturalWidth() const {
-	if (_name.isEmpty() || _style->colorPatternIndex(_index)) {
-		return st::settingsColorSampleSize;
-	}
-	const auto padding = st::settingsColorSamplePadding;
-	return std::max(
-		padding.left() + _name.maxWidth() + padding.right(),
-		padding.top() + st::semiboldFont->height + padding.bottom());
-}
-
 PreviewWrap::PreviewWrap(
 	not_null<Ui::GenericBox*> box,
 	std::shared_ptr<Ui::ChatStyle> style,
@@ -313,9 +310,11 @@ PreviewWrap::PreviewWrap(
 	WebPageCollage(),
 	nullptr, // iv
 	nullptr, // stickerSet
+	nullptr, // uniqueGift
 	0, // duration
 	QString(), // author
 	false, // hasLargeMedia
+	false, // photoIsVideoCover
 	0)) // pendingTill
 , _theme(theme)
 , _style(style)
@@ -458,19 +457,12 @@ LevelBadge::LevelBadge(
 	uint32 level,
 	not_null<Main::Session*> session)
 : Ui::RpWidget(parent)
-, _level(level)
-, _icon(Ui::Text::SingleCustomEmoji(
-	session->data().customEmojiManager().registerInternalEmoji(
-		st::settingsLevelBadgeLock,
-		QMargins(0, st::settingsLevelBadgeLockSkip, 0, 0),
-		false)))
-, _context({ .session = session }) {
+, _level(level) {
 	updateText();
 }
 
 void LevelBadge::updateText() {
-	auto text = _icon;
-	text.append(' ');
+	auto text = Ui::Text::IconEmoji(&st::settingsLevelBadgeLock).append(' ');
 	if (!_minimal) {
 		text.append(tr::lng_boost_level(
 			tr::now,
@@ -485,7 +477,7 @@ void LevelBadge::updateText() {
 		st,
 		text,
 		kMarkupTextOptions,
-		_context);
+		Ui::Text::MarkedContext{ .repaint = [=] { update(); } });
 	const auto &padding = st::settingsColorSamplePadding;
 	QWidget::resize(
 		_text.maxWidth() + rect::m::sum::h(padding),
@@ -525,7 +517,7 @@ void LevelBadge::paintEvent(QPaintEvent *e) {
 struct SetValues {
 	uint8 colorIndex = 0;
 	DocumentId backgroundEmojiId = 0;
-	DocumentId statusId = 0;
+	EmojiStatusId statusId;
 	TimeId statusUntil = 0;
 	bool statusChanged = false;
 };
@@ -569,15 +561,15 @@ void Set(
 			MTP_flags(Flag::f_color | Flag::f_background_emoji_id),
 			MTP_int(values.colorIndex),
 			MTP_long(values.backgroundEmojiId)));
-	} else if (peer->isMegagroup()) {
 	} else if (const auto channel = peer->asChannel()) {
-		using Flag = MTPchannels_UpdateColor::Flag;
-		send(MTPchannels_UpdateColor(
-			MTP_flags(Flag::f_color | Flag::f_background_emoji_id),
-			channel->inputChannel,
-			MTP_int(values.colorIndex),
-			MTP_long(values.backgroundEmojiId)));
-
+		if (peer->isBroadcast()) {
+			using Flag = MTPchannels_UpdateColor::Flag;
+			send(MTPchannels_UpdateColor(
+				MTP_flags(Flag::f_color | Flag::f_background_emoji_id),
+				channel->inputChannel,
+				MTP_int(values.colorIndex),
+				MTP_long(values.backgroundEmojiId)));
+		}
 		if (values.statusChanged
 			&& (values.statusId || peer->emojiStatusId())) {
 			peer->owner().emojiStatuses().set(
@@ -807,7 +799,7 @@ int ColorSelector::resizeGetHeight(int newWidth) {
 	const auto state = right->lifetime().make_state<State>();
 	state->panel.someCustomChosen(
 	) | rpl::start_with_next([=](EmojiStatusPanel::CustomChosen chosen) {
-		emojiIdChosen(chosen.id);
+		emojiIdChosen(chosen.id.documentId);
 	}, raw->lifetime());
 
 	std::move(colorIndexValue) | rpl::start_with_next([=](uint8 index) {
@@ -871,13 +863,12 @@ int ColorSelector::resizeGetHeight(int newWidth) {
 		const auto customTextColor = [=] {
 			return style->coloredValues(false, state->index).name;
 		};
-		const auto controller = show->resolveWindow(
-			ChatHelpers::WindowUsage::PremiumPromo);
+		const auto controller = show->resolveWindow();
 		if (controller) {
 			state->panel.show({
 				.controller = controller,
 				.button = right,
-				.ensureAddedEmojiId = state->emojiId,
+				.ensureAddedEmojiId = { state->emojiId },
 				.customTextColor = customTextColor,
 				.backgroundEmojiMode = true,
 			});
@@ -901,8 +892,8 @@ int ColorSelector::resizeGetHeight(int newWidth) {
 		not_null<Ui::RpWidget*> parent,
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<ChannelData*> channel,
-		rpl::producer<DocumentId> statusIdValue,
-		Fn<void(DocumentId,TimeId)> statusIdChosen,
+		rpl::producer<EmojiStatusId> statusIdValue,
+		Fn<void(EmojiStatusId,TimeId)> statusIdChosen,
 		bool group) {
 	const auto button = ButtonStyleWithRightEmoji(
 		parent,
@@ -924,20 +915,20 @@ int ColorSelector::resizeGetHeight(int newWidth) {
 	struct State {
 		EmojiStatusPanel panel;
 		std::unique_ptr<Ui::Text::CustomEmoji> emoji;
-		DocumentId statusId = 0;
+		EmojiStatusId statusId;
 	};
 	const auto state = right->lifetime().make_state<State>();
 	state->panel.someCustomChosen(
 	) | rpl::start_with_next([=](EmojiStatusPanel::CustomChosen chosen) {
-		statusIdChosen(chosen.id, chosen.until);
+		statusIdChosen({ chosen.id }, chosen.until);
 	}, raw->lifetime());
 
 	const auto session = &show->session();
-	std::move(statusIdValue) | rpl::start_with_next([=](DocumentId id) {
+	std::move(statusIdValue) | rpl::start_with_next([=](EmojiStatusId id) {
 		state->statusId = id;
 		state->emoji = id
 			? session->data().customEmojiManager().create(
-				id,
+				Data::EmojiStatusCustomId(id),
 				[=] { right->update(); })
 			: nullptr;
 		right->resize(
@@ -985,13 +976,12 @@ int ColorSelector::resizeGetHeight(int newWidth) {
 	}, right->lifetime());
 
 	raw->setClickedCallback([=] {
-		const auto controller = show->resolveWindow(
-			ChatHelpers::WindowUsage::PremiumPromo);
+		const auto controller = show->resolveWindow();
 		if (controller) {
 			state->panel.show({
 				.controller = controller,
 				.button = right,
-				.ensureAddedEmojiId = state->statusId,
+				.ensureAddedEmojiId = { state->statusId },
 				.channelStatusMode = true,
 			});
 		}
@@ -1183,7 +1173,7 @@ void EditPeerColorBox(
 	struct State {
 		rpl::variable<uint8> index;
 		rpl::variable<DocumentId> emojiId;
-		rpl::variable<DocumentId> statusId;
+		rpl::variable<EmojiStatusId> statusId;
 		TimeId statusUntil = 0;
 		bool statusChanged = false;
 		bool changing = false;
@@ -1210,7 +1200,7 @@ void EditPeerColorBox(
 			peer,
 			state->index.value(),
 			state->emojiId.value()
-		), {});
+		), style::margins());
 
 		auto indices = peer->session().api().peerColors().suggestedValue();
 		const auto margin = st::settingsColorRadioMargin;
@@ -1263,8 +1253,7 @@ void EditPeerColorBox(
 			{ &st::menuBlueIconWallpaper }
 		);
 		button->setClickedCallback([=] {
-			const auto usage = ChatHelpers::WindowUsage::PremiumPromo;
-			if (const auto strong = show->resolveWindow(usage)) {
+			if (const auto strong = show->resolveWindow()) {
 				show->show(Box<BackgroundBox>(strong, channel));
 			}
 		});
@@ -1321,7 +1310,7 @@ void EditPeerColorBox(
 			show,
 			channel,
 			state->statusId.value(),
-			[=](DocumentId id, TimeId until) {
+			[=](EmojiStatusId id, TimeId until) {
 				state->statusId = id;
 				state->statusUntil = until;
 				state->statusChanged = true;
@@ -1471,8 +1460,7 @@ void CheckBoostLevel(
 			return;
 		}
 		const auto openStatistics = [=] {
-			if (const auto controller = show->resolveWindow(
-					ChatHelpers::WindowUsage::PremiumPromo)) {
+			if (const auto controller = show->resolveWindow()) {
 				controller->showSection(Info::Boosts::Make(peer));
 			}
 		};
@@ -1481,7 +1469,11 @@ void CheckBoostLevel(
 		show->show(Box(Ui::AskBoostBox, Ui::AskBoostBoxData{
 			.link = qs(data.vboost_url()),
 			.boost = counters,
+			.features = (peer->isChannel()
+				? LookupBoostFeatures(peer->asChannel())
+				: Ui::BoostFeatures()),
 			.reason = *reason,
+			.group = !peer->isBroadcast(),
 		}, openStatistics, nullptr));
 		cancel();
 	}).fail([=](const MTP::Error &error) {

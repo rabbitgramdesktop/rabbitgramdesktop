@@ -95,7 +95,9 @@ void SendSimpleMedia(SendAction action, MTPInputMedia inputMedia) {
 	const auto messagePostAuthor = peer->isBroadcast()
 		? session->user()->name()
 		: QString();
-
+	const auto starsPaid = std::min(
+		peer->starsPerMessageChecked(),
+		action.options.starsApproved);
 	if (action.options.scheduled) {
 		flags |= MessageFlag::IsOrWasScheduled;
 		sendFlags |= MTPmessages_SendMedia::Flag::f_schedule_date;
@@ -107,9 +109,16 @@ void SendSimpleMedia(SendAction action, MTPInputMedia inputMedia) {
 	if (action.options.effectId) {
 		sendFlags |= MTPmessages_SendMedia::Flag::f_effect;
 	}
+	if (action.options.suggest) {
+		sendFlags |= MTPmessages_SendMedia::Flag::f_suggested_post;
+	}
 	if (action.options.invertCaption) {
 		flags |= MessageFlag::InvertMedia;
 		sendFlags |= MTPmessages_SendMedia::Flag::f_invert_media;
+	}
+	if (starsPaid) {
+		action.options.starsApproved -= starsPaid;
+		sendFlags |= MTPmessages_SendMedia::Flag::f_allow_paid_stars;
 	}
 
 	auto &histories = history->owner().histories();
@@ -129,7 +138,9 @@ void SendSimpleMedia(SendAction action, MTPInputMedia inputMedia) {
 			MTP_int(action.options.scheduled),
 			(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 			Data::ShortcutIdToMTP(session, action.options.shortcutId),
-			MTP_long(action.options.effectId)
+			MTP_long(action.options.effectId),
+			MTP_long(starsPaid),
+			SuggestToMTP(action.options.suggest)
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 	}, [=](const MTP::Error &error, const MTP::Response &response) {
 		api->sendMessageFail(error, peer, randomId);
@@ -160,7 +171,7 @@ void SendExistingMedia(
 			? (*localMessageId)
 			: session->data().nextLocalMessageId());
 	const auto randomId = base::RandomValue<uint64>();
-	const auto &action = message.action;
+	auto &action = message.action;
 
 	auto flags = NewMessageFlags(peer);
 	auto sendFlags = MTPmessages_SendMedia::Flags(0);
@@ -190,7 +201,9 @@ void SendExistingMedia(
 		sendFlags |= MTPmessages_SendMedia::Flag::f_entities;
 	}
 	const auto captionText = caption.text;
-
+	const auto starsPaid = std::min(
+		peer->starsPerMessageChecked(),
+		action.options.starsApproved);
 	if (action.options.scheduled) {
 		flags |= MessageFlag::IsOrWasScheduled;
 		sendFlags |= MTPmessages_SendMedia::Flag::f_schedule_date;
@@ -202,9 +215,16 @@ void SendExistingMedia(
 	if (action.options.effectId) {
 		sendFlags |= MTPmessages_SendMedia::Flag::f_effect;
 	}
+	if (action.options.suggest) {
+		sendFlags |= MTPmessages_SendMedia::Flag::f_suggested_post;
+	}
 	if (action.options.invertCaption) {
 		flags |= MessageFlag::InvertMedia;
 		sendFlags |= MTPmessages_SendMedia::Flag::f_invert_media;
+	}
+	if (starsPaid) {
+		action.options.starsApproved -= starsPaid;
+		sendFlags |= MTPmessages_SendMedia::Flag::f_allow_paid_stars;
 	}
 
 	session->data().registerMessageRandomId(randomId, newId);
@@ -216,8 +236,10 @@ void SendExistingMedia(
 		.replyTo = action.replyTo,
 		.date = NewMessageDate(action.options),
 		.shortcutId = action.options.shortcutId,
+		.starsPaid = starsPaid,
 		.postAuthor = NewMessagePostAuthor(action),
 		.effectId = action.options.effectId,
+		.suggest = HistoryMessageSuggestInfo(action.options),
 	}, media, caption);
 
 	const auto performRequest = [=](const auto &repeatRequest) -> void {
@@ -240,7 +262,9 @@ void SendExistingMedia(
 				MTP_int(action.options.scheduled),
 				(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 				Data::ShortcutIdToMTP(session, action.options.shortcutId),
-				MTP_long(action.options.effectId)
+				MTP_long(action.options.effectId),
+				MTP_long(starsPaid),
+				SuggestToMTP(action.options.suggest)
 			), [=](const MTPUpdates &result, const MTP::Response &response) {
 		}, [=](const MTP::Error &error, const MTP::Response &response) {
 			if (error.code() == 400
@@ -272,7 +296,9 @@ void SendExistingDocument(
 		return MTP_inputMediaDocument(
 			MTP_flags(0),
 			document->mtpInput(),
+			MTPInputPhoto(), // video_cover
 			MTPint(), // ttl_seconds
+			MTPint(), // video_timestamp
 			MTPstring()); // query
 	};
 	SendExistingMedia(
@@ -339,7 +365,7 @@ bool SendDice(MessageToSend &message) {
 	message.action.generateLocal = true;
 
 
-	const auto &action = message.action;
+	auto &action = message.action;
 	api->sendAction(action);
 
 	const auto newId = FullMsgId(
@@ -374,9 +400,19 @@ bool SendDice(MessageToSend &message) {
 	if (action.options.effectId) {
 		sendFlags |= MTPmessages_SendMedia::Flag::f_effect;
 	}
+	if (action.options.suggest) {
+		sendFlags |= MTPmessages_SendMedia::Flag::f_suggested_post;
+	}
 	if (action.options.invertCaption) {
 		flags |= MessageFlag::InvertMedia;
 		sendFlags |= MTPmessages_SendMedia::Flag::f_invert_media;
+	}
+	const auto starsPaid = std::min(
+		peer->starsPerMessageChecked(),
+		action.options.starsApproved);
+	if (starsPaid) {
+		action.options.starsApproved -= starsPaid;
+		sendFlags |= MTPmessages_SendMedia::Flag::f_allow_paid_stars;
 	}
 
 	session->data().registerMessageRandomId(randomId, newId);
@@ -388,8 +424,10 @@ bool SendDice(MessageToSend &message) {
 		.replyTo = action.replyTo,
 		.date = NewMessageDate(action.options),
 		.shortcutId = action.options.shortcutId,
+		.starsPaid = starsPaid,
 		.postAuthor = NewMessagePostAuthor(action),
 		.effectId = action.options.effectId,
+		.suggest = HistoryMessageSuggestInfo(action.options),
 	}, TextWithEntities(), MTP_messageMediaDice(
 		MTP_int(0),
 		MTP_string(emoji)));
@@ -409,7 +447,9 @@ bool SendDice(MessageToSend &message) {
 			MTP_int(action.options.scheduled),
 			(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 			Data::ShortcutIdToMTP(session, action.options.shortcutId),
-			MTP_long(action.options.effectId)
+			MTP_long(action.options.effectId),
+			MTP_long(starsPaid),
+			SuggestToMTP(action.options.suggest)
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 	}, [=](const MTP::Error &error, const MTP::Response &response) {
 		api->sendMessageFail(error, peer, randomId, newId);
@@ -547,9 +587,12 @@ void SendConfirmedFile(
 			using Flag = MTPDmessageMediaDocument::Flag;
 			return MTP_messageMediaDocument(
 				MTP_flags(Flag::f_document
-					| (file->spoiler ? Flag::f_spoiler : Flag())),
+					| (file->spoiler ? Flag::f_spoiler : Flag())
+					| (file->videoCover ? Flag::f_video_cover : Flag())),
 				file->document,
 				MTPVector<MTPDocument>(), // alt_documents
+				file->videoCover ? file->videoCover->photo : MTPPhoto(),
+				MTPint(), // video_timestamp
 				MTPint());
 		} else if (file->type == SendMediaType::Audio) {
 			const auto ttlSeconds = file->to.options.ttlSeconds;
@@ -557,9 +600,12 @@ void SendConfirmedFile(
 			return MTP_messageMediaDocument(
 				MTP_flags(Flag::f_document
 					| Flag::f_voice
-					| (ttlSeconds ? Flag::f_ttl_seconds : Flag())),
+					| (ttlSeconds ? Flag::f_ttl_seconds : Flag())
+					| (file->videoCover ? Flag::f_video_cover : Flag())),
 				file->document,
 				MTPVector<MTPDocument>(), // alt_documents
+				file->videoCover ? file->videoCover->photo : MTPPhoto(),
+				MTPint(), // video_timestamp
 				MTP_int(ttlSeconds));
 		} else if (file->type == SendMediaType::Round) {
 			using Flag = MTPDmessageMediaDocument::Flag;
@@ -571,6 +617,8 @@ void SendConfirmedFile(
 					| (file->spoiler ? Flag::f_spoiler : Flag())),
 				file->document,
 				MTPVector<MTPDocument>(), // alt_documents
+				MTPPhoto(), // video_cover
+				MTPint(), // video_timestamp
 				MTP_int(ttlSeconds));
 		} else {
 			Unexpected("Type in sendFilesConfirmed.");
@@ -590,6 +638,7 @@ void SendConfirmedFile(
 		edition.useSameMarkup = true;
 		edition.useSameReplies = true;
 		edition.useSameReactions = true;
+		edition.useSameSuggest = true;
 		edition.savePreviousMedia = true;
 		itemToEdit->applyEdition(std::move(edition));
 	} else {
@@ -600,9 +649,13 @@ void SendConfirmedFile(
 			.replyTo = file->to.replyTo,
 			.date = NewMessageDate(file->to.options),
 			.shortcutId = file->to.options.shortcutId,
+			.starsPaid = std::min(
+				history->peer->starsPerMessageChecked(),
+				file->to.options.starsApproved),
 			.postAuthor = NewMessagePostAuthor(action),
 			.groupedId = groupId,
 			.effectId = file->to.options.effectId,
+			.suggest = HistoryMessageSuggestInfo(file->to.options),
 		}, caption, media);
 	}
 

@@ -30,7 +30,7 @@ void RoundnessPreview::paintEvent(QPaintEvent* e) {
     PainterHighQualityEnabler hq(p);
 
     auto size = st::rndPreviewSize;
-    auto radius = size * (RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.);
+    auto radius = size * (RabbitSettings::userpicRoundness() / 100.);
 
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(st::rndPreviewFill));
@@ -71,10 +71,10 @@ void ChatPreview::paintEvent(QPaintEvent* e) {
     Painter p(this);
     PainterHighQualityEnabler hq(p);
 
-    auto sticker_size = RabbitSettings::JsonSettings::GetInt("sticker_size");
+    auto sticker_size = RabbitSettings::stickerSize();
     auto size = QSize(sticker_size, sticker_size * 0.7);
     auto radius = []() -> qreal {
-        switch (RabbitSettings::JsonSettings::GetInt("sticker_shape")) {
+        switch (RabbitSettings::stickerShape()) {
         case 1: return st::bubbleRadiusSmall;
         case 2: return st::bubbleRadiusLarge;
         default: return 0;
@@ -150,7 +150,7 @@ void StickerShapePicker::paintEvent(QPaintEvent* e) {
     auto gapLeft = st::stickerShapePenWidth;
 
     for (int i = 0; i < 3; i++) {
-        p.setPen(RabbitSettings::JsonSettings::GetInt("sticker_shape") == i
+        p.setPen(RabbitSettings::stickerShape() == i
             ? activePen
             : inactivePen);
         p.setBrush(Qt::NoBrush);
@@ -184,8 +184,7 @@ void StickerShapePicker::mousePressEvent(QMouseEvent *e) {
     for (int i = 0; i < 3; i++) {
         auto maxCords = (i + 1) * variantWidth + (i + 1) * variantMargin;
         if (x < maxCords) {
-            RabbitSettings::JsonSettings::Set("sticker_shape", i);
-            RabbitSettings::JsonSettings::Write();
+            RabbitSettings::setStickerShape(i);
             repaint();
             break;
         }

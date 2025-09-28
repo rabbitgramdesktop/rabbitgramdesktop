@@ -194,16 +194,16 @@ void ShowAddParticipantsError(
 			&& channel->canAddAdmins()) {
 			const auto makeAdmin = [=](Fn<void()> close) {
 				const auto user = forbidden.users.front();
-				const auto weak = std::make_shared<QPointer<EditAdminBox>>();
+				const auto weak = std::make_shared<base::weak_qptr<EditAdminBox>>();
 				const auto done = [=](auto&&...) {
-					if (const auto strong = weak->data()) {
+					if (const auto strong = weak->get()) {
 						strong->uiShow()->showToast(
 							tr::lng_box_done(tr::now));
 						strong->closeBox();
 					}
 				};
 				const auto fail = [=] {
-					if (const auto strong = weak->data()) {
+					if (const auto strong = weak->get()) {
 						strong->closeBox();
 					}
 				};
@@ -262,10 +262,16 @@ void ShowAddParticipantsError(
 			return tr::lng_bot_already_in_group(tr::now);
 		} else if (error == u"BOT_GROUPS_BLOCKED"_q) {
 			return tr::lng_error_cant_add_bot(tr::now);
-		} else if (error == u"ADMINS_TOO_MUCH"_q) {
-			return ((chat->isChat() || chat->isMegagroup())
-				? tr::lng_error_admin_limit
-				: tr::lng_error_admin_limit_channel)(tr::now);
+		} else if (error == u"YOU_BLOCKED_USER"_q) {
+			return tr::lng_error_you_blocked_user(tr::now);
+		} else if (error == u"CHAT_ADMIN_INVITE_REQUIRED"_q) {
+			return tr::lng_error_add_admin_not_member(tr::now);
+		} else if (error == u"USER_ADMIN_INVALID"_q) {
+			return tr::lng_error_user_admin_invalid(tr::now);
+		} else if (error == u"BOTS_TOO_MUCH"_q) {
+			return (chat->isChannel()
+				? tr::lng_error_channel_bots_too_much
+				: tr::lng_error_group_bots_too_much)(tr::now);
 		}
 		return tr::lng_failed_add_participant(tr::now);
 	}();
@@ -440,7 +446,7 @@ void AddContactBox::save() {
 		firstName = lastName;
 		lastName = QString();
 	}
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto session = _session;
 	_sentName = firstName;
 	_contactId = base::RandomValue<uint64>();
@@ -553,7 +559,7 @@ void GroupInfoBox::prepare() {
 		&_navigation->parentController()->window(),
 		Ui::UserpicButton::Role::ChoosePhoto,
 		st::defaultUserpicButton,
-		(_type == Type::Forum));
+		(_type == Type::Forum) ? Ui::PeerUserpicShape::Forum : Ui::PeerUserpicShape::Auto);
 	_photo->showCustomOnChosen();
 	_title.create(
 		this,
@@ -710,7 +716,7 @@ TimeId GroupInfoBox::ttlPeriod() const {
 }
 
 void GroupInfoBox::createGroup(
-		QPointer<Ui::BoxContent> selectUsersBox,
+		base::weak_qptr<Ui::BoxContent> selectUsersBox,
 		const QString &title,
 		const std::vector<not_null<PeerData*>> &users) {
 	if (_creationRequestId) {
@@ -744,8 +750,8 @@ void GroupInfoBox::createGroup(
 		_creationRequestId = 0;
 		const auto controller = _navigation->parentController();
 		if (type == u"NO_CHAT_TITLE"_q) {
-			const auto weak = Ui::MakeWeak(this);
-			if (const auto strong = selectUsersBox.data()) {
+			const auto weak = base::make_weak(this);
+			if (const auto strong = selectUsersBox.get()) {
 				strong->closeBox();
 			}
 			if (weak) {
@@ -786,10 +792,10 @@ void GroupInfoBox::submit() {
 	} else if (_canAddBot) {
 		createGroup(nullptr, title, { not_null<PeerData*>(_canAddBot) });
 	} else {
-		auto initBox = [title, weak = Ui::MakeWeak(this)](
+		auto initBox = [title, weak = base::make_weak(this)](
 				not_null<PeerListBox*> box) {
 			auto create = [box, title, weak] {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->createGroup(
 						box.get(),
 						title,

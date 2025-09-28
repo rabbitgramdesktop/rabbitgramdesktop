@@ -30,10 +30,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_changes.h"
 #include "base/unixtime.h"
 #include "ui/effects/outline_segments.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/text/text_utilities.h"
 #include "info/profile/info_profile_values.h"
 #include "window/window_session_controller.h"
 #include "history/history.h"
+#include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
 
 namespace {
@@ -149,8 +152,7 @@ void SaveChannelAdmin(
 	channel->session().api().request(MTPchannels_EditAdmin(
 		channel->inputChannel,
 		user->inputUser,
-		MTP_chatAdminRights(MTP_flags(
-			MTPDchatAdminRights::Flags::from_raw(uint32(newRights.flags)))),
+		AdminRightsToMTP(newRights),
 		MTP_string(rank)
 	)).done([=](const MTPUpdates &result) {
 		channel->session().api().applyUpdates(result);
@@ -458,6 +460,7 @@ void ParticipantsAdditionalData::setExternal(
 		_adminRights.erase(user);
 		_adminCanEdit.erase(user);
 		_adminPromotedBy.erase(user);
+		_adminRanks.erase(user);
 		_admins.erase(user);
 	}
 	_restrictedRights.erase(participant);
@@ -535,6 +538,7 @@ void ParticipantsAdditionalData::fillFromChannel(
 			_adminRights.erase(user);
 			_adminCanEdit.erase(user);
 			_adminPromotedBy.erase(user);
+			_adminRanks.erase(user);
 			_restrictedRights.emplace(user, restricted->second.rights);
 		}
 	}
@@ -686,7 +690,7 @@ UserData *ParticipantsAdditionalData::applyAdmin(
 	const auto user = _peer->owner().userLoaded(data.userId());
 	if (!user) {
 		return nullptr;
-	} else if (const auto chat = _peer->asChat()) {
+	} else if (_peer->isChat()) {
 		// This can come from saveAdmin callback.
 		_admins.emplace(user);
 		return user;
@@ -730,7 +734,7 @@ UserData *ParticipantsAdditionalData::applyRegular(UserId userId) {
 	const auto user = _peer->owner().userLoaded(userId);
 	if (!user) {
 		return nullptr;
-	} else if (const auto chat = _peer->asChat()) {
+	} else if (_peer->isChat()) {
 		// This can come from saveAdmin or saveRestricted callback.
 		_admins.erase(user);
 		return user;
@@ -740,6 +744,7 @@ UserData *ParticipantsAdditionalData::applyRegular(UserId userId) {
 	_adminRights.erase(user);
 	_adminCanEdit.erase(user);
 	_adminPromotedBy.erase(user);
+	_adminRanks.erase(user);
 	_restrictedRights.erase(user);
 	_kicked.erase(user);
 	_restrictedBy.erase(user);
@@ -758,6 +763,7 @@ PeerData *ParticipantsAdditionalData::applyBanned(
 		_adminRights.erase(user);
 		_adminCanEdit.erase(user);
 		_adminPromotedBy.erase(user);
+		_adminRanks.erase(user);
 	}
 	if (data.isKicked()) {
 		_kicked.emplace(participant);
@@ -910,7 +916,7 @@ void ParticipantsBoxController::setupListChangeViewers() {
 				return;
 			}
 		}
-		if (const auto row = delegate()->peerListFindRow(user->id.value)) {
+		if (delegate()->peerListFindRow(user->id.value)) {
 			delegate()->peerListPartitionRows([&](const PeerListRow &row) {
 				return (row.peer() == user);
 			});
@@ -1267,6 +1273,33 @@ void ParticipantsBoxController::prepare() {
 	} else {
 		rebuild();
 	}
+
+	_peer->session().changes().chatAdminChanges(
+	) | rpl::start_with_next([=](const Data::ChatAdminChange &update) {
+		if (update.peer != _peer) {
+			return;
+		}
+		const auto user = update.user;
+		const auto rights = ChatAdminRightsInfo(update.rights);
+		const auto rank = update.rank;
+		_additional.applyAdminLocally(user, rights, rank);
+		if (!_additional.isCreator(user) || !user->isSelf()) {
+			if (!rights.flags) {
+				if (_role == Role::Admins) {
+					removeRow(user);
+				}
+			} else {
+				if (_role == Role::Admins) {
+					prependRow(user);
+				} else if (_role == Role::Kicked
+					|| _role == Role::Restricted) {
+					removeRow(user);
+				}
+			}
+		}
+		recomputeTypeFor(user);
+		refreshRows();
+	}, lifetime());
 }
 
 void ParticipantsBoxController::unload() {
@@ -1291,9 +1324,9 @@ void ParticipantsBoxController::rebuild() {
 	refreshRows();
 }
 
-QPointer<Ui::BoxContent> ParticipantsBoxController::showBox(
+base::weak_qptr<Ui::BoxContent> ParticipantsBoxController::showBox(
 		object_ptr<Ui::BoxContent> box) const {
-	const auto weak = Ui::MakeWeak(box.data());
+	const auto weak = base::make_weak(box.data());
 	delegate()->peerListUiShow()->showBox(std::move(box));
 	return weak;
 }
@@ -1645,6 +1678,51 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 	auto result = base::make_unique_q<Ui::PopupMenu>(
 		parent,
 		st::popupMenuWithIcons);
+	const auto addToEnd = gsl::finally([&] {
+		const auto addInfoAction = [&](
+				not_null<PeerData*> by,
+				tr::phrase<lngtag_user, lngtag_date> phrase,
+				TimeId since) {
+			auto text = phrase(
+				tr::now,
+				lt_user,
+				Ui::Text::Bold(by->name()),
+				lt_date,
+				Ui::Text::Bold(
+					langDateTimeFull(base::unixtime::parse(since))),
+				Ui::Text::WithEntities);
+			auto button = base::make_unique_q<Ui::Menu::MultilineAction>(
+				result->menu(),
+				result->st().menu,
+				st::historyHasCustomEmoji,
+				st::historyHasCustomEmojiPosition,
+				std::move(text));
+			if (const auto n = _navigation) {
+				button->setClickedCallback([=] {
+					n->parentController()->show(PrepareShortInfoBox(by, n));
+				});
+			}
+			result->addSeparator();
+			result->addAction(std::move(button));
+		};
+
+		if (const auto by = _additional.restrictedBy(participant)) {
+			if (const auto since = _additional.restrictedSince(participant)) {
+				addInfoAction(
+					by,
+					_additional.isKicked(participant)
+						? tr::lng_rights_chat_banned_by
+						: tr::lng_rights_chat_restricted_by,
+					since);
+			}
+		} else if (user) {
+			if (const auto by = _additional.adminPromotedBy(user)) {
+				if (const auto since = _additional.adminPromotedSince(user)) {
+					addInfoAction(by, tr::lng_rights_about_by, since);
+				}
+			}
+		}
+	});
 	if (_navigation) {
 		result->addAction(
 			(participant->isUser()
@@ -1652,38 +1730,13 @@ base::unique_qptr<Ui::PopupMenu> ParticipantsBoxController::rowContextMenu(
 				: participant->isBroadcast()
 				? tr::lng_context_view_channel
 				: tr::lng_context_view_group)(tr::now),
-			crl::guard(this, [=] {
-				_navigation->showPeerInfo(participant); }),
+			crl::guard(this, [=, this] {
+				_navigation->parentController()->show(
+					PrepareShortInfoBox(participant, _navigation));
+			}),
 			(participant->isUser()
 				? &st::menuIconProfile
 				: &st::menuIconInfo));
-	}
-	if (const auto by = _additional.restrictedBy(participant)) {
-		result->addAction(
-			(_role == Role::Kicked
-				? tr::lng_channel_banned_status_removed_by
-				: tr::lng_channel_banned_status_restricted_by)(
-					tr::now,
-					lt_user,
-					by->name()),
-			crl::guard(this, [=] {
-				_navigation->parentController()->show(
-					PrepareShortInfoBox(by, _navigation));
-			}),
-			&st::menuIconAdmin);
-	} else if (user) {
-		if (const auto by = _additional.adminPromotedBy(user)) {
-			result->addAction(
-				tr::lng_channel_admin_status_promoted_by(
-					tr::now,
-					lt_user,
-					by->name()),
-				crl::guard(this, [=] {
-					_navigation->parentController()->show(
-						PrepareShortInfoBox(by, _navigation));
-				}),
-				&st::menuIconAdmin);
-		}
 	}
 	if (_role == Role::Kicked) {
 		if (_peer->isMegagroup()
@@ -1777,23 +1830,8 @@ void ParticipantsBoxController::editAdminDone(
 	if (_editParticipantBox) {
 		_editParticipantBox->closeBox();
 	}
-
-	_additional.applyAdminLocally(user, rights, rank);
-	if (!_additional.isCreator(user) || !user->isSelf()) {
-		if (!rights.flags) {
-			if (_role == Role::Admins) {
-				removeRow(user);
-			}
-		} else {
-			if (_role == Role::Admins) {
-				prependRow(user);
-			} else if (_role == Role::Kicked || _role == Role::Restricted) {
-				removeRow(user);
-			}
-		}
-	}
-	recomputeTypeFor(user);
-	refreshRows();
+	const auto flags = rights.flags;
+	user->session().changes().chatAdminChanged(_peer, user, flags, rank);
 }
 
 void ParticipantsBoxController::showRestricted(not_null<UserData*> user) {
@@ -2259,6 +2297,8 @@ void ParticipantsBoxSearchController::restoreState(
 		_allLoaded = my->allLoaded;
 		_offset = my->offset;
 		_query = my->query;
+		_timer.cancel();
+		_requestId = 0;
 		if (my->wasLoading) {
 			searchOnServer();
 		}

@@ -9,7 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "rabbit/settings/rabbit_settings.h"
 
-#include "ui/emoji_config.h"
+#include "info/channel_statistics/earn/earn_icons.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/animation_value.h"
 #include "ui/emoji_config.h"
@@ -19,6 +19,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h" // style::IconButton
 #include "styles/style_info.h" // st::topBarCall
+
+#include <QtCore/QMutex>
+#include <QtSvg/QSvgRenderer>
 
 namespace Ui {
 namespace {
@@ -186,6 +189,18 @@ void PaintMyNotesInner(
 		fg);
 }
 
+void PaintCurrencyInner(
+		QPainter &p,
+		int x,
+		int y,
+		int size,
+		const style::color &fg) {
+	auto svg = QSvgRenderer(Ui::Earn::CurrencySvgColored(fg->c));
+	const auto skip = size / 5;
+	svg.render(&p, QRect(x, y, size, size).marginsRemoved(
+		{ skip, skip, skip, skip }));
+}
+
 void PaintExternalMessagesInner(
 		QPainter &p,
 		int x,
@@ -327,7 +342,7 @@ void EmptyUserpic::paintCircle(
 		int outerWidth,
 		int size) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});
@@ -341,7 +356,7 @@ void EmptyUserpic::paintRounded(
 		int size,
 		int radius) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});
@@ -354,9 +369,20 @@ void EmptyUserpic::paintSquare(
 		int outerWidth,
 		int size) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
+	});
+}
+
+void EmptyUserpic::paintMonoforum(
+		QPainter &p,
+		int x,
+		int y,
+		int outerWidth,
+		int size) const {
+	paint(p, x, y, outerWidth, size, [&] {
+		PaintMonoforumShape(p, QRect(x, y, size, size));
 	});
 }
 
@@ -388,7 +414,7 @@ void EmptyUserpic::PaintSavedMessages(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(std::move(bg));
 	p.setPen(Qt::NoPen);
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
 	p.drawRoundedRect(x, y, size, size, 
 		radius, radius);
 
@@ -429,7 +455,7 @@ void EmptyUserpic::PaintRepliesMessages(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	auto radius = size * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100;
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
 	p.drawRoundedRect(x, y, size, size, 
 		radius, radius);
 
@@ -520,6 +546,45 @@ QImage EmptyUserpic::GenerateMyNotes(int size) {
 	});
 }
 
+void EmptyUserpic::PaintCurrency(
+		QPainter &p,
+		int x,
+		int y,
+		int outerWidth,
+		int size) {
+	auto bg = QLinearGradient(x, y, x, y + size);
+	bg.setStops({
+		{ 0., st::historyPeerSavedMessagesBg->c },
+		{ 1., st::historyPeerSavedMessagesBg2->c }
+	});
+	const auto &fg = st::historyPeerUserpicFg;
+	PaintCurrency(p, x, y, outerWidth, size, QBrush(bg), fg);
+}
+
+void EmptyUserpic::PaintCurrency(
+		QPainter &p,
+		int x,
+		int y,
+		int outerWidth,
+		int size,
+		QBrush bg,
+		const style::color &fg) {
+	x = style::RightToLeft() ? (outerWidth - x - size) : x;
+
+	PainterHighQualityEnabler hq(p);
+	p.setBrush(bg);
+	p.setPen(Qt::NoPen);
+	p.drawEllipse(x, y, size, size);
+
+	PaintCurrencyInner(p, x, y, size, fg);
+}
+
+QImage EmptyUserpic::GenerateCurrency(int size) {
+	return Generate(size, [&](QPainter &p) {
+		PaintCurrency(p, 0, 0, size, size);
+	});
+}
+
 std::pair<uint64, uint64> EmptyUserpic::uniqueKey() const {
 	const auto first = (uint64(0xFFFFFFFFU) << 32)
 		| anim::getPremultiplied(_colors.color1->c);
@@ -607,5 +672,87 @@ void EmptyUserpic::fillString(const QString &name) {
 }
 
 EmptyUserpic::~EmptyUserpic() = default;
+
+void PaintMonoforumShape(QPainter &p, QRect rect) {
+	p.drawEllipse(rect);
+
+	auto path = QPainterPath();
+	path.moveTo(
+		rect.x() + rect.width() * 0.5,
+		rect.y() + rect.height() * 0.5);
+	path.arcTo(
+		QRectF(
+			rect.x() - rect.width() * 0.5,
+			rect.y(),
+			rect.width(),
+			rect.height()),
+		0,
+		-90);
+	path.arcTo(
+		QRectF(
+			rect.x() - rect.width() * 0.25,
+			rect.y() - rect.height() * 2,
+			rect.width() * 0.5,
+			rect.height() * 3),
+		-90,
+		45);
+	path.lineTo(
+		rect.x() + rect.width() * 0.5,
+		rect.y() + rect.height() * 0.5);
+	p.drawPath(path);
+}
+
+QImage MonoforumShapeMask(QSize size) {
+	auto result = QImage(size, QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+
+	QPainter p(&result);
+	PainterHighQualityEnabler hq(p);
+	p.setBrush(Qt::white);
+	p.setPen(Qt::NoPen);
+
+	PaintMonoforumShape(p, QRect(QPoint(), size));
+
+	p.end();
+
+	return result;
+}
+
+const QImage &MonoforumShapeMaskCached(QSize size) {
+	const auto key = (uint64(uint32(size.width())) << 32)
+		| uint64(uint32(size.height()));
+
+	static auto Masks = base::flat_map<uint64, QImage>();
+	static auto Mutex = QMutex();
+	auto lock = QMutexLocker(&Mutex);
+	const auto i = Masks.find(key);
+	if (i != end(Masks)) {
+		return i->second;
+	}
+	lock.unlock();
+
+	auto mask = MonoforumShapeMask(size);
+
+	lock.relock();
+	return Masks.emplace(key, std::move(mask)).first->second;
+}
+
+QImage ApplyMonoforumShape(QImage image) {
+	const auto size = image.size();
+	auto mask = MonoforumShapeMaskCached(size);
+
+	constexpr auto format = QImage::Format_ARGB32_Premultiplied;
+	if (image.format() != format) {
+		image = std::move(image).convertToFormat(format);
+	}
+	auto p = QPainter(&image);
+	p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+	p.drawImage(
+		QRect(QPoint(), image.size() / image.devicePixelRatio()),
+		mask);
+	p.end();
+
+	return image;
+}
 
 } // namespace Ui

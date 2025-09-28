@@ -13,6 +13,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_cloud_file.h"
 #include "core/file_location.h"
 
+class HistoryItem;
+class PhotoData;
 enum class ChatRestriction;
 class mtpFileLoader;
 
@@ -180,6 +182,7 @@ public:
 	[[nodiscard]] const VideoData *video() const;
 
 	void forceIsStreamedAnimation();
+	[[nodiscard]] bool isMusicForProfile() const;
 	[[nodiscard]] bool isVoiceMessage() const;
 	[[nodiscard]] bool isVideoMessage() const;
 	[[nodiscard]] bool isSong() const;
@@ -206,6 +209,7 @@ public:
 	[[nodiscard]] bool isPremiumSticker() const;
 	[[nodiscard]] bool isPremiumEmoji() const;
 	[[nodiscard]] bool emojiUsesTextColor() const;
+	void overrideEmojiUsesTextColor(bool value);
 
 	[[nodiscard]] bool hasThumbnail() const;
 	[[nodiscard]] bool thumbnailLoading() const;
@@ -396,6 +400,10 @@ private:
 	std::unique_ptr<FileLoader> _loader;
 
 };
+
+[[nodiscard]] PhotoData *LookupVideoCover(
+	not_null<DocumentData*> document,
+	HistoryItem *item);
 
 VoiceWaveform documentWaveformDecode(const QByteArray &encoded5bit);
 QByteArray documentWaveformEncode5bit(const VoiceWaveform &waveform);

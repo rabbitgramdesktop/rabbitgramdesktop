@@ -23,6 +23,7 @@ enum class ResolveType {
 	ShareGame,
 	Mention,
 	Boost,
+	ChannelDirect,
 	Profile,
 };
 
@@ -40,15 +41,20 @@ struct PeerByLinkInfo {
 	QString chatLinkSlug;
 	MsgId messageId = ShowAtUnreadMsgId;
 	StoryId storyId = 0;
+	int storyAlbumId = 0;
+	int giftCollectionId = 0;
+	std::optional<TimeId> videoTimestamp;
 	QString text;
 	RepliesByLinkInfo repliesInfo;
 	ResolveType resolveType = ResolveType::Default;
+	QString referral;
 	QString startToken;
 	ChatAdminRights startAdminRights;
 	bool startAutoSubmit = false;
 	bool joinChannel = false;
 	QString botAppName;
 	bool botAppForceConfirmation = false;
+	bool botAppFullScreen = false;
 	QString attachBotUsername;
 	std::optional<QString> attachBotToggleCommand;
 	bool attachBotMainOpen = false;
@@ -57,6 +63,7 @@ struct PeerByLinkInfo {
 	std::optional<QString> voicechatHash;
 	FullMsgId clickFromMessageId;
 	std::shared_ptr<InlineBots::WebViewContext> clickFromBotWebviewContext;
+	bool historyInNewWindow = false;
 };
 
 } // namespace Window

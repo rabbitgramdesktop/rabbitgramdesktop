@@ -78,7 +78,8 @@ public:
 		Fn<void()> &&callback,
 		anim::type animated = anim::type::instant);
 
-	void startRecording();
+	void startRecordingAndLock(bool round);
+
 	void finishAnimating();
 	void hideAnimated();
 	void hideFast();
@@ -100,6 +101,7 @@ public:
 
 	void setStartRecordingFilter(FilterCallback &&callback);
 	void setTTLFilter(FilterCallback &&callback);
+	void setPauseInsteadSend(bool pauseInsteadSend);
 
 	[[nodiscard]] bool isRecording() const;
 	[[nodiscard]] bool isRecordingLocked() const;
@@ -144,6 +146,9 @@ private:
 	void startRedCircleAnimation();
 	void installListenStateFilter();
 
+	void startRecording();
+	void prepareOnSendPress();
+
 	[[nodiscard]] bool isTypeRecord() const;
 	[[nodiscard]] bool hasDuration() const;
 
@@ -155,6 +160,7 @@ private:
 	[[nodiscard]] float64 activeAnimationRatio() const;
 
 	void computeAndSetLockProgress(QPoint globalPos);
+	[[nodiscard]] float64 calcLockProgress(QPoint globalPos);
 
 	[[nodiscard]] bool peekTTLState() const;
 	[[nodiscard]] bool takeTTLState() const;
@@ -192,7 +198,10 @@ private:
 	FilterCallback _startRecordingFilter;
 	FilterCallback _hasTTLFilter;
 
+	base::unique_qptr<QObject> _keyFilterInRecordingState;
+
 	bool _warningShown = false;
+	bool _pauseInsteadSend = false;
 
 	rpl::variable<bool> _recording = false;
 	rpl::variable<bool> _inField = false;

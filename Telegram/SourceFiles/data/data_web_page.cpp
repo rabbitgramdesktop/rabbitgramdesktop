@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_photo.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
+#include "core/local_url_handlers.h"
 #include "lang/lang_keys.h"
 #include "iv/iv_data.h"
 #include "ui/image/image.h"
@@ -158,6 +159,8 @@ WebPageType ParseWebPageType(
 		return WebPageType::VoiceChat;
 	} else if (type == u"telegram_livestream"_q) {
 		return WebPageType::Livestream;
+	} else if (type == u"telegram_call"_q) {
+		return WebPageType::ConferenceCall;
 	} else if (type == u"telegram_user"_q) {
 		return WebPageType::User;
 	} else if (type == u"telegram_botapp"_q) {
@@ -170,6 +173,10 @@ WebPageType ParseWebPageType(
 		return WebPageType::Giftcode;
 	} else if (type == u"telegram_stickerset"_q) {
 		return WebPageType::StickerSet;
+	} else if (type == u"telegram_story_album"_q) {
+		return WebPageType::StoryAlbum;
+	} else if (type == u"telegram_collection"_q) {
+		return WebPageType::GiftCollection;
 	} else if (hasIV) {
 		return WebPageType::ArticleWithIV;
 	} else {
@@ -224,9 +231,11 @@ bool WebPageData::applyChanges(
 		WebPageCollage &&newCollage,
 		std::unique_ptr<Iv::Data> newIv,
 		std::unique_ptr<WebPageStickerSet> newStickerSet,
+		std::shared_ptr<Data::UniqueGift> newUniqueGift,
 		int newDuration,
 		const QString &newAuthor,
 		bool newHasLargeMedia,
+		bool newPhotoIsVideoCover,
 		int newPendingTill) {
 	if (newPendingTill != 0
 		&& (!url.isEmpty() || failed)
@@ -264,6 +273,9 @@ bool WebPageData::applyChanges(
 		|| (hasSiteName + hasTitle + hasDescription < 2)) {
 		newHasLargeMedia = false;
 	}
+	if (!newDocument || !newDocument->isVideoFile() || !newPhoto) {
+		newPhotoIsVideoCover = false;
+	}
 
 	if (type == newType
 		&& url == resultUrl
@@ -278,9 +290,11 @@ bool WebPageData::applyChanges(
 		&& (!iv == !newIv)
 		&& (!iv || iv->partial() == newIv->partial())
 		&& (!stickerSet == !newStickerSet)
+		&& (!uniqueGift == !newUniqueGift)
 		&& duration == newDuration
 		&& author == resultAuthor
 		&& hasLargeMedia == (newHasLargeMedia ? 1 : 0)
+		&& photoIsVideoCover == (newPhotoIsVideoCover ? 1 : 0)
 		&& pendingTill == newPendingTill) {
 		return false;
 	}
@@ -289,6 +303,7 @@ bool WebPageData::applyChanges(
 	}
 	type = newType;
 	hasLargeMedia = newHasLargeMedia ? 1 : 0;
+	photoIsVideoCover = newPhotoIsVideoCover ? 1 : 0;
 	url = resultUrl;
 	displayUrl = resultDisplayUrl;
 	siteName = resultSiteName;
@@ -300,6 +315,7 @@ bool WebPageData::applyChanges(
 	collage = std::move(newCollage);
 	iv = std::move(newIv);
 	stickerSet = std::move(newStickerSet);
+	uniqueGift = std::move(newUniqueGift);
 	duration = newDuration;
 	author = resultAuthor;
 	pendingTill = newPendingTill;
@@ -360,7 +376,7 @@ void WebPageData::ApplyChanges(
 		}, [&](const auto &) {
 		});
 	}
-	session->data().sendWebPageGamePollNotifications();
+	session->data().sendWebPageGamePollTodoListNotifications();
 }
 
 QString WebPageData::displayedSiteName() const {
@@ -371,6 +387,21 @@ QString WebPageData::displayedSiteName() const {
 		: siteName;
 }
 
+TimeId WebPageData::extractVideoTimestamp() const {
+	const auto take = [&](const QStringList &list, int index) {
+		return (index >= 0 && index < list.size()) ? list[index] : QString();
+	};
+	const auto hashed = take(url.split('#'), 0);
+	const auto params = take(hashed.split('?'), 1);
+	const auto parts = params.split('&');
+	for (const auto &part : parts) {
+		if (part.startsWith(u"t="_q)) {
+			return Core::ParseVideoTimestamp(part.mid(2));
+		}
+	}
+	return 0;
+}
+
 bool WebPageData::computeDefaultSmallMedia() const {
 	if (!collage.items.empty()) {
 		return false;
@@ -379,7 +410,8 @@ bool WebPageData::computeDefaultSmallMedia() const {
 		&& description.empty()
 		&& author.isEmpty()) {
 		return false;
-	} else if (!document
+	} else if (!uniqueGift
+		&& !document
 		&& photo
 		&& type != WebPageType::Photo
 		&& type != WebPageType::Document

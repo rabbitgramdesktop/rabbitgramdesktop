@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "lang/lang_keys.h"
 #include "intro/intro_code.h"
+#include "intro/intro_email.h"
 #include "intro/intro_qr.h"
 #include "styles/style_intro.h"
 #include "ui/widgets/buttons.h"
@@ -80,6 +81,9 @@ PhoneWidget::PhoneWidget(
 	) | rpl::start_with_next([=](const QString &added) {
 		_phone->addedToNumber(added);
 	}, _phone->lifetime());
+	_code->spacePressed() | rpl::start_with_next([=] {
+		submit();
+	}, _code->lifetime());
 	connect(_phone, &Ui::PhonePartInput::changed, [=] { phoneChanged(); });
 	connect(_code, &Ui::CountryCodeInput::changed, [=] { phoneChanged(); });
 
@@ -234,6 +238,9 @@ void PhoneWidget::phoneSubmitDone(const MTPauth_SentCode &result) {
 		fillSentCodeData(data);
 		getData()->phone = DigitsOnly(_sentPhone);
 		getData()->phoneHash = qba(data.vphone_code_hash());
+		if (getData()->emailStatus == EmailStatus::SetupRequired) {
+			return goNext<EmailWidget>();
+		}
 		const auto next = data.vnext_type();
 		if (next && next->type() == mtpc_auth_codeTypeCall) {
 			getData()->callStatus = CallStatus::Waiting;
@@ -245,6 +252,9 @@ void PhoneWidget::phoneSubmitDone(const MTPauth_SentCode &result) {
 		goNext<CodeWidget>();
 	}, [&](const MTPDauth_sentCodeSuccess &data) {
 		finish(data.vauthorization());
+	}, [](const MTPDauth_sentCodePaymentRequired &) {
+		LOG(("API Error: Unexpected auth.sentCodePaymentRequired "
+			"(PhoneWidget::phoneSubmitDone)."));
 	});
 }
 

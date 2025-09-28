@@ -84,9 +84,9 @@ Entry::Entry(not_null<Data::Session*> owner, Type type)
 , _flags((type == Type::History)
 	? (Flag::IsThread | Flag::IsHistory)
 	: (type == Type::ForumTopic)
-	? Flag::IsThread
+	? (Flag::IsThread | Flag::IsForumTopic)
 	: (type == Type::SavedSublist)
-	? Flag::IsSavedSublist
+	? (Flag::IsThread | Flag::IsSavedSublist)
 	: Flag(0)) {
 }
 
@@ -113,7 +113,7 @@ Data::Forum *Entry::asForum() {
 }
 
 Data::Folder *Entry::asFolder() {
-	return (_flags & (Flag::IsThread | Flag::IsSavedSublist))
+	return (_flags & Flag::IsThread)
 		? nullptr
 		: static_cast<Data::Folder*>(this);
 }
@@ -125,7 +125,7 @@ Data::Thread *Entry::asThread() {
 }
 
 Data::ForumTopic *Entry::asTopic() {
-	return ((_flags & Flag::IsThread) && !(_flags & Flag::IsHistory))
+	return (_flags & Flag::IsForumTopic)
 		? static_cast<Data::ForumTopic*>(this)
 		: nullptr;
 }
@@ -229,6 +229,13 @@ uint64 Entry::computeSortPosition(FilterId filterId) const {
 }
 
 void Entry::updateChatListExistence() {
+	if (const auto history = asHistory()) {
+		if (history->peer->asMonoforum()) {
+			if (!folderKnown()) {
+				history->clearFolder();
+			}
+		}
+	}
 	setChatListExistence(shouldBeInChatList());
 }
 
@@ -254,8 +261,36 @@ void Entry::notifyUnreadStateChange(const UnreadState &wasState) {
 			return state.messages || state.marks || state.mentions;
 		};
 		if (isForFilters(wasState) != isForFilters(nowState)) {
+			const auto wasTags = _tagColors.size();
 			owner().chatsFilters().refreshHistory(history);
+
+			// Hack for History::fakeUnreadWhileOpened().
+			if (!isForFilters(nowState)
+				&& (wasTags > 0)
+				&& (wasTags == _tagColors.size())) {
+				auto updateRequested = false;
+				for (const auto &filter : filters.list()) {
+					if (!(filter.flags() & Data::ChatFilter::Flag::NoRead)
+						|| !_chatListLinks.contains(filter.id())
+						|| filter.contains(history, true)) {
+						continue;
+					}
+					const auto wasTagsCount = _tagColors.size();
+					setColorIndexForFilterId(filter.id(), std::nullopt);
+					updateRequested |= (wasTagsCount != _tagColors.size());
+				}
+				if (updateRequested) {
+					updateChatListEntryHeight();
+					session().changes().peerUpdated(
+						history->peer,
+						Data::PeerUpdate::Flag::Name);
+				}
+			}
 		}
+	} else if (const auto sublist = asSublist()) {
+		session().changes().sublistUpdated(
+			sublist,
+			Data::SublistUpdate::Flag::UnreadView);
 	}
 	updateChatListEntryPostponed();
 }
@@ -332,9 +367,29 @@ int Entry::posInChatList(FilterId filterId) const {
 	return mainChatListLink(filterId)->index();
 }
 
+void Entry::setColorIndexForFilterId(
+		FilterId filterId,
+		std::optional<uint8> colorIndex) {
+	if (!filterId) {
+		return;
+	}
+	if (colorIndex) {
+		_tagColors[filterId] = *colorIndex;
+	} else {
+		_tagColors.remove(filterId);
+	}
+}
+
 not_null<Row*> Entry::addToChatList(
 		FilterId filterId,
 		not_null<MainList*> list) {
+	if (filterId) {
+		const auto &list = owner().chatsFilters().list();
+		const auto it = ranges::find(list, filterId, &Data::ChatFilter::id);
+		if (it != end(list)) {
+			setColorIndexForFilterId(filterId, it->colorIndex());
+		}
+	}
 	if (const auto main = maybeMainChatListLink(filterId)) {
 		return main;
 	}
@@ -349,6 +404,12 @@ void Entry::removeFromChatList(
 		not_null<MainList*> list) {
 	if (isPinnedDialog(filterId)) {
 		owner().setChatPinned(this, filterId, false);
+	}
+	if (filterId) {
+		const auto it = _tagColors.find(filterId);
+		if (it != end(_tagColors)) {
+			_tagColors.erase(it);
+		}
 	}
 
 	const auto i = _chatListLinks.find(filterId);
@@ -395,6 +456,20 @@ void Entry::updateChatListEntryPostponed() {
 
 void Entry::updateChatListEntryHeight() {
 	session().changes().entryUpdated(this, Data::EntryUpdate::Flag::Height);
+}
+
+[[nodiscard]] bool Entry::hasChatsFilterTags(FilterId exclude) const {
+	if (!owner().chatsFilters().tagsEnabled()) {
+		return false;
+	}
+	if (exclude) {
+		if (_tagColors.size() == 1) {
+			if (_tagColors.begin()->first == exclude) {
+				return false;
+			}
+		}
+	}
+	return !_tagColors.empty();
 }
 
 } // namespace Dialogs

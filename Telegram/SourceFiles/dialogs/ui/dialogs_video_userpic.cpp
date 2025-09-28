@@ -15,6 +15,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_photo_media.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
+#include "dialogs/dialogs_entry.h"
 #include "dialogs/ui/dialogs_layout.h"
 #include "ui/painter.h"
 #include "styles/style_dialogs.h"
@@ -97,8 +98,8 @@ void VideoUserpic::paintLeft(
 
 		QPainterPath clipPath;
 		QImage frame = _video->current(request(size), now);
-		auto radius = frame.height() * RabbitSettings::JsonSettings::GetInt("userpic_roundness") / 100.;
-		if (_peer->isForum() && !RabbitSettings::JsonSettings::GetBool("general_roundness")) radius *= .5;
+		auto radius = frame.height() * RabbitSettings::userpicRoundness() / 100.;
+		if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= .5;
 		clipPath.addRoundedRect(
 			QRect(x, y, frame.width(), frame.height()),
 			radius, radius);

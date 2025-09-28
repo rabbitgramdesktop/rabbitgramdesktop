@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_chat_links.h"
 #include "boxes/premium_preview_box.h"
 #include "core/click_handler_types.h"
+#include "core/ui_integration.h" // TextContext
 #include "data/business/data_business_info.h"
 #include "data/business/data_business_chatbots.h"
 #include "data/business/data_shortcut_messages.h"
@@ -40,7 +41,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/checkbox.h" // Ui::RadiobuttonGroup.
 #include "ui/widgets/gradient_round_button.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -76,9 +76,10 @@ using Order = std::vector<QString>;
 		u"quick_replies"_q,
 		u"business_hours"_q,
 		u"business_location"_q,
-		u"business_bots"_q,
-		u"business_intro"_q,
 		u"business_links"_q,
+		u"business_intro"_q,
+		u"business_bots"_q,
+		u"folder_tags"_q,
 	};
 }
 
@@ -136,7 +137,7 @@ using Order = std::vector<QString>;
 				tr::lng_business_subtitle_chatbots(),
 				tr::lng_business_about_chatbots(),
 				PremiumFeature::BusinessBots,
-				true
+				true,
 			},
 		},
 		{
@@ -146,7 +147,6 @@ using Order = std::vector<QString>;
 				tr::lng_business_subtitle_chat_intro(),
 				tr::lng_business_about_chat_intro(),
 				PremiumFeature::ChatIntro,
-				true
 			},
 		},
 		{
@@ -156,7 +156,15 @@ using Order = std::vector<QString>;
 				tr::lng_business_subtitle_chat_links(),
 				tr::lng_business_about_chat_links(),
 				PremiumFeature::ChatLinks,
-				true
+			},
+		},
+		{
+			u"folder_tags"_q,
+			Entry{
+				&st::settingsPremiumIconTags,
+				tr::lng_premium_summary_subtitle_filter_tags(),
+				tr::lng_premium_summary_about_filter_tags(),
+				PremiumFeature::FilterTags,
 			},
 		},
 	};
@@ -323,9 +331,9 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
-	[[nodiscard]] QPointer<Ui::RpWidget> createPinnedToTop(
+	[[nodiscard]] base::weak_qptr<Ui::RpWidget> createPinnedToTop(
 		not_null<QWidget*> parent) override;
-	[[nodiscard]] QPointer<Ui::RpWidget> createPinnedToBottom(
+	[[nodiscard]] base::weak_qptr<Ui::RpWidget> createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) override;
 
 	void showFinished() override;
@@ -402,6 +410,10 @@ void Business::setupContent() {
 	Ui::AddSkip(content, st::settingsFromFileTop);
 
 	const auto showFeature = [=](PremiumFeature feature) {
+		if (feature == PremiumFeature::FilterTags) {
+			ShowPremiumPreviewToBuy(_controller, feature);
+			return;
+		}
 		showOther([&] {
 			switch (feature) {
 			case PremiumFeature::AwayMessage: return AwayMessageId();
@@ -437,6 +449,8 @@ void Business::setupContent() {
 			return owner->session().user()->isFullLoaded();
 		case PremiumFeature::ChatLinks:
 			return owner->session().api().chatLinks().loaded();
+		case PremiumFeature::FilterTags:
+			return true;
 		}
 		Unexpected("Feature in isReady.");
 	};
@@ -509,28 +523,23 @@ void Business::setupContent() {
 
 		const auto session = &_controller->session();
 		{
-			const auto arrow = Ui::Text::SingleCustomEmoji(
-				session->data().customEmojiManager().registerInternalEmoji(
-					st::topicButtonArrow,
-					st::channelEarnLearnArrowMargins,
-					false));
 			inner->add(object_ptr<Ui::DividerLabel>(
 				inner,
-				Ui::CreateLabelWithCustomEmoji(
+				object_ptr<Ui::FlatLabel>(
 					inner,
 					tr::lng_business_about_sponsored(
 						lt_link,
 						rpl::combine(
 							tr::lng_business_about_sponsored_link(
 								lt_emoji,
-								rpl::single(arrow),
+								rpl::single(Ui::Text::IconEmoji(
+									&st::textMoreIconEmoji)),
 								Ui::Text::RichLangValue),
 							tr::lng_business_about_sponsored_url()
 						) | rpl::map([](TextWithEntities text, QString url) {
 							return Ui::Text::Link(text, url);
 						}),
 						Ui::Text::RichLangValue),
-					{ .session = session },
 					st::boxDividerLabel),
 				st::defaultBoxDividerLabelPadding,
 				RectPart::Top | RectPart::Bottom));
@@ -571,7 +580,7 @@ void Business::setupContent() {
 	Ui::ResizeFitChild(this, content);
 }
 
-QPointer<Ui::RpWidget> Business::createPinnedToTop(
+base::weak_qptr<Ui::RpWidget> Business::createPinnedToTop(
 		not_null<QWidget*> parent) {
 	auto title = tr::lng_business_title();
 	auto about = [&]() -> rpl::producer<TextWithEntities> {
@@ -612,23 +621,10 @@ QPointer<Ui::RpWidget> Business::createPinnedToTop(
 		content->setRoundEdges(wrap == Info::Wrap::Layer);
 	}, content->lifetime());
 
-	const auto calculateMaximumHeight = [=] {
-		return st::settingsPremiumTopHeight;
-	};
-
-	content->setMaximumHeight(calculateMaximumHeight());
-	content->setMinimumHeight(st::settingsPremiumTopHeight);// st::infoLayerTopBarHeight);
+	content->setMaximumHeight(st::settingsPremiumTopHeight);
+	content->setMinimumHeight(st::settingsPremiumTopHeight);
 
 	content->resize(content->width(), content->maximumHeight());
-	//content->additionalHeight(
-	//) | rpl::start_with_next([=](int additionalHeight) {
-	//	const auto wasMax = (content->height() == content->maximumHeight());
-	//	content->setMaximumHeight(calculateMaximumHeight()
-	//		+ additionalHeight);
-	//	if (wasMax) {
-	//		content->resize(content->width(), content->maximumHeight());
-	//	}
-	//}, content->lifetime());
 
 	_wrap.value(
 	) | rpl::start_with_next([=](Info::Wrap wrap) {
@@ -673,14 +669,14 @@ QPointer<Ui::RpWidget> Business::createPinnedToTop(
 		}
 	}, content->lifetime());
 
-	return Ui::MakeWeak(not_null<Ui::RpWidget*>{ content });
+	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }
 
 void Business::showFinished() {
 	_showFinished.fire({});
 }
 
-QPointer<Ui::RpWidget> Business::createPinnedToBottom(
+base::weak_qptr<Ui::RpWidget> Business::createPinnedToBottom(
 		not_null<Ui::RpWidget*> parent) {
 	const auto content = Ui::CreateChild<Ui::RpWidget>(parent.get());
 
@@ -749,7 +745,7 @@ QPointer<Ui::RpWidget> Business::createPinnedToBottom(
 		_subscribe->setVisible(!premium && premiumPossible);
 	}, _subscribe->lifetime());
 
-	return Ui::MakeWeak(not_null<Ui::RpWidget*>{ content });
+	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }
 
 } // namespace
@@ -804,12 +800,14 @@ std::vector<PremiumFeature> BusinessFeaturesOrder(
 			return PremiumFeature::BusinessHours;
 		} else if (s == u"business_location"_q) {
 			return PremiumFeature::BusinessLocation;
-		} else if (s == u"business_bots"_q) {
-			return PremiumFeature::BusinessBots;
+		} else if (s == u"business_links"_q) {
+			return PremiumFeature::ChatLinks;
 		} else if (s == u"business_intro"_q) {
 			return PremiumFeature::ChatIntro;
-		} else if (s == "business_links"_q) {
-			return PremiumFeature::ChatLinks;
+		} else if (s == u"business_bots"_q) {
+			return PremiumFeature::BusinessBots;
+		} else if (s == u"folder_tags"_q) {
+			return PremiumFeature::FilterTags;
 		}
 		return PremiumFeature::kCount;
 	}) | ranges::views::filter([](PremiumFeature feature) {

@@ -8,7 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/peer_list_controllers.h"
 
 #include "api/api_chat_participants.h"
-#include "api/api_premium.h"
+#include "api/api_premium.h" // MessageMoneyRestriction.
 #include "base/random.h"
 #include "boxes/filters/edit_filter_chats_list.h"
 #include "settings/settings_premium.h"
@@ -23,6 +23,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/ui_utility.h"
 #include "main/main_session.h"
 #include "data/data_peer_values.h"
+#include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_channel.h"
@@ -41,8 +43,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "dialogs/dialogs_main_list.h"
+#include "payments/ui/payments_reaction_box.h"
 #include "ui/effects/outline_segments.h"
 #include "ui/wrap/slide_wrap.h"
+#include "window/window_separate_id.h"
 #include "window/window_session_controller.h" // showAddContact()
 #include "base/unixtime.h"
 #include "styles/style_boxes.h"
@@ -64,6 +68,10 @@ object_ptr<Ui::BoxContent> PrepareContactsBox(
 	public:
 		using ContactsBoxController::ContactsBoxController;
 
+		[[nodiscard]] rpl::producer<not_null<PeerData*>> wheelClicks() const {
+			return _wheelClicks.events();
+		}
+
 	protected:
 		std::unique_ptr<PeerListRow> createRow(
 				not_null<UserData*> user) override {
@@ -71,6 +79,14 @@ object_ptr<Ui::BoxContent> PrepareContactsBox(
 				? ContactsBoxController::createRow(user)
 				: nullptr;
 		}
+
+		void rowMiddleClicked(
+				not_null<PeerListRow*> row) override {
+			_wheelClicks.fire(row->peer());
+		}
+
+	private:
+		rpl::event_stream<not_null<PeerData*>> _wheelClicks;
 
 	};
 	auto controller = std::make_unique<Controller>(
@@ -100,6 +116,10 @@ object_ptr<Ui::BoxContent> PrepareContactsBox(
 				online ? &st::contactsSortOnlineIconOver : nullptr);
 		});
 		raw->setSortMode(Mode::Online);
+
+		raw->wheelClicks() | rpl::start_with_next([=](not_null<PeerData*> p) {
+			sessionController->showInNewWindow(p);
+		}, box->lifetime());
 	};
 	return Box<PeerListBox>(std::move(controller), std::move(init));
 }
@@ -258,40 +278,71 @@ bool PeerListGlobalSearchController::isLoading() {
 	return _timer.isActive() || _requestId;
 }
 
+struct RecipientRow::Restriction {
+	Api::MessageMoneyRestriction value;
+	RestrictionBadgeCache cache;
+};
+
 RecipientRow::RecipientRow(
 	not_null<PeerData*> peer,
 	const style::PeerListItem *maybeLockedSt,
 	History *maybeHistory)
 : PeerListRow(peer)
 , _maybeHistory(maybeHistory)
-, _resolvePremiumRequired(maybeLockedSt != nullptr) {
-	if (maybeLockedSt
-		&& (Api::ResolveRequiresPremiumToWrite(peer, maybeHistory)
-			== Api::RequirePremiumState::Yes)) {
-		_lockedSt = maybeLockedSt;
+, _maybeLockedSt(maybeLockedSt) {
+	if (_maybeLockedSt) {
+		setRestriction(Api::ResolveMessageMoneyRestrictions(
+			peer,
+			maybeHistory));
 	}
 }
 
-PaintRoundImageCallback RecipientRow::generatePaintUserpicCallback(
-		bool forceRound) {
-	auto result = PeerListRow::generatePaintUserpicCallback(forceRound);
-	if (const auto st = _lockedSt) {
-		return [=](Painter &p, int x, int y, int outerWidth, int size) {
-			result(p, x, y, outerWidth, size);
-			PaintPremiumRequiredLock(p, st, x, y, outerWidth, size);
-		};
+Api::MessageMoneyRestriction RecipientRow::restriction() const {
+	return _restriction
+		? _restriction->value
+		: Api::MessageMoneyRestriction();
+}
+
+void RecipientRow::setRestriction(Api::MessageMoneyRestriction restriction) {
+	if (!restriction) {
+		_restriction = nullptr;
+		return;
+	} else if (!_restriction) {
+		_restriction = std::make_unique<Restriction>();
 	}
-	return result;
+	_restriction->value = restriction;
+}
+
+void RecipientRow::paintUserpicOverlay(
+		Painter &p,
+		const style::PeerListItem &st,
+		int x,
+		int y,
+		int outerWidth) {
+	if (const auto &r = _restriction) {
+		PaintRestrictionBadge(
+			p,
+			_maybeLockedSt,
+			r->value.starsPerMessage,
+			r->cache,
+			x,
+			y,
+			outerWidth,
+			st.photoSize);
+	}
 }
 
 bool RecipientRow::refreshLock(
 		not_null<const style::PeerListItem*> maybeLockedSt) {
 	if (const auto user = peer()->asUser()) {
-		const auto locked = _resolvePremiumRequired
-			&& (Api::ResolveRequiresPremiumToWrite(user, _maybeHistory)
-				== Api::RequirePremiumState::Yes);
-		if (this->locked() != locked) {
-			setLocked(locked ? maybeLockedSt.get() : nullptr);
+		using Restriction = Api::MessageMoneyRestriction;
+		const auto r = _maybeLockedSt
+			? Api::ResolveMessageMoneyRestrictions(
+				user,
+				_maybeHistory)
+			: Restriction();
+		if ((_restriction ? _restriction->value : Restriction()) != r) {
+			setRestriction(r);
 			return true;
 		}
 	}
@@ -301,22 +352,30 @@ bool RecipientRow::refreshLock(
 void RecipientRow::preloadUserpic() {
 	PeerListRow::preloadUserpic();
 
-	if (!_resolvePremiumRequired) {
+	if (!_maybeLockedSt) {
 		return;
-	} else if (Api::ResolveRequiresPremiumToWrite(peer(), _maybeHistory)
-		== Api::RequirePremiumState::Unknown) {
-		const auto user = peer()->asUser();
-		user->session().api().premium().resolvePremiumRequired(user);
+	}
+	const auto peer = this->peer();
+	const auto known = Api::ResolveMessageMoneyRestrictions(
+		peer,
+		_maybeHistory).known;
+	if (known) {
+		return;
+	} else if (const auto user = peer->asUser()) {
+		const auto api = &user->session().api();
+		api->premium().resolveMessageMoneyRestrictions(user);
+	} else if (const auto group = peer->asChannel()) {
+		group->updateFull();
 	}
 }
 
-void TrackPremiumRequiredChanges(
+void TrackMessageMoneyRestrictionsChanges(
 		not_null<PeerListController*> controller,
 		rpl::lifetime &lifetime) {
 	const auto session = &controller->session();
 	rpl::merge(
 		Data::AmPremiumValue(session) | rpl::to_empty,
-		session->api().premium().somePremiumRequiredResolved()
+		session->api().premium().someMessageMoneyRestrictionsResolved()
 	) | rpl::start_with_next([=] {
 		const auto st = &controller->computeListSt().item;
 		const auto delegate = controller->delegate();
@@ -709,7 +768,7 @@ std::unique_ptr<PeerListRow> ContactsBoxController::createRow(
 	return std::make_unique<PeerListRow>(user);
 }
 
-RecipientPremiumRequiredError WritePremiumRequiredError(
+RecipientMoneyRestrictionError WriteMoneyRestrictionError(
 		not_null<UserData*> user) {
 	return {
 		.text = tr::lng_send_non_premium_message_toast(
@@ -742,7 +801,7 @@ ChooseRecipientBoxController::ChooseRecipientBoxController(
 , _session(args.session)
 , _callback(std::move(args.callback))
 , _filter(std::move(args.filter))
-, _premiumRequiredError(std::move(args.premiumRequiredError)) {
+, _moneyRestrictionError(std::move(args.moneyRestrictionError)) {
 }
 
 Main::Session &ChooseRecipientBoxController::session() const {
@@ -752,14 +811,17 @@ Main::Session &ChooseRecipientBoxController::session() const {
 void ChooseRecipientBoxController::prepareViewHook() {
 	delegate()->peerListSetTitle(tr::lng_forward_choose());
 
-	if (_premiumRequiredError) {
-		TrackPremiumRequiredChanges(this, lifetime());
+	if (_moneyRestrictionError) {
+		TrackMessageMoneyRestrictionsChanges(this, lifetime());
 	}
 }
 
 bool ChooseRecipientBoxController::showLockedError(
 		not_null<PeerListRow*> row) {
-	return RecipientRow::ShowLockedError(this, row, _premiumRequiredError);
+	return RecipientRow::ShowLockedError(
+		this,
+		row,
+		_moneyRestrictionError);
 }
 
 void ChooseRecipientBoxController::rowClicked(not_null<PeerListRow*> row) {
@@ -769,7 +831,7 @@ void ChooseRecipientBoxController::rowClicked(not_null<PeerListRow*> row) {
 	auto guard = base::make_weak(this);
 	const auto peer = row->peer();
 	if (const auto forum = peer->forum()) {
-		const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
+		const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 		auto callback = [=](not_null<Data::ForumTopic*> topic) {
 			const auto exists = guard.get();
 			if (!exists) {
@@ -807,6 +869,45 @@ void ChooseRecipientBoxController::rowClicked(not_null<PeerListRow*> row) {
 		*weak = owned.data();
 		delegate()->peerListUiShow()->showBox(std::move(owned));
 		return;
+	} else if (const auto monoforum = peer->monoforum()) {
+		const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
+		auto callback = [=](not_null<Data::SavedSublist*> sublist) {
+			const auto exists = guard.get();
+			if (!exists) {
+				if (*weak) {
+					(*weak)->closeBox();
+				}
+				return;
+			}
+			auto onstack = std::move(_callback);
+			onstack(sublist);
+			if (guard) {
+				_callback = std::move(onstack);
+			} else if (*weak) {
+				(*weak)->closeBox();
+			}
+		};
+		const auto filter = [=](not_null<Data::SavedSublist*> sublist) {
+			return guard && (!_filter || _filter(sublist));
+		};
+		auto owned = Box<PeerListBox>(
+			std::make_unique<ChooseSublistBoxController>(
+				monoforum,
+				std::move(callback),
+				filter),
+			[=](not_null<PeerListBox*> box) {
+				box->addButton(tr::lng_cancel(), [=] {
+					box->closeBox();
+				});
+
+				monoforum->destroyed(
+				) | rpl::start_with_next([=] {
+					box->closeBox();
+				}, box->lifetime());
+			});
+		*weak = owned.data();
+		delegate()->peerListUiShow()->showBox(std::move(owned));
+		return;
 	}
 	const auto history = peer->owner().history(peer);
 	auto callback = std::move(_callback);
@@ -819,8 +920,9 @@ void ChooseRecipientBoxController::rowClicked(not_null<PeerListRow*> row) {
 bool RecipientRow::ShowLockedError(
 		not_null<PeerListController*> controller,
 		not_null<PeerListRow*> row,
-		Fn<RecipientPremiumRequiredError(not_null<UserData*>)> error) {
-	if (!static_cast<RecipientRow*>(row.get())->locked()) {
+		Fn<RecipientMoneyRestrictionError(not_null<UserData*>)> error) {
+	const auto recipient = static_cast<RecipientRow*>(row.get());
+	if (!recipient->restriction().premiumRequired) {
 		return false;
 	}
 	::Settings::ShowPremiumPromoToast(
@@ -843,15 +945,15 @@ auto ChooseRecipientBoxController::createRow(
 		: ((peer->isBroadcast() && !Data::CanSendAnything(peer))
 			|| peer->isRepliesChat()
 			|| peer->isVerifyCodes()
-			|| (peer->isUser() && (_premiumRequiredError
-				? !peer->asUser()->canSendIgnoreRequirePremium()
+			|| (peer->isUser() && (_moneyRestrictionError
+				? !peer->asUser()->canSendIgnoreMoneyRestrictions()
 				: !Data::CanSendAnything(peer))));
 	if (skip) {
 		return nullptr;
 	}
 	auto result = std::make_unique<Row>(
 		history,
-		_premiumRequiredError ? &computeListSt().item : nullptr);
+		_moneyRestrictionError ? &computeListSt().item : nullptr);
 	return result;
 }
 
@@ -1065,31 +1167,177 @@ std::unique_ptr<PeerListRow> ChooseTopicBoxController::createSearchRow(
 	return nullptr;
 }
 
+std::unique_ptr<PeerListRow> ChooseTopicBoxController::MakeRow(
+		not_null<Data::ForumTopic*> topic) {
+	return std::make_unique<Row>(topic);
+}
+
 auto ChooseTopicBoxController::createRow(not_null<Data::ForumTopic*> topic)
 -> std::unique_ptr<Row> {
 	const auto skip = _filter && !_filter(topic);
 	return skip ? nullptr : std::make_unique<Row>(topic);
 };
 
-void PaintPremiumRequiredLock(
+ChooseSublistBoxController::ChooseSublistBoxController(
+	not_null<Data::SavedMessages*> monoforum,
+	FnMut<void(not_null<Data::SavedSublist*>)> callback,
+	Fn<bool(not_null<Data::SavedSublist*>)> filter)
+: _monoforum(monoforum)
+, _callback(std::move(callback))
+, _filter(std::move(filter)) {
+	setStyleOverrides(&st::chooseTopicList);
+
+	_monoforum->chatsListChanges(
+	) | rpl::start_with_next([=] {
+		refreshRows();
+	}, lifetime());
+
+	_monoforum->sublistDestroyed(
+	) | rpl::start_with_next([=](not_null<Data::SavedSublist*> sublist) {
+		const auto id = sublist->sublistPeer()->id.value;
+		if (const auto row = delegate()->peerListFindRow(id)) {
+			delegate()->peerListRemoveRow(row);
+			delegate()->peerListRefreshRows();
+		}
+	}, lifetime());
+}
+
+Main::Session &ChooseSublistBoxController::session() const {
+	return _monoforum->session();
+}
+
+void ChooseSublistBoxController::rowClicked(not_null<PeerListRow*> row) {
+	const auto weak = base::make_weak(this);
+	auto onstack = base::take(_callback);
+	onstack(_monoforum->sublist(row->peer()));
+	if (weak) {
+		_callback = std::move(onstack);
+	}
+}
+
+void ChooseSublistBoxController::prepare() {
+	delegate()->peerListSetTitle(tr::lng_forward_choose());
+	setSearchNoResultsText(tr::lng_topics_not_found(tr::now));
+	delegate()->peerListSetSearchMode(PeerListSearchMode::Enabled);
+	refreshRows(true);
+
+	session().changes().entryUpdates(
+		Data::EntryUpdate::Flag::Repaint
+	) | rpl::start_with_next([=](const Data::EntryUpdate &update) {
+		if (const auto sublist = update.entry->asSublist()) {
+			if (sublist->parent() == _monoforum) {
+				const auto id = sublist->sublistPeer()->id.value;
+				if (const auto row = delegate()->peerListFindRow(id)) {
+					delegate()->peerListUpdateRow(row);
+				}
+			}
+		}
+	}, lifetime());
+}
+
+void ChooseSublistBoxController::refreshRows(bool initial) {
+	auto added = false;
+	for (const auto &row : _monoforum->chatsList()->indexed()->all()) {
+		if (const auto sublist = row->sublist()) {
+			const auto id = sublist->sublistPeer()->id.value;
+			auto already = delegate()->peerListFindRow(id);
+			if (initial || !already) {
+				if (auto created = createRow(sublist)) {
+					delegate()->peerListAppendRow(std::move(created));
+					added = true;
+				}
+			} else if (already->isSearchResult()) {
+				delegate()->peerListAppendFoundRow(already);
+				added = true;
+			}
+		}
+	}
+	if (added) {
+		delegate()->peerListRefreshRows();
+	}
+}
+
+void ChooseSublistBoxController::loadMoreRows() {
+	_monoforum->loadMore();
+}
+
+std::unique_ptr<PeerListRow> ChooseSublistBoxController::createSearchRow(
+		PeerListRowId id) {
+	const auto peer = session().data().peer(PeerId(id));
+	if (const auto sublist = _monoforum->sublistLoaded(peer)) {
+		auto result = std::make_unique<PeerListRow>(sublist->sublistPeer());
+		result->setCustomStatus(QString());
+		return result;
+	}
+	return nullptr;
+}
+
+auto ChooseSublistBoxController::createRow(
+	not_null<Data::SavedSublist*> sublist)
+-> std::unique_ptr<PeerListRow> {
+	if (_filter && !_filter(sublist)) {
+		return nullptr;
+	}
+	auto result = std::make_unique<PeerListRow>(sublist->sublistPeer());
+	result->setCustomStatus(QString());
+	return result;
+};
+
+void PaintRestrictionBadge(
 		Painter &p,
 		not_null<const style::PeerListItem*> st,
+		int stars,
+		RestrictionBadgeCache &cache,
 		int x,
 		int y,
 		int outerWidth,
 		int size) {
-	auto hq = PainterHighQualityEnabler(p);
+	const auto paletteVersion = style::PaletteVersion();
+	const auto good = !cache.badge.isNull()
+		&& (cache.stars == stars)
+		&& (cache.paletteVersion == paletteVersion);
 	const auto &check = st->checkbox.check;
-	auto pen = check.border->p;
-	pen.setWidthF(check.width);
-	p.setPen(pen);
-	p.setBrush(st::premiumButtonBg2);
-	const auto &icon = st::stickersPremiumLock;
-	const auto width = icon.width();
-	const auto height = icon.height();
-	const auto rect = QRect(
-		QPoint(x + size - width, y + size - height),
-		icon.size());
-	p.drawEllipse(rect);
-	icon.paintInCenter(p, rect);
+	const auto add = check.width;
+	if (!good) {
+		cache.stars = stars;
+		cache.paletteVersion = paletteVersion;
+		if (stars) {
+			const auto text = (stars >= 1000)
+				? (QString::number(stars / 1000) + 'K')
+				: QString::number(stars);
+			cache.badge = Ui::GenerateSmallBadgeImage(
+				text,
+				st::paidReactTopStarIcon,
+				check.bgActive->c,
+				st::premiumButtonFg->c,
+				&check);
+		} else {
+			auto hq = PainterHighQualityEnabler(p);
+			const auto &icon = st::stickersPremiumLock;
+			const auto width = icon.width();
+			const auto height = icon.height();
+			const auto rect = QRect(
+				QPoint(x + size - width, y + size - height),
+				icon.size());
+			const auto added = QMargins(add, add, add, add);
+			const auto ratio = style::DevicePixelRatio();
+			cache.badge = QImage(
+				(rect + added).size() * ratio,
+				QImage::Format_ARGB32_Premultiplied);
+			cache.badge.setDevicePixelRatio(ratio);
+			cache.badge.fill(Qt::transparent);
+			const auto inner = QRect(add, add, rect.width(), rect.height());
+			auto q = QPainter(&cache.badge);
+			auto pen = check.border->p;
+			pen.setWidthF(check.width);
+			q.setPen(pen);
+			q.setBrush(st::premiumButtonBg2);
+			q.drawEllipse(inner);
+			icon.paintInCenter(q, inner);
+		}
+	}
+	const auto cached = cache.badge.size() / cache.badge.devicePixelRatio();
+	const auto left = x + size + add - cached.width();
+	const auto top = stars ? (y - add) : (y + size + add - cached.height());
+	p.drawImage(left, top, cache.badge);
 }

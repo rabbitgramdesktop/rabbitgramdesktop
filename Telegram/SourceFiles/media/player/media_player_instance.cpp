@@ -34,6 +34,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_session.h"
 #include "main/main_account.h" // session->account().sessionChanges().
 #include "main/main_session_settings.h"
+#include "storage/storage_account.h"
 
 namespace Media {
 namespace Player {
@@ -50,7 +51,8 @@ constexpr auto kIdsPreloadAfter = 28;
 constexpr auto kShufflePlaylistLimit = 10'000;
 constexpr auto kRememberShuffledOrderItems = 16;
 
-constexpr auto kMinLengthForSavePosition = 20 * TimeId(60); // 20 minutes.
+constexpr auto kMinLengthForSavePositionVideo = TimeId(60); // 1 minute.
+constexpr auto kMinLengthForSavePositionMusic = 20 * TimeId(60); // 20.
 
 base::options::toggle OptionDisableAutoplayNext({
 	.id = kOptionDisableAutoplayNext,
@@ -83,8 +85,10 @@ struct Instance::ShuffleData {
 	std::vector<UniversalMsgId> playedIds;
 	History *history = nullptr;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 	History *migrated = nullptr;
 	bool scheduled = false;
+	bool savedMusic = false;
 	int indexInPlayedIds = 0;
 	bool allLoaded = false;
 	rpl::lifetime nextSliceLifetime;
@@ -108,18 +112,20 @@ void finish(not_null<Audio::Instance*> instance) {
 void SaveLastPlaybackPosition(
 		not_null<DocumentData*> document,
 		const TrackState &state) {
+	const auto limit = document->isVideoFile()
+		? kMinLengthForSavePositionVideo
+		: kMinLengthForSavePositionMusic;
 	const auto time = (state.position == kTimeUnknown
 		|| state.length == kTimeUnknown
 		|| state.state == State::PausedAtEnd
 		|| IsStopped(state.state))
 		? TimeId(0)
-		: (state.length >= kMinLengthForSavePosition * state.frequency)
+		: (state.length >= limit * state.frequency)
 		? (state.position / state.frequency) * crl::time(1000)
 		: TimeId(0);
 	auto &session = document->session();
-	if (session.settings().mediaLastPlaybackPosition(document->id) != time) {
-		session.settings().setMediaLastPlaybackPosition(document->id, time);
-		session.saveSettingsDelayed();
+	if (session.local().mediaLastPlaybackPosition(document->id) != time) {
+		session.local().setMediaLastPlaybackPosition(document->id, time);
 	}
 }
 
@@ -243,6 +249,7 @@ void Instance::setHistory(
 	if (history) {
 		data->history = history->migrateToOrMe();
 		data->topicRootId = 0;
+		data->monoforumPeerId = 0;
 		data->migrated = data->history->migrateFrom();
 		setSession(data, &history->session());
 	} else {
@@ -345,6 +352,7 @@ bool Instance::validPlaylist(not_null<const Data*> data) const {
 		const auto inSameDomain = [](const Key &a, const Key &b) {
 			return (a.peerId == b.peerId)
 				&& (a.topicRootId == b.topicRootId)
+				&& (a.monoforumPeerId == b.monoforumPeerId)
 				&& (a.migratedPeerId == b.migratedPeerId);
 		};
 		const auto countDistanceInData = [&](const Key &a, const Key &b) {
@@ -380,6 +388,8 @@ void Instance::validatePlaylist(not_null<Data*> data) {
 		const auto sharedMediaViewer = (key->topicRootId
 			== SparseIdsMergedSlice::kScheduledTopicId)
 			? SharedScheduledMediaViewer
+			: (key->topicRootId == SparseIdsMergedSlice::kSavedMusicTopicId)
+			? SavedMusicMediaViewer
 			: SharedMediaMergedViewer;
 		sharedMediaViewer(
 			&data->history->session(),
@@ -406,7 +416,10 @@ auto Instance::playlistKey(not_null<const Data*> data) const
 		return {};
 	}
 	const auto item = data->history->owner().message(contextId);
-	if (!item || (!item->isRegular() && !item->isScheduled())) {
+	if (!item
+		|| (!item->isRegular()
+			&& !item->isScheduled()
+			&& !item->isSavedMusicItem())) {
 		return {};
 	}
 
@@ -417,7 +430,10 @@ auto Instance::playlistKey(not_null<const Data*> data) const
 		data->history->peer->id,
 		(item->isScheduled()
 			? SparseIdsMergedSlice::kScheduledTopicId
+			: item->isSavedMusicItem()
+			? SparseIdsMergedSlice::kSavedMusicTopicId
 			: data->topicRootId),
+		data->monoforumPeerId,
 		data->migrated ? data->migrated->peer->id : 0,
 		universalId);
 }
@@ -475,6 +491,7 @@ auto Instance::playlistOtherKey(not_null<const Data*> data) const
 	return SliceKey(
 		data->history->peer->id,
 		data->topicRootId,
+		data->monoforumPeerId,
 		data->migrated ? data->migrated->peer->id : 0,
 		(data->playlistSlice->skippedBefore() == 0
 			? ServerMaxMsgId - 1
@@ -849,9 +866,9 @@ Streaming::PlaybackOptions Instance::streamingOptions(
 	if (position >= 0) {
 		result.position = position;
 	} else if (document) {
-		auto &settings = document->session().settings();
-		result.position = settings.mediaLastPlaybackPosition(document->id);
-		settings.setMediaLastPlaybackPosition(document->id, 0);
+		auto &local = document->session().local();
+		result.position = local.mediaLastPlaybackPosition(document->id);
+		local.setMediaLastPlaybackPosition(document->id, 0);
 	} else {
 		result.position = 0;
 	}
@@ -899,13 +916,18 @@ void Instance::validateShuffleData(not_null<Data*> data) {
 	const auto key = playlistKey(data);
 	const auto scheduled = key
 		&& (key->topicRootId == SparseIdsMergedSlice::kScheduledTopicId);
+	const auto savedMusic = key
+		&& (key->topicRootId == SparseIdsMergedSlice::kSavedMusicTopicId);
 	if (raw->history != data->history
 		|| raw->topicRootId != data->topicRootId
+		|| raw->monoforumPeerId != data->monoforumPeerId
 		|| raw->migrated != data->migrated
-		|| raw->scheduled != scheduled) {
+		|| raw->scheduled != scheduled
+		|| raw->savedMusic != savedMusic) {
 		raw->history = data->history;
 		raw->migrated = data->migrated;
 		raw->scheduled = scheduled;
+		raw->savedMusic = savedMusic;
 		raw->nextSliceLifetime.destroy();
 		raw->allLoaded = false;
 		raw->playlist.clear();
@@ -958,6 +980,7 @@ void Instance::validateShuffleData(not_null<Data*> data) {
 			SliceKey(
 				raw->history->peer->id,
 				raw->topicRootId,
+				raw->monoforumPeerId,
 				raw->migrated ? raw->migrated->peer->id : 0,
 				last),
 			data->overview),

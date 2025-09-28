@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/object_ptr.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
+#include "dialogs/ui/dialogs_quick_action_context.h"
 #include "data/data_messages.h"
 #include "ui/dragging_scroll_manager.h"
 #include "ui/effects/animations.h"
@@ -19,11 +20,20 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace style {
 struct DialogRow;
+struct DialogRightButton;
 } // namespace style
+
+namespace Api {
+struct PeerSearchResult;
+} // namespace Api
 
 namespace MTP {
 class Error;
 } // namespace MTP
+
+namespace Lottie {
+class Icon;
+} // namespace Lottie
 
 namespace Main {
 class Session;
@@ -33,7 +43,12 @@ namespace Ui {
 class IconButton;
 class PopupMenu;
 class FlatLabel;
+class VerticalLayout;
+class RoundButton;
 struct ScrollToRequest;
+namespace Controls {
+enum class QuickDialogAction;
+} // namespace Controls
 } // namespace Ui
 
 namespace Window {
@@ -41,9 +56,11 @@ class SessionController;
 } // namespace Window
 
 namespace Data {
+class ChatFilter;
 class Thread;
 class Folder;
 class Forum;
+class SavedMessages;
 struct ReactionId;
 } // namespace Data
 
@@ -63,10 +80,15 @@ class SearchTags;
 class SearchEmpty;
 class ChatSearchIn;
 enum class HashOrCashtag : uchar;
+struct RightButton;
+enum class ChatTypeFilter : uchar;
 
 struct ChosenRow {
 	Key key;
 	Data::MessagePosition message;
+	MsgId topicJumpRootId;
+	PeerId sublistJumpPeerId;
+	QByteArray sponsoredRandomId;
 	bool userpicClick : 1 = false;
 	bool filteredRow : 1 = false;
 	bool newWindow : 1 = false;
@@ -99,6 +121,8 @@ enum class WidgetState {
 
 class InnerWidget final : public Ui::RpWidget {
 public:
+	using ChatsFilterTagsKey = int64;
+
 	struct ChildListShown {
 		PeerId peerId = 0;
 		float64 shown = 0.;
@@ -113,10 +137,7 @@ public:
 		HistoryItem *inject,
 		SearchRequestType type,
 		int fullCount);
-	void peerSearchReceived(
-		const QString &query,
-		const QVector<MTPPeer> &my,
-		const QVector<MTPPeer> &result);
+	void peerSearchReceived(Api::PeerSearchResult result);
 
 	[[nodiscard]] FilterId filterId() const;
 
@@ -136,6 +157,8 @@ public:
 	void refreshEmpty();
 	void resizeEmpty();
 
+	void showPeerMenu();
+
 	[[nodiscard]] bool isUserpicPress() const;
 	[[nodiscard]] bool isUserpicPressOnWide() const;
 	void cancelChatPreview();
@@ -144,7 +167,8 @@ public:
 	void chatPreviewShown(bool shown, RowDescriptor row = {});
 	bool chooseRow(
 		Qt::KeyboardModifiers modifiers = {},
-		MsgId pressedTopicRootId = {});
+		MsgId pressedTopicRootId = {},
+		PeerId pressedSublistPeerId = {});
 
 	void scrollToEntry(const RowDescriptor &entry);
 
@@ -172,6 +196,8 @@ public:
 	[[nodiscard]] rpl::producer<> listBottomReached() const;
 	[[nodiscard]] auto changeSearchTabRequests() const
 		-> rpl::producer<ChatSearchTab>;
+	[[nodiscard]] auto changeSearchFilterRequests() const
+		-> rpl::producer<ChatTypeFilter>;
 	[[nodiscard]] rpl::producer<> cancelSearchRequests() const;
 	[[nodiscard]] rpl::producer<> cancelSearchFromRequests() const;
 	[[nodiscard]] rpl::producer<> changeSearchFromRequests() const;
@@ -197,6 +223,15 @@ public:
 		return _touchCancelRequests.events();
 	}
 
+	[[nodiscard]] rpl::producer<UserId> openBotMainAppRequests() const;
+
+	void setSwipeContextData(
+		int64 key,
+		std::optional<Ui::Controls::SwipeContextData> data);
+	[[nodiscard]] int64 calcSwipeKey(int top);
+	void prepareQuickAction(int64 key, Dialogs::Ui::QuickDialogAction);
+	void clearQuickActions();
+
 protected:
 	void visibleTopBottomUpdated(
 		int visibleTop,
@@ -214,7 +249,9 @@ protected:
 private:
 	struct CollapsedRow;
 	struct HashtagResult;
+	struct SponsoredSearchResult;
 	struct PeerSearchResult;
+	struct TagCache;
 
 	enum class JumpSkip {
 		PreviousOrBegin,
@@ -270,6 +307,7 @@ private:
 	void repaintDialogRow(RowDescriptor row);
 	void refreshDialogRow(RowDescriptor row);
 	bool updateEntryHeight(not_null<Entry*> entry);
+	void showSponsoredMenu(int peerSearchIndex, QPoint globalPos);
 
 	void clearMouseSelection(bool clearSelection = false);
 	void mousePressReleased(
@@ -283,11 +321,17 @@ private:
 	void scrollToItem(int top, int height);
 	void scrollToDefaultSelected();
 	void setCollapsedPressed(int pressed);
-	void setPressed(Row *pressed, bool pressedTopicJump);
+	void setPressed(
+		Row *pressed,
+		bool pressedTopicJump,
+		bool pressedRightButton);
 	void clearPressed();
 	void setHashtagPressed(int pressed);
-	void setFilteredPressed(int pressed, bool pressedTopicJump);
-	void setPeerSearchPressed(int pressed);
+	void setFilteredPressed(
+		int pressed,
+		bool pressedTopicJump,
+		bool pressedRightButton);
+	void setPeerSearchPressed(int pressed, bool pressedRightButton);
 	void setPreviewPressed(int pressed);
 	void setSearchedPressed(int pressed);
 	bool isPressed() const {
@@ -298,7 +342,8 @@ private:
 			|| (_peerSearchPressed >= 0)
 			|| (_previewPressed >= 0)
 			|| (_searchedPressed >= 0)
-			|| _pressedMorePosts;
+			|| _pressedMorePosts
+			|| _pressedChatTypeFilter;
 	}
 	bool isSelected() const {
 		return (_collapsedSelected >= 0)
@@ -308,7 +353,8 @@ private:
 			|| (_peerSearchSelected >= 0)
 			|| (_previewSelected >= 0)
 			|| (_searchedSelected >= 0)
-			|| _selectedMorePosts;
+			|| _selectedMorePosts
+			|| _selectedChatTypeFilter;
 	}
 	bool uniqueSearchResults() const;
 	bool hasHistoryInResults(not_null<History*> history) const;
@@ -319,6 +365,11 @@ private:
 
 	void updateRowCornerStatusShown(not_null<History*> history);
 	void repaintDialogRowCornerStatus(not_null<History*> history);
+
+	bool addBotAppRipple(QPoint origin, Fn<void()> updateCallback);
+	bool addQuickActionRipple(not_null<Row*> row, Fn<void()> updateCallback);
+
+	bool addRightButtonRipple(QPoint origin, Fn<void()> updateCallback);
 
 	void setupShortcuts();
 	RowDescriptor computeJump(
@@ -422,7 +473,8 @@ private:
 	Ui::VideoUserpic *validateVideoUserpic(not_null<History*> history);
 
 	Row *shownRowByKey(Key key);
-	void clearSearchResults(bool clearPeerSearchResults = true);
+	void clearSearchResults(bool alsoPeerSearchResults = true);
+	void clearPeerSearchResults();
 	void clearPreviewResults();
 	void updateSelectedRow(Key key = Key());
 	void trackResultsHistory(not_null<History*> history);
@@ -444,9 +496,31 @@ private:
 	void handleChatListEntryRefreshes();
 	void moveSearchIn();
 	void dragPinnedFromTouch();
+	[[nodiscard]] bool hasChatTypeFilter() const;
 
 	void saveChatsFilterScrollState(FilterId filterId);
 	void restoreChatsFilterScrollState(FilterId filterId);
+
+	[[nodiscard]] not_null<Ui::QuickActionContext*> ensureQuickAction(
+		int64 key);
+	void deactivateQuickAction();
+
+	[[nodiscard]] bool lookupIsInBotAppButton(
+		Row *row,
+		QPoint localPosition);
+	[[nodiscard]] bool lookupIsInRightButton(
+		const RightButton &button,
+		QPoint localPosition);
+	[[nodiscard]] RightButton *maybeCacheRightButton(Row *row);
+	void fillRightButton(
+		RightButton &button,
+		const TextWithEntities &text,
+		const style::DialogRightButton &st);
+
+	[[nodiscard]] QImage *cacheChatsFilterTag(
+		const Data::ChatFilter &filter,
+		uint8 more,
+		bool active);
 
 	const not_null<Window::SessionController*> _controller;
 
@@ -464,6 +538,8 @@ private:
 	std::vector<std::unique_ptr<CollapsedRow>> _collapsedRows;
 	not_null<const style::DialogRow*> _st;
 	mutable std::unique_ptr<Ui::TopicJumpCache> _topicJumpCache;
+	bool _selectedChatTypeFilter = false;
+	bool _pressedChatTypeFilter = false;
 	bool _selectedMorePosts = false;
 	bool _pressedMorePosts = false;
 	int _collapsedSelected = -1;
@@ -472,8 +548,14 @@ private:
 	Row *_selected = nullptr;
 	Row *_pressed = nullptr;
 	MsgId _pressedTopicJumpRootId;
+	PeerId _pressedSublistJumpPeerId;
 	bool _selectedTopicJump = false;
 	bool _pressedTopicJump = false;
+
+	RightButton *_pressedRightButtonData = nullptr;
+	bool _pressedRightButtonSponsored = false;
+	bool _selectedRightButton = false;
+	bool _pressedRightButton = false;
 
 	Row *_dragging = nullptr;
 	int _draggingIndex = -1;
@@ -508,15 +590,18 @@ private:
 	rpl::lifetime _trackedLifetime;
 
 	QString _peerSearchQuery;
+	base::flat_set<not_null<PeerData*>> _sponsoredRemoved;
 	std::vector<std::unique_ptr<PeerSearchResult>> _peerSearchResults;
 	int _peerSearchSelected = -1;
 	int _peerSearchPressed = -1;
+	int _peerSearchMenu = -1;
 
 	std::vector<std::unique_ptr<FakeRow>> _previewResults;
 	int _previewCount = 0;
 	int _previewSelected = -1;
 	int _previewPressed = -1;
 	int _morePostsWidth = 0;
+	int _chatTypeFilterWidth = 0;
 
 	std::vector<std::unique_ptr<FakeRow>> _searchResults;
 	int _searchedCount = 0;
@@ -528,6 +613,7 @@ private:
 
 	std::unique_ptr<ChatSearchIn> _searchIn;
 	rpl::event_stream<ChatSearchTab> _changeSearchTabRequests;
+	rpl::event_stream<ChatTypeFilter> _changeSearchFilterRequests;
 	rpl::event_stream<> _cancelSearchRequests;
 	rpl::event_stream<> _cancelSearchFromRequests;
 	rpl::event_stream<> _changeSearchFromRequests;
@@ -535,6 +621,8 @@ private:
 	object_ptr<SearchEmpty> _searchEmpty = { nullptr };
 	SearchState _searchEmptyState;
 	object_ptr<Ui::FlatLabel> _empty = { nullptr };
+	object_ptr<Ui::VerticalLayout> _emptyList = { nullptr };
+	object_ptr<Ui::RoundButton> _emptyButton = { nullptr };
 
 	Ui::DraggingScrollManager _draggingScroll;
 
@@ -554,6 +642,12 @@ private:
 
 	base::flat_map<FilterId, int> _chatsFilterScrollStates;
 
+	std::unordered_map<ChatsFilterTagsKey, TagCache> _chatsFilterTags;
+	bool _waitingAllChatListEntryRefreshesForTags = false;
+	rpl::lifetime _handleChatListEntryTagRefreshesLifetime;
+
+	std::unordered_map<PeerId, RightButton> _rightButtons;
+
 	Fn<void()> _loadMoreCallback;
 	Fn<void()> _loadMoreFilteredCallback;
 	rpl::event_stream<> _listBottomReached;
@@ -565,6 +659,11 @@ private:
 	rpl::event_stream<SearchRequestDelay> _searchRequests;
 	rpl::event_stream<QString> _completeHashtagRequests;
 	rpl::event_stream<> _refreshHashtagsRequests;
+	rpl::event_stream<UserId> _openBotMainAppRequests;
+
+	using QuickActionPtr = std::unique_ptr<Ui::QuickActionContext>;
+	QuickActionPtr _activeQuickAction;
+	std::vector<QuickActionPtr> _inactiveQuickActions;
 
 	RowDescriptor _chatPreviewRow;
 	bool _chatPreviewScheduled = false;
@@ -578,7 +677,8 @@ private:
 	float64 _narrowRatio = 0.;
 	bool _geometryInited = false;
 
-	bool _savedSublists = false;
+	Data::SavedMessages *_savedSublists = nullptr;
+
 	bool _searchLoading = false;
 	bool _searchWaiting = false;
 

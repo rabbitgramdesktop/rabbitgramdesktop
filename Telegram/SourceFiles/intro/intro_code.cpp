@@ -84,16 +84,19 @@ void CodeWidget::updateDescText() {
 	const auto byTelegram = getData()->codeByTelegram;
 	const auto isFragment = !getData()->codeByFragmentUrl.isEmpty();
 	_isFragment = isFragment;
-	setDescriptionText(
-		isFragment
-			? tr::lng_intro_fragment_about(
-				lt_phone_number,
-				rpl::single(TextWithEntities{
-					.text = Ui::FormatPhone(getData()->phone)
-				}),
-				Ui::Text::RichLangValue)
-			: (byTelegram ? tr::lng_code_from_telegram : tr::lng_code_desc)(
-				Ui::Text::RichLangValue));
+	setDescriptionText(isEmailVerification()
+		? tr::lng_intro_email_confirm_subtitle(
+			lt_email,
+			rpl::single(Ui::Text::WrapEmailPattern(getData()->emailPattern)),
+			Ui::Text::WithEntities)
+		: isFragment
+		? tr::lng_intro_fragment_about(
+			lt_phone_number,
+			rpl::single(
+				TextWithEntities::Simple(Ui::FormatPhone(getData()->phone))),
+			Ui::Text::RichLangValue)
+		: (byTelegram ? tr::lng_code_from_telegram : tr::lng_code_desc)(
+			Ui::Text::RichLangValue));
 	if (getData()->codeByTelegram) {
 		_noTelegramCode->show();
 		_callTimer.cancel();
@@ -150,7 +153,9 @@ void CodeWidget::resizeEvent(QResizeEvent *e) {
 }
 
 void CodeWidget::updateControlsGeometry() {
-	_code->moveToLeft(contentLeft(), contentTop() + st::introStepFieldTop);
+	_code->moveToLeft(
+		contentLeft() - st::shakeShift - st::lineWidth,
+		contentTop() + st::introStepFieldTop + st::introPhoneTop * 3);
 	auto linkTop = _code->y() + _code->height() + st::introLinkTop;
 	_noTelegramCode->moveToLeft(contentLeft() + st::buttonRadius, linkTop);
 	_callLabel->moveToLeft(contentLeft() + st::buttonRadius, linkTop);
@@ -293,6 +298,9 @@ void CodeWidget::callDone(const MTPauth_SentCode &result) {
 		}
 	}, [&](const MTPDauth_sentCodeSuccess &data) {
 		finish(data.vauthorization());
+	}, [](const MTPDauth_sentCodePaymentRequired &) {
+		LOG(("API Error: Unexpected auth.sentCodePaymentRequired "
+			"(CodeWidget::callDone)."));
 	});
 }
 
@@ -345,16 +353,22 @@ void CodeWidget::submitCode(const QString &text) {
 	_code->setEnabled(false);
 	getData()->pwdState = Core::CloudPasswordState();
 	_sentRequest = api().request(MTPauth_SignIn(
-		MTP_flags(MTPauth_SignIn::Flag::f_phone_code),
+		MTP_flags(isEmailVerification()
+			? MTPauth_SignIn::Flag::f_email_verification
+			: MTPauth_SignIn::Flag::f_phone_code),
 		MTP_string(getData()->phone),
 		MTP_bytes(getData()->phoneHash),
 		MTP_string(_sentCode),
-		MTPEmailVerification()
+		MTP_emailVerificationCode(MTP_string(_sentCode))
 	)).done([=](const MTPauth_Authorization &result) {
 		codeSubmitDone(result);
 	}).fail([=](const MTP::Error &error) {
 		codeSubmitFail(error);
 	}).handleFloodErrors().send();
+}
+
+bool CodeWidget::isEmailVerification() const {
+	return !getData()->emailPattern.isEmpty();
 }
 
 rpl::producer<QString> CodeWidget::nextButtonText() const {
@@ -408,6 +422,9 @@ void CodeWidget::noTelegramCodeDone(const MTPauth_SentCode &result) {
 		updateDescText();
 	}, [&](const MTPDauth_sentCodeSuccess &data) {
 		finish(data.vauthorization());
+	}, [](const MTPDauth_sentCodePaymentRequired &) {
+		LOG(("API Error: Unexpected auth.sentCodePaymentRequired "
+			"(CodeWidget::noTelegramCodeDone)."));
 	});
 }
 
