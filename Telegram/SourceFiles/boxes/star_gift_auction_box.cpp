@@ -497,7 +497,7 @@ void AddBidPlaces(
 			if (i->amount < chosen
 				|| (!setting
 					&& i->amount == chosen
-					&& i->date > value.my.date)) {
+					&& i->date >= value.my.date)) {
 				top.push_back({ show->session().user(), chosen });
 				for (auto j = i; j != e; ++j) {
 					if (!pushTop(j)) {

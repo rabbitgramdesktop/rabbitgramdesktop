@@ -288,9 +288,8 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 					Fn<void()> callback;
 					base::has_weak_ptr guard;
 				};
-				const auto button = state->auctionsLifetime.make_state<
-					Button
-				>();
+				auto &lifetime = state->auctionsLifetime;
+				const auto button = lifetime.template make_state<Button>();
 				const auto window = FindSessionController(parent);
 				auctions->active(
 				) | rpl::start_with_next([=](ActiveAuctions &&active) {
