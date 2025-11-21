@@ -9,6 +9,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "base/flat_set.h"
 
+class QDebug;
+
 namespace MTP {
 
 class Error {
@@ -68,5 +70,7 @@ struct ResponseHandler {
 	DoneHandler done;
 	FailHandler fail;
 };
+
+[[nodiscard]] QDebug operator<<(QDebug debug, const Error &error);
 
 } // namespace MTP

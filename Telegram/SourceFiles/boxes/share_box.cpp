@@ -586,7 +586,7 @@ void ShareBox::showMenu(not_null<Ui::RpWidget*> parent) {
 		uiShow()->showBox(
 			HistoryView::PrepareScheduleBox(
 				this,
-				nullptr, // ChatHelpers::Show for effect attachment.
+				_descriptor.session,
 				sendMenuDetails(),
 				[=](Api::SendOptions options) { submit(options); },
 				action.options,
@@ -1707,6 +1707,9 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		const auto commonSendFlags = Flag(0)
 			| Flag::f_with_my_score
 			| (options.scheduled ? Flag::f_schedule_date : Flag(0))
+			| ((options.scheduled && options.scheduleRepeatPeriod)
+				? Flag::f_schedule_repeat_period
+				: Flag(0))
 			| ((forwardOptions != Data::ForwardOptions::PreserveInfo)
 				? Flag::f_drop_author
 				: Flag(0))
@@ -1733,6 +1736,9 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		const auto donePhraseArgs = CreateForwardedMessagePhraseArgs(
 			result,
 			msgIds);
+		const auto showRecentForwardsToSelf = result.size() == 1
+			&& result.front()->peer()->isSelf()
+			&& history->owner().session().premium();
 		const auto requestType = Data::Histories::RequestType::Send;
 		for (const auto thread : result) {
 			if (!comment.text.isEmpty()) {
@@ -1783,6 +1789,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 							? MTP_inputReplyToMonoForum(sublistPeer->input)
 							: MTPInputReplyTo()),
 						MTP_int(options.scheduled),
+						MTP_int(options.scheduleRepeatPeriod),
 						MTP_inputPeerEmpty(), // send_as
 						Data::ShortcutIdToMTP(session, options.shortcutId),
 						MTP_int(videoTimestamp.value_or(0)),
@@ -1790,13 +1797,22 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 						Api::SuggestToMTP(options.suggest)
 				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
 					threadHistory->session().api().applyUpdates(updates);
+					if (showRecentForwardsToSelf) {
+						ApiWrap::ProcessRecentSelfForwards(
+							&threadHistory->session(),
+							updates,
+							peer->id,
+							history->peer->id);
+					}
 					state->requests.remove(reqId);
 					if (state->requests.empty()) {
 						if (show->valid()) {
 							auto phrase = rpl::variable<TextWithEntities>(
 								ChatHelpers::ForwardedMessagePhrase(
 									donePhraseArgs)).current();
-							show->showToast(std::move(phrase));
+							if (!phrase.empty()) {
+								show->showToast(std::move(phrase));
+							}
 							show->hideLayer();
 						}
 					}
@@ -1954,7 +1970,9 @@ void FastShareMessageToSelf(
 			auto phrase = rpl::variable<TextWithEntities>(
 				ChatHelpers::ForwardedMessagePhrase(
 					donePhraseArgs)).current();
-			show->showToast(std::move(phrase));
+			if (!phrase.empty()) {
+				show->showToast(std::move(phrase));
+			}
 		});
 }
 

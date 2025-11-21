@@ -134,11 +134,12 @@ struct GiveawayResults {
 };
 
 enum class GiftType : uchar {
-	Premium, // count - months
+	Premium, // count - days
 	Credits, // count - credits
 	Ton, // count - nano tons
 	StarGift, // count - stars
 	ChatTheme,
+	BirthdaySuggest,
 };
 
 struct GiftCode {
@@ -148,6 +149,7 @@ struct GiftCode {
 	PeerData *stargiftReleasedBy = nullptr;
 	std::shared_ptr<UniqueGift> unique;
 	TextWithEntities message;
+	PeerData *auctionTo = nullptr;
 	ChannelData *channel = nullptr;
 	PeerData *channelFrom = nullptr;
 	uint64 channelSavedId = 0;
@@ -157,6 +159,8 @@ struct GiftCode {
 	int starsConverted = 0;
 	int starsToUpgrade = 0;
 	int starsUpgradedBySender = 0;
+	int starsForDetailsRemove = 0;
+	int starsBid = 0;
 	int limitedCount = 0;
 	int limitedLeft = 0;
 	int64 count = 0;
@@ -164,6 +168,7 @@ struct GiftCode {
 	bool viaGiveaway : 1 = false;
 	bool transferred : 1 = false;
 	bool upgradeSeparate : 1 = false;
+	bool upgradeGifted : 1 = false;
 	bool upgradable : 1 = false;
 	bool unclaimed : 1 = false;
 	bool anonymous : 1 = false;
@@ -206,6 +211,7 @@ public:
 	virtual bool paperForBoth() const;
 	virtual FullStoryId storyId() const;
 	virtual bool storyExpired(bool revalidate = false);
+	virtual bool storyUnsupported() const;
 	virtual bool storyMention() const;
 	virtual const GiveawayStart *giveawayStart() const;
 	virtual const GiveawayResults *giveawayResults() const;
@@ -753,6 +759,7 @@ public:
 
 	FullStoryId storyId() const override;
 	bool storyExpired(bool revalidate = false) override;
+	bool storyUnsupported() const override;
 	bool storyMention() const override;
 
 	TextWithEntities notificationText() const override;
@@ -774,6 +781,7 @@ private:
 	const FullStoryId _storyId;
 	const bool _mention = false;
 	bool _viewMayExist = false;
+	bool _unsupported = false;
 	bool _expired = false;
 
 };

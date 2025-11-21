@@ -671,7 +671,7 @@ int UnwrappedMedia::additionalWidth(
 		accumulate_max(result, 2 * st::msgReplyPadding.left() + via->maxWidth + st::msgReplyPadding.right());
 	}
 	if (reply) {
-		accumulate_max(result, reply->maxWidth());
+		accumulate_max(result, st::msgReplyPadding.left() + reply->maxWidth());
 	}
 	return result;
 }

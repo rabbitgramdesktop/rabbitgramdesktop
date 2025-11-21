@@ -11,16 +11,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_credits.h"
 #include "api/api_cloud_password.h"
 #include "base/unixtime.h"
+#include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
+#include "boxes/peers/replace_boost_box.h"
+#include "boxes/gift_premium_box.h"
 #include "boxes/passcode_box.h"
+#include "boxes/peer_list_box.h"
+#include "boxes/peer_list_controllers.h"
+#include "boxes/star_gift_box.h"
+#include "boxes/star_gift_resale_box.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_session.h"
 #include "data/data_star_gift.h"
 #include "data/data_thread.h"
 #include "data/data_user.h"
-#include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
-#include "boxes/peer_list_box.h"
-#include "boxes/peer_list_controllers.h"
-#include "boxes/star_gift_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
@@ -38,6 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h" // peerListSingleRow.
 #include "styles/style_credits.h" // starIconEmoji.
 #include "styles/style_dialogs.h" // recentPeersSpecialName.
+#include "styles/style_info.h" // defaultSubTabs.
 #include "styles/style_layers.h" // boxLabel.
 
 namespace {
@@ -140,6 +144,8 @@ void ExportOnBlockchain(
 		) | rpl::take(
 			1
 		) | rpl::start_with_next([=](const Core::CloudPasswordState &pass) {
+			state->lifetime.destroy();
+
 			auto fields = PasscodeBox::CloudFields::From(pass);
 			fields.customTitle = tr::lng_gift_transfer_password_title();
 			fields.customDescription
@@ -578,17 +584,16 @@ void ShowTransferToBox(
 		Fn<void()> closeParentBox) {
 	const auto stars = gift->starsForTransfer;
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(tr::lng_gift_transfer_title(
-			lt_name,
-			rpl::single(UniqueGiftName(*gift))));
-
 		auto transfer = (stars > 0)
 			? tr::lng_gift_transfer_button_for(
 				lt_price,
-				tr::lng_action_gift_for_stars(
-					lt_count,
-					rpl::single(stars * 1.)))
-			: tr::lng_gift_transfer_button();
+				rpl::single(Ui::Text::IconEmoji(
+					&st::starIconEmoji
+				).append(Lang::FormatCreditsAmountDecimal(
+					CreditsAmount(stars)
+				))),
+				Ui::Text::WithEntities)
+			: tr::lng_gift_transfer_button(Ui::Text::WithEntities);
 
 		struct State {
 			bool sent = false;
@@ -621,6 +626,10 @@ void ShowTransferToBox(
 			TransferGift(controller, peer, gift, savedId, done);
 		};
 
+		box->addRow(
+			CreateGiftTransfer(box->verticalLayout(), gift, peer),
+			QMargins(0, st::boxPadding.top(), 0, 0));
+
 		Ui::ConfirmBox(box, {
 			.text = (stars > 0)
 				? tr::lng_gift_transfer_sure_for(
@@ -643,6 +652,9 @@ void ShowTransferToBox(
 			.confirmed = std::move(callback),
 			.confirmText = std::move(transfer),
 		});
+
+		const auto show = controller->uiShow();
+		AddTransferGiftTable(show, box->verticalLayout(), gift);
 	}));
 }
 
@@ -781,7 +793,7 @@ void ShowBuyResaleGiftBox(
 		std::shared_ptr<Data::UniqueGift> gift,
 		bool forceTon,
 		not_null<PeerData*> to,
-		Fn<void()> closeParentBox) {
+		Fn<void(bool ok)> closeParentBox) {
 	show->show(Box([=](not_null<Ui::GenericBox*> box) {
 		struct State {
 			rpl::variable<bool> ton;
@@ -802,6 +814,7 @@ void ShowBuyResaleGiftBox(
 			const auto tabs = box->addRow(
 				object_ptr<Ui::SubTabs>(
 					box,
+					st::defaultSubTabs,
 					Ui::SubTabsOptions{
 						.selected = (state->ton.current()
 							? u"ton"_q
@@ -846,12 +859,12 @@ void ShowBuyResaleGiftBox(
 			const auto weak = base::make_weak(box);
 			const auto done = [=](Payments::CheckoutResult result) {
 				if (result == Payments::CheckoutResult::Cancelled) {
-					closeParentBox();
+					closeParentBox(false);
 					close();
 				} else if (result != Payments::CheckoutResult::Paid) {
 					state->sent = false;
 				} else {
-					closeParentBox();
+					closeParentBox(true);
 					close();
 				}
 			};
@@ -936,4 +949,20 @@ bool ShowTransferGiftLater(
 			: tr::lng_minutes(tr::now, lt_count, minutes)) },
 	});
 	return true;
+}
+
+void ShowActionLocked(
+		std::shared_ptr<ChatHelpers::Show> show,
+		const QString &slug) {
+	const auto open = [=] {
+		UrlClickHandler::Open(u"https://fragment.com/gift/"_q
+			+ slug
+			+ u"?collection=my"_q);
+	};
+	show->show(Ui::MakeConfirmBox({
+		.text = tr::lng_gift_transfer_locked_text(),
+		.confirmed = [=](Fn<void()> close) { open(); close(); },
+		.confirmText = tr::lng_gift_transfer_confirm_button(),
+		.title = tr::lng_gift_transfer_locked_title(),
+	}));
 }

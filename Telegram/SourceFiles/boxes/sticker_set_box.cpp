@@ -649,7 +649,9 @@ void ChangeSetNameBox(
 	field->selectAll();
 	constexpr auto kMaxSetNameLength = 50;
 	field->setMaxLength(kMaxSetNameLength);
-	Ui::AddLengthLimitLabel(field, kMaxSetNameLength, kMaxSetNameLength + 1);
+	Ui::AddLengthLimitLabel(field, kMaxSetNameLength, {
+		.customThreshold = kMaxSetNameLength + 1,
+	});
 	box->setFocusCallback([=] { field->setFocusFast(); });
 	const auto close = crl::guard(box, [=] { box->closeBox(); });
 	const auto save = [=, show = box->uiShow()] {
@@ -748,7 +750,7 @@ void StickerSetBox::updateButtons() {
 						_inner->setReorderState(true);
 						updateButtons();
 					},
-					&st::menuIconManage);
+					&st::menuIconReorder);
 			});
 		}();
 		if (_inner->notInstalled()) {
