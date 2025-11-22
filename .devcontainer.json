@@ -25,6 +25,6 @@
     "securityOpt": [
         "seccomp=unconfined"
     ],
-    "workspaceMount": "source=${localWorkspaceFolder},target=/usr/src/tdesktop,type=bind,consistency=cached",
-    "workspaceFolder": "/usr/src/tdesktop"
+    "workspaceMount": "source=${localWorkspaceFolder},target=/usr/src/rtgdesktopdev,type=bind,consistency=cached",
+    "workspaceFolder": "/usr/src/rtgdesktopdev"
 }
