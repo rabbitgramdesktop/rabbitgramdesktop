@@ -8,11 +8,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_session_controller.h"
 
 #include "api/api_text_entities.h"
-#include "boxes/add_contact_box.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
 #include "boxes/peers/replace_boost_box.h"
+#include "boxes/add_contact_box.h"
 #include "boxes/delete_messages_box.h"
+#include "boxes/star_gift_auction_box.h"
 #include "window/window_chat_preview.h"
 #include "window/window_chat_switch_process.h"
 #include "window/window_controller.h"
@@ -435,6 +436,7 @@ void SessionNavigation::fullInfoLoadedHook(not_null<PeerData*> peer) {
 	if (!_waitingDirectChannel || _waitingDirectChannel != peer) {
 		return;
 	}
+	_waitingDirectChannel = nullptr;
 	const auto monoforum = peer->broadcastMonoforum();
 	const auto open = monoforum ? monoforum : peer.get();
 	showPeerHistory(open, SectionShow::Way::Forward, ShowAtUnreadMsgId);
@@ -622,7 +624,7 @@ void SessionNavigation::showPeerByLinkResolved(
 			if (controller->windowId().hasChatsList()
 				&& !controller->adaptive().isOneColumn()
 				&& controller->shownForum().current() != forum
-				&& !forum->channel()->useSubsectionTabs()) {
+				&& !forum->peer()->useSubsectionTabs()) {
 				controller->showForum(forum);
 			}
 		}
@@ -660,19 +662,18 @@ void SessionNavigation::showPeerByLinkResolved(
 				info.messageId,
 				callback);
 		}
-	} else if (info.storyId) {
-		const auto storyId = FullStoryId{ peer->id, info.storyId };
+	} else if (info.storyParam == u"live"_q) {
+		parentController()->openPeerStories(peer->id, std::nullopt, true);
+	} else if (const auto storyId = info.storyParam.toInt()) {
+		const auto id = FullStoryId{ peer->id, storyId };
 		const auto context = (info.storyAlbumId > 0)
 			? Data::StoriesContext{ Data::StoriesContextAlbum{
 				info.storyAlbumId,
 			} }
 			: Data::StoriesContext{ Data::StoriesContextSingle() };
-		peer->owner().stories().resolve(storyId, crl::guard(this, [=] {
-			if (peer->owner().stories().lookup(storyId)) {
-				parentController()->openPeerStory(
-					peer,
-					storyId.story,
-					context);
+		peer->owner().stories().resolve(id, crl::guard(this, [=] {
+			if (peer->owner().stories().lookup(id)) {
+				parentController()->openPeerStory(peer, id.story, context);
 			} else {
 				showToast(tr::lng_stories_link_invalid(tr::now));
 			}
@@ -740,7 +741,7 @@ void SessionNavigation::showPeerByLinkResolved(
 		peer->updateFull();
 	} else if (const auto monoforum = peer->broadcastMonoforum()
 		; monoforum && resolveType == ResolveType::ChannelDirect) {
-		showPeerHistory(peer, params, ShowAtUnreadMsgId);
+		showPeerHistory(monoforum, params, ShowAtUnreadMsgId);
 	} else {
 		// Show specific posts only in channels / supergroups.
 		const auto msgId = peer->isChannel()
@@ -980,6 +981,13 @@ void SessionNavigation::resolveConferenceCall(
 				if (call->fullCount() >= conferenceLimit) {
 					showToast(tr::lng_confcall_participants_limit(tr::now));
 				} else {
+					//parentController()->window().openInMediaView(
+					//	Media::View::OpenRequest(
+					//		parentController(),
+					//		call,
+					//		slug,
+					//		inviteMsgId));
+					//AssertIsDebug();
 					Core::App().calls().startOrJoinConferenceCall({
 						.call = call,
 						.linkSlug = slug,
@@ -1573,6 +1581,9 @@ SessionController::SessionController(
 			}
 		}
 		if (update.flags & Data::PeerUpdate::Flag::FullInfo) {
+			if (update.peer->isSelf()) {
+				Support::Helper::CheckIfLost(this);
+			}
 			fullInfoLoadedHook(update.peer);
 		}
 		return (update.flags & Data::PeerUpdate::Flag::FullInfo)
@@ -1987,11 +1998,11 @@ void SessionController::showForum(
 	const auto forced = params.forceTopicsList;
 	if (showForumInDifferentWindow(forum, params)) {
 		return;
-	} else if (!forced && forum->channel()->useSubsectionTabs()) {
+	} else if (!forced && forum->peer()->useSubsectionTabs()) {
 		if (const auto active = forum->activeSubsectionThread()) {
 			showThread(active, ShowAtUnreadMsgId, params);
 		} else {
-			showPeerHistory(forum->channel(), params);
+			showPeerHistory(forum->peer(), params);
 		}
 		return;
 	}
@@ -2034,14 +2045,16 @@ void SessionController::showForum(
 	}, _shownForumLifetime);
 	if (!forced) {
 		using FlagChange = Data::Flags<ChannelDataFlags>::Change;
-		forum->channel()->flagsValue(
-		) | rpl::start_with_next([=](FlagChange change) {
-			if (change.diff & ChannelDataFlag::ForumTabs) {
-				if (HistoryView::SubsectionTabs::UsedFor(history)) {
-					closeAndShowHistory(true);
+		if (const auto channel = forum->channel()) {
+			channel->flagsValue(
+			) | rpl::start_with_next([=](FlagChange change) {
+				if (change.diff & ChannelDataFlag::ForumTabs) {
+					if (HistoryView::SubsectionTabs::UsedFor(history)) {
+						closeAndShowHistory(true);
+					}
 				}
-			}
-		}, _shownForumLifetime);
+			}, _shownForumLifetime);
+		}
 	}
 }
 
@@ -3501,7 +3514,9 @@ void SessionController::openPeerStory(
 
 void SessionController::openPeerStories(
 		PeerId peerId,
-		std::optional<Data::StorySourcesList> list) {
+		std::optional<Data::StorySourcesList> list,
+		bool onlyLive,
+		bool afterReload) {
 	using namespace Media::View;
 	using namespace Data;
 
@@ -3509,16 +3524,26 @@ void SessionController::openPeerStories(
 	auto &stories = session().data().stories();
 	if (const auto source = stories.source(peerId)) {
 		if (const auto idDates = source->toOpen()) {
+			if (onlyLive && !idDates.videoStream) {
+				showToast(tr::lng_stories_live_finished(tr::now));
+				return;
+			}
 			openPeerStory(
 				source->peer,
 				idDates.id,
 				(list
 					? StoriesContext{ *list }
 					: StoriesContext{ StoriesContextPeer() }));
+		} else if (onlyLive) {
+			showToast(tr::lng_stories_live_finished(tr::now));
+		}
+	} else if (afterReload) {
+		if (onlyLive) {
+			showToast(tr::lng_stories_live_finished(tr::now));
 		}
 	} else if (const auto peer = session().data().peerLoaded(peerId)) {
 		const auto done = crl::guard(&_storyOpenGuard, [=] {
-			openPeerStories(peerId, list);
+			openPeerStories(peerId, list, onlyLive, true);
 		});
 		stories.requestPeerStories(peer, done);
 	}
@@ -3613,6 +3638,16 @@ auto SessionController::restoreSubsectionTabsFor(
 void SessionController::dropSubsectionTabs() {
 	_savedSubsectionTabsLifetime.destroy();
 	base::take(_savedSubsectionTabs);
+}
+
+void SessionController::showStarGiftAuction(const QString &slug) {
+	_starGiftAuctionLifetime.destroy();
+	_starGiftAuctionLifetime = Ui::ShowStarGiftAuction(
+		this,
+		nullptr,
+		slug,
+		[] {},
+		[=] { _starGiftAuctionLifetime.destroy(); });
 }
 
 SessionController::~SessionController() {

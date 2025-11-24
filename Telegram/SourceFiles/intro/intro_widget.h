@@ -120,6 +120,7 @@ protected:
 	void keyPressEvent(QKeyEvent *e) override;
 
 private:
+	void setupStep();
 	void refreshLang();
 	void showFinished();
 	void createLanguageLink();
@@ -201,6 +202,7 @@ private:
 	object_ptr<Ui::FadeWrap<Ui::IconButton>> _back;
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _update = { nullptr };
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _settings;
+	object_ptr<Ui::FadeWrap<Ui::FlatLabel>> _testModeLabel = { nullptr };
 
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _next;
 	object_ptr<Ui::FadeWrap<Ui::LinkButton>> _changeLanguage = { nullptr };

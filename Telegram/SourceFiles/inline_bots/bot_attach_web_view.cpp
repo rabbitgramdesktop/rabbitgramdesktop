@@ -84,7 +84,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_channel_earn.h"
 #include "styles/style_chat.h"
-#include "styles/style_info.h" // infoVerifiedCheck.
+#include "styles/style_info.h" // infoVerifiedStar.
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_window.h"
@@ -414,7 +414,7 @@ void FillBotUsepic(
 		title,
 		rpl::single(bot->name()),
 		box->getDelegate()->style().title);
-	const auto icon = bot->isVerified() ? &st::infoVerifiedCheck : nullptr;
+	const auto icon = bot->isVerified() ? &st::infoVerifiedStar : nullptr;
 	title->resize(
 		titleLabel->width() + (icon ? icon->width() : 0),
 		titleLabel->height());
@@ -1352,9 +1352,11 @@ void WebViewInstance::show(ShowArgs &&args) {
 		const auto raw = titleBadge.data();
 		raw->paintRequest() | rpl::start_with_next([=] {
 			auto p = Painter(raw);
-			st::infoVerifiedCheck.paint(p, st::lineWidth, 0, raw->width());
+			const auto w = raw->width();
+			st::infoVerifiedStar.paint(p, st::lineWidth, 0, w);
+			st::infoPeerBadge.verifiedCheck.paint(p, st::lineWidth, 0, w);
 		}, raw->lifetime());
-		raw->resize(st::infoVerifiedCheck.size() + QSize(0, st::lineWidth));
+		raw->resize(st::infoVerifiedStar.size() + QSize(0, st::lineWidth));
 	}
 
 	const auto &bots = _session->attachWebView().attachBots();
@@ -1409,7 +1411,7 @@ void WebViewInstance::showGame() {
 	Expects(v::is<WebViewSourceGame>(_source));
 
 	if (!_bot->isFullLoaded()) {
-		_botFullWaitingArgs.emplace();
+		_botFullWaitingArgs = ShowArgs{};
 		return;
 	}
 	const auto game = v::get<WebViewSourceGame>(_source);

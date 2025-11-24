@@ -18,6 +18,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/gift_premium_box.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
+#include "boxes/star_gift_resale_box.h"
 #include "boxes/transfer_gift_box.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -26,6 +27,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/click_handler_types.h" // UrlClickHandler
 #include "core/ui_integration.h"
 #include "data/components/credits.h"
+#include "data/components/recent_shared_media_gifts.h"
 #include "data/data_boosts.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
@@ -212,69 +214,6 @@ void ToggleStarGiftSaved(
 		if (const auto onstack = done) {
 			onstack(false);
 		}
-		show->showToast(error.type());
-	}).send();
-}
-
-void ToggleStarGiftPinned(
-		std::shared_ptr<ChatHelpers::Show> show,
-		Data::SavedStarGiftId savedId,
-		std::vector<Data::SavedStarGiftId> already,
-		bool pinned,
-		std::shared_ptr<Data::UniqueGift> uniqueData = nullptr,
-		std::shared_ptr<Data::UniqueGift> replacingData = nullptr) {
-	already.erase(ranges::remove(already, savedId), end(already));
-	if (pinned) {
-		already.insert(begin(already), savedId);
-		const auto limit = show->session().appConfig().pinnedGiftsLimit();
-		if (already.size() > limit) {
-			already.erase(begin(already) + limit, end(already));
-		}
-	}
-
-	auto inputs = QVector<MTPInputSavedStarGift>();
-	inputs.reserve(already.size());
-	for (const auto &id : already) {
-		inputs.push_back(Api::InputSavedStarGiftId(id));
-	}
-
-	const auto api = &show->session().api();
-	const auto peer = savedId.chat()
-		? savedId.chat()
-		: show->session().user();
-	api->request(MTPpayments_ToggleStarGiftsPinnedToTop(
-		peer->input,
-		MTP_vector<MTPInputSavedStarGift>(std::move(inputs))
-	)).done([=] {
-		using GiftAction = Data::GiftUpdate::Action;
-		show->session().data().notifyGiftUpdate({
-			.id = savedId,
-			.action = (pinned ? GiftAction::Pin : GiftAction::Unpin),
-		});
-
-		if (pinned) {
-			show->showToast({
-				.title = (uniqueData
-					? tr::lng_gift_pinned_done_title(
-						tr::now,
-						lt_gift,
-						Data::UniqueGiftName(*uniqueData))
-					: QString()),
-				.text = (replacingData
-					? tr::lng_gift_pinned_done_replaced(
-						tr::now,
-						lt_gift,
-						TextWithEntities{
-							Data::UniqueGiftName(*replacingData),
-						},
-						Ui::Text::WithEntities)
-					: tr::lng_gift_pinned_done(
-						tr::now,
-						Ui::Text::WithEntities)),
-				.duration = Ui::Toast::kDefaultDuration * 2,
-			});
-		}
-	}).fail([=](const MTP::Error &error) {
 		show->showToast(error.type());
 	}).send();
 }
@@ -516,7 +455,8 @@ void FillCreditOptions(
 		Fn<void()> paid,
 		rpl::producer<> showFinishes,
 		rpl::producer<QString> subtitle,
-		std::vector<Data::CreditTopupOption> preloadedTopupOptions) {
+		std::vector<Data::CreditTopupOption> preloadedTopupOptions,
+		bool dark) {
 	const auto options = container->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			container,
@@ -553,9 +493,15 @@ void FillCreditOptions(
 	const auto fillLoading = [=] {
 		Ui::AddSkip(content, st::settingsPremiumOptionsPadding.top());
 		if (subtitle) {
-			Ui::AddSubsectionTitle(content, std::move(subtitle));
+			Ui::AddSubsectionTitle(
+				content,
+				std::move(subtitle),
+				{},
+				dark ? &st::groupCallSubsectionTitle : nullptr);
 		}
-		const auto &st = st::creditsTopupButton;
+		const auto &st = dark
+			? st::videoStreamTopupButton
+			: st::creditsTopupButton;
 		const auto loadingList = content;
 		const auto isRtl = QLocale().textDirection() == Qt::RightToLeft;
 		using WidgetPtr = object_ptr<Ui::RpWidget>;
@@ -595,7 +541,11 @@ void FillCreditOptions(
 		}
 		Ui::AddSkip(content, st::settingsPremiumOptionsPadding.top());
 		if (subtitle) {
-			Ui::AddSubsectionTitle(content, std::move(subtitle));
+			Ui::AddSubsectionTitle(
+				content,
+				std::move(subtitle),
+				{},
+				dark ? &st::groupCallSubsectionTitle : nullptr);
 		}
 
 		const auto buttons = content->add(
@@ -607,14 +557,18 @@ void FillCreditOptions(
 				object_ptr<Ui::SettingsButton>(
 					content,
 					tr::lng_credits_more_options(),
-					st::statisticsShowMoreButton)));
+					(dark
+						? st::videoStreamShowMoreButton
+						: st::statisticsShowMoreButton))));
 		const auto showMore = showMoreWrap->entity();
 		showMore->setClickedCallback([=] {
 			showMoreWrap->toggle(false, anim::type::instant);
 		});
 		Ui::AddToggleUpDownArrowToMoreButton(showMore);
 
-		const auto &st = st::creditsTopupButton;
+		const auto &st = dark
+			? st::videoStreamTopupButton
+			: st::creditsTopupButton;
 		const auto diffBetweenTextAndStar = st.padding.left()
 			- st.iconLeft
 			- int(singleStarWidth * 1.5);
@@ -655,7 +609,7 @@ void FillCreditOptions(
 			const auto price = Ui::CreateChild<Ui::FlatLabel>(
 				button,
 				Ui::FillAmountAndCurrency(option.amount, option.currency),
-				st::creditsTopupPrice);
+				dark ? st::videoStreamTopupPrice : st::creditsTopupPrice);
 			const auto inner = Ui::CreateChild<Ui::RpWidget>(button);
 			const auto getStars = [=] {
 				const auto starIndex = i + 1;
@@ -727,7 +681,11 @@ void FillCreditOptions(
 				}),
 				Ui::Text::RichLangValue);
 			Ui::AddSkip(content);
-			Ui::AddDividerText(content, std::move(text));
+			Ui::AddDividerText(
+				content,
+				std::move(text),
+				st::defaultBoxDividerLabelPadding,
+				dark ? st::groupCallDividerLabel : st::defaultDividerLabel);
 		}
 
 		content->resizeToWidth(container->width());
@@ -769,7 +727,8 @@ not_null<Ui::RpWidget*> AddBalanceWidget(
 		not_null<Main::Session*> session,
 		rpl::producer<CreditsAmount> balanceValue,
 		bool rightAlign,
-		rpl::producer<float64> opacityValue) {
+		rpl::producer<float64> opacityValue,
+		bool dark) {
 	struct State final {
 		float64 opacity = 1.0;
 		Ui::Text::String label;
@@ -822,7 +781,7 @@ not_null<Ui::RpWidget*> AddBalanceWidget(
 		auto p = QPainter(balance);
 
 		p.setOpacity(state->opacity);
-		p.setPen(st::boxTextFg);
+		p.setPen(dark ? st::groupCallMembersFg : st::boxTextFg);
 
 		state->label.draw(p, {
 			.position = QPoint(
@@ -968,11 +927,29 @@ void ProcessReceivedSubscriptions(
 	}
 }
 
+[[nodiscard]] bool ShowResellButton(
+		not_null<Main::Session*> session,
+		const Data::CreditsHistoryEntry &e) {
+	const auto unique = e.uniqueGift.get();
+	const auto host = (unique && unique->hostId)
+		? session->data().peer(unique->hostId).get()
+		: (unique && unique->ownerId)
+		? session->data().peer(unique->ownerId).get()
+		: nullptr;
+	return !host
+		? false
+		: host->isSelf()
+		? e.in
+		: false;
+	// Currently we're not reselling channel gifts.
+	// (host->isChannel() && host->asChannel()->canTransferGifts());
+}
+
 [[nodiscard]] bool CanResellGift(
 		not_null<Main::Session*> session,
 		const Data::CreditsHistoryEntry &e) {
 	const auto unique = e.uniqueGift.get();
-	const auto owner = unique
+	const auto owner = (unique && unique->ownerId)
 		? session->data().peer(unique->ownerId).get()
 		: nullptr;
 	return !owner
@@ -1017,7 +994,12 @@ void FillUniqueGiftMenu(
 		};
 		if (e.giftPinned) {
 			menu->addAction(tr::lng_context_unpin_from_top(tr::now), [=] {
-				ToggleStarGiftPinned(show, savedId, ids(pinned()), false);
+				session->recentSharedGifts().togglePinned(
+					show,
+					giftChannel ? giftChannel : session->user(),
+					savedId,
+					false,
+					unique);
 			}, st.unpin ? st.unpin : &st::menuIconUnpin);
 		} else {
 			menu->addAction(tr::lng_context_pin_to_top(tr::now), [=] {
@@ -1043,19 +1025,19 @@ void FillUniqueGiftMenu(
 							.action = GiftAction::Unpin,
 						});
 
-						ToggleStarGiftPinned(
+						session->recentSharedGifts().togglePinned(
 							show,
+							giftChannel ? giftChannel : session->user(),
 							savedId,
-							already,
 							true,
 							unique,
 							replaced);
 					});
 				} else {
-					ToggleStarGiftPinned(
+					session->recentSharedGifts().togglePinned(
 						show,
+						giftChannel ? giftChannel : session->user(),
 						savedId,
-						already,
 						true,
 						unique);
 				}
@@ -1101,45 +1083,60 @@ void FillUniqueGiftMenu(
 			}
 		}, st.theme ? st.theme : &st::menuIconChangeColors);
 	}
+	const auto owner = unique->ownerId
+		? show->session().data().peer(unique->ownerId).get()
+		: (PeerData*)nullptr;
+	const auto host = unique->hostId
+		? show->session().data().peer(unique->hostId).get()
+		: owner;
+	if (!host) {
+		return;
+	}
 	const auto transfer = savedId
 		&& (savedId.isUser() ? e.in : savedId.chat()->canTransferGifts())
 		&& (unique->starsForTransfer >= 0);
 	if (transfer) {
 		menu->addAction(tr::lng_gift_transfer_button(tr::now), [=] {
-			if (const auto window = show->resolveWindow()) {
+			if (!owner) {
+				ShowActionLocked(show, unique->slug);
+			} else if (const auto window = show->resolveWindow()) {
 				ShowTransferGiftBox(window, unique, savedId);
 			}
 		}, st.transfer ? st.transfer : &st::menuIconReplace);
 	}
-	const auto owner = show->session().data().peer(unique->ownerId);
-	const auto wear = owner->isSelf()
+	const auto wear = host->isSelf()
 		? e.in
-		: (owner->isChannel() && owner->asChannel()->canEditEmoji());
+		: (host->isChannel() && host->asChannel()->canEditEmoji());
 	if (wear) {
 		const auto name = UniqueGiftName(*unique);
-		const auto now = owner->emojiStatusId().collectible;
+		const auto now = host->emojiStatusId().collectible;
 		if (now && unique->slug == now->slug) {
 			menu->addAction(tr::lng_gift_transfer_take_off(tr::now), [=] {
-				show->session().data().emojiStatuses().set(owner, {});
+				show->session().data().emojiStatuses().set(host, {});
 			}, st.takeoff ? st.takeoff : &st::menuIconNftTakeOff);
 		} else {
 			menu->addAction(tr::lng_gift_transfer_wear(tr::now), [=] {
-				ShowUniqueGiftWearBox(show, owner, *unique, st.giftWearBox
+				ShowUniqueGiftWearBox(show, host, *unique, st.giftWearBox
 					? *st.giftWearBox
 					: GiftWearBoxStyleOverride());
 			}, st.wear ? st.wear : &st::menuIconNftWear);
 		}
 	}
-	if (CanResellGift(&show->session(), e)) {
+	if (ShowResellButton(&show->session(), e)) {
+		const auto can = CanResellGift(&show->session(), e);
 		const auto inResale = (unique->starsForResale > 0);
 		const auto editPrice = (inResale
 			? tr::lng_gift_transfer_update
 			: tr::lng_gift_transfer_sell)(tr::now);
 		menu->addAction(editPrice, [=] {
-			const auto style = st.giftWearBox
-				? *st.giftWearBox
-				: GiftWearBoxStyleOverride();
-			ShowUniqueGiftSellBox(show, unique, savedId, style);
+			if (!can) {
+				ShowActionLocked(show, unique->slug);
+			} else {
+				const auto style = st.giftWearBox
+					? *st.giftWearBox
+					: GiftWearBoxStyleOverride();
+				ShowUniqueGiftSellBox(show, unique, savedId, style);
+			}
 		}, st.resell ? st.resell : &st::menuIconTagSell);
 		if (inResale) {
 			menu->addAction(tr::lng_gift_transfer_unlist(tr::now), [=] {
@@ -1807,6 +1804,40 @@ void GenericCreditsEntryBox(
 	}
 
 	Ui::AddSkip(content);
+
+	const auto addGiftLinkTON = [&] {
+		if (!uniqueGift) {
+			return;
+		}
+		const auto address = !uniqueGift->giftAddress.isEmpty()
+			? uniqueGift->giftAddress
+			: uniqueGift->ownerAddress;
+		if (address.isEmpty()) {
+			return;
+		}
+		const auto label = box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				box,
+				tr::lng_gift_in_blockchain(
+					lt_link,
+					tr::lng_gift_in_blockchain_link_arrow(
+						lt_arrow,
+						rpl::single(arrow),
+						Ui::Text::WithEntities
+					) | Ui::Text::ToLink(),
+					Ui::Text::WithEntities),
+				st::creditsBoxAboutDivider),
+			style::al_top);
+		label->setClickHandlerFilter([=](const auto &...) {
+			UrlClickHandler::Open(TonAddressUrl(session, address));
+			return false;
+		});
+	};
+
+	if (starGiftCanManage) {
+		addGiftLinkTON();
+	}
+
 	Ui::AddSkip(content);
 
 	struct State final {
@@ -1848,6 +1879,8 @@ void GenericCreditsEntryBox(
 	const auto canGiftUpgrade = !e.uniqueGift
 		&& !e.in
 		&& !e.giftPrepayUpgradeHash.isEmpty();
+	const auto canRemoveDetails = e.uniqueGift
+		&& (e.starsForDetailsRemove > 0);
 	const auto upgradeGuard = std::make_shared<bool>();
 	const auto upgrade = [=] {
 		const auto window = show->resolveWindow();
@@ -1878,6 +1911,31 @@ void GenericCreditsEntryBox(
 					&& !e.giftUpgradeSeparate
 					&& !e.anonymous)),
 		});
+	};
+	const auto removeDetails = [=](Fn<void()> removed) {
+		const auto session = &show->session();
+		const auto unique = e.uniqueGift;
+		const auto savedId = EntryToSavedStarGiftId(session, e);
+		auto done = [=](
+				Payments::CheckoutResult result,
+				const MTPUpdates *updates) {
+			if (result == Payments::CheckoutResult::Paid) {
+				removed();
+
+				const auto name = Data::UniqueGiftName(*unique);
+				show->showToast(tr::lng_gift_unique_info_removed(
+					tr::now,
+					lt_name,
+					Ui::Text::Bold(name),
+					Ui::Text::WithEntities));
+				unique->originalDetails = Data::UniqueGiftOriginalDetails();
+			}
+		};
+		RequestStarsFormAndSubmit(
+			show,
+			MTP_inputInvoiceStarGiftDropOriginalDetails(
+				Api::InputSavedStarGiftId(savedId, e.uniqueGift)),
+			std::move(done));
 	};
 
 	if (isStarGift && e.id.isEmpty()) {
@@ -1933,7 +1991,8 @@ void GenericCreditsEntryBox(
 			st,
 			e,
 			canConvert ? convert : Fn<void()>(),
-			canUpgrade ? upgrade : Fn<void()>());
+			canUpgrade ? upgrade : Fn<void()>(),
+			canRemoveDetails ? removeDetails : Fn<void(Fn<void()>)>());
 	} else {
 		AddCreditsHistoryEntryTable(show, content, st, e);
 		AddSubscriptionEntryTable(show, content, st, s);
@@ -1992,7 +2051,7 @@ void GenericCreditsEntryBox(
 			: canToggle
 			? std::move(withHide)
 			: visiblePhrase(Ui::Text::WithEntities);
-		if (e.anonymous && e.barePeerId) {
+		if (e.anonymous && e.barePeerId && !uniqueGift) {
 			text = rpl::combine(
 				std::move(text),
 				(giftToChannelCanManage
@@ -2012,25 +2071,8 @@ void GenericCreditsEntryBox(
 			toggleVisibility(!e.savedToProfile);
 			return false;
 		});
-	} else if (uniqueGift && !uniqueGift->ownerAddress.isEmpty()) {
-		const auto label = box->addRow(
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_gift_in_blockchain(
-					lt_link,
-					tr::lng_gift_in_blockchain_link_arrow(
-						lt_arrow,
-						rpl::single(arrow),
-						Ui::Text::WithEntities
-					) | Ui::Text::ToLink(),
-					Ui::Text::WithEntities),
-				st::creditsBoxAboutDivider),
-			style::al_top);
-		label->setClickHandlerFilter([=](const auto &...) {
-			UrlClickHandler::Open(
-				TonAddressUrl(session, uniqueGift->ownerAddress));
-			return false;
-		});
+	} else {
+		addGiftLinkTON();
 	}
 	if (s) {
 		const auto user = peer ? peer->asUser() : nullptr;
@@ -2184,7 +2226,7 @@ void GenericCreditsEntryBox(
 				e.uniqueGift,
 				e.giftResaleForceTon,
 				to,
-				crl::guard(box, [=] { box->closeBox(); }));
+				crl::guard(box, [=](bool) { box->closeBox(); }));
 		} else if (canUpgrade || canGiftUpgrade) {
 			upgrade();
 		} else if (canToggle && !e.savedToProfile) {
@@ -2396,7 +2438,7 @@ void UniqueGiftValueBox(
 					platform(Ui::Text::WithEntities),
 					lt_arrow,
 					rpl::single(Ui::Text::IconEmoji(&st::textMoreIconEmoji)),
-					[](const QString &text) { return Ui::Text::Link(text); }),
+					tr::link),
 				st::uniqueGiftValueAvailableLink,
 				st::defaultPopupMenu,
 				Core::TextContext({ .session = &show->session() })),
@@ -2503,6 +2545,7 @@ void GlobalStarGiftBox(
 		CreditsEntryBoxStyleOverrides st) {
 	const auto selfId = show->session().userPeerId();
 	const auto ownerId = data.unique ? data.unique->ownerId.value : 0;
+	const auto hostId = data.unique ? data.unique->hostId.value : 0;
 	Settings::GenericCreditsEntryBox(
 		box,
 		show,
@@ -2510,6 +2553,7 @@ void GlobalStarGiftBox(
 			.credits = CreditsAmount(data.stars),
 			.bareGiftStickerId = data.document->id,
 			.bareGiftOwnerId = ownerId,
+			.bareGiftHostId = hostId,
 			.bareGiftResaleRecipientId = ((resale.recipientId != selfId)
 				? resale.recipientId.value
 				: 0),
@@ -2532,6 +2576,12 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		not_null<PeerData*> owner,
 		const Data::SavedStarGift &data) {
 	const auto chatGiftPeer = data.manageId.chat();
+	const auto ownerId = data.info.unique
+		? data.info.unique->ownerId
+		: owner->id;
+	const auto hostId = data.info.unique
+		? data.info.unique->hostId
+		: PeerId();
 	return {
 		.description = data.message,
 		.date = base::unixtime::parse(data.date),
@@ -2539,7 +2589,8 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		.bareMsgId = uint64(data.manageId.userMessageId().bare),
 		.barePeerId = data.fromId.value,
 		.bareGiftStickerId = data.info.document->id,
-		.bareGiftOwnerId = owner->id.value,
+		.bareGiftOwnerId = ownerId.value,
+		.bareGiftHostId = hostId.value,
 		.bareActorId = data.fromId.value,
 		.bareEntryOwnerId = chatGiftPeer ? chatGiftPeer->id.value : 0,
 		.giftChannelSavedId = data.manageId.chatSavedId(),
@@ -2552,6 +2603,7 @@ Data::CreditsHistoryEntry SavedStarGiftEntry(
 		.starsConverted = int(data.starsConverted),
 		.starsToUpgrade = int(data.info.starsToUpgrade),
 		.starsUpgradedBySender = int(data.starsUpgradedBySender),
+		.starsForDetailsRemove = int(data.starsForDetailsRemove),
 		.converted = false,
 		.anonymous = data.anonymous,
 		.stargift = true,
@@ -2614,10 +2666,16 @@ void ShowStarGiftViewBox(
 	const auto peer = item->history()->peer;
 	const auto toChannel = peer->isServiceUser() && data.channel;
 	const auto incoming = !toChannel
+		&& !data.auctionTo
 		&& (data.upgrade ? item->out() : !item->out());
 	const auto fromId = incoming ? peer->id : peer->session().userPeerId();
-	const auto toId = incoming ? peer->session().userPeerId() : peer->id;
+	const auto toId = incoming
+		? peer->session().userPeerId()
+		: data.auctionTo
+		? data.auctionTo->id
+		: peer->id;
 	const auto ownerId = data.unique ? data.unique->ownerId : toId;
+	const auto hostId = data.unique ? data.unique->hostId : PeerId();
 	const auto nextToUpgradeStickerId = upgradeNext
 		? upgradeNext->info.document->id
 		: uint64();
@@ -2638,6 +2696,7 @@ void ShowStarGiftViewBox(
 		.barePeerId = fromId.value,
 		.bareGiftStickerId = data.document ? data.document->id : 0,
 		.bareGiftOwnerId = ownerId.value,
+		.bareGiftHostId = hostId.value,
 		.bareGiftReleasedById = (data.stargiftReleasedBy
 			? data.stargiftReleasedBy->id.value
 			: 0),
@@ -2655,12 +2714,15 @@ void ShowStarGiftViewBox(
 		.starsConverted = data.starsConverted,
 		.starsToUpgrade = data.starsToUpgrade,
 		.starsUpgradedBySender = data.starsUpgradedBySender,
+		.starsForDetailsRemove = data.starsForDetailsRemove,
 		.converted = data.converted,
 		.anonymous = data.anonymous,
 		.stargift = true,
+		.auction = (data.auctionTo != nullptr),
 		.giftTransferred = data.transferred,
 		.giftRefunded = data.refunded,
 		.giftUpgradeSeparate = data.upgradeSeparate,
+		.giftUpgradeGifted = data.upgradeGifted,
 		.savedToProfile = data.saved,
 		.canUpgradeGift = data.upgradable,
 		.hasGiftComment = !data.message.empty(),
@@ -2830,6 +2892,7 @@ void SmallBalanceBox(
 		paid();
 	};
 
+	auto dark = false;
 	const auto owner = &show->session().data();
 	const auto name = v::match(source, [&](SmallBalanceBot value) {
 		return value.botId
@@ -2837,6 +2900,9 @@ void SmallBalanceBox(
 			: QString();
 	}, [&](SmallBalanceReaction value) {
 		return owner->peer(peerFromChannel(value.channelId))->name();
+	}, [&](SmallBalanceVideoStream value) {
+		dark = true;
+		return owner->peer(value.streamerId)->name();
 	}, [](SmallBalanceSubscription value) {
 		return value.name;
 	}, [](SmallBalanceDeepLink) {
@@ -2862,7 +2928,9 @@ void SmallBalanceBox(
 	const auto content = [&]() -> Ui::Premium::TopBarAbstract* {
 		return box->setPinnedToTopContent(object_ptr<Ui::Premium::TopBar>(
 			box,
-			st::creditsLowBalancePremiumCover,
+			(dark
+				? st::videoStreamStarsCover
+				: st::creditsLowBalancePremiumCover),
 			Ui::Premium::TopBarDescriptor{
 				.title = tr::lng_credits_small_balance_title(
 					lt_count,
@@ -2881,6 +2949,11 @@ void SmallBalanceBox(
 					: v::is<SmallBalanceReaction>(source)
 					? tr::lng_credits_small_balance_reaction(
 						lt_channel,
+						rpl::single(Ui::Text::Bold(name)),
+						Ui::Text::RichLangValue)
+					: v::is<SmallBalanceVideoStream>(source)
+					? tr::lng_credits_small_balance_video_stream(
+						lt_name,
 						rpl::single(Ui::Text::Bold(name)),
 						Ui::Text::RichLangValue)
 					: v::is<SmallBalanceDeepLink>(source)
@@ -2927,7 +3000,8 @@ void SmallBalanceBox(
 		[=] { show->session().credits().load(true); },
 		box->showFinishes(),
 		tr::lng_credits_summary_options_subtitle(),
-		{});
+		{},
+		dark);
 
 	content->setMaximumHeight(st::creditsLowBalancePremiumCoverHeight);
 	content->setMinimumHeight(st::infoLayerTopBarHeight);
@@ -2948,7 +3022,9 @@ void SmallBalanceBox(
 			content,
 			&show->session(),
 			show->session().credits().balanceValue(),
-			true);
+			true,
+			nullptr,
+			dark);
 		show->session().credits().load(true);
 
 		rpl::combine(
@@ -3038,7 +3114,6 @@ void AddWithdrawalWidget(
 	const auto buttonsContainer = withdrawalWrap->entity()->add(
 		Ui::CreateSkipWidget(withdrawalWrap->entity(), stButton.height),
 		st::boxRowPadding);
-	withdrawalWrap->toggle(withdrawalEnabled, anim::type::instant);
 
 	const auto button = Ui::CreateChild<Ui::RoundButton>(
 		buttonsContainer,
@@ -3051,14 +3126,47 @@ void AddWithdrawalWidget(
 		stButton);
 	buttonCredits->setTextTransform(
 		Ui::RoundButton::TextTransform::NoTransform);
+	{
+		const auto icon = Ui::CreateChild<Ui::RpWidget>(buttonCredits);
+		const auto &st = st::msgBotKbUrlIcon;
+		icon->resize(st.width(), st.height());
+		icon->paintRequest() | rpl::start_with_next([=] {
+			auto p = QPainter(icon);
+			st.paint(p, { 0, 0 }, icon->width(), stButton.textFg->c);
+		}, icon->lifetime());
+		buttonCredits->sizeValue(
+		) | rpl::start_with_next([=, padding = st::msgBotKbIconPadding] {
+			icon->moveToRight(padding, padding);
+		}, icon->lifetime());
+		icon->setAttribute(Qt::WA_TransparentForMouseEvents);
+	}
 
 	Ui::ToggleChildrenVisibility(buttonsContainer, true);
+
+	const auto updateButtonState = [=](bool disabled) {
+		button->setBrushOverride(disabled
+			? std::optional(st::windowSubTextFg)
+			: std::nullopt);
+		button->setAttribute(Qt::WA_TransparentForMouseEvents, disabled);
+	};
+
+	struct UrlState {
+		QString url;
+		base::unique_qptr<Ui::PopupMenu> menu;
+	};
+	const auto urlState = buttonsContainer->lifetime().make_state<UrlState>();
 
 	rpl::combine(
 		std::move(secondButtonUrl),
 		buttonsContainer->sizeValue()
 	) | rpl::start_with_next([=](const QString &url, const QSize &size) {
-		if (url.isEmpty()) {
+		const auto secondVisible = !url.isEmpty();
+		urlState->url = url;
+		withdrawalWrap->toggle(
+			withdrawalEnabled || secondVisible,
+			anim::type::instant);
+		updateButtonState(!withdrawalEnabled);
+		if (!secondVisible) {
 			button->resize(size.width(), size.height());
 			buttonCredits->resize(0, 0);
 		} else {
@@ -3069,6 +3177,27 @@ void AddWithdrawalWidget(
 			buttonCredits->setClickedCallback([=] {
 				UrlClickHandler::Open(url);
 			});
+			buttonCredits->events(
+			) | rpl::filter([](not_null<QEvent*> e) {
+				return e->type() == QEvent::ContextMenu;
+			}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+				if (urlState->url.isEmpty()) {
+					return;
+				}
+				urlState->menu = base::make_unique_q<Ui::PopupMenu>(
+					buttonCredits,
+					st::popupMenuWithIcons);
+				urlState->menu->addAction(
+					tr::lng_context_copy_link(tr::now),
+					[=, show = controller->uiShow()] {
+						TextUtilities::SetClipboardText({ urlState->url });
+						show->showToast(
+							tr::lng_channel_public_link_copied(tr::now));
+					},
+					&st::menuIconCopy);
+				urlState->menu->popup(QCursor::pos());
+				e->accept();
+			}, buttonCredits->lifetime());
 		}
 	}, buttonsContainer->lifetime());
 
@@ -3079,7 +3208,9 @@ void AddWithdrawalWidget(
 	rpl::duplicate(
 		lockedValue
 	) | rpl::start_with_next([=](bool v) {
-		button->setAttribute(Qt::WA_TransparentForMouseEvents, v);
+		if (withdrawalEnabled) {
+			updateButtonState(v);
+		}
 	}, button->lifetime());
 
 	const auto session = &controller->session();
@@ -3269,8 +3400,7 @@ void AddWithdrawalWidget(
 	container->add(object_ptr<Ui::DividerLabel>(
 		container,
 		std::move(about),
-		st::defaultBoxDividerLabelPadding,
-		RectPart::Top | RectPart::Bottom));
+		st::defaultBoxDividerLabelPadding));
 
 	Ui::AddSkip(container);
 }

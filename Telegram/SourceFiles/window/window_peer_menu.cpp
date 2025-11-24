@@ -42,6 +42,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/peers/add_participants_box.h"
 #include "boxes/peers/edit_forum_topic_box.h"
 #include "boxes/peers/edit_contact_box.h"
+#include "boxes/peers/prepare_short_info_box.h"
 #include "calls/calls_instance.h"
 #include "inline_bots/bot_attach_web_view.h" // InlineBots::PeerType.
 #include "ui/toast/toast.h"
@@ -157,7 +158,8 @@ void ShareBotGame(
 			MTP_long(randomId),
 			MTPReplyMarkup(),
 			MTPVector<MTPMessageEntity>(),
-			MTP_int(0), // schedule_date
+			MTPint(), // schedule_date
+			MTPint(), // schedule_repeat_period
 			MTPInputPeer(), // send_as
 			MTPInputQuickReplyShortcut(),
 			MTPlong(),
@@ -289,7 +291,7 @@ private:
 	void addSupportInfo();
 	void addInfo();
 	void addStoryArchive();
-	void addNewWindow();
+	void addNewWindow(bool addSeparator = true);
 	void addToggleFolder();
 	void addToggleUnreadMark();
 	void addToggleArchive();
@@ -437,8 +439,9 @@ void TogglePinnedThread(
 			controller->content()->dialogsToUp();
 		}
 	} else if (const auto topic = entry->asTopic()) {
-		owner->session().api().request(MTPchannels_UpdatePinnedForumTopic(
-			topic->channel()->inputChannel,
+		const auto peer = topic->peer();
+		owner->session().api().request(MTPmessages_UpdatePinnedForumTopic(
+			peer->input,
 			MTP_int(topic->rootId()),
 			MTP_bool(isPinned)
 		)).done([=](const MTPUpdates &result) {
@@ -502,7 +505,10 @@ void Filler::addToggleTopicClosed() {
 	}
 	const auto closed = _topic->closed();
 	const auto weak = base::make_weak(_topic);
-	_addAction(closed ? tr::lng_forum_topic_reopen(tr::now) : tr::lng_forum_topic_close(tr::now), [=] {
+	const auto text = closed
+		? tr::lng_forum_topic_reopen(tr::now)
+		: tr::lng_forum_topic_close(tr::now);
+	_addAction(text, [=] {
 		if (const auto topic = weak.get()) {
 			topic->setClosedAndSave(!closed);
 		}
@@ -593,7 +599,9 @@ void Filler::addInfo() {
 	const auto controller = _controller;
 	const auto weak = base::make_weak(_thread);
 	const auto text = _thread->asTopic()
-		? tr::lng_context_view_topic(tr::now)
+		? (_thread->peer()->isBot()
+			? tr::lng_context_view_thread(tr::now)
+			: tr::lng_context_view_topic(tr::now))
 		: (infoPeer->isChat() || infoPeer->isMegagroup())
 		? tr::lng_context_view_group(tr::now)
 		: infoPeer->isUser()
@@ -601,7 +609,12 @@ void Filler::addInfo() {
 		: tr::lng_context_view_channel(tr::now);
 	_addAction(text, [=] {
 		if (const auto strong = weak.get()) {
-			controller->showPeerInfo(strong);
+			if (base::IsCtrlPressed()) {
+				controller->uiShow()->showBox(
+					PrepareShortInfoBox(infoPeer, controller));
+			} else {
+				controller->showPeerInfo(strong);
+			}
 		}
 	}, infoPeer->isUser() ? &st::menuIconProfile : &st::menuIconInfo);
 }
@@ -672,7 +685,7 @@ void Filler::addToggleUnreadMark() {
 	}, (unread ? &st::menuIconMarkRead : &st::menuIconMarkUnread));
 }
 
-void Filler::addNewWindow() {
+void Filler::addNewWindow(bool addSeparator) {
 	const auto controller = _controller;
 	if (_folder) {
 		_addAction(tr::lng_context_new_window(tr::now), [=] {
@@ -681,7 +694,9 @@ void Filler::addNewWindow() {
 				SeparateType::Archive,
 				&controller->session()));
 		}, &st::menuIconNewWindow);
-		AddSeparatorAndShiftUp(_addAction);
+		if (addSeparator) {
+			AddSeparatorAndShiftUp(_addAction);
+		}
 		return;
 	} else if (const auto weak = base::make_weak(_sublist)) {
 		_addAction(tr::lng_context_new_window(tr::now), [=] {
@@ -692,7 +707,9 @@ void Filler::addNewWindow() {
 					sublist));
 			}
 		}, &st::menuIconNewWindow);
-		AddSeparatorAndShiftUp(_addAction);
+		if (addSeparator) {
+			AddSeparatorAndShiftUp(_addAction);
+		}
 		return;
 	}
 	const auto history = _request.key.history();
@@ -712,13 +729,15 @@ void Filler::addNewWindow() {
 		if (const auto strong = weak.get()) {
 			const auto forum = !strong->asTopic()
 				&& peer->isForum()
-				&& !peer->asChannel()->useSubsectionTabs();
+				&& !peer->useSubsectionTabs();
 			controller->showInNewWindow(SeparateId(
 				forum ? SeparateType::Forum : SeparateType::Chat,
 				strong));
 		}
 	}, &st::menuIconNewWindow);
-	AddSeparatorAndShiftUp(_addAction);
+	if (addSeparator) {
+		AddSeparatorAndShiftUp(_addAction);
+	}
 }
 
 void Filler::addToggleArchive() {
@@ -1088,18 +1107,19 @@ void Filler::addTopicLink() {
 		return;
 	}
 	const auto channel = _topic->channel();
-	const auto id = _topic->rootId();
+	if (!channel) {
+		return;
+	}
 	const auto controller = _controller;
+	const auto weak = base::make_weak(_topic);
 	_addAction(tr::lng_context_copy_topic_link(tr::now), [=] {
-		const auto base = channel->hasUsername()
-			? channel->username()
-			: "c/" + QString::number(peerToChannel(channel->id).bare);
-		const auto query = base + '/' + QString::number(id.bare);
-		const auto link = channel->session().createInternalLinkFull(query);
-		QGuiApplication::clipboard()->setText(link);
-		controller->showToast(channel->hasUsername()
-			? tr::lng_channel_public_link_copied(tr::now)
-			: tr::lng_context_about_private_link(tr::now));
+		if (const auto strong = weak.get()) {
+			const auto link = Info::Profile::TopicLink(strong, true);
+			QGuiApplication::clipboard()->setText(link);
+			controller->showToast(channel->hasUsername()
+				? tr::lng_channel_public_link_copied(tr::now)
+				: tr::lng_context_about_private_link(tr::now));
+		}
 	}, &st::menuIconCopy);
 }
 
@@ -1110,7 +1130,10 @@ void Filler::addManageTopic() {
 	const auto history = _topic->history();
 	const auto rootId = _topic->rootId();
 	const auto navigation = _controller;
-	_addAction(tr::lng_forum_topic_edit(tr::now), [=] {
+	const auto text = _topic->forum()->peer()->isBot()
+		? tr::lng_bot_thread_edit(tr::now)
+		: tr::lng_forum_topic_edit(tr::now);
+	_addAction(text, [=] {
 		navigation->show(
 			Box(EditForumTopicBox, navigation, history, rootId));
 	}, &st::menuIconEdit);
@@ -1384,7 +1407,7 @@ void Filler::fill() {
 }
 
 void Filler::addCreateTopic() {
-	if (!_peer || !_peer->canCreateTopics()) {
+	if (!_peer || !_peer->canCreateTopics() || _peer->isBot()) {
 		return;
 	}
 	const auto peer = _peer;
@@ -1447,6 +1470,7 @@ void Filler::addViewAsMessages() {
 void Filler::addViewAsTopics() {
 	if (!_peer
 		|| !_peer->isForum()
+		|| !_peer->isChannel()
 		|| (_peer->asChannel()->flags() & ChannelDataFlag::ForumTabs)
 		|| !_controller->adaptive().isOneColumn()) {
 		return;
@@ -1678,7 +1702,7 @@ void Filler::fillArchiveActions() {
 }
 
 void Filler::fillSavedSublistActions() {
-	addNewWindow();
+	addNewWindow(false);
 	addTogglePin();
 }
 
@@ -1832,17 +1856,17 @@ void PeerMenuDeleteTopicWithConfirmation(
 
 void PeerMenuDeleteTopic(
 		not_null<Window::SessionNavigation*> navigation,
-		not_null<ChannelData*> channel,
+		not_null<PeerData*> peer,
 		MsgId rootId) {
-	const auto api = &channel->session().api();
-	api->request(MTPchannels_DeleteTopicHistory(
-		channel->inputChannel,
+	const auto api = &peer->session().api();
+	api->request(MTPmessages_DeleteTopicHistory(
+		peer->input,
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result) {
-		const auto offset = api->applyAffectedHistory(channel, result);
+		const auto offset = api->applyAffectedHistory(peer, result);
 		if (offset > 0) {
-			PeerMenuDeleteTopic(navigation, channel, rootId);
-		} else if (const auto forum = channel->forum()) {
+			PeerMenuDeleteTopic(navigation, peer, rootId);
+		} else if (const auto forum = peer->forum()) {
 			forum->applyTopicDeleted(rootId);
 		}
 	}).send();
@@ -1851,7 +1875,7 @@ void PeerMenuDeleteTopic(
 void PeerMenuDeleteTopic(
 		not_null<Window::SessionNavigation*> navigation,
 		not_null<Data::ForumTopic*> topic) {
-	PeerMenuDeleteTopic(navigation, topic->channel(), topic->rootId());
+	PeerMenuDeleteTopic(navigation, topic->peer(), topic->rootId());
 }
 
 void PeerMenuShareContactBox(
@@ -2835,7 +2859,7 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 				return true;
 			}
 			const auto id = SeparateId(
-				((peer->isForum() && !peer->asChannel()->useSubsectionTabs())
+				((peer->isForum() && !peer->useSubsectionTabs())
 					? SeparateType::Forum
 					: SeparateType::Chat),
 				thread);
@@ -3922,7 +3946,9 @@ void ForwardToSelf(
 					.singleMessage = (count == 1),
 					.to1 = session->user(),
 				})).current();
-				show->showToast(std::move(phrase));
+				if (!phrase.empty()) {
+					show->showToast(std::move(phrase));
+				}
 			});
 	}
 }

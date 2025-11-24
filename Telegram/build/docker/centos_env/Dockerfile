@@ -91,7 +91,7 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin https://github.com/desktop-app/patches.git \
-	&& git fetch --depth=1 origin a25a212644a8e42d9a5b1c7ba6489e11e92df813 \
+	&& git fetch --depth=1 origin 0b68b11048987a68d31b2d8380d9b7c5116aa961 \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
@@ -662,8 +662,8 @@ RUN git clone -b 0.3.62 --depth=1 https://github.com/PipeWire/pipewire.git \
 		--buildtype=plain \
 		-Dtests=disabled \
 		-Dexamples=disabled \
-		-Dsession-managers=media-session \
 		-Dspa-plugins=disabled \
+		-Dsession-managers= \
 	&& meson compile -C build \
 	&& DESTDIR=/usr/src/pipewire-cache meson install -C build \
 	&& cd .. \
@@ -731,7 +731,7 @@ COPY --link --from=xcb-cursor /usr/src/xcb-cursor-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
-ENV QT=6.9.2
+ENV QT=6.10.0
 RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 	&& cd qt5 \
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
@@ -747,6 +747,7 @@ RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 		-DFEATURE_sanitize_address=ON \
 {%- endif %}
 		-DQT_QPA_PLATFORMS="wayland;xcb" \
+		-DFEATURE_copy_file_range=OFF \
 		-DINPUT_libpng=qt \
 		-DINPUT_harfbuzz=qt \
 		-DINPUT_pcre=qt \
@@ -874,10 +875,10 @@ COPY --link --from=tde2e /usr/src/tde2e-cache /
 COPY --link --from=patches /usr/src/patches patches
 RUN patch -p1 -d /usr/lib64/gobject-introspection -i $PWD/patches/gobject-introspection.patch && rm -rf patches
 
-WORKDIR /usr/src/tdesktop
+WORKDIR /usr/src/rtgdesktopdev
 ENV BOOST_INCLUDEDIR=/usr/include/boost1.78
 ENV BOOST_LIBRARYDIR=/usr/lib64/boost1.78
 
 USER user
-VOLUME [ "/usr/src/tdesktop" ]
-CMD [ "/usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh" ]
+VOLUME [ "/usr/src/rtgdesktopdev" ]
+CMD [ "/usr/src/rtgdesktopdev/Telegram/build/docker/centos_env/build.sh" ]

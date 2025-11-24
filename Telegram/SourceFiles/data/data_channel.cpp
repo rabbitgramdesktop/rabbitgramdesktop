@@ -1099,7 +1099,7 @@ void ChannelData::setGroupCall(
 			data.vaccess_hash().v,
 			scheduleDate,
 			rtmp,
-			false); // conference
+			Data::GroupCallOrigin::Group);
 		owner().registerGroupCall(_call.get());
 		session().changes().peerUpdated(this, UpdateFlag::GroupCall);
 		addFlags(Flag::CallActive);
@@ -1158,20 +1158,34 @@ bool ChannelData::hasUnreadStories() const {
 	return flags() & Flag::HasUnreadStories;
 }
 
+bool ChannelData::hasActiveVideoStream() const {
+	return flags() & Flag::HasActiveVideoStream;
+}
+
 void ChannelData::setStoriesState(StoriesState state) {
 	Expects(state != StoriesState::Unknown);
 
 	const auto was = flags();
 	switch (state) {
 	case StoriesState::None:
-		_flags.remove(Flag::HasActiveStories | Flag::HasUnreadStories);
+		_flags.remove(Flag::HasActiveStories
+			| Flag::HasUnreadStories
+			| Flag::HasActiveVideoStream);
 		break;
 	case StoriesState::HasRead:
-		_flags.set(
-			(flags() & ~Flag::HasUnreadStories) | Flag::HasActiveStories);
+		_flags.set(Flag::HasActiveStories
+			| (was
+				& ~(Flag::HasUnreadStories | Flag::HasActiveVideoStream)));
 		break;
 	case StoriesState::HasUnread:
-		_flags.add(Flag::HasActiveStories | Flag::HasUnreadStories);
+		_flags.set((was & ~Flag::HasActiveVideoStream)
+			| Flag::HasActiveStories
+			| Flag::HasUnreadStories);
+		break;
+	case StoriesState::HasVideoStream:
+		_flags.set((was & ~Flag::HasUnreadStories)
+			| Flag::HasActiveStories
+			| Flag::HasActiveVideoStream);
 		break;
 	}
 	if (flags() != was) {
@@ -1179,12 +1193,6 @@ void ChannelData::setStoriesState(StoriesState state) {
 			history->updateChatListEntryPostponed();
 		}
 		session().changes().peerUpdated(this, UpdateFlag::StoriesState);
-	}
-}
-
-void ChannelData::processTopics(const MTPVector<MTPForumTopic> &topics) {
-	if (const auto forum = this->forum()) {
-		forum->applyReceivedTopics(topics);
 	}
 }
 

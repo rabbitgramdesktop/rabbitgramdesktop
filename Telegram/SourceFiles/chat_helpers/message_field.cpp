@@ -576,6 +576,7 @@ void InitMessageFieldGeometry(not_null<Ui::InputField*> field) {
 		st::historySendSize.height() - 2 * st::historySendPadding);
 	field->setMaxHeight(st::historyComposeFieldMaxHeight);
 
+	// st::messageSendingAnimationTextFromOffset.
 	field->setDocumentMargin(4.);
 	field->setAdditionalMargin(style::ConvertScale(4) - 4);
 }
@@ -1425,10 +1426,7 @@ void FrozenInfoBox(
 		content,
 		{
 			.name = u"media_forbidden"_q,
-			.sizeOverride = {
-				st::changePhoneIconSize,
-				st::changePhoneIconSize,
-			},
+			.sizeOverride = st::normalBoxLottieSize,
 		},
 		st::settingLocalPasscodeIconPadding);
 	content->add(std::move(icon.widget));

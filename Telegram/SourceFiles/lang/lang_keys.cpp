@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "lang/lang_keys.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "base/const_string.h"
 #include "lang/lang_file_parser.h"
 #include "ui/integration.h"
@@ -158,7 +160,11 @@ QString langDateTime(const QDateTime &date) {
 		lt_date,
 		langDayOfMonth(date.date()),
 		lt_time,
-		QLocale().toString(date.time(), QLocale::ShortFormat));
+		QLocale().toString(
+			date.time(), 
+			RabbitSettings::showSeconds()
+				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+				: QLocale::system().timeFormat(QLocale::ShortFormat)));
 }
 
 QString langDateTimeFull(const QDateTime &date) {
@@ -167,7 +173,11 @@ QString langDateTimeFull(const QDateTime &date) {
 		lt_date,
 		langDayOfMonthFull(date.date()),
 		lt_time,
-		QLocale().toString(date.time(), QLocale::ShortFormat));
+		QLocale().toString(
+			date.time(), 
+			RabbitSettings::showSeconds()
+				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+				: QLocale::system().timeFormat(QLocale::ShortFormat)));
 }
 
 namespace Lang {

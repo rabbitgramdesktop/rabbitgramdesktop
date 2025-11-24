@@ -11,7 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/effects/cross_animation.h"
 #include "ui/painter.h"
-#include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 
 namespace Ui {
 

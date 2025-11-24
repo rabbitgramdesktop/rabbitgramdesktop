@@ -55,10 +55,7 @@ auto kAutoHideInterval = crl::time(10000);
 
 [[nodiscard]] QPoint notificationStartPosition() {
 	const auto corner = Core::App().settings().notificationsCorner();
-	const auto window = Core::App().activePrimaryWindow();
-	const auto r = window
-		? window->widget()->desktopRect()
-		: QGuiApplication::primaryScreen()->availableGeometry();
+	const auto r = NotificationDisplayRect(Core::App().activePrimaryWindow());
 	const auto isLeft = Core::Settings::IsLeftCorner(corner);
 	const auto isTop = Core::Settings::IsTopCorner(corner);
 	const auto x = (isLeft == rtl())
