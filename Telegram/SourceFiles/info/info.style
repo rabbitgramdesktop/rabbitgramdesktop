@@ -1448,3 +1448,4 @@ earnTonIconMargin: margins(0px, 2px, 0px, 0px);
 
 infoMusicButtonRipple: universalRippleAnimation;
 infoMusicButtonPadding: margins(16px, 6px, 13px, 6px);
+infoMusicButtonMargin: 2px;
