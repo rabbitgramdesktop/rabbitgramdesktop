@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/peer/video_userpic_player.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
@@ -57,25 +59,25 @@ QImage VideoUserpicPlayer::frame(QSize size, not_null<PeerData*> peer) {
 	auto request = ::Media::Streaming::FrameRequest();
 	const auto ratio = style::DevicePixelRatio();
 	request.outer = request.resize = size * ratio;
+	const auto customRadius = RabbitSettings::userpicRoundness() / 100.0;
 
 	const auto broadcast = peer->monoforumBroadcast();
 
-	if (broadcast) {
+	if (broadcast && _monoforumMask.isNull()) {
 		if (_monoforumMask.isNull()) {
 			_monoforumMask = Ui::MonoforumShapeMask(request.resize);
 		}
 	} else if (peer->isForum()) {
 		const auto radius = int(
-			size.width() * Ui::ForumUserpicRadiusMultiplier());
+			size.width() * customRadius * ratio);
+		if (!RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
 		if (_roundingCorners[0].width() != radius * ratio) {
 			_roundingCorners = Images::CornersMask(radius);
 		}
-		request.rounding = Images::CornersMaskRef(_roundingCorners);
 	} else {
-		if (_ellipseMask.size() != request.outer) {
-			_ellipseMask = Images::EllipseMask(size);
-		}
-		request.mask = _ellipseMask;
+		const auto radius = int(size.width() * customRadius * ratio);
+		request.mask = Images::CornersMaskRef(
+			Images::CornersMask(radius));
 	}
 
 	auto result = _streamed->frame(request);

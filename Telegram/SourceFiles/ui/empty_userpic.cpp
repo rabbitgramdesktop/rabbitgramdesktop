@@ -15,6 +15,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/emoji_config.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
+#include "ui/userpic_view.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h" // style::IconButton
@@ -674,31 +675,19 @@ void EmptyUserpic::fillString(const QString &name) {
 EmptyUserpic::~EmptyUserpic() = default;
 
 void PaintMonoforumShape(QPainter &p, QRect rect) {
-	p.drawEllipse(rect);
+	auto radius = RabbitSettings::userpicRoundness() / 100.0;
+	if (!RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
 
+	p.drawRoundedRect(
+		rect,
+		radius * rect.width(),
+		radius * rect.height());
+	
 	auto path = QPainterPath();
-	path.moveTo(
-		rect.x() + rect.width() * 0.5,
-		rect.y() + rect.height() * 0.5);
-	path.arcTo(
-		QRectF(
-			rect.x() - rect.width() * 0.5,
-			rect.y(),
-			rect.width(),
-			rect.height()),
-		0,
-		-90);
-	path.arcTo(
-		QRectF(
-			rect.x() - rect.width() * 0.25,
-			rect.y() - rect.height() * 2,
-			rect.width() * 0.5,
-			rect.height() * 3),
-		-90,
-		45);
-	path.lineTo(
-		rect.x() + rect.width() * 0.5,
-		rect.y() + rect.height() * 0.5);
+	path.addRoundedRect(
+		rect,
+		radius * rect.width(),
+		radius * rect.height());
 	p.drawPath(path);
 }
 
