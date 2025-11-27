@@ -95,6 +95,16 @@ void MusicButton::paintEvent(QPaintEvent *e) {
 		.now = crl::now(),
 		.elisionLines = 1,
 	});
+
+	// icon part
+	const auto &icon = st::topicButtonArrow;
+	const auto iconWidth = icon.width();
+	const auto iconHeight = icon.height();
+
+	const auto iconTop = (height() - iconHeight) / 2.0;
+	const auto iconLeft = width() - padding.right() - iconWidth;
+
+	icon.paint(p, iconLeft,	iconTop, iconWidth, p.pen().color());
 }
 
 int MusicButton::resizeGetHeight(int newWidth) {
