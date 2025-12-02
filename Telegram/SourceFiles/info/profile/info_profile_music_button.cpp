@@ -35,12 +35,12 @@ void MusicButton::updateData(MusicButtonData data) {
 	const auto performerLength = result.entities.empty()
 		? 0
 		: int(result.entities.front().length());
-	_performer.setText(
-		st::semiboldTextStyle,
-		result.text.mid(0, performerLength));
 	_title.setText(
-		st::defaultTextStyle,
+		st::semiboldTextStyle,
 		result.text.mid(performerLength, result.text.size()));
+	_performer.setText(
+		st::defaultTextStyle,
+		result.text.mid(0, performerLength));
 	update();
 }
 
