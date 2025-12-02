@@ -59,40 +59,11 @@ QImage VideoUserpicPlayer::frame(QSize size, not_null<PeerData*> peer) {
 	auto request = ::Media::Streaming::FrameRequest();
 	const auto ratio = style::DevicePixelRatio();
 	request.outer = request.resize = size * ratio;
-	const auto customRadius = RabbitSettings::userpicRoundness() / 100.0;
 
-	const auto broadcast = peer->monoforumBroadcast();
-
-	if (broadcast && _monoforumMask.isNull()) {
-		if (_monoforumMask.isNull()) {
-			_monoforumMask = Ui::MonoforumShapeMask(request.resize);
-		}
-	} else if (peer->isForum()) {
-		const auto radius = int(
-			size.width() * customRadius * ratio);
-		if (!RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
-		if (_roundingCorners[0].width() != radius * ratio) {
-			_roundingCorners = Images::CornersMask(radius);
-		}
-	} else {
-		const auto radius = int(size.width() * customRadius * ratio);
-		request.mask = Images::CornersMaskRef(
-			Images::CornersMask(radius));
-	}
+	_roundingCorners = Images::CornersMask(0);
+	request.rounding = Images::CornersMaskRef(_roundingCorners);
 
 	auto result = _streamed->frame(request);
-	if (broadcast) {
-		constexpr auto kFormat = QImage::Format_ARGB32_Premultiplied;
-		if (result.format() != kFormat) {
-			result = std::move(result).convertToFormat(kFormat);
-		}
-		auto q = QPainter(&result);
-		q.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-		q.drawImage(
-			QRect(QPoint(), result.size() / result.devicePixelRatio()),
-			_monoforumMask);
-		q.end();
-	}
 	_streamed->markFrameShown();
 	return result;
 }
