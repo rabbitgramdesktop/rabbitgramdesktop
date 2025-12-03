@@ -51,7 +51,10 @@ FormatSongName::ComposedName FormatSongName::composedName() const {
 
 QString FormatSongName::string() const {
 	const auto &[title, performer] = _composedName;
-	return performer + title;
+	const auto dash = (title.isEmpty() || performer.isEmpty())
+		? QString()
+		: QString::fromUtf8(" \xe2\x80\x93 ");
+	return performer + dash + title;
 }
 
 TextWithEntities FormatSongName::textWithEntities(

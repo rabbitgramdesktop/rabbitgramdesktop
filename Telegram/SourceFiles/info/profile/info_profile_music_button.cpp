@@ -37,7 +37,7 @@ void MusicButton::updateData(MusicButtonData data) {
 		: int(result.entities.front().length());
 	_title.setText(
 		st::semiboldTextStyle,
-		result.text.mid(performerLength, result.text.size()));
+		result.text.mid(3 + performerLength, result.text.size()));
 	_performer.setText(
 		st::defaultTextStyle,
 		result.text.mid(0, performerLength));
