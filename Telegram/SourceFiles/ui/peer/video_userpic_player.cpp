@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/peer/video_userpic_player.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
@@ -58,39 +60,10 @@ QImage VideoUserpicPlayer::frame(QSize size, not_null<PeerData*> peer) {
 	const auto ratio = style::DevicePixelRatio();
 	request.outer = request.resize = size * ratio;
 
-	const auto broadcast = peer->monoforumBroadcast();
-
-	if (broadcast) {
-		if (_monoforumMask.isNull()) {
-			_monoforumMask = Ui::MonoforumShapeMask(request.resize);
-		}
-	} else if (peer->isForum()) {
-		const auto radius = int(
-			size.width() * Ui::ForumUserpicRadiusMultiplier());
-		if (_roundingCorners[0].width() != radius * ratio) {
-			_roundingCorners = Images::CornersMask(radius);
-		}
-		request.rounding = Images::CornersMaskRef(_roundingCorners);
-	} else {
-		if (_ellipseMask.size() != request.outer) {
-			_ellipseMask = Images::EllipseMask(size);
-		}
-		request.mask = _ellipseMask;
-	}
+	_roundingCorners = Images::CornersMask(0);
+	request.rounding = Images::CornersMaskRef(_roundingCorners);
 
 	auto result = _streamed->frame(request);
-	if (broadcast) {
-		constexpr auto kFormat = QImage::Format_ARGB32_Premultiplied;
-		if (result.format() != kFormat) {
-			result = std::move(result).convertToFormat(kFormat);
-		}
-		auto q = QPainter(&result);
-		q.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-		q.drawImage(
-			QRect(QPoint(), result.size() / result.devicePixelRatio()),
-			_monoforumMask);
-		q.end();
-	}
 	_streamed->markFrameShown();
 	return result;
 }

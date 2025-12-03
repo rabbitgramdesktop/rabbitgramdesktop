@@ -478,9 +478,9 @@ void PeerData::paintUserpic(
 		cloud ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
 		context.shape);
-	
+
 	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
-	if (context.shape == Ui::PeerUserpicShape::Forum && !RabbitSettings::generalRoundness()) radius *= .5;
+	if (isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
 
 	p.save();
 	auto hq = PainterHighQualityEnabler(p);
@@ -529,6 +529,11 @@ QImage PeerData::GenerateUserpicImage(
 		Ui::PeerUserpicView &view,
 		int size,
 		std::optional<int> radius) {
+	auto customRadius = RabbitSettings::userpicRoundness() / 100.0;
+	if (peer->isForum() && !RabbitSettings::generalRoundness()) {
+		customRadius *= Ui::ForumUserpicRadiusMultiplier();
+	}
+		
 	if (const auto userpic = peer->userpicCloudImage(view)) {
 		auto image = userpic->scaled(
 			{ size, size },
@@ -539,15 +544,7 @@ QImage PeerData::GenerateUserpicImage(
 				std::move(image),
 				Images::CornersMask(radius / style::DevicePixelRatio()));
 		};
-		if (radius == 0) {
-			return image;
-		} else if (radius) {
-			return round(*radius);
-		} else if (peer->isForum()) {
-			return round(size * Ui::ForumUserpicRadiusMultiplier());
-		} else {
-			return Images::Circle(std::move(image));
-		}
+		return round(int(size * customRadius));
 	}
 	auto result = QImage(
 		QSize(size, size),
@@ -555,22 +552,14 @@ QImage PeerData::GenerateUserpicImage(
 	result.fill(Qt::transparent);
 
 	Painter p(&result);
-	if (radius == 0) {
-		peer->ensureEmptyUserpic()->paintSquare(p, 0, 0, size, size);
-	} else if (radius) {
-		const auto r = *radius;
-		peer->ensureEmptyUserpic()->paintRounded(p, 0, 0, size, size, r);
-	} else if (peer->isForum()) {
-		peer->ensureEmptyUserpic()->paintRounded(
-			p,
-			0,
-			0,
-			size,
-			size,
-			size * Ui::ForumUserpicRadiusMultiplier());
-	} else {
-		peer->ensureEmptyUserpic()->paintCircle(p, 0, 0, size, size);
-	}
+
+	peer->ensureEmptyUserpic()->paintRounded(
+		p,
+		0,
+		0,
+		size,
+		size,
+		size * customRadius);
 	p.end();
 
 	return result;

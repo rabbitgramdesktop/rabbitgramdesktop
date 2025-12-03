@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_top_bar.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "api/api_peer_colors.h"
 #include "api/api_peer_photo.h"
 #include "api/api_user_privacy.h"
@@ -1708,7 +1710,21 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		const auto size = st::infoProfileTopBarPhotoSize;
 		const auto frame = _videoUserpicPlayer->frame(Size(size), _peer);
 		if (!frame.isNull()) {
+
+			auto radius = RabbitSettings::userpicRoundness() / 100.0;
+			if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
+
+			auto path = QPainterPath();
+			path.addRoundedRect(
+				geometry,
+				geometry.width() * radius,
+				geometry.width() * radius);
+
+			p.save();
+			p.setClipPath(path);
 			p.drawImage(geometry, frame);
+			p.restore();
+
 			update();
 			return;
 		}
@@ -1748,7 +1764,20 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		_cachedUserpic = std::move(image);
 		_cachedUserpic.setDevicePixelRatio(style::DevicePixelRatio());
 	}
+
+	auto radius = RabbitSettings::userpicRoundness() / 100.0;
+	if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
+	
+	auto path = QPainterPath();
+	path.addRoundedRect(
+		geometry,
+		geometry.width() * radius,
+		geometry.width() * radius);
+
+	p.save();
+	p.setClipPath(path);
 	p.drawImage(geometry, _cachedUserpic);
+	p.restore();
 }
 
 void TopBar::paintEvent(QPaintEvent *e) {

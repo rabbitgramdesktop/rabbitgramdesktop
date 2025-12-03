@@ -35,12 +35,12 @@ void MusicButton::updateData(MusicButtonData data) {
 	const auto performerLength = result.entities.empty()
 		? 0
 		: int(result.entities.front().length());
-	_performer.setText(
-		st::semiboldTextStyle,
-		result.text.mid(0, performerLength));
 	_title.setText(
+		st::semiboldTextStyle,
+		result.text.mid(3 + performerLength, result.text.size()));
+	_performer.setText(
 		st::defaultTextStyle,
-		result.text.mid(performerLength, result.text.size()));
+		result.text.mid(0, performerLength));
 	update();
 }
 
@@ -62,81 +62,60 @@ void MusicButton::paintEvent(QPaintEvent *e) {
 	}
 	paintRipple(p, QPoint());
 
+	const auto padding = st::infoMusicButtonPadding;
+	const auto contentLeft = padding.left();
+	const auto contentWidth = width() - padding.left() - padding.right();
+
+	// title part
+	const auto titleFont = st::semiboldFont;
+	const auto titleTop = padding.top();
+
+	p.setPen(_overrideBg ? st::groupCallMembersFg : st::windowBoldFg);
+	p.setFont(titleFont);
+	
+	_title.draw(p, {
+		.position = QPoint(
+			contentLeft,
+			titleTop),
+		.availableWidth = contentWidth,
+		.now = crl::now(),
+		.elisionLines = 1,
+	});
+
+	// performer part
+	const auto performerFont = st::normalFont;
+	const auto performerTop = titleTop + titleFont->height + st::infoMusicButtonMargin;
+
+	p.setPen(_overrideBg ? st::groupCallVideoSubTextFg : st::windowSubTextFg);
+	p.setFont(performerFont);
+
+	_performer.draw(p, {
+		.position = { contentLeft, performerTop },
+		.availableWidth = contentWidth,
+		.now = crl::now(),
+		.elisionLines = 1,
+	});
+
+	// icon part
 	const auto &icon = st::topicButtonArrow;
 	const auto iconWidth = icon.width();
 	const auto iconHeight = icon.height();
 
-	const auto padding = st::infoMusicButtonPadding;
-	const auto skip = st::normalFont->spacew;
+	const auto iconTop = (height() - iconHeight) / 2.0;
+	const auto iconLeft = width() - padding.right() - iconWidth;
 
-	const auto titleWidth = _title.maxWidth();
-	const auto performerWidth = _performer.maxWidth();
-	const auto totalNeeded = titleWidth + performerWidth + skip;
-	const auto availableWidth = width()
-		- rect::m::sum::h(padding)
-		- iconWidth
-		- skip
-		- _noteWidth;
-
-	auto actualTitleWidth = 0;
-	auto actualPerformerWidth = 0;
-	if (totalNeeded <= availableWidth) {
-		actualTitleWidth = titleWidth;
-		actualPerformerWidth = performerWidth;
-	} else {
-		const auto ratio = float64(titleWidth) / totalNeeded;
-		actualPerformerWidth = int(availableWidth * (1.0 - ratio));
-		actualTitleWidth = availableWidth - actualPerformerWidth;
-	}
-
-	const auto totalContentWidth = _noteWidth
-		+ actualPerformerWidth
-		+ skip
-		+ actualTitleWidth
-		+ skip
-		+ iconWidth;
-	const auto centerX = width() / 2;
-	const auto contentStartX = centerX - totalContentWidth / 2;
-	const auto textTop = (height() - st::normalFont->height) / 2;
-
-	p.setPen(_overrideBg ? st::groupCallMembersFg : st::windowBoldFg);
-	p.setFont(st::normalFont);
-	p.drawText(contentStartX, textTop + st::normalFont->ascent, _noteSymbol);
-
-	_performer.draw(p, {
-		.position = { contentStartX + _noteWidth, textTop },
-		.availableWidth = actualPerformerWidth,
-		.now = crl::now(),
-		.elisionLines = 1,
-		.elisionMiddle = true,
-	});
-
-	p.setPen(_overrideBg ? st::groupCallVideoSubTextFg : st::windowSubTextFg);
-	_title.draw(p, {
-		.position = QPoint(
-			contentStartX + _noteWidth + actualPerformerWidth + skip,
-			textTop),
-		.availableWidth = actualTitleWidth,
-		.now = crl::now(),
-		.elisionLines = 1,
-		.elisionMiddle = true,
-	});
-
-	const auto iconLeft = contentStartX
-		+ _noteWidth
-		+ actualPerformerWidth
-		+ actualTitleWidth
-		+ skip
-		+ skip;
-	const auto iconTop = (height() - iconHeight) / 2;
-	icon.paint(p, iconLeft, iconTop, iconWidth, p.pen().color());
+	icon.paint(p, iconLeft,	iconTop, iconWidth, p.pen().color());
 }
 
 int MusicButton::resizeGetHeight(int newWidth) {
 	const auto padding = st::infoMusicButtonPadding;
 	const auto &font = st::defaultTextStyle.font;
 
-	return padding.top() + font->height + padding.bottom();
+	return padding.top() 
+		+ font->height 
+		+ st::infoMusicButtonMargin
+		+ font->height
+		+ padding.bottom();
 }
 
 } // namespace Info::Profile

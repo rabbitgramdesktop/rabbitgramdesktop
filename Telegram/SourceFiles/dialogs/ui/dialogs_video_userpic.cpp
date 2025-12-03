@@ -99,7 +99,7 @@ void VideoUserpic::paintLeft(
 		QPainterPath clipPath;
 		QImage frame = _video->current(request(size), now);
 		auto radius = frame.height() * RabbitSettings::userpicRoundness() / 100.;
-		if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= .5;
+		if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
 		clipPath.addRoundedRect(
 			QRect(x, y, frame.width(), frame.height()),
 			radius, radius);
