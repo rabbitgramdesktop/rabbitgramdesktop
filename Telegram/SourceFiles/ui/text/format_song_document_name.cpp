@@ -57,7 +57,9 @@ FormatSongName FormatVoiceName(
 			const auto date = parsed.date();
 			const auto time = QLocale().toString(
 				parsed.time(),
-				QLocale::ShortFormat);
+				RabbitSettings::showSeconds()
+						? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+						: QLocale::system().timeFormat(QLocale::ShortFormat));
 			const auto today = QDateTime::currentDateTime().date();
 			if (date == today) {
 				return tr::lng_player_message_today(
