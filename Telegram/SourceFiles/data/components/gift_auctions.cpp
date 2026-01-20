@@ -25,7 +25,7 @@ GiftAuctions::GiftAuctions(not_null<Main::Session*> session)
 			_session->data().chatsListLoadedEvents()
 		) | rpl::filter(
 			!rpl::mappers::_1
-		) | rpl::take(1) | rpl::start_with_next([=] {
+		) | rpl::take(1) | rpl::on_next([=] {
 			requestActive();
 		}, _lifetime);
 	});
@@ -33,17 +33,91 @@ GiftAuctions::GiftAuctions(not_null<Main::Session*> session)
 
 GiftAuctions::~GiftAuctions() = default;
 
-rpl::producer<GiftAuctionState> GiftAuctions::state(const QString &slug) {
+void GiftAuctions::resolveSlug(const QString &slug, Fn<void(uint64)> done) {
+	const auto it = _slugToGiftId.find(slug);
+	if (it != _slugToGiftId.end()) {
+		done(it->second);
+		return;
+	}
+
+	auto &request = _slugRequests[slug];
+	request.callbacks.push_back(std::move(done));
+	if (request.callbacks.size() > 1) {
+		return;
+	}
+
+	_session->api().request(MTPpayments_GetStarGiftAuctionState(
+		MTP_inputStarGiftAuctionSlug(MTP_string(slug)),
+		MTP_int(0)
+	)).done([=](const MTPpayments_StarGiftAuctionState &result) {
+		const auto &data = result.data();
+
+		_session->data().processUsers(data.vusers());
+		_session->data().processChats(data.vchats());
+
+		auto gift = Api::FromTL(_session, data.vgift());
+		if (!gift || !gift->id) {
+			_slugRequests.erase(slug);
+			return;
+		}
+		const auto giftId = gift->id;
+
+		_slugToGiftId.emplace(slug, giftId);
+
+		auto &entry = _map[giftId];
+		if (!entry) {
+			entry = std::make_unique<Entry>();
+		}
+		const auto raw = entry.get();
+		raw->state.gift = std::move(gift);
+
+		applyStateResponse(raw, result);
+
+		auto callbacks = std::move(_slugRequests[slug].callbacks);
+		_slugRequests.erase(slug);
+		for (const auto &callback : callbacks) {
+			callback(giftId);
+		}
+	}).fail([=] {
+		_slugRequests.erase(slug);
+	}).send();
+}
+
+void GiftAuctions::applyStateResponse(
+		not_null<Entry*> entry,
+		const MTPpayments_StarGiftAuctionState &result) {
+	const auto &data = result.data();
+
+	const auto timeout = data.vtimeout().v;
+	const auto ms = timeout * crl::time(1000);
+	entry->state.subscribedTill = ms ? (crl::now() + ms) : -1;
+
+	const auto was = myStateKey(entry->state);
+	apply(entry, data.vstate());
+	apply(entry, data.vuser_state());
+
+	if (entry->changes.has_consumers()) {
+		entry->changes.fire({});
+		if (ms && (!_timer.isActive() || _timer.remainingTime() > ms)) {
+			_timer.callOnce(ms);
+		}
+	}
+	if (was != myStateKey(entry->state)) {
+		_activeChanged.fire({});
+	}
+}
+
+rpl::producer<GiftAuctionState> GiftAuctions::state(uint64 giftId) {
 	return [=](auto consumer) {
 		auto lifetime = rpl::lifetime();
 
-		auto &entry = _map[slug];
+		auto &entry = _map[giftId];
 		if (!entry) {
 			entry = std::make_unique<Entry>();
 		}
 		const auto raw = entry.get();
 
-		raw->changes.events() | rpl::start_with_next([=] {
+		raw->changes.events() | rpl::on_next([=] {
 			consumer.put_next_copy(raw->state);
 		}, lifetime);
 
@@ -52,7 +126,7 @@ rpl::producer<GiftAuctionState> GiftAuctions::state(const QString &slug) {
 			|| raw->state.subscribedTill >= now) {
 			consumer.put_next_copy(raw->state);
 		} else if (raw->state.subscribedTill >= 0) {
-			request(slug);
+			request(giftId);
 		}
 
 		return lifetime;
@@ -112,6 +186,7 @@ void GiftAuctions::requestAcquired(
 				.date = data.vdate().v,
 				.bidAmount = int64(data.vbid_amount().v),
 				.round = data.vround().v,
+				.number = data.vgift_num().value_or_empty(),
 				.position = data.vpos().v,
 				.nameHidden = data.is_name_hidden(),
 			});
@@ -126,6 +201,49 @@ void GiftAuctions::requestAcquired(
 		done(std::move(gifts));
 	}).fail([=] {
 		done({});
+	}).send();
+}
+
+std::optional<Data::UniqueGiftAttributes> GiftAuctions::attributes(
+		uint64 giftId) const {
+	const auto i = _attributes.find(giftId);
+	return (i != end(_attributes) && i->second.waiters.empty())
+		? i->second.lists
+		: std::optional<Data::UniqueGiftAttributes>();
+}
+
+void GiftAuctions::requestAttributes(uint64 giftId, Fn<void()> ready) {
+	auto &entry = _attributes[giftId];
+	entry.waiters.push_back(std::move(ready));
+	if (entry.waiters.size() > 1) {
+		return;
+	}
+	_session->api().request(MTPpayments_GetStarGiftUpgradeAttributes(
+		MTP_long(giftId)
+	)).done([=](const MTPpayments_StarGiftUpgradeAttributes &result) {
+		const auto &attributes = result.data().vattributes().v;
+		auto &entry = _attributes[giftId];
+		auto &info = entry.lists;
+		info.models.reserve(attributes.size());
+		info.patterns.reserve(attributes.size());
+		info.backdrops.reserve(attributes.size());
+		for (const auto &attribute : attributes) {
+			attribute.match([&](const MTPDstarGiftAttributeModel &data) {
+				info.models.push_back(Api::FromTL(_session, data));
+			}, [&](const MTPDstarGiftAttributePattern &data) {
+				info.patterns.push_back(Api::FromTL(_session, data));
+			}, [&](const MTPDstarGiftAttributeBackdrop &data) {
+				info.backdrops.push_back(Api::FromTL(data));
+			}, [](const MTPDstarGiftAttributeOriginalDetails &data) {
+			});
+		}
+		for (const auto &ready : base::take(entry.waiters)) {
+			ready();
+		}
+	}).fail([=] {
+		for (const auto &ready : base::take(_attributes[giftId].waiters)) {
+			ready();
+		}
 	}).send();
 }
 
@@ -152,7 +270,7 @@ rpl::producer<bool> GiftAuctions::hasActiveChanges() const {
 }
 
 bool GiftAuctions::hasActive() const {
-	for (const auto &[slug, entry] : _map) {
+	for (const auto &[giftId, entry] : _map) {
 		if (myStateKey(entry->state)) {
 			return true;
 		}
@@ -163,13 +281,13 @@ bool GiftAuctions::hasActive() const {
 void GiftAuctions::checkSubscriptions() {
 	const auto now = crl::now();
 	auto next = crl::time();
-	for (const auto &[slug, entry] : _map) {
+	for (const auto &[giftId, entry] : _map) {
 		const auto raw = entry.get();
 		const auto till = raw->state.subscribedTill;
 		if (till <= 0 || !raw->changes.has_consumers()) {
 			continue;
 		} else if (till <= now) {
-			request(slug);
+			request(giftId);
 		} else {
 			const auto timeout = till - now;
 			if (!next || timeout < next) {
@@ -205,7 +323,7 @@ auto GiftAuctions::myStateKey(const GiftAuctionState &state) const
 ActiveAuctions GiftAuctions::collectActive() const {
 	auto result = ActiveAuctions();
 	result.list.reserve(_map.size());
-	for (const auto &[slug, entry] : _map) {
+	for (const auto &[giftId, entry] : _map) {
 		const auto raw = &entry->state;
 		if (raw->gift && raw->my.date) {
 			result.list.push_back(raw);
@@ -230,22 +348,24 @@ void GiftAuctions::requestActive() {
 	_activeRequestId = _session->api().request(
 		MTPpayments_GetStarGiftActiveAuctions(MTP_long(countActiveHash()))
 	).done([=](const MTPpayments_StarGiftActiveAuctions &result) {
+		_activeRequestId = 0;
 		result.match([=](const MTPDpayments_starGiftActiveAuctions &data) {
 			const auto owner = &_session->data();
 			owner->processUsers(data.vusers());
+			owner->processChats(data.vchats());
 
-			auto giftsFound = base::flat_set<QString>();
+			auto giftsFound = base::flat_set<uint64>();
 			const auto &list = data.vauctions().v;
 			giftsFound.reserve(list.size());
 			for (const auto &auction : list) {
 				const auto &data = auction.data();
 				auto gift = Api::FromTL(_session, data.vgift());
-				const auto slug = gift ? gift->auctionSlug : QString();
-				if (slug.isEmpty()) {
+				if (!gift || !gift->id) {
 					LOG(("Api Error: Bad auction gift."));
 					continue;
 				}
-				auto &entry = _map[slug];
+				const auto giftId = gift->id;
+				auto &entry = _map[giftId];
 				if (!entry) {
 					entry = std::make_unique<Entry>();
 				}
@@ -255,21 +375,21 @@ void GiftAuctions::requestActive() {
 				}
 				apply(raw, data.vstate());
 				apply(raw, data.vuser_state());
-				giftsFound.emplace(slug);
+				giftsFound.emplace(giftId);
 			}
-			for (const auto &[slug, entry] : _map) {
+			for (const auto &[giftId, entry] : _map) {
 				const auto my = &entry->state.my;
-				if (my->date && !giftsFound.contains(slug)) {
+				if (my->date && !giftsFound.contains(giftId)) {
 					my->to = nullptr;
 					my->minBidAmount = 0;
 					my->bid = 0;
 					my->date = 0;
 					my->returned = false;
-					giftsFound.emplace(slug);
+					giftsFound.emplace(giftId);
 				}
 			}
-			for (const auto &slug : giftsFound) {
-				_map[slug]->changes.fire({});
+			for (const auto &giftId : giftsFound) {
+				_map[giftId]->changes.fire({});
 			}
 			_activeChanged.fire({});
 		}, [](const MTPDpayments_starGiftActiveAuctionsNotModified &) {
@@ -277,54 +397,49 @@ void GiftAuctions::requestActive() {
 	}).send();
 }
 
-void GiftAuctions::request(const QString &slug) {
-	auto &entry = _map[slug];
-	Assert(entry != nullptr);
-
-	const auto raw = entry.get();
+void GiftAuctions::request(uint64 giftId) {
+	auto it = _map.find(giftId);
+	if (it == _map.end()) {
+		return;
+	}
+	const auto raw = it->second.get();
 	if (raw->requested) {
 		return;
 	}
 	raw->requested = true;
 	_session->api().request(MTPpayments_GetStarGiftAuctionState(
-		MTP_inputStarGiftAuctionSlug(MTP_string(slug)),
+		MTP_inputStarGiftAuction(MTP_long(giftId)),
 		MTP_int(raw->state.version)
 	)).done([=](const MTPpayments_StarGiftAuctionState &result) {
+		auto it = _map.find(giftId);
+		if (it == _map.end()) {
+			return;
+		}
+		const auto raw = it->second.get();
 		raw->requested = false;
+
 		const auto &data = result.data();
 
 		_session->data().processUsers(data.vusers());
+		_session->data().processChats(data.vchats());
 
 		raw->state.gift = Api::FromTL(_session, data.vgift());
 		if (!raw->state.gift) {
 			return;
 		}
-		const auto timeout = data.vtimeout().v;
-		const auto ms = timeout * crl::time(1000);
-		raw->state.subscribedTill = ms ? (crl::now() + ms) : -1;
 
-		const auto was = myStateKey(raw->state);
-		apply(raw, data.vstate());
-		apply(raw, data.vuser_state());
-		if (raw->changes.has_consumers()) {
-			raw->changes.fire({});
-			if (ms && (!_timer.isActive() || _timer.remainingTime() > ms)) {
-				_timer.callOnce(ms);
-			}
-		}
-		if (was != myStateKey(raw->state)) {
-			_activeChanged.fire({});
+		applyStateResponse(raw, result);
+	}).fail([=] {
+		auto it = _map.find(giftId);
+		if (it != _map.end()) {
+			it->second->requested = false;
 		}
 	}).send();
 }
 
 GiftAuctions::Entry *GiftAuctions::find(uint64 giftId) const {
-	for (const auto &[slug, entry] : _map) {
-		if (entry->state.gift && entry->state.gift->id == giftId) {
-			return entry.get();
-		}
-	}
-	return nullptr;
+	const auto it = _map.find(giftId);
+	return (it != _map.end()) ? it->second.get() : nullptr;
 }
 
 void GiftAuctions::apply(
@@ -367,6 +482,24 @@ void GiftAuctions::apply(
 		entry->giftsLeft = data.vgifts_left().v;
 		entry->currentRound = data.vcurrent_round().v;
 		entry->totalRounds = data.vtotal_rounds().v;
+		const auto &rounds = data.vrounds().v;
+		entry->roundParameters.clear();
+		entry->roundParameters.reserve(rounds.size());
+		for (const auto &round : rounds) {
+			round.match([&](const MTPDstarGiftAuctionRound &data) {
+				entry->roundParameters.push_back({
+					.number = data.vnum().v,
+					.duration = data.vduration().v,
+				});
+			}, [&](const MTPDstarGiftAuctionRoundExtendable &data) {
+				entry->roundParameters.push_back({
+					.number = data.vnum().v,
+					.duration = data.vduration().v,
+					.extendTop = data.vextend_top().v,
+					.extendDuration = data.vextend_window().v,
+				});
+			});
+		}
 		entry->averagePrice = 0;
 	}, [&](const MTPDstarGiftAuctionStateFinished &data) {
 		entry->averagePrice = data.vaverage_price().v;

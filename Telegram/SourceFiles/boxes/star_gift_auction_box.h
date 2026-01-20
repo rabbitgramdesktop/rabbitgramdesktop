@@ -14,6 +14,7 @@ class Show;
 namespace Data {
 struct GiftAuctionState;
 struct ActiveAuctions;
+struct StarGift;
 } // namespace Data
 
 namespace Info::PeerGifts {
@@ -33,7 +34,7 @@ class GenericBox;
 [[nodiscard]] rpl::lifetime ShowStarGiftAuction(
 	not_null<Window::SessionController*> controller,
 	PeerData *peer,
-	QString slug,
+	uint64 giftId,
 	Fn<void()> finishRequesting,
 	Fn<void()> boxClosed);
 
@@ -49,6 +50,7 @@ struct AuctionBidBoxArgs {
 enum class AuctionButtonCountdownType {
 	Join,
 	Place,
+	Preview,
 };
 void SetAuctionButtonCountdownText(
 	not_null<RoundButton*> button,
@@ -74,5 +76,7 @@ struct ManyAuctionsState {
 [[nodiscard]] Fn<void()> ActiveAuctionsCallback(
 	not_null<Window::SessionController*> window,
 	const Data::ActiveAuctions &auctions);
+
+[[nodiscard]] std::vector<int> RandomIndicesSubset(int total, int subset);
 
 } // namespace Ui

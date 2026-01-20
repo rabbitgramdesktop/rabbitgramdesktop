@@ -92,7 +92,7 @@ void SendRequest(
 	user->session().api().request(MTPcontacts_AddContact(
 		MTP_flags(Flag::f_note
 			| (sharePhone ? Flag::f_add_phone_privacy_exception : Flag(0))),
-		user->inputUser,
+		user->inputUser(),
 		MTP_string(first),
 		MTP_string(last),
 		MTP_string(phone),
@@ -348,8 +348,8 @@ void Controller::initNameFields(
 			_save();
 		}
 	};
-	first->submits() | rpl::start_with_next(submit, first->lifetime());
-	last->submits() | rpl::start_with_next(submit, last->lifetime());
+	first->submits() | rpl::on_next(submit, first->lifetime());
+	last->submits() | rpl::on_next(submit, last->lifetime());
 	first->setMaxLength(Ui::EditPeer::kMaxUserFirstLastName);
 	first->setMaxLength(Ui::EditPeer::kMaxUserFirstLastName);
 }
@@ -418,11 +418,11 @@ void Controller::setupNotesField() {
 	_emojiPanel->hide();
 	_emojiPanel->selector()->setCurrentPeer(_window->session().user());
 	_emojiPanel->selector()->emojiChosen(
-	) | rpl::start_with_next([=](ChatHelpers::EmojiChosen data) {
+	) | rpl::on_next([=](ChatHelpers::EmojiChosen data) {
 		Ui::InsertEmojiAtCursor(_notesField->textCursor(), data.emoji);
 	}, _notesField->lifetime());
 	_emojiPanel->selector()->customEmojiChosen(
-	) | rpl::start_with_next([=](ChatHelpers::FileChosen data) {
+	) | rpl::on_next([=](ChatHelpers::FileChosen data) {
 		const auto info = data.document->sticker();
 		if (info
 			&& info->setType == Data::StickersType::Emoji
@@ -440,7 +440,8 @@ void Controller::setupNotesField() {
 		_box,
 		_window,
 		_emojiPanel.get(),
-		st::sendGifWithCaptionEmojiPosition);
+		st::sendGifWithCaptionEmojiPosition,
+		false);
 	emojiButton->show();
 
 	using Limit = HistoryView::Controls::CharactersLimitLabel;
@@ -464,7 +465,7 @@ void Controller::setupNotesField() {
 			rpl::combine(
 				limitState->charsLimitation->geometryValue(),
 				_notesField->geometryValue()
-			) | rpl::start_with_next([=](QRect limit, QRect field) {
+			) | rpl::on_next([=](QRect limit, QRect field) {
 				limitState->charsLimitation->setVisible(
 					(w->mapToGlobal(limit.bottomLeft()).y() - border)
 						< w->mapToGlobal(field.bottomLeft()).y());
@@ -474,7 +475,7 @@ void Controller::setupNotesField() {
 		limitState->charsLimitation->setLeft(remove);
 	};
 
-	_notesField->changes() | rpl::start_with_next([=] {
+	_notesField->changes() | rpl::on_next([=] {
 		checkCharsLimitation();
 	}, _notesField->lifetime());
 
@@ -496,7 +497,7 @@ void Controller::setupPhotoButtons() {
 		})) | rpl::map([=](const QString &text) {
 			return text.isEmpty() ? Ui::kQEllipsis : text;
 		})
-		: rpl::single(_user->shortName()) | rpl::type_erased();
+		: rpl::single(_user->shortName()) | rpl::type_erased;
 	const auto inner = _box->verticalLayout();
 	Ui::AddSkip(inner);
 
@@ -558,7 +559,7 @@ void Controller::setupPhotoButtons() {
 
 	_suggestIconWidget = Ui::CreateChild<Ui::RpWidget>(suggestButton);
 	_suggestIconWidget->resize(iconPlaceholder);
-	_suggestIconWidget->paintRequest() | rpl::start_with_next([=] {
+	_suggestIconWidget->paintRequest() | rpl::on_next([=] {
 		if (_suggestIcon && _suggestIcon->valid()) {
 			auto p = QPainter(_suggestIconWidget);
 			const auto frame = _suggestIcon->frame(st::lightButtonFg->c);
@@ -566,7 +567,7 @@ void Controller::setupPhotoButtons() {
 		}
 	}, _suggestIconWidget->lifetime());
 
-	suggestButton->sizeValue() | rpl::start_with_next([=](QSize size) {
+	suggestButton->sizeValue() | rpl::on_next([=](QSize size) {
 		_suggestIconWidget->move(
 			st::settingsButtonLight.iconLeft - iconPlaceholder.width() / 4,
 			(size.height() - _suggestIconWidget->height()) / 2);
@@ -590,7 +591,7 @@ void Controller::setupPhotoButtons() {
 
 	_cameraIconWidget = Ui::CreateChild<Ui::RpWidget>(setButton);
 	_cameraIconWidget->resize(iconPlaceholder);
-	_cameraIconWidget->paintRequest() | rpl::start_with_next([=] {
+	_cameraIconWidget->paintRequest() | rpl::on_next([=] {
 		if (_cameraIcon && _cameraIcon->valid()) {
 			auto p = QPainter(_cameraIconWidget);
 			const auto frame = _cameraIcon->frame(st::lightButtonFg->c);
@@ -598,7 +599,7 @@ void Controller::setupPhotoButtons() {
 		}
 	}, _cameraIconWidget->lifetime());
 
-	setButton->sizeValue() | rpl::start_with_next([=](QSize size) {
+	setButton->sizeValue() | rpl::on_next([=](QSize size) {
 		_cameraIconWidget->move(
 			st::settingsButtonLight.iconLeft - iconPlaceholder.width() / 4,
 			(size.height() - _cameraIconWidget->height()) / 2);
@@ -635,7 +636,7 @@ void Controller::setupPhotoButtons() {
 	userpicButton->setAttribute(Qt::WA_TransparentForMouseEvents);
 
 	resetButton->sizeValue(
-	) | rpl::start_with_next([=](QSize size) {
+	) | rpl::on_next([=](QSize size) {
 		userpicButton->move(
 			st::settingsButtonLight.iconLeft,
 			(size.height() - userpicButton->height()) / 2);
@@ -688,7 +689,7 @@ void Controller::setupDeleteContactButton() {
 		const auto deleteSure = [=](Fn<void()> &&close) {
 			close();
 			_user->session().api().request(MTPcontacts_DeleteContacts(
-				MTP_vector<MTPInputUser>(1, _user->inputUser)
+				MTP_vector<MTPInputUser>(1, _user->inputUser())
 			)).done([=](const MTPUpdates &result) {
 				_user->session().api().applyUpdates(result);
 				_box->closeBox();
@@ -751,13 +752,13 @@ void Controller::showPhotoMenu(bool suggest) {
 							? tr::lng_profile_suggest_sure(
 								tr::now,
 								lt_user,
-								Ui::Text::Bold(_user->shortName()),
-								Ui::Text::WithEntities)
+								tr::bold(_user->shortName()),
+								tr::marked)
 							: tr::lng_profile_set_personal_sure(
 								tr::now,
 								lt_user,
-								Ui::Text::Bold(_user->shortName()),
-								Ui::Text::WithEntities)),
+								tr::bold(_user->shortName()),
+								tr::marked)),
 						.confirm = (suggest
 							? tr::lng_profile_suggest_button(tr::now)
 							: tr::lng_profile_set_photo_button(tr::now)),
@@ -798,13 +799,13 @@ void Controller::choosePhotoFile(bool suggest) {
 				? tr::lng_profile_suggest_sure(
 					tr::now,
 					lt_user,
-					Ui::Text::Bold(_user->shortName()),
-					Ui::Text::WithEntities)
+					tr::bold(_user->shortName()),
+					tr::marked)
 				: tr::lng_profile_set_personal_sure(
 					tr::now,
 					lt_user,
-					Ui::Text::Bold(_user->shortName()),
-					Ui::Text::WithEntities)),
+					tr::bold(_user->shortName()),
+					tr::marked)),
 			.confirm = (suggest
 				? tr::lng_profile_suggest_button(tr::now)
 				: tr::lng_profile_set_photo_button(tr::now)),

@@ -89,11 +89,11 @@ void AddArrowDown(not_null<RpWidget*> widget) {
 	const auto skip = st::lineWidth * 4;
 	const auto size = icon->width() + skip * 2;
 	arrow->resize(size, size);
-	widget->widthValue() | rpl::start_with_next([=](int width) {
+	widget->widthValue() | rpl::on_next([=](int width) {
 		const auto left = (width - st::paidReactTopUserpic) / 2;
 		arrow->moveToRight(left - skip, -st::lineWidth, width);
 	}, widget->lifetime());
-	arrow->paintRequest() | rpl::start_with_next([=] {
+	arrow->paintRequest() | rpl::on_next([=] {
 		Painter p(arrow);
 		auto hq = PainterHighQualityEnabler(p);
 		p.setBrush(st::activeButtonBg);
@@ -146,10 +146,10 @@ void AddArrowDown(not_null<RpWidget*> widget) {
 		result->update();
 	});
 	style::PaletteChanged(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		state->badge = QImage();
 	}, result->lifetime());
-	result->paintRequest() | rpl::start_with_next([=] {
+	result->paintRequest() | rpl::on_next([=] {
 		auto p = Painter(result);
 		const auto left = (result->width() - st::paidReactTopUserpic) / 2;
 		p.drawImage(left, top, photo->image(st::paidReactTopUserpic));
@@ -285,7 +285,7 @@ void FillTopReactors(
 	rpl::combine(
 		std::move(chosen),
 		std::move(shownPeer)
-	) | rpl::start_with_next([=](int chosen, uint64 barePeerId) {
+	) | rpl::on_next([=](int chosen, uint64 barePeerId) {
 		if (!state->initialChosen) {
 			state->initialChosen = chosen;
 		} else if (*state->initialChosen != chosen) {
@@ -375,7 +375,7 @@ void FillTopReactors(
 	rpl::combine(
 		state->updated.events_starting_with({}),
 		wrap->widthValue()
-	) | rpl::start_with_next([=](auto, int width) {
+	) | rpl::on_next([=](auto, int width) {
 		if (!state->widgets.empty()) {
 			parent->resize(parent->width(), state->widgets.back()->height());
 		}
@@ -405,7 +405,7 @@ void FillTopReactors(
 	const auto subtextHeight = st::starSelectInfoSubtext.style.font->height;
 	const auto height = titleHeight + subtextHeight;
 
-	result->paintRequest() | rpl::start_with_next([=] {
+	result->paintRequest() | rpl::on_next([=] {
 		auto p = QPainter(result);
 		auto hq = PainterHighQualityEnabler(p);
 		p.setPen(Qt::NoPen);
@@ -441,7 +441,7 @@ void FillTopReactors(
 		result->widthValue(),
 		titleLabel->widthValue(),
 		subtextLabel->widthValue()
-	) | rpl::start_with_next([=](int width, int titlew, int subtextw) {
+	) | rpl::on_next([=](int width, int titlew, int subtextw) {
 		const auto padding = st::starSelectInfoPadding;
 		titleLabel->moveToLeft((width - titlew) / 2, padding.top(), width);
 		subtextLabel->moveToLeft(
@@ -493,6 +493,7 @@ void PaidReactionsBox(
 	const auto colorings = args.colorings;
 	const auto videoStreamChoosing = args.videoStreamChoosing;
 	const auto videoStreamSending = args.videoStreamSending;
+	const auto videoStreamAdmin = args.videoStreamAdmin;
 	const auto videoStream = videoStreamChoosing || videoStreamSending;
 	const auto initialShownPeer = ranges::find(
 		args.top,
@@ -544,8 +545,12 @@ void PaidReactionsBox(
 			content,
 			std::move(args.top),
 			colorings,
-			state->chosen.value(),
-			state->shownPeer.value(),
+			(videoStreamAdmin
+				? rpl::single(state->chosen.current())
+				: state->chosen.value() | rpl::type_erased),
+			(videoStreamAdmin
+				? rpl::single(state->shownPeer.current())
+				: state->shownPeer.value() | rpl::type_erased),
 			[=](uint64 barePeerId) {
 				state->shownPeer = state->savedShownPeer = barePeerId;
 			},
@@ -564,7 +569,9 @@ void PaidReactionsBox(
 	box->addRow(
 		object_ptr<FlatLabel>(
 			box,
-			(videoStreamChoosing
+			(videoStreamAdmin
+				? tr::lng_paid_admin_title()
+				: videoStreamChoosing
 				? tr::lng_paid_comment_title()
 				: videoStreamSending
 				? tr::lng_paid_reaction_title()
@@ -579,28 +586,30 @@ void PaidReactionsBox(
 			+ QMargins(0, st::lineWidth, 0, st::boostBottomSkip)));
 	const auto label = CreateChild<FlatLabel>(
 		labelWrap,
-		(videoStream
+		(videoStreamAdmin
+			? tr::lng_paid_admin_about(tr::marked)
+			: videoStream
 			? (videoStreamChoosing
 				? tr::lng_paid_comment_about
 				: tr::lng_paid_reaction_about)(
 					lt_name,
-					rpl::single(Text::Bold(args.name)),
-					Text::RichLangValue)
+					rpl::single(tr::bold(args.name)),
+					tr::rich)
 			: already
 			? tr::lng_paid_react_already(
 				lt_count,
 				rpl::single(already) | tr::to_count(),
-				Text::RichLangValue)
+				tr::rich)
 			: tr::lng_paid_react_about(
 				lt_channel,
-				rpl::single(Text::Bold(args.name)),
-				Text::RichLangValue)),
+				rpl::single(tr::bold(args.name)),
+				tr::rich)),
 		dark ? st::darkEditStarsText : st::boostText);
 	label->setTryMakeSimilarLines(true);
-	labelWrap->widthValue() | rpl::start_with_next([=](int width) {
+	labelWrap->widthValue() | rpl::on_next([=](int width) {
 		label->resizeToWidth(width);
 	}, label->lifetime());
-	label->heightValue() | rpl::start_with_next([=](int height) {
+	label->heightValue() | rpl::on_next([=](int height) {
 		const auto min = 2 * st::normalFont->height;
 		const auto skip = std::max((min - height) / 2, 0);
 		labelWrap->resize(labelWrap->width(), 2 * skip + height);
@@ -620,7 +629,7 @@ void PaidReactionsBox(
 			st::boxRowPadding + QMargins(0, 0, 0, skip),
 			style::al_top);
 		named->checkedValue(
-		) | rpl::start_with_next([=](bool show) {
+		) | rpl::on_next([=](bool show) {
 			state->shownPeer = show ? state->savedShownPeer : 0;
 		}, named->lifetime());
 	}
@@ -630,15 +639,17 @@ void PaidReactionsBox(
 
 	AddDividerText(
 		content,
-		tr::lng_paid_react_agree(
-			lt_link,
-			rpl::combine(
-				tr::lng_paid_react_agree_link(),
-				tr::lng_group_invite_subscription_about_url()
-			) | rpl::map([](const QString &text, const QString &url) {
-				return Ui::Text::Link(text, url);
-			}),
-			Ui::Text::RichLangValue),
+		(videoStreamAdmin
+			? tr::lng_paid_react_admin_cant(tr::marked)
+			: tr::lng_paid_react_agree(
+				lt_link,
+				rpl::combine(
+					tr::lng_paid_react_agree_link(),
+					tr::lng_group_invite_subscription_about_url()
+				) | rpl::map([](const QString &text, const QString &url) {
+					return tr::link(text, url);
+				}),
+				tr::rich)),
 		st::defaultBoxDividerLabelPadding,
 		dark ? st::groupCallDividerLabel : st::defaultDividerLabel);
 
@@ -648,7 +659,7 @@ void PaidReactionsBox(
 
 	box->boxClosing() | rpl::filter([=] {
 		return state->shownPeer.current() != initialShownPeer;
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		args.send(0, state->shownPeer.current());
 	}, box->lifetime());
 
@@ -835,7 +846,7 @@ void PaidReactionSlider(
 			: std::max(value, min);
 	};
 
-	std::move(current) | rpl::start_with_next([=](int value) {
+	std::move(current) | rpl::on_next([=](int value) {
 		value = std::clamp(value, 1, max);
 		if (discreter.ratioToValue(slider->value()) != value) {
 			slider->setValue(discreter.valueToRatio(value));
@@ -868,7 +879,7 @@ void PaidReactionSlider(
 	const auto stars = Ui::CreateChild<Ui::RpWidget>(slider->parentWidget());
 	stars->show();
 	stars->raise();
-	slider->geometryValue() | rpl::start_with_next([=](QRect rect) {
+	slider->geometryValue() | rpl::on_next([=](QRect rect) {
 		stars->setGeometry(rect);
 	}, stars->lifetime());
 
@@ -877,7 +888,7 @@ void PaidReactionSlider(
 
 	const auto seekSize = st::paidReactSlider.seekSize.width();
 	const auto seekRadius = seekSize / 2.;
-	stars->paintRequest() | rpl::start_with_next([=] {
+	stars->paintRequest() | rpl::on_next([=] {
 		if (!state->animation.animating()) {
 			state->animation.start();
 		}
@@ -904,14 +915,14 @@ void PaidReactionSlider(
 
 		p.setClipPath(fullPath.subtracted(circlePath));
 		state->particles.setColor(Qt::white);
-		state->particles.paint(p, rect, crl::now());
+		state->particles.paint(p, rect, crl::now(), false);
 		p.setClipping(false);
 
 		p.setClipPath(fullPath.intersected(circlePath.united(rightRect)));
 		state->particles.setColor(activeFgOverride
 			? st::groupCallMemberInactiveIcon->c
 			: st::creditsBg3->c);
-		state->particles.paint(p, rect, crl::now());
+		state->particles.paint(p, rect, crl::now(), false);
 	}, stars->lifetime());
 }
 
@@ -930,7 +941,7 @@ void AddStarSelectBalance(
 	rpl::combine(
 		balance->sizeValue(),
 		box->widthValue()
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		balance->moveToLeft(
 			st::creditsHistoryRightSkip * 2,
 			st::creditsHistoryRightSkip);
@@ -970,7 +981,7 @@ not_null<Premium::BubbleWidget*> AddStarSelectBubble(
 		st::boxRowPadding);
 	bubble->show();
 	if (activeFgOverride) {
-		std::move(value) | rpl::start_with_next([=](int count) {
+		std::move(value) | rpl::on_next([=](int count) {
 			bubble->setBrushOverride(activeFgOverride(count));
 		}, bubble->lifetime());
 	}
@@ -1002,7 +1013,7 @@ object_ptr<RpWidget> MakeStarSelectInfoBlocks(
 			dark));
 	}
 	raw->resize(raw->width(), state->blocks.front()->height());
-	raw->widthValue() | rpl::start_with_next([=](int width) {
+	raw->widthValue() | rpl::on_next([=](int width) {
 		const auto count = int(state->blocks.size());
 		const auto skip = (st::boxRowPadding.left() / 2);
 		const auto single = (width - skip * (count - 1)) / float64(count);

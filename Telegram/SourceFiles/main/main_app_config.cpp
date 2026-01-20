@@ -27,7 +27,7 @@ AppConfig::AppConfig(not_null<Account*> account) : _account(account) {
 	account->sessionChanges(
 	) | rpl::filter([=](Session *session) {
 		return (session != nullptr);
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		_lastFrozenRefresh = 0;
 		refresh();
 	}, _lifetime);
@@ -37,12 +37,13 @@ AppConfig::~AppConfig() = default;
 
 void AppConfig::start() {
 	_account->mtpMainSessionValue(
-	) | rpl::start_with_next([=](not_null<MTP::Instance*> instance) {
+	) | rpl::on_next([=](not_null<MTP::Instance*> instance) {
 		_api.emplace(instance);
+		_requestId = 0;
 		refresh();
 
 		_frozenTrackLifetime = instance->frozenErrorReceived(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			if (!get<int>(u"freeze_since_date"_q, 0)) {
 				const auto now = crl::now();
 				if (!_lastFrozenRefresh
@@ -99,6 +100,14 @@ float64 AppConfig::starsWithdrawRate() const {
 }
 
 float64 AppConfig::currencyWithdrawRate() const {
+	return get<float64>(u"ton_usd_rate"_q, 1);
+}
+
+float64 AppConfig::starsSellRate() const {
+	return get<float64>(u"stars_usd_sell_rate_x1000"_q, 1410) / 1000.;
+}
+
+float64 AppConfig::currencySellRate() const {
 	return get<float64>(u"ton_usd_rate"_q, 1);
 }
 
@@ -261,6 +270,35 @@ int AppConfig::groupCallMessageLengthLimit() const {
 
 TimeId AppConfig::groupCallMessageTTL() const {
 	return get<int>(u"group_call_message_ttl"_q, 10);
+}
+
+int AppConfig::passkeysAccountPasskeysMax() const {
+	return get<int>(u"passkeys_account_passkeys_max"_q, 10);
+}
+
+bool AppConfig::settingsDisplayPasskeys() const {
+	return get<bool>(u"settings_display_passkeys"_q, false);
+}
+
+int64 AppConfig::stakeDiceNanoTonMin() const {
+	return get<int64>(u"ton_stakedice_stake_amount_min"_q, 100'000'000LL);
+}
+
+int64 AppConfig::stakeDiceNanoTonMax() const {
+	return get<int64>(u"ton_stakedice_stake_amount_max"_q, 50'000'000'000LL);
+}
+
+std::vector<int64> AppConfig::stakeDiceNanoTonSuggested() const {
+	return get<std::vector<int64>>(
+		u"ton_stakedice_stake_suggested_amounts"_q,
+		std::vector<int64>{
+			100'000'000LL,
+			1'000'000'000LL,
+			2'000'000'000LL,
+			5'000'000'000LL,
+			10'000'000'000LL,
+			20'000'000'000LL,
+		});
 }
 
 void AppConfig::refresh(bool force) {
@@ -439,6 +477,27 @@ std::vector<int> AppConfig::getIntArray(
 				}
 				result.push_back(
 					int(base::SafeRound(entry.c_jsonNumber().vvalue().v)));
+			}
+			return result;
+		}, [&](const auto &data) {
+			return std::move(fallback);
+		});
+	});
+}
+
+std::vector<int64> AppConfig::getInt64Array(
+		const QString &key,
+		std::vector<int64> &&fallback) const {
+	return getValue(key, [&](const MTPJSONValue &value) {
+		return value.match([&](const MTPDjsonArray &data) {
+			auto result = std::vector<int64>();
+			result.reserve(data.vvalue().v.size());
+			for (const auto &entry : data.vvalue().v) {
+				if (entry.type() != mtpc_jsonNumber) {
+					return std::move(fallback);
+				}
+				result.push_back(
+					int64(base::SafeRound(entry.c_jsonNumber().vvalue().v)));
 			}
 			return result;
 		}, [&](const auto &data) {

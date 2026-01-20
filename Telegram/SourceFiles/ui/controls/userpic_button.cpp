@@ -83,7 +83,7 @@ void CameraBox(
 		return;
 	}
 	track->stateValue(
-	) | rpl::start_with_next([=](const VideoState &state) {
+	) | rpl::on_next([=](const VideoState &state) {
 		if (state == VideoState::Inactive) {
 			box->closeBox();
 		}
@@ -139,7 +139,7 @@ void SetupSubButtonBackground(
 
 	background->resize(size);
 	background->paintRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		auto p = QPainter(background);
 		auto hq = PainterHighQualityEnabler(p);
 		p.setBrush(st::boxBg);
@@ -148,9 +148,18 @@ void SetupSubButtonBackground(
 	}, background->lifetime());
 
 	upload->positionValue(
-	) | rpl::start_with_next([=](QPoint position) {
+	) | rpl::on_next([=](QPoint position) {
 		background->move(position - QPoint(border, border));
 	}, background->lifetime());
+}
+
+[[nodiscard]] QBrush CreateDefaultGradientBrush(int size) {
+	auto gradient = QLinearGradient(0, 0, 0, size);
+	gradient.setStops({
+		{ 0.0, st::historyPeer4UserpicBg->c },
+		{ 1.0, st::historyPeer4UserpicBg2->c },
+	});
+	return QBrush(std::move(gradient));
 }
 
 } // namespace
@@ -231,7 +240,7 @@ void UserpicButton::prepare() {
 
 void UserpicButton::showCustomOnChosen() {
 	chosenImages(
-	) | rpl::start_with_next([=](ChosenImage &&chosen) {
+	) | rpl::on_next([=](ChosenImage &&chosen) {
 		showCustom(std::move(chosen.image));
 	}, lifetime());
 }
@@ -310,8 +319,8 @@ void UserpicButton::choosePhotoLocally() {
 				? (*phrase)(
 					tr::now,
 					lt_user,
-					Ui::Text::Bold(name),
-					Ui::Text::WithEntities)
+					tr::bold(name),
+					tr::marked)
 				: TextWithEntities()),
 			.confirm = ((type == ChosenType::Suggest)
 				? tr::lng_profile_suggest_button(tr::now)
@@ -430,7 +439,7 @@ void UserpicButton::choosePhotoLocally() {
 					key
 				) | rpl::take(
 					1
-				) | rpl::start_with_next([=](const UserPrivacy::Rule &value) {
+				) | rpl::on_next([=](const UserPrivacy::Rule &value) {
 					using namespace Settings;
 					_window->show(Box<EditPrivacyBox>(
 						_window->sessionController(),
@@ -446,7 +455,7 @@ void UserpicButton::choosePhotoLocally() {
 auto UserpicButton::makeResetToOriginalAction()
 -> base::unique_qptr<Menu::ItemBase> {
 	auto item = base::make_unique_q<Menu::Action>(
-		_menu.get(),
+		_menu->menu(),
 		_menu->st().menu,
 		Menu::CreateAction(
 			_menu.get(),
@@ -505,7 +514,7 @@ void UserpicButton::setupPeerViewers() {
 				user->hasPersonalPhoto());
 		}) | rpl::distinct_until_changed() | rpl::skip(
 			1
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			processNewPeerPhoto();
 			update();
 		}, _sourceLifetime);
@@ -516,7 +525,7 @@ void UserpicButton::setupPeerViewers() {
 		_peer->session().changes().peerUpdates(
 			_peer,
 			Data::PeerUpdate::Flag::Photo
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			processNewPeerPhoto();
 			update();
 		}, _sourceLifetime);
@@ -524,7 +533,7 @@ void UserpicButton::setupPeerViewers() {
 	_peer->session().downloaderTaskFinished(
 	) | rpl::filter([=] {
 		return _waiting;
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		const auto loading = _showPeerUserpic
 			? Ui::PeerUserpicLoading(_userpicView)
 			: (_nonPersonalView && !_nonPersonalView->loaded());
@@ -583,9 +592,9 @@ void UserpicButton::paintEvent(QPaintEvent *e) {
 		paintUserpicFrame(p, photoPosition);
 	}
 
-	const auto fillTranslatedShape = [&](const style::color &color) {
+	const auto fillTranslatedShape = [&](QBrush brush) {
 		p.translate(photoLeft, photoTop);
-		fillShape(p, color);
+		fillShape(p, std::move(brush));
 		p.translate(-photoLeft, -photoTop);
 	};
 
@@ -593,16 +602,10 @@ void UserpicButton::paintEvent(QPaintEvent *e) {
 		auto over = isOver() || isDown();
 		if (over) {
 			fillTranslatedShape(_userpicHasImage
-				? st::msgDateImgBg
-				: _st.changeButton.textBgOver);
+				? st::msgDateImgBg->b
+				: st::shadowFg->b);
 		}
-		paintRipple(
-			p,
-			photoLeft,
-			photoTop,
-			(_userpicHasImage
-				? &st::shadowFg->c
-				: &_st.changeButton.ripple.color->c));
+		paintRipple(p, photoLeft, photoTop, &st::shadowFg->c);
 		if (over || !_userpicHasImage) {
 			auto iconLeft = (_st.changeIconPosition.x() < 0)
 				? (_st.photoSize - _st.changeIcon.width()) / 2
@@ -789,7 +792,7 @@ bool UserpicButton::createStreamingObjects(not_null<PhotoData*> photo) {
 		nullptr);
 	_streamed->lockPlayer();
 	_streamed->player().updates(
-	) | rpl::start_with_next_error([=](Update &&update) {
+	) | rpl::on_next_error([=](Update &&update) {
 		handleStreamingUpdate(std::move(update));
 	}, [=](Error &&error) {
 		handleStreamingError(std::move(error));
@@ -969,7 +972,7 @@ void UserpicButton::switchChangePhotoOverlay(
 			updateCursorInChangeOverlay(
 				mapFromGlobal(QCursor::pos()));
 			if (chosen) {
-				chosenImages() | rpl::start_with_next(chosen, lifetime());
+				chosenImages() | rpl::on_next(chosen, lifetime());
 			}
 		} else {
 			_changeOverlayShown.stop();
@@ -1061,7 +1064,7 @@ void UserpicButton::showCustom(QImage &&image) {
 			: Images::Circle(std::move(small)));
 	} else {
 		_userpic = CreateSquarePixmap(_st.photoSize, [&](Painter &p) {
-			fillShape(p, _st.changeButton.textBg);
+			fillShape(p, CreateDefaultGradientBrush(_st.photoSize));
 		});
 	}
 	_userpic.setDevicePixelRatio(style::DevicePixelRatio());
@@ -1102,10 +1105,10 @@ rpl::producer<> UserpicButton::resetPersonalRequests() const {
 	return _resetPersonalRequests.events();
 }
 
-void UserpicButton::fillShape(QPainter &p, const style::color &color) const {
+void UserpicButton::fillShape(QPainter &p, QBrush brush) const {
 	PainterHighQualityEnabler hq(p);
 	p.setPen(Qt::NoPen);
-	p.setBrush(color);
+	p.setBrush(brush);
 	const auto size = _st.photoSize;
 	if (useForumShape()) {
 		const auto radius = size * Ui::ForumUserpicRadiusMultiplier();
@@ -1172,7 +1175,7 @@ void UserpicButton::prepareUserpicPixmap() {
 				}
 			}
 		} else {
-			fillShape(p, _st.changeButton.textBg);
+			fillShape(p, CreateDefaultGradientBrush(_st.photoSize));
 		}
 	});
 	_userpicUniqueKey = _userpicHasImage

@@ -90,7 +90,7 @@ void Polls::create(
 		randomId,
 		Data::Histories::PrepareMessage<MTPmessages_SendMedia>(
 			MTP_flags(sendFlags),
-			peer->input,
+			peer->input(),
 			Data::Histories::ReplyToPlaceholder(),
 			PollDataToInputMedia(&data),
 			MTP_string(),
@@ -99,7 +99,7 @@ void Polls::create(
 			MTPVector<MTPMessageEntity>(),
 			MTP_int(action.options.scheduled),
 			MTP_int(action.options.scheduleRepeatPeriod),
-			(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
+			(sendAs ? sendAs->input() : MTP_inputPeerEmpty()),
 			Data::ShortcutIdToMTP(_session, action.options.shortcutId),
 			MTP_long(action.options.effectId),
 			MTP_long(starsPaid),
@@ -162,7 +162,7 @@ void Polls::sendVotes(
 		ranges::back_inserter(prepared),
 		[](const QByteArray &option) { return MTP_bytes(option); });
 	const auto requestId = _api.request(MTPmessages_SendVote(
-		item->history()->peer->input,
+		item->history()->peer->input(),
 		MTP_int(item->id),
 		MTP_vector<MTPbytes>(prepared)
 	)).done([=](const MTPUpdates &result) {
@@ -188,7 +188,7 @@ void Polls::close(not_null<HistoryItem*> item) {
 	}
 	const auto requestId = _api.request(MTPmessages_EditMessage(
 		MTP_flags(MTPmessages_EditMessage::Flag::f_media),
-		item->history()->peer->input,
+		item->history()->peer->input(),
 		MTP_int(item->id),
 		MTPstring(),
 		PollDataToInputMedia(poll, true),
@@ -212,7 +212,7 @@ void Polls::reloadResults(not_null<HistoryItem*> item) {
 		return;
 	}
 	const auto requestId = _api.request(MTPmessages_GetPollResults(
-		item->history()->peer->input,
+		item->history()->peer->input(),
 		MTP_int(item->id)
 	)).done([=](const MTPUpdates &result) {
 		_pollReloadRequestIds.erase(itemId);

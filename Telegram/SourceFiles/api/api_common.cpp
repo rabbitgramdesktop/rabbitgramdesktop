@@ -14,7 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Api {
 
-MTPSuggestedPost SuggestToMTP(SuggestPostOptions suggest) {
+MTPSuggestedPost SuggestToMTP(SuggestOptions suggest) {
 	using Flag = MTPDsuggestedPost::Flag;
 	return suggest.exists
 		? MTP_suggestedPost(

@@ -42,8 +42,9 @@ object_ptr<RpWidget> MakeFeatureListEntry(
 	icon->show();
 	title->show();
 	about->show();
+	about->setLinksTrusted();
 	widget->widthValue(
-	) | rpl::start_with_next([=](int width) {
+	) | rpl::on_next([=](int width) {
 		const auto left = st::infoStarsFeatureLabelLeft;
 		const auto available = width - left;
 		title->resizeToWidth(available);

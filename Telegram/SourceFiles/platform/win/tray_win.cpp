@@ -212,7 +212,7 @@ void Tray::createIcon() {
 			&QPlatformSystemTrayIcon::contextMenuRequested
 		) | rpl::filter([=] {
 			return _menu != nullptr;
-		}) | rpl::start_with_next([=](
+		}) | rpl::on_next([=](
 				QPoint globalNativePosition,
 				const QPlatformScreen *screen) {
 			_aboutToShowRequests.fire({});
@@ -280,7 +280,7 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 	auto callbackLater = crl::guard(_menu.get(), [=] {
 		using namespace rpl::mappers;
 		_callbackFromTrayLifetime = _menu->shownValue(
-		) | rpl::filter(!_1) | rpl::take(1) | rpl::start_with_next([=] {
+		) | rpl::filter(!_1) | rpl::take(1) | rpl::on_next([=] {
 			callback();
 		});
 	});
@@ -288,7 +288,7 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 	const auto action = _menu->addAction(QString(), std::move(callbackLater));
 	std::move(
 		text
-	) | rpl::start_with_next([=](const QString &text) {
+	) | rpl::on_next([=](const QString &text) {
 		action->setText(text);
 	}, _actionsLifetime);
 }

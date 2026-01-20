@@ -32,6 +32,7 @@ set(style_files
     intro/intro.style
     iv/iv.style
     media/player/media_player.style
+    media/stories/media_stories.style
     passport/passport.style
     payments/ui/payments.style
     profile/profile.style
@@ -97,6 +98,8 @@ PRIVATE
     data/data_channel_earn.h
     data/data_credits.h
     data/data_credits_earn.h
+    data/data_passkey_deserialize.cpp
+    data/data_passkey_deserialize.h
     data/data_peer_colors.h
     data/data_premium_subscription_option.h
     data/data_statistics_chart.cpp
@@ -139,6 +142,9 @@ PRIVATE
     editor/scene/scene_item_image.h
     editor/scene/scene_item_line.cpp
     editor/scene/scene_item_line.h
+
+    ui/boxes/about_cocoon_box.h
+    ui/boxes/about_cocoon_box.cpp
 
     history/admin_log/history_admin_log_filter_value.h
     history/history_view_top_toast.cpp
@@ -237,14 +243,22 @@ PRIVATE
 
     platform/linux/current_geo_location_linux.cpp
     platform/linux/current_geo_location_linux.h
+    platform/linux/text_recognition_linux.h
     platform/mac/file_bookmark_mac.h
     platform/mac/file_bookmark_mac.mm
     platform/mac/current_geo_location_mac.h
     platform/mac/current_geo_location_mac.mm
+    platform/mac/text_recognition_mac.h
+    platform/mac/text_recognition_mac.mm
     platform/win/current_geo_location_win.cpp
     platform/win/current_geo_location_win.h
+    platform/win/text_recognition_win.h
     platform/platform_file_bookmark.h
     platform/platform_current_geo_location.h
+    platform/platform_text_recognition.h
+
+    profile/profile_back_button.cpp
+    profile/profile_back_button.h
 
     settings/settings_common.cpp
     settings/settings_common.h

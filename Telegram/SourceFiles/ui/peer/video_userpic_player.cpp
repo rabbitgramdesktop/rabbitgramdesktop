@@ -86,7 +86,7 @@ bool VideoUserpicPlayer::createStreaming(
 		nullptr);
 	_streamed->lockPlayer();
 	_streamed->player().updates(
-	) | rpl::start_with_next_error([=](Update &&update) {
+	) | rpl::on_next_error([=](Update &&update) {
 		handleUpdate(std::move(update));
 	}, [=](Error &&error) {
 		handleError(std::move(error));
