@@ -41,7 +41,7 @@ constexpr auto kVolumeStickedValues
 } // namespace
 
 MenuVolumeItem::MenuVolumeItem(
-	not_null<RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	const style::Menu &st,
 	const style::MediaSlider &stSlider,
 	rpl::producer<Group::ParticipantState> participantState,
@@ -65,14 +65,14 @@ MenuVolumeItem::MenuVolumeItem(
 	_localMuted ? 0. : (startVolume / float(maxVolume)),
 	Ui::Paint::ArcsAnimation::Direction::Right)) {
 
-	initResizeHook(parent->sizeValue());
+	fitToMenuWidth();
 	enableMouseSelecting();
 	enableMouseSelecting(_slider.get());
 
 	_slider->setAlwaysDisplayMarker(true);
 
 	sizeValue(
-	) | rpl::start_with_next([=](const QSize &size) {
+	) | rpl::on_next([=](const QSize &size) {
 		const auto geometry = QRect(QPoint(), size);
 		_itemRect = geometry - _padding;
 		_speakerRect = QRect(_itemRect.topLeft(), _stCross.icon.size());
@@ -90,7 +90,7 @@ MenuVolumeItem::MenuVolumeItem(
 	setCloudVolume(startVolume);
 
 	paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(this);
 
 		const auto volume = _localMuted
@@ -167,7 +167,7 @@ MenuVolumeItem::MenuVolumeItem(
 
 	std::move(
 		participantState
-	) | rpl::start_with_next([=](const Group::ParticipantState &state) {
+	) | rpl::on_next([=](const Group::ParticipantState &state) {
 		const auto newMuted = state.mutedByMe;
 		const auto newVolume = state.volume.value_or(0);
 
@@ -210,7 +210,7 @@ void MenuVolumeItem::initArcsAnimation() {
 	});
 
 	_arcs->startUpdateRequests(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		if (!_arcsAnimation.animating()) {
 			*lastTime = crl::now();
 			_arcsAnimation.start();
@@ -218,7 +218,7 @@ void MenuVolumeItem::initArcsAnimation() {
 	}, lifetime());
 
 	_arcs->stopUpdateRequests(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		_arcsAnimation.stop();
 	}, lifetime());
 }

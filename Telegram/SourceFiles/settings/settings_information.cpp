@@ -35,6 +35,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/add_contact_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/username_box.h"
+#include "boxes/peers/edit_peer_color_box.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_peer_values.h"
@@ -134,7 +135,7 @@ ComposedBadge::ComposedBadge(
 	}
 
 	_badge.updated(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		if (const auto button = _badge.widget()) {
 			button->widthValue(
 			) | rpl::start_to_stream(_premiumWidth, button->lifetime());
@@ -153,7 +154,7 @@ ComposedBadge::ComposedBadge(
 			: 0),
 		std::move(textWidth),
 		button->sizeValue()
-	) | rpl::start_with_next([=](
+	) | rpl::on_next([=](
 			int unreadWidth,
 			int premiumWidth,
 			int textWidth,
@@ -227,15 +228,15 @@ private:
 		const auto push = [=] {
 			const auto now = base::unixtime::now();
 			consumer.put_next(Data::OnlineTextActive(user, now)
-				? Ui::Text::Link(Data::OnlineText(user, now))
-				: Ui::Text::WithEntities(Data::OnlineText(user, now)));
+				? tr::link(Data::OnlineText(user, now))
+				: tr::marked(Data::OnlineText(user, now)));
 			timer->callOnce(Data::OnlineChangeTimeout(user, now));
 		};
 		timer->setCallback(push);
 		user->session().changes().peerFlagsValue(
 			user,
 			Data::PeerUpdate::Flag::OnlineStatus
-		) | rpl::start_with_next(push, lifetime);
+		) | rpl::on_next(push, lifetime);
 		return lifetime;
 	};
 }
@@ -257,7 +258,7 @@ void SetupPhoto(
 	const auto upload = CreateUploadSubButton(wrap, controller);
 
 	upload->chosenImages(
-	) | rpl::start_with_next([=](Ui::UserpicButton::ChosenImage &&chosen) {
+	) | rpl::on_next([=](Ui::UserpicButton::ChosenImage &&chosen) {
 		auto &image = chosen.image;
 		UpdatePhotoLocally(self, image);
 		photo->showCustom(base::duplicate(image));
@@ -284,7 +285,7 @@ void SetupPhoto(
 		photo->widthValue(),
 		Info::Profile::NameValue(self),
 		status->widthValue()
-	) | rpl::start_with_next([=](
+	) | rpl::on_next([=](
 			int max,
 			int photoWidth,
 			const QString&,
@@ -339,7 +340,7 @@ void AddRow(
 	wrap->clicks(
 	) | rpl::filter([=] {
 		return !wrap->isDisabled();
-	}) | rpl::start_with_next([=](Qt::MouseButton button) {
+	}) | rpl::on_next([=](Qt::MouseButton button) {
 		if (button == Qt::LeftButton) {
 			edit();
 		} else if (!forcopy->isEmpty()) {
@@ -356,7 +357,7 @@ void AddRow(
 		value
 	) | rpl::filter([](const TextWithEntities &text) {
 		return text.entities.isEmpty();
-	}) | rpl::start_with_next([=](const TextWithEntities &text) {
+	}) | rpl::on_next([=](const TextWithEntities &text) {
 		*forcopy = text.text;
 	}, wrap->lifetime());
 }
@@ -406,13 +407,13 @@ void SetupBirthday(
 		tr::lng_settings_birthday_contacts(
 			lt_link,
 			tr::lng_settings_birthday_contacts_link(
-			) | Ui::Text::ToLink(u"internal:edit_privacy_birthday"_q),
-			Ui::Text::WithEntities),
+				tr::url(u"internal:edit_privacy_birthday"_q)),
+			tr::marked),
 		tr::lng_settings_birthday_about(
 			lt_link,
 			tr::lng_settings_birthday_about_link(
-			) | Ui::Text::ToLink(u"internal:edit_privacy_birthday"_q),
-			Ui::Text::WithEntities)));
+				tr::url(u"internal:edit_privacy_birthday"_q)),
+			tr::marked)));
 }
 
 void SetupPersonalChannel(
@@ -439,18 +440,15 @@ void SetupPersonalChannel(
 		tr::lng_mediaview_copy(tr::now),
 		edit,
 		{ &st::menuIconChannel });
-}
-
-void SetupReplyColor(
-		not_null<Ui::VerticalLayout*> container,
-		not_null<Window::SessionController*> controller) {
-	Ui::AddSkip(container);
 
 	AddPeerColorButton(
 		container,
 		controller->uiShow(),
-		controller->session().user(),
+		self,
 		st::settingsColorButton);
+
+	Ui::AddSkip(container);
+	Ui::AddDivider(container);
 }
 
 void SetupRows(
@@ -470,7 +468,7 @@ void SetupRows(
 	AddRow(
 		container,
 		tr::lng_settings_name_label(),
-		Info::Profile::NameValue(self) | Ui::Text::ToWithEntities(),
+		Info::Profile::NameValue(self) | rpl::map(tr::marked),
 		tr::lng_profile_copy_fullname(tr::now),
 		showEditName,
 		{ &st::menuIconProfile });
@@ -528,7 +526,7 @@ void SetupRows(
 			const auto box = controller->show(
 				Box(UsernamesBox, session->user()));
 			box->boxClosing(
-			) | rpl::start_with_next([=] {
+			) | rpl::on_next([=] {
 				session->api().usernames().requestToCache(session->user());
 			}, box->lifetime());
 		},
@@ -571,7 +569,7 @@ void SetupBio(
 	rpl::combine(
 		bio->geometryValue(),
 		countdown->widthValue()
-	) | rpl::start_with_next([=](QRect geometry, int width) {
+	) | rpl::on_next([=](QRect geometry, int width) {
 		countdown->move(
 			geometry.x() + geometry.width() - width,
 			geometry.y() + style->textMargins.top());
@@ -604,7 +602,7 @@ void SetupBio(
 
 	Info::Profile::AboutValue(
 		self
-	) | rpl::start_with_next([=](const TextWithEntities &text) {
+	) | rpl::on_next([=](const TextWithEntities &text) {
 		const auto wasChanged = (*current != bio->getLastText());
 		*current = text.text;
 		if (wasChanged) {
@@ -617,7 +615,7 @@ void SetupBio(
 
 	const auto generation = Ui::CreateChild<int>(bio);
 	changed->events(
-	) | rpl::start_with_next([=](bool changed) {
+	) | rpl::on_next([=](bool changed) {
 		if (changed) {
 			const auto saved = *generation = std::abs(*generation) + 1;
 			base::call_delayed(kSaveBioTimeout, bio, [=] {
@@ -644,8 +642,8 @@ void SetupBio(
 	auto cursor = bio->textCursor();
 	cursor.setPosition(bio->getLastText().size());
 	bio->setTextCursor(cursor);
-	bio->submits() | rpl::start_with_next([=] { save(); }, bio->lifetime());
-	bio->changes() | rpl::start_with_next(updated, bio->lifetime());
+	bio->submits() | rpl::on_next([=] { save(); }, bio->lifetime());
+	bio->changes() | rpl::on_next(updated, bio->lifetime());
 	bio->setInstantReplaces(Ui::InstantReplaces::Default());
 	bio->setInstantReplacesEnabled(
 		Core::App().settings().replaceEmojiValue());
@@ -704,7 +702,7 @@ void SetupAccountsWrap(
 			[=] { return window->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer); });
 		composedBadge->sizeValue(
-		) | rpl::start_with_next([=](const QSize &s) {
+		) | rpl::on_next([=](const QSize &s) {
 			container->resize(s);
 		}, container->lifetime());
 	}
@@ -724,7 +722,7 @@ void SetupAccountsWrap(
 	const auto userpicSize = st::mainMenuAccountSize
 		+ userpicSkip * 2;
 	raw->heightValue(
-	) | rpl::start_with_next([=](int height) {
+	) | rpl::on_next([=](int height) {
 		const auto left = st::mainMenuAddAccountButton.iconLeft
 			+ (st::settingsIconAdd.width() - userpicSize) / 2;
 		const auto top = (height - userpicSize) / 2;
@@ -732,7 +730,7 @@ void SetupAccountsWrap(
 	}, state->userpic.lifetime());
 
 	state->userpic.paintRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		auto p = Painter(&state->userpic);
 		const auto size = st::mainMenuAccountSize;
 		const auto line = st::mainMenuAccountLine;
@@ -755,7 +753,7 @@ void SetupAccountsWrap(
 
 	raw->setAcceptBoth(true);
 	raw->clicks(
-	) | rpl::start_with_next([=](Qt::MouseButton which) {
+	) | rpl::on_next([=](Qt::MouseButton which) {
 		if (which == Qt::LeftButton) {
 			callback(raw->clickModifiers());
 			return;
@@ -846,7 +844,7 @@ void AccountsList::setup() {
 
 	rpl::single(rpl::empty) | rpl::then(
 		Core::App().domain().accountsChanges()
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		const auto &list = Core::App().domain().accounts();
 		const auto exists = [&](not_null<Main::Account*> account) {
 			for (const auto &[index, existing] : list) {
@@ -866,7 +864,7 @@ void AccountsList::setup() {
 		for (const auto &[index, account] : list) {
 			if (_watched.emplace(account.get()).second) {
 				account->sessionChanges(
-				) | rpl::start_with_next([=] {
+				) | rpl::on_next([=] {
 					rebuild();
 				}, _outer->lifetime());
 			}
@@ -875,7 +873,7 @@ void AccountsList::setup() {
 	}, _outer->lifetime());
 
 	Core::App().domain().maxAccountsChanges(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		// Full rebuild.
 		for (auto i = _watched.begin(); i != _watched.end(); i++) {
 			i->second = nullptr;
@@ -925,7 +923,7 @@ not_null<Ui::SlideWrap<Ui::SettingsButton>*> AccountsList::setupAdd() {
 
 	button->setAcceptBoth(true);
 	button->clicks(
-	) | rpl::start_with_next([=](Qt::MouseButton which) {
+	) | rpl::on_next([=](Qt::MouseButton which) {
 		if (which == Qt::LeftButton) {
 			const auto modifiers = button->clickModifiers();
 			const auto newWindow = (modifiers & Qt::ControlModifier);
@@ -933,7 +931,13 @@ not_null<Ui::SlideWrap<Ui::SettingsButton>*> AccountsList::setupAdd() {
 			return;
 		} else if (which != Qt::RightButton
 			|| !IsAltShift(button->clickModifiers())) {
+#ifdef _DEBUG
+			if (which != Qt::RightButton) {
+				return;
+			}
+#else // _DEBUG
 			return;
+#endif // !_DEBUG
 		}
 		_contextMenu = base::make_unique_q<Ui::PopupMenu>(_outer);
 		_contextMenu->addAction("Production Server", [=] {
@@ -955,7 +959,7 @@ void AccountsList::rebuild() {
 
 	_reorder = std::make_unique<Ui::VerticalLayoutReorder>(inner);
 	_reorder->updates(
-	) | rpl::start_with_next([=](Ui::VerticalLayoutReorder::Single data) {
+	) | rpl::on_next([=](Ui::VerticalLayoutReorder::Single data) {
 		using State = Ui::VerticalLayoutReorder::State;
 		if (data.state == State::Started) {
 			++_reordering;
@@ -1114,7 +1118,7 @@ not_null<Ui::RpWidget*> AddRight(
 		button->sizeValue(),
 		widget->sizeValue(),
 		widget->shownValue()
-	) | rpl::start_with_next([=](QSize outer, QSize inner, bool shown) {
+	) | rpl::on_next([=](QSize outer, QSize inner, bool shown) {
 		auto padding = button->st().padding;
 		if (shown) {
 			widget->moveToRight(
@@ -1147,7 +1151,7 @@ not_null<Ui::RpWidget*> CreateUnread(
 
 	std::move(
 		value
-	) | rpl::start_with_next([=](UnreadBadge badge) {
+	) | rpl::on_next([=](UnreadBadge badge) {
 		state->st.muted = badge.muted;
 		state->count = badge.count;
 		if (!state->count) {
@@ -1162,7 +1166,7 @@ not_null<Ui::RpWidget*> CreateUnread(
 	}, state->widget.lifetime());
 
 	state->widget.paintRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		auto p = Painter(&state->widget);
 		Ui::PaintUnreadBadge(
 			p,
@@ -1181,7 +1185,7 @@ void AddUnread(
 	const auto container = AddRight(button);
 	const auto badge = CreateUnread(container, std::move(value));
 	badge->sizeValue(
-	) | rpl::start_with_next([=](const QSize &s) {
+	) | rpl::on_next([=](const QSize &s) {
 		container->resize(s);
 	}, container->lifetime());
 }

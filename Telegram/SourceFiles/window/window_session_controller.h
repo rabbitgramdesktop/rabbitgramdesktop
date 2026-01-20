@@ -195,6 +195,7 @@ struct SectionShow {
 	bool forceTopicsList = false;
 	bool reapplyLocalDraft = false;
 	bool dropSameFromStack = false;
+	bool allowDuplicateInStack = false;
 	Origin origin;
 
 };
@@ -697,6 +698,7 @@ public:
 	void dropSubsectionTabs();
 
 	void showStarGiftAuction(const QString &slug);
+	void showStarGiftAuction(uint64 giftId);
 
 	[[nodiscard]] rpl::lifetime &lifetime() {
 		return _lifetime;
