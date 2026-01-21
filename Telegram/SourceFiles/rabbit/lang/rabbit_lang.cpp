@@ -174,7 +174,7 @@ void Load(const QString &baseLangCode, const QString &langCode) {
 QString Translate(const QString &key, Var var1, Var var2, Var var3, Var var4) {
 	auto phrase = (CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty())
 		? CurrentValues.value(key)
-		: DefaultValues.value(key);
+		: (DefaultValues.contains(key) ? DefaultValues.value(key) : key);
 
 	for (const auto &v : { var1, var2, var3, var4 }) {
 		if (!v.key.isEmpty()) {
@@ -208,7 +208,7 @@ TextWithEntities TranslateWithEntities(const QString &key, EntVar var1, EntVar v
 	TextWithEntities phrase = {
 		(CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty())
 			? CurrentValues.value(key)
-			: DefaultValues.value(key)
+			: (DefaultValues.contains(key) ? DefaultValues.value(key) : key)
 	};
 
 	for (const auto &v : { var1, var2, var3, var4 }) {
