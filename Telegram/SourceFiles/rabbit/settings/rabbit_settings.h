@@ -128,6 +128,8 @@ inline QJsonArray GetJsonArrayWithPending(
 inline bool streamerMode() { return JsonSettings::GetBool("streamer_mode"); }
 inline bool hideNotificationsAutomatically() { return JsonSettings::GetBool("auto_hide_notifications"); }
 inline bool showUserpicInTopBar() { return JsonSettings::GetBool("userpic_in_top_bar"); }
+inline bool connectionBarLost() { return JsonSettings::GetBool("connection_bar_lost"); }
+inline bool connectionBarProxy() { return JsonSettings::GetBool("connection_bar_proxy"); }
 inline QString appIcon() { return JsonSettings::GetString("app_icon"); }
 inline int userpicRoundness() { return JsonSettings::GetInt("userpic_roundness"); }
 inline bool generalRoundness() { return JsonSettings::GetBool("general_roundness"); }
@@ -150,6 +152,8 @@ inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webvie
 inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
 inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
 inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set("userpic_in_top_bar", value); }
+inline void setConnectionBarLost(bool value) { JsonSettings::Set("connection_bar_lost", value); }
+inline void setConnectionBarProxy(bool value) { JsonSettings::Set("connection_bar_proxy", value); }
 inline void setAppIcon(QString value) { JsonSettings::Set("app_icon", value); }
 inline void setUserpicRoundness(int value) { JsonSettings::Set("userpic_roundness", value); }
 inline void setGeneralRoundness(bool value) { JsonSettings::Set("general_roundness", value); }

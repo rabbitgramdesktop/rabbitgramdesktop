@@ -209,6 +209,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap {
 	{ "userpic_in_top_bar", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = false, }},
+	{ "connection_bar_lost", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
+	{ "connection_bar_proxy", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = true, }},
 	//   Appearance
 	{ "app_icon", {
 		.type = SettingType::QStringSetting,
