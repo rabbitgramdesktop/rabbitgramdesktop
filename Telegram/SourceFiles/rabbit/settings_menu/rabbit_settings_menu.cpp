@@ -50,7 +50,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 )->toggledValue( \
 ) | rpl::filter([](bool enabled) { \
 	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
-}) | rpl::start_with_next([](bool enabled) { \
+}) | rpl::on_next([](bool enabled) { \
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
 }, container->lifetime());
 
