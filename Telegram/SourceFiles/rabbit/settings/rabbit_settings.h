@@ -157,7 +157,7 @@ inline void setSidebarMyProfile(bool value) { JsonSettings::Set("sidebar_my_prof
 inline void setSidebarBots(bool value) { JsonSettings::Set("sidebar_bots", value); }
 inline void setSidebarCreateGroup(bool value) { JsonSettings::Set("sidebar_create_group", value); }
 inline void setSidebarCreateChannel(bool value) { JsonSettings::Set("sidebar_create_channel", value); }
-inline void setSidebarContacts(bool value) { JsonSettings::Set("side__bar_contacts", value); }
+inline void setSidebarContacts(bool value) { JsonSettings::Set("sidebar_contacts", value); }
 inline void setSidebarCalls(bool value) { JsonSettings::Set("sidebar_calls", value); }
 inline void setSidebarSavedMessages(bool value) { JsonSettings::Set("sidebar_saved_messages", value); }
 inline void setSidebarNightMode(bool value) { JsonSettings::Set("sidebar_night_mode", value); }
