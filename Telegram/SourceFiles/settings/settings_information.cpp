@@ -31,7 +31,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/click_handler_types.h"
 #include "core/core_settings.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
-#include "boxes/peers/edit_peer_color_box.h"
 #include "boxes/add_contact_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/username_box.h"
@@ -1068,7 +1067,6 @@ void Information::setupContent(
 	SetupPhoto(content, controller, self);
 	SetupBio(content, self);
 	SetupRows(content, controller, self);
-	SetupReplyColor(content, controller);
 	SetupPersonalChannel(content, controller, self);
 	SetupBirthday(content, controller, self);
 	SetupAccountsWrap(content, controller);
