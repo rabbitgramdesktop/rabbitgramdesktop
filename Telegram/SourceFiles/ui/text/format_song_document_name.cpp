@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "ui/text/format_song_document_name.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
