@@ -48,7 +48,7 @@ UnwrappedMedia::UnwrappedMedia(
 , _content(std::move(content)) {
 	RabbitSettings::JsonSettings::Events(
 		"sticker_size"
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		history()->owner().requestItemViewRefresh(_parent->data());
 	}, _lifetime);
 }

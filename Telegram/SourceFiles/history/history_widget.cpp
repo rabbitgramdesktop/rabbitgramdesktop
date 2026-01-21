@@ -654,7 +654,7 @@ HistoryWidget::HistoryWidget(
 
 	RabbitSettings::JsonSettings::Events(
 		"sticker_size"
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
 			updateHistoryGeometry();
 			});

@@ -292,7 +292,7 @@ StickersListWidget::StickersListWidget(
 
 	RabbitSettings::JsonSettings::Events(
 		"more_recent_stickers"
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		refreshStickers();
 	}, lifetime());
 }

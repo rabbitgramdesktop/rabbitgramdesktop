@@ -46,7 +46,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 )->toggledValue( \
 ) | rpl::filter([](bool enabled) { \
 	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
-}) | rpl::start_with_next([](bool enabled) { \
+}) | rpl::on_next([](bool enabled) { \
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
 }, container->lifetime());
 
@@ -121,7 +121,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarMyProfile());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarMyProfile(enabled);
 		}, container->lifetime());
 
@@ -135,7 +135,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarBots());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarBots(enabled);
 		}, container->lifetime());
 
@@ -149,7 +149,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarCreateGroup());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarCreateGroup(enabled);
 		}, container->lifetime());
 
@@ -163,7 +163,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarCreateChannel());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarCreateChannel(enabled);
 		}, container->lifetime());
 
@@ -177,7 +177,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarContacts());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarContacts(enabled);
 		}, container->lifetime());
 
@@ -191,7 +191,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarCalls());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarCalls(enabled);
 		}, container->lifetime());
 
@@ -205,7 +205,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarSavedMessages());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarSavedMessages(enabled);
 		}, container->lifetime());
 
@@ -219,7 +219,7 @@ namespace Settings {
 		)->toggledValue(
 		) | rpl::filter([](bool enabled) {
 			return (enabled != RabbitSettings::sidebarNightMode());
-		}) | rpl::start_with_next([](bool enabled) {
+		}) | rpl::on_next([](bool enabled) {
 			RabbitSettings::setSidebarNightMode(enabled);
 		}, container->lifetime());
 	}
