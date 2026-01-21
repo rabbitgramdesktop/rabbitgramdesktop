@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_window.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
 #include "ui/widgets/continuous_sliders.h"
@@ -67,9 +68,46 @@ namespace Settings {
         SettingsMenuJsonSwitch(rtg_general_userpic_in_top_bar, userpic_in_top_bar);
     }
 
+    void RabbitGeneral::SetupConnectionBar(not_null<Ui::VerticalLayout*> container) {
+        Ui::AddSubsectionTitle(container, rktr("rtg_connection_bar"));
+
+        AddButtonWithIcon(
+			container,
+			rktr("rtg_connection_bar_lost"),
+			st::settingsButton,
+			IconDescriptor{ &st::menuIconNetwork }
+		)->toggleOn(
+			rpl::single(RabbitSettings::connectionBarLost())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != RabbitSettings::connectionBarLost());
+		}) | rpl::on_next([](bool enabled) {
+			RabbitSettings::setConnectionBarLost(enabled);
+		}, container->lifetime());
+
+        AddButtonWithIcon(
+			container,
+			rktr("rtg_connection_bar_proxy"),
+			st::settingsButton,
+			IconDescriptor{ &st::menuIconAntispam }
+		)->toggleOn(
+			rpl::single(RabbitSettings::connectionBarProxy())
+		)->toggledValue(
+		) | rpl::filter([](bool enabled) {
+			return (enabled != RabbitSettings::connectionBarProxy());
+		}) | rpl::on_next([](bool enabled) {
+			RabbitSettings::setConnectionBarProxy(enabled);
+		}, container->lifetime());
+    }
+
     void RabbitGeneral::SetupRabbitGeneral(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
 		Ui::AddSkip(container);
     	SetupGeneral(container);
+
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupConnectionBar(container);
     }
 
     void RabbitGeneral::setupContent(not_null<Window::SessionController *> controller) {

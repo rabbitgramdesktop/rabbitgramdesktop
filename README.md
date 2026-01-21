@@ -18,6 +18,8 @@ The source code is published under GPLv3 with OpenSSL exception, the license is 
 ### General
 * Streamer mode
 * Auto-hiding notifications
+* Always show userpic in chat top bar
+* Disable connecting/proxy popup on bottom left
 ### Appearance
 * Mutliple app icons (thx Ayugram)
 * Userpic corners
