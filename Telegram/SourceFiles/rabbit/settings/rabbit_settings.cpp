@@ -265,6 +265,9 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap {
 	{ "comma_after_mention", {
 		.type = SettingType::BoolSetting,
 		.defaultValue = false, }},
+	{ "hide_bubble_tails", {
+		.type = SettingType::BoolSetting,
+		.defaultValue = false, }},
 	{ "sticker_shape", {
 		.type = SettingType::IntSetting,
 		.defaultValue = 0,

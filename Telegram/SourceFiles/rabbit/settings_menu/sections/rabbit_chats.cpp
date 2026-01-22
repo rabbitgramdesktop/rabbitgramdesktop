@@ -36,19 +36,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_blocked_peers.h"
 #include "ui/widgets/continuous_sliders.h"
 
-#define SettingsMenuJsonSwitch(LangKey, Option) container->add(object_ptr<Button>( \
-	container, \
-	rktr(#LangKey), \
-	st::settingsButtonNoIcon \
-))->toggleOn( \
-	rpl::single(RabbitSettings::JsonSettings::GetBool(#Option)) \
-)->toggledValue( \
-) | rpl::filter([](bool enabled) { \
-	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
-}) | rpl::on_next([](bool enabled) { \
-	RabbitSettings::JsonSettings::Set(#Option, enabled); \
-}, container->lifetime());
-
 namespace Settings {
 
 	rpl::producer<QString> RabbitChats::title() {
@@ -60,6 +47,23 @@ namespace Settings {
 			not_null<Window::SessionController *> controller)
 			: Section(parent) {
 		setupContent(controller);
+	}
+
+	void AddToggle(
+		not_null<Ui::VerticalLayout*> container,
+		const QString& key,
+		const style::icon* icon,
+		Fn<bool()> getter,
+		Fn<void(bool)> setter) {
+
+		Ui::SettingsButton* button = icon
+			? (Ui::SettingsButton*)AddButtonWithIcon(container, rktr(key), st::settingsButton, { icon })
+			: (Ui::SettingsButton*)container->add(object_ptr<Ui::SettingsButton>(container, rktr(key), st::settingsButtonNoIcon));
+
+		button->toggleOn(rpl::single(getter()))
+			->toggledValue()
+			| rpl::filter([=](bool enabled) { return enabled != getter(); })
+			| rpl::on_next([=](bool enabled) { setter(enabled); }, container->lifetime());
 	}
 
 	void RabbitChats::SetupChats(not_null<Ui::VerticalLayout *> container) {
@@ -95,23 +99,30 @@ namespace Settings {
 			RabbitSettings::stickerSize(),
 			updateStickerSize);
 		updateStickerSizeLabel(RabbitSettings::stickerSize());
-		
-		AddButtonWithIcon(
-			container,
-			rktr("rtg_show_actions_time"),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconReschedule }
-		)->toggleOn(
-			rpl::single(RabbitSettings::showActionsTime())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::showActionsTime());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setShowActionsTime(enabled);
-		}, container->lifetime());
 
-		SettingsMenuJsonSwitch(rtg_show_seconds, show_seconds);
-		SettingsMenuJsonSwitch(rtg_comma_after_mention, comma_after_mention);
+		AddToggle(
+			container, "rtg_show_actions_time", &st::menuIconReschedule,
+			[] { return RabbitSettings::showActionsTime(); },
+			[](bool value) { RabbitSettings::setShowActionsTime(value); }
+		);
+
+		AddToggle(
+			container, "rtg_show_seconds", nullptr,
+			[] { return RabbitSettings::showSeconds(); },
+			[](bool value) { RabbitSettings::setShowSeconds(value); }
+		);
+
+		AddToggle(
+			container, "rtg_comma_after_mention", nullptr,
+			[] { return RabbitSettings::commaAfterMention(); },
+			[](bool value) { RabbitSettings::setCommaAfterMention(value); }
+		);
+
+		AddToggle(
+			container, "rtg_hide_bubble_tails", nullptr,
+			[] { return RabbitSettings::hideBubbleTails(); },
+			[](bool value) { RabbitSettings::setHideBubbleTails(value); }
+		);
 	}
 
 	void RabbitChats::SetupStickerShape(not_null<Ui::VerticalLayout *> container) {
@@ -125,7 +136,11 @@ namespace Settings {
 	void RabbitChats::SetupStickers(not_null<Ui::VerticalLayout *> container) {
 		Ui::AddSubsectionTitle(container, rktr("rtg_chats_stickers"));
 
-		SettingsMenuJsonSwitch(rtg_chats_more_recent_stickers, more_recent_stickers);
+		AddToggle(
+			container, "rtg_chats_more_recent_stickers", nullptr,
+			[] { return RabbitSettings::moreRecentStickers(); },
+			[](bool value) { RabbitSettings::setMoreRecentStickers(value); }
+		);
 	}
 
 	void RabbitChats::SetupRabbitChats(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {

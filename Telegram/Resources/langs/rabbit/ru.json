@@ -18,6 +18,7 @@
     "rtg_show_actions_time": "Показывать время действий",
     "rtg_show_seconds": "Показывать время с секундами",
     "rtg_comma_after_mention": "Запятая после упоминания",
+    "rtg_hide_bubble_tails": "Убрать хвост у сообщений",
     "rtg_chats_sticker_shape": "Форма стикеров",
     "rtg_chats_sticker_shape_none": "По умолчанию",
     "rtg_chats_sticker_shape_small": "Закруглённая",

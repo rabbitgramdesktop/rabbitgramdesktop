@@ -18,6 +18,7 @@
     "rtg_show_actions_time": "Show actions time",
     "rtg_show_seconds": "Show time with seconds",
     "rtg_comma_after_mention": "Add comma after mention",
+    "rtg_hide_bubble_tails": "Hide message bubble tail",
     "rtg_chats_sticker_shape": "Stickers shape",
     "rtg_chats_sticker_shape_none": "Default",
     "rtg_chats_sticker_shape_small": "Rounded",

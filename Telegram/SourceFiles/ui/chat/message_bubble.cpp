@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "ui/chat/message_bubble.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "ui/cached_round_corners.h"
 #include "ui/image/image_prepare.h"
 #include "ui/chat/chat_style.h"
@@ -135,10 +137,10 @@ void PaintBubbleGeneric(
 			}
 		}
 	}
-	const auto leftTail = (bottomWithTailLeft == Corner::Tail)
+	const auto leftTail = (bottomWithTailLeft == Corner::Tail && !RabbitSettings::hideBubbleTails())
 		? paintTail({ rect.x(), rect.y() + rect.height() })
 		: 0;
-	const auto rightTail = (bottomWithTailRight == Corner::Tail)
+	const auto rightTail = (bottomWithTailRight == Corner::Tail && !RabbitSettings::hideBubbleTails())
 		? paintTail({ rect.x() + rect.width(), rect.y() + rect.height() })
 		: 0;
 	if (!args.shadowed) {

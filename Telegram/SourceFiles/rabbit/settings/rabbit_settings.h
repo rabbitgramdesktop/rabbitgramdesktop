@@ -145,6 +145,7 @@ inline int stickerSize() { return JsonSettings::GetInt("sticker_size"); }
 inline bool showActionsTime() { return JsonSettings::GetBool("show_actions_time"); }
 inline bool showSeconds() { return JsonSettings::GetBool("show_seconds"); }
 inline bool commaAfterMention() { return JsonSettings::GetBool("comma_after_mention"); }
+inline bool hideBubbleTails() { return JsonSettings::GetBool("hide_bubble_tails"); }
 inline int stickerShape() { return JsonSettings::GetInt("sticker_shape"); }
 inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
 inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
@@ -169,6 +170,7 @@ inline void setStickerSize(int value) { JsonSettings::Set("sticker_size", value)
 inline void setShowActionsTime(bool value) { JsonSettings::Set("show_actions_time", value); }
 inline void setShowSeconds(bool value) { JsonSettings::Set("show_seconds", value); }
 inline void setCommaAfterMention(bool value) { JsonSettings::Set("comma_after_mention", value); }
+inline void setHideBubbleTails(bool value) { JsonSettings::Set("hide_bubble_tails", value); }
 inline void setStickerShape(int value) { JsonSettings::Set("sticker_shape", value); }
 inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
 inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
