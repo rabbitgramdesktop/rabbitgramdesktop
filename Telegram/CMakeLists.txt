@@ -49,7 +49,7 @@ if (WIN32)
     )
 endif()
 
-set_target_properties(Telegram PROPERTIES AUTOMOC ON)
+set_target_properties(Telegram PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_NAME "rabbitGram" OUTPUT_NAME "rabbitGram")
 
 target_link_libraries(Telegram
 PRIVATE
