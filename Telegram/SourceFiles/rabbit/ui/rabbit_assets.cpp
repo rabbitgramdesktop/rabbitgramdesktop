@@ -13,50 +13,57 @@ static QString LAST_LOADED_NAME;
 static QImage LAST_LOADED;
 static QImage LAST_LOADED_NO_MARGIN;
 
-namespace RabbitAssets {
+namespace RabbitAssets
+{
+    void loadAppIco()
+    {
+        auto appIcon = RabbitSettings::appIcon();
 
-void loadAppIco() {
-    auto appIcon = RabbitSettings::appIcon();
+        QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
+        QString tempIconPath = appDataPath + "/rabbitGram.ico";
 
-	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
-	QString tempIconPath = appDataPath + "/rabbitGram.ico";
+        // workaround for read-only file
+        auto f = QFile(tempIconPath);
+        if (f.exists())
+        {
+            f.setPermissions(QFile::WriteOther);
+            f.remove();
+        }
+        f.close();
+        QFile::copy(qsl(":/gui/art/rabbit/%1/app_icon.ico").arg(appIcon), tempIconPath);
+    }
 
-	// workaround for read-only file
-	auto f = QFile(tempIconPath);
-	if (f.exists()) {
-		f.setPermissions(QFile::WriteOther);
-		f.remove();
-	}
-	f.close();
-	QFile::copy(qsl(":/gui/art/rabbit/%1/app_icon.ico").arg(appIcon), tempIconPath);
-}
+    void loadIcons()
+    {
+        auto appIcon = RabbitSettings::appIcon();
+        if (LAST_LOADED_NAME != appIcon)
+        {
+            LAST_LOADED_NAME = appIcon;
 
-void loadIcons() {
-    auto appIcon = RabbitSettings::appIcon();
-	if (LAST_LOADED_NAME != appIcon) {
-		LAST_LOADED_NAME = appIcon;
+            LAST_LOADED = QImage(qsl(":/gui/art/rabbit/%1/app.png").arg(appIcon));
+            LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/rabbit/%1/app_preview.png").arg(appIcon));
+        }
+    }
 
-		LAST_LOADED = QImage(qsl(":/gui/art/rabbit/%1/app.png").arg(appIcon));
-		LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/rabbit/%1/app_preview.png").arg(appIcon));
-	}
-}
+    QImage loadPreview(QString name)
+    {
+        return QImage(qsl(":/gui/art/rabbit/%1/app_preview.png").arg(name));
+    }
 
-QImage loadPreview(QString name) {
-	return QImage(qsl(":/gui/art/rabbit/%1/app_preview.png").arg(name));
-}
+    QString currentAppLogoName()
+    {
+        return LAST_LOADED_NAME;
+    }
 
-QString currentAppLogoName() {
-	return LAST_LOADED_NAME;
-}
+    QImage currentAppLogo()
+    {
+        loadIcons();
+        return LAST_LOADED;
+    }
 
-QImage currentAppLogo() {
-	loadIcons();
-	return LAST_LOADED;
-}
-
-QImage currentAppLogoNoMargin() {
-	loadIcons();
-	return LAST_LOADED_NO_MARGIN;
-}
-
+    QImage currentAppLogoNoMargin()
+    {
+        loadIcons();
+        return LAST_LOADED_NO_MARGIN;
+    }
 }

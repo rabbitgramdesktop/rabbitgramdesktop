@@ -23,143 +23,160 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #endif
 
 const QVector<QString> icons{
-	RabbitAssets::DEFAULT_ICON,
-	RabbitAssets::ANGEL_ICON,
-	RabbitAssets::BLACKOUT_ICON,
-	RabbitAssets::COLOR_ICON,
-	RabbitAssets::IMPOSTOR_ICON,
-	RabbitAssets::MATRIX_ICON,
-	RabbitAssets::MOON_ICON,
-	RabbitAssets::OLD_ICON,
-	RabbitAssets::SEASONAL_ICON,
-	RabbitAssets::TWITCH_ICON,
+    RabbitAssets::DEFAULT_ICON,
+    RabbitAssets::ANGEL_ICON,
+    RabbitAssets::BLACKOUT_ICON,
+    RabbitAssets::COLOR_ICON,
+    RabbitAssets::IMPOSTOR_ICON,
+    RabbitAssets::MATRIX_ICON,
+    RabbitAssets::MOON_ICON,
+    RabbitAssets::OLD_ICON,
+    RabbitAssets::SEASONAL_ICON,
+    RabbitAssets::TWITCH_ICON,
 };
 
-const auto rows = icons.size() / 4 + std::min(1, static_cast<int>(icons.size())) % 4;
+const auto rows = icons.size() / 4 + std::min(1, icons.size()) % 4;
 
-void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float strokeOpacity) {
-	xOffset += st::cpPadding;
+void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
+{
+    xOffset += st::cpPadding;
 
-	p.save();
-	p.setPen(QPen(st::boxDividerBg, 0));
-	p.setBrush(QBrush(st::boxDividerBg));
-	p.setOpacity(strokeOpacity);
-	p.drawRoundedRect(
-		xOffset + st::cpSelectedPadding,
-		yOffset + st::cpSelectedPadding,
-		st::cpIconSize + st::cpSelectedPadding * 2,
-		st::cpIconSize + st::cpSelectedPadding * 2,
-		st::cpSelectedRounding,
-		st::cpSelectedRounding
-	);
-	p.restore();
+    p.save();
+    p.setPen(QPen(st::boxDividerBg, 0));
+    p.setBrush(QBrush(st::boxDividerBg));
+    p.setOpacity(strokeOpacity);
+    p.drawRoundedRect(
+        xOffset + st::cpSelectedPadding,
+        yOffset + st::cpSelectedPadding,
+        st::cpIconSize + st::cpSelectedPadding * 2,
+        st::cpIconSize + st::cpSelectedPadding * 2,
+        st::cpSelectedRounding,
+        st::cpSelectedRounding
+    );
+    p.restore();
 
-	auto rect = QRect(
-		xOffset + st::cpImagePadding,
-		yOffset + st::cpImagePadding,
-		st::cpIconSize,
-		st::cpIconSize
-	);
-	p.drawImage(rect, icon);
+    auto rect = QRect(
+        xOffset + st::cpImagePadding,
+        yOffset + st::cpImagePadding,
+        st::cpIconSize,
+        st::cpIconSize
+    );
+    p.drawImage(rect, icon);
 }
 
-void applyIcon() {
+void applyIcon()
+{
 #ifdef Q_OS_WIN
-	RabbitAssets::loadAppIco();
-	reloadAppIconFromTaskBar();
+    RabbitAssets::loadAppIco();
+    reloadAppIconFromTaskBar();
 #endif
 
-	Window::OverrideApplicationIcon(RabbitAssets::currentAppLogo());
-	Core::App().refreshApplicationIcon();
-	Core::App().tray().updateIconCounters();
-	Core::App().domain().notifyUnreadBadgeChanged();
+    Window::OverrideApplicationIcon(RabbitAssets::currentAppLogo());
+    Core::App().refreshApplicationIcon();
+    Core::App().tray().updateIconCounters();
+    Core::App().domain().notifyUnreadBadgeChanged();
 }
 
-IconPicker::IconPicker(QWidget *parent)
-	: RpWidget(parent) {
-	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows - st::cpPadding);
+IconPicker::IconPicker(QWidget* parent)
+    : RpWidget(parent)
+{
+    setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows - st::cpPadding);
 }
 
-void IconPicker::paintEvent(QPaintEvent *e) {
-	Painter p(this);
-	PainterHighQualityEnabler hq(p);
+void IconPicker::paintEvent(QPaintEvent* e)
+{
+    Painter p(this);
+    PainterHighQualityEnabler hq(p);
 
-	auto offset = st::boxWidth / 2 - (st::cpIconSize + st::cpSpacingX) * 2;
+    auto offset = st::boxWidth / 2 - (st::cpIconSize + st::cpSpacingX) * 2;
 
-	for (int row = 0; row < rows; row++) {
-		const auto columns = std::min(4, static_cast<int>(icons.size()) - row * 4);
-		for (int i = 0; i < columns; i++) {
-			auto const idx = i + row * 4;
+    for (int row = 0; row < rows; row++)
+    {
+        const auto columns = std::min(4, icons.size() - row * 4);
+        for (int i = 0; i < columns; i++)
+        {
+            const auto idx = i + row * 4;
 
-			const auto &iconName = icons[idx];
-			if (iconName.isEmpty()) {
-				continue;
-			}
+            const auto& iconName = icons[idx];
+            if (iconName.isEmpty())
+            {
+                continue;
+            }
 
-			auto icon = RabbitAssets::loadPreview(iconName)
-				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            auto icon = RabbitAssets::loadPreview(iconName)
+                .scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-			auto opacity = 0.0f;
-			if (iconName == wasSelected) {
-				opacity = 1.0f - animation.value(1.0f);
-			} else if (iconName == RabbitAssets::currentAppLogoName()) {
-				opacity = wasSelected.isEmpty() ? 1.0f : animation.value(1.0f);
-			}
+            auto opacity = 0.0f;
+            if (iconName == wasSelected)
+            {
+                opacity = 1.0f - animation.value(1.0f);
+            }
+            else if (iconName == RabbitAssets::currentAppLogoName())
+            {
+                opacity = wasSelected.isEmpty() ? 1.0f : animation.value(1.0f);
+            }
 
-			drawIcon(
-				p,
-				icon,
-				(st::cpIconSize + st::cpSpacingX) * i + offset,
-				row * (st::cpIconSize + st::cpSpacingY),
-				opacity
-			);
-		}
-	}
+            drawIcon(
+                p,
+                icon,
+                (st::cpIconSize + st::cpSpacingX) * i + offset,
+                row * (st::cpIconSize + st::cpSpacingY),
+                opacity
+            );
+        }
+    }
 }
 
-void IconPicker::mousePressEvent(QMouseEvent *e) {
+void IconPicker::mousePressEvent(QMouseEvent* e)
+{
     auto appIcon = RabbitSettings::appIcon();
-	auto changed = false;
+    auto changed = false;
 
-	auto x = e->pos().x();
-	for (int row = 0; row < rows; row++) {
-		const auto columns = std::min(4, static_cast<int>(icons.size()) - row * 4);
-		for (int i = 0; i < columns; i++) {
-			auto const idx = i + row * 4;
-			auto const xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
-			auto const yOffset = row * (st::cpIconSize + st::cpSpacingY);
+    auto x = e->pos().x();
+    for (int row = 0; row < rows; row++)
+    {
+        const auto columns = std::min(4, icons.size() - row * 4);
+        for (int i = 0; i < columns; i++)
+        {
+            const auto idx = i + row * 4;
+            const auto xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
+            const auto yOffset = row * (st::cpIconSize + st::cpSpacingY);
 
-			if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
-				&& e->pos().y() <= yOffset + st::cpIconSize) {
-				const auto &iconName = icons[idx];
-				if (iconName.isEmpty()) {
-					break;
-				}
+            if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
+                && e->pos().y() <= yOffset + st::cpIconSize)
+            {
+                const auto& iconName = icons[idx];
+                if (iconName.isEmpty())
+                {
+                    break;
+                }
 
-				if (appIcon != iconName) {
-					wasSelected = appIcon;
-					animation.start(
-						[=]
-						{
-							update();
-						},
-						0.0,
-						1.0,
-						200,
-						anim::easeOutCubic
-					);
- 
+                if (appIcon != iconName)
+                {
+                    wasSelected = appIcon;
+                    animation.start(
+                        [=]
+                        {
+                            update();
+                        },
+                        0.0,
+                        1.0,
+                        200,
+                        anim::easeOutCubic
+                    );
+
                     RabbitSettings::setAppIcon(iconName);
-					changed = true;
-					break;
-				}
-			}
-		}
-	}
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
 
-	if (changed) {
-		applyIcon();
+    if (changed)
+    {
+        applyIcon();
 
-		repaint();
-	}
+        repaint();
+    }
 }

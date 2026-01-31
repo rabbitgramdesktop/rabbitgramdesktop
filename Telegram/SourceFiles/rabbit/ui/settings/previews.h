@@ -12,27 +12,27 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 class RoundnessPreview : public Ui::RpWidget
 {
 public:
-	RoundnessPreview(QWidget* parent);
+    RoundnessPreview(QWidget* parent);
 
 protected:
-	void paintEvent(QPaintEvent* e) override;
+    void paintEvent(QPaintEvent* e) override;
 };
 
 class ChatPreview : public Ui::RpWidget
 {
 public:
-	ChatPreview(QWidget* parent);
+    ChatPreview(QWidget* parent);
 
 protected:
-	void paintEvent(QPaintEvent* e) override;
+    void paintEvent(QPaintEvent* e) override;
 };
 
 class StickerShapePicker : public Ui::RpWidget
 {
 public:
-	StickerShapePicker(QWidget* parent);
+    StickerShapePicker(QWidget* parent);
 
 protected:
-	void paintEvent(QPaintEvent* e) override;
-	void mousePressEvent(QMouseEvent *e) override;
+    void paintEvent(QPaintEvent* e) override;
+    void mousePressEvent(QMouseEvent* e) override;
 };

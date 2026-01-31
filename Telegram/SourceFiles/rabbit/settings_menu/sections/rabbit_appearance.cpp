@@ -50,196 +50,222 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
 }, container->lifetime());
 
-namespace Settings {
-
-    rpl::producer<QString> RabbitAppearance::title() {
+namespace Settings
+{
+    rpl::producer<QString> RabbitAppearance::title()
+    {
         return rktr("rtg_settings_appearance");
     }
 
     RabbitAppearance::RabbitAppearance(
-            QWidget *parent,
-            not_null<Window::SessionController *> controller)
-            : Section(parent) {
+        QWidget* parent,
+        not_null<Window::SessionController*> controller)
+        : Section(parent)
+    {
         setupContent(controller);
     }
 
-	void RabbitAppearance::SetupAppIcon(not_null<Ui::VerticalLayout *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_settings_app_icon"));
+    void RabbitAppearance::SetupAppIcon(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_settings_app_icon"));
 
-		container->add(
-			object_ptr<IconPicker>(container),
-			st::settingsCheckboxPadding);
-	}
-
-	void RabbitAppearance::SetupAppearance(not_null<Ui::VerticalLayout *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_settings_appearance"));
-
-		const auto roundnessPreview = container->add(
-			object_ptr<RoundnessPreview>(container),
-			st::defaultSubsectionTitlePadding);
-
-		const auto userpicRoundnessLabel = container->add(
-			object_ptr<Ui::LabelSimple>(
-				container,
-				st::settingsAudioVolumeLabel),
-			st::settingsAudioVolumeLabelPadding);
-    	const auto userpicRoundnessSlider = container->add(
-			object_ptr<Ui::MediaSlider>(
-				container,
-				st::settingsAudioVolumeSlider),
-			st::settingsAudioVolumeSliderPadding);
-    	const auto updateUserpicRoundnessLabel = [=](int value) {
-    		const auto radius = QString::number(value);
-    		userpicRoundnessLabel->setText(ktr("rtg_settings_userpic_rounding", { "radius", radius }));
-    	};
-    	const auto updateUserpicRoundness = [=](int value) {
-    		updateUserpicRoundnessLabel(value);
-			roundnessPreview->repaint();
-    		RabbitSettings::setUserpicRoundness(value);
-    	};
-    	userpicRoundnessSlider->resize(st::settingsAudioVolumeSlider.seekSize);
-    	userpicRoundnessSlider->setPseudoDiscrete(
-			51,
-			[](int val) { return val; },
-			RabbitSettings::userpicRoundness(),
-			updateUserpicRoundness);
-    	updateUserpicRoundnessLabel(RabbitSettings::userpicRoundness());
-
-    	SettingsMenuJsonSwitch(rtg_general_roundness, general_roundness);
-	}
-	
-	void RabbitAppearance::SetupSidebar(not_null<Ui::VerticalLayout  *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_sidebar_editor"));
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_menu_my_profile(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconProfile }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarMyProfile())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarMyProfile());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarMyProfile(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_filters_type_bots(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconBots }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarBots())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarBots());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarBots(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_create_group_title(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconGroups }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarCreateGroup())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarCreateGroup());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarCreateGroup(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_create_channel_title(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconChannel }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarCreateChannel())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarCreateChannel());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarCreateChannel(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_menu_contacts(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconProfile }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarContacts())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarContacts());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarContacts(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_menu_calls(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconPhone }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarCalls())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarCalls());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarCalls(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_saved_messages(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconSavedMessages }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarSavedMessages())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarSavedMessages());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarSavedMessages(enabled);
-		}, container->lifetime());
-
-		AddButtonWithIcon(
-			container,
-			tr::lng_menu_night_mode(),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconNightMode }
-		)->toggleOn(
-			rpl::single(RabbitSettings::sidebarNightMode())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::sidebarNightMode());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setSidebarNightMode(enabled);
-		}, container->lifetime());
-	}
-
-    void RabbitAppearance::SetupRabbitAppearance(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
-		Ui::AddSkip(container);
-		SetupAppIcon(container);
-
-		Ui::AddSkip(container);
-		Ui::AddDivider(container);
-		Ui::AddSkip(container);
-    	SetupAppearance(container);
-
-		Ui::AddSkip(container);
-		Ui::AddDivider(container);
-		Ui::AddSkip(container);
-		SetupSidebar(container);
+        container->add(
+            object_ptr<IconPicker>(container),
+            st::settingsCheckboxPadding);
     }
 
-    void RabbitAppearance::setupContent(not_null<Window::SessionController *> controller) {
+    void RabbitAppearance::SetupAppearance(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_settings_appearance"));
+
+        const auto roundnessPreview = container->add(
+            object_ptr<RoundnessPreview>(container),
+            st::defaultSubsectionTitlePadding);
+
+        const auto userpicRoundnessLabel = container->add(
+            object_ptr<Ui::LabelSimple>(
+                container,
+                st::settingsAudioVolumeLabel),
+            st::settingsAudioVolumeLabelPadding);
+        const auto userpicRoundnessSlider = container->add(
+            object_ptr<Ui::MediaSlider>(
+                container,
+                st::settingsAudioVolumeSlider),
+            st::settingsAudioVolumeSliderPadding);
+        const auto updateUserpicRoundnessLabel = [=](int value)
+        {
+            const auto radius = QString::number(value);
+            userpicRoundnessLabel->setText(ktr("rtg_settings_userpic_rounding", {"radius", radius}));
+        };
+        const auto updateUserpicRoundness = [=](int value)
+        {
+            updateUserpicRoundnessLabel(value);
+            roundnessPreview->repaint();
+            RabbitSettings::setUserpicRoundness(value);
+        };
+        userpicRoundnessSlider->resize(st::settingsAudioVolumeSlider.seekSize);
+        userpicRoundnessSlider->setPseudoDiscrete(
+            51,
+            [](int val) { return val; },
+            RabbitSettings::userpicRoundness(),
+            updateUserpicRoundness);
+        updateUserpicRoundnessLabel(RabbitSettings::userpicRoundness());
+
+        SettingsMenuJsonSwitch(rtg_general_roundness, general_roundness);
+    }
+
+    void RabbitAppearance::SetupSidebar(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_sidebar_editor"));
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_menu_my_profile(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconProfile}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarMyProfile())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarMyProfile());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarMyProfile(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_filters_type_bots(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconBots}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarBots())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarBots());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarBots(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_create_group_title(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconGroups}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarCreateGroup())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarCreateGroup());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarCreateGroup(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_create_channel_title(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconChannel}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarCreateChannel())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarCreateChannel());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarCreateChannel(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_menu_contacts(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconProfile}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarContacts())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarContacts());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarContacts(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_menu_calls(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconPhone}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarCalls())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarCalls());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarCalls(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_saved_messages(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconSavedMessages}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarSavedMessages())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarSavedMessages());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarSavedMessages(enabled);
+        }, container->lifetime());
+
+        AddButtonWithIcon(
+            container,
+            tr::lng_menu_night_mode(),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconNightMode}
+        )->toggleOn(
+            rpl::single(RabbitSettings::sidebarNightMode())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::sidebarNightMode());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setSidebarNightMode(enabled);
+        }, container->lifetime());
+    }
+
+    void RabbitAppearance::SetupRabbitAppearance(not_null<Ui::VerticalLayout*> container,
+                                                 not_null<Window::SessionController*> controller)
+    {
+        Ui::AddSkip(container);
+        SetupAppIcon(container);
+
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupAppearance(container);
+
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupSidebar(container);
+    }
+
+    void RabbitAppearance::setupContent(not_null<Window::SessionController*> controller)
+    {
         const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
         SetupRabbitAppearance(content, controller);

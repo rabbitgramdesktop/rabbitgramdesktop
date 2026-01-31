@@ -49,60 +49,70 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 	RabbitSettings::JsonSettings::Set(#Option, enabled); \
 }, container->lifetime());
 
-namespace Settings {
-
-    rpl::producer<QString> RabbitGeneral::title() {
+namespace Settings
+{
+    rpl::producer<QString> RabbitGeneral::title()
+    {
         return rktr("rtg_settings_general");
     }
 
     RabbitGeneral::RabbitGeneral(
-            QWidget *parent,
-            not_null<Window::SessionController *> controller)
-            : Section(parent) {
+        QWidget* parent,
+        not_null<Window::SessionController*> controller)
+        : Section(parent)
+    {
         setupContent(controller);
     }
 
-    void RabbitGeneral::SetupGeneral(not_null<Ui::VerticalLayout *> container) {
+    void RabbitGeneral::SetupGeneral(not_null<Ui::VerticalLayout*> container)
+    {
         SettingsMenuJsonSwitch(rtg_general_streamer_mode, streamer_mode);
         SettingsMenuJsonSwitch(rtg_general_auto_hide_notifications, auto_hide_notifications);
         SettingsMenuJsonSwitch(rtg_general_userpic_in_top_bar, userpic_in_top_bar);
     }
 
-    void RabbitGeneral::SetupConnectionBar(not_null<Ui::VerticalLayout*> container) {
+    void RabbitGeneral::SetupConnectionBar(not_null<Ui::VerticalLayout*> container)
+    {
         Ui::AddSubsectionTitle(container, rktr("rtg_connection_bar"));
 
         AddButtonWithIcon(
-			container,
-			rktr("rtg_connection_bar_lost"),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconNetwork }
-		)->toggleOn(
-			rpl::single(RabbitSettings::connectionBarLost())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::connectionBarLost());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setConnectionBarLost(enabled);
-		}, container->lifetime());
+            container,
+            rktr("rtg_connection_bar_lost"),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconNetwork}
+        )->toggleOn(
+            rpl::single(RabbitSettings::connectionBarLost())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::connectionBarLost());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setConnectionBarLost(enabled);
+        }, container->lifetime());
 
         AddButtonWithIcon(
-			container,
-			rktr("rtg_connection_bar_proxy"),
-			st::settingsButton,
-			IconDescriptor{ &st::menuIconAntispam }
-		)->toggleOn(
-			rpl::single(RabbitSettings::connectionBarProxy())
-		)->toggledValue(
-		) | rpl::filter([](bool enabled) {
-			return (enabled != RabbitSettings::connectionBarProxy());
-		}) | rpl::on_next([](bool enabled) {
-			RabbitSettings::setConnectionBarProxy(enabled);
-		}, container->lifetime());
+            container,
+            rktr("rtg_connection_bar_proxy"),
+            st::settingsButton,
+            IconDescriptor{&st::menuIconAntispam}
+        )->toggleOn(
+            rpl::single(RabbitSettings::connectionBarProxy())
+        )->toggledValue(
+        ) | rpl::filter([](bool enabled)
+        {
+            return (enabled != RabbitSettings::connectionBarProxy());
+        }) | rpl::on_next([](bool enabled)
+        {
+            RabbitSettings::setConnectionBarProxy(enabled);
+        }, container->lifetime());
     }
 
-    void RabbitGeneral::SetupRabbitGeneral(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
-		Ui::AddSkip(container);
-    	SetupGeneral(container);
+    void RabbitGeneral::SetupRabbitGeneral(not_null<Ui::VerticalLayout*> container,
+                                           not_null<Window::SessionController*> controller)
+    {
+        Ui::AddSkip(container);
+        SetupGeneral(container);
 
         Ui::AddSkip(container);
         Ui::AddDivider(container);
@@ -110,7 +120,8 @@ namespace Settings {
         SetupConnectionBar(container);
     }
 
-    void RabbitGeneral::setupContent(not_null<Window::SessionController *> controller) {
+    void RabbitGeneral::setupContent(not_null<Window::SessionController*> controller)
+    {
         const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
         SetupRabbitGeneral(content, controller);

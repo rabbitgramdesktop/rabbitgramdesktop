@@ -36,133 +36,146 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_blocked_peers.h"
 #include "ui/widgets/continuous_sliders.h"
 
-namespace Settings {
+namespace Settings
+{
+    rpl::producer<QString> RabbitChats::title()
+    {
+        return rktr("rtg_settings_chats");
+    }
 
-	rpl::producer<QString> RabbitChats::title() {
-		return rktr("rtg_settings_chats");
-	}
+    RabbitChats::RabbitChats(
+        QWidget* parent,
+        not_null<Window::SessionController*> controller)
+        : Section(parent)
+    {
+        setupContent(controller);
+    }
 
-	RabbitChats::RabbitChats(
-			QWidget *parent,
-			not_null<Window::SessionController *> controller)
-			: Section(parent) {
-		setupContent(controller);
-	}
+    void AddToggle(
+        not_null<Ui::VerticalLayout*> container,
+        const QString& key,
+        const style::icon* icon,
+        Fn<bool()> getter,
+        Fn<void(bool)> setter)
+    {
+        Ui::SettingsButton* button = icon
+                                         ? static_cast<Ui::SettingsButton*>(AddButtonWithIcon(
+                                             container, rktr(key), st::settingsButton, {icon}))
+                                         : container->add(
+                                             object_ptr<Ui::SettingsButton>(
+                                                 container, rktr(key), st::settingsButtonNoIcon));
 
-	void AddToggle(
-		not_null<Ui::VerticalLayout*> container,
-		const QString& key,
-		const style::icon* icon,
-		Fn<bool()> getter,
-		Fn<void(bool)> setter) {
+        button->toggleOn(rpl::single(getter()))
+              ->toggledValue()
+            | rpl::filter([=](bool enabled) { return enabled != getter(); })
+            | rpl::on_next([=](bool enabled) { setter(enabled); }, container->lifetime());
+    }
 
-		Ui::SettingsButton* button = icon
-			? (Ui::SettingsButton*)AddButtonWithIcon(container, rktr(key), st::settingsButton, { icon })
-			: (Ui::SettingsButton*)container->add(object_ptr<Ui::SettingsButton>(container, rktr(key), st::settingsButtonNoIcon));
+    void RabbitChats::SetupChats(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_settings_chats"));
 
-		button->toggleOn(rpl::single(getter()))
-			->toggledValue()
-			| rpl::filter([=](bool enabled) { return enabled != getter(); })
-			| rpl::on_next([=](bool enabled) { setter(enabled); }, container->lifetime());
-	}
+        const auto chatPreview = container->add(
+            object_ptr<ChatPreview>(container),
+            st::defaultSubsectionTitlePadding);
 
-	void RabbitChats::SetupChats(not_null<Ui::VerticalLayout *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_settings_chats"));
+        const auto stickerSizeLabel = container->add(
+            object_ptr<Ui::LabelSimple>(
+                container,
+                st::settingsAudioVolumeLabel),
+            st::settingsAudioVolumeLabelPadding);
+        const auto stickerSizeSlider = container->add(
+            object_ptr<Ui::MediaSlider>(
+                container,
+                st::settingsAudioVolumeSlider),
+            st::settingsAudioVolumeSliderPadding);
+        const auto updateStickerSizeLabel = [=](int value)
+        {
+            const auto pixels = QString::number(value);
+            stickerSizeLabel->setText(ktr("rtg_chats_sticker_size", {"pixels", pixels}));
+        };
+        const auto updateStickerSize = [=](int value)
+        {
+            updateStickerSizeLabel(value);
+            chatPreview->repaint();
+            RabbitSettings::setStickerSize(value);
+        };
+        stickerSizeSlider->resize(st::settingsAudioVolumeSlider.seekSize);
+        stickerSizeSlider->setPseudoDiscrete(
+            193,
+            [](int val) { return val + 64; },
+            RabbitSettings::stickerSize(),
+            updateStickerSize);
+        updateStickerSizeLabel(RabbitSettings::stickerSize());
 
-		const auto chatPreview = container->add(
-			object_ptr<ChatPreview>(container),
-			st::defaultSubsectionTitlePadding);
+        AddToggle(
+            container, "rtg_show_actions_time", &st::menuIconReschedule,
+            [] { return RabbitSettings::showActionsTime(); },
+            [](bool value) { RabbitSettings::setShowActionsTime(value); }
+        );
 
-		const auto stickerSizeLabel = container->add(
-			object_ptr<Ui::LabelSimple>(
-				container,
-				st::settingsAudioVolumeLabel),
-			st::settingsAudioVolumeLabelPadding);
-		const auto stickerSizeSlider = container->add(
-			object_ptr<Ui::MediaSlider>(
-				container,
-				st::settingsAudioVolumeSlider),
-			st::settingsAudioVolumeSliderPadding);
-		const auto updateStickerSizeLabel = [=](int value) {
-			const auto pixels = QString::number(value);
-			stickerSizeLabel->setText(ktr("rtg_chats_sticker_size", { "pixels", pixels }));
-		};
-		const auto updateStickerSize = [=](int value) {
-			updateStickerSizeLabel(value);
-			chatPreview->repaint();
-			RabbitSettings::setStickerSize(value);
-		};
-		stickerSizeSlider->resize(st::settingsAudioVolumeSlider.seekSize);
-		stickerSizeSlider->setPseudoDiscrete(
-			193,
-			[](int val) { return val + 64; },
-			RabbitSettings::stickerSize(),
-			updateStickerSize);
-		updateStickerSizeLabel(RabbitSettings::stickerSize());
+        AddToggle(
+            container, "rtg_show_seconds", nullptr,
+            [] { return RabbitSettings::showSeconds(); },
+            [](bool value) { RabbitSettings::setShowSeconds(value); }
+        );
 
-		AddToggle(
-			container, "rtg_show_actions_time", &st::menuIconReschedule,
-			[] { return RabbitSettings::showActionsTime(); },
-			[](bool value) { RabbitSettings::setShowActionsTime(value); }
-		);
+        AddToggle(
+            container, "rtg_comma_after_mention", nullptr,
+            [] { return RabbitSettings::commaAfterMention(); },
+            [](bool value) { RabbitSettings::setCommaAfterMention(value); }
+        );
 
-		AddToggle(
-			container, "rtg_show_seconds", nullptr,
-			[] { return RabbitSettings::showSeconds(); },
-			[](bool value) { RabbitSettings::setShowSeconds(value); }
-		);
+        AddToggle(
+            container, "rtg_hide_bubble_tails", nullptr,
+            [] { return RabbitSettings::hideBubbleTails(); },
+            [](bool value) { RabbitSettings::setHideBubbleTails(value); }
+        );
+    }
 
-		AddToggle(
-			container, "rtg_comma_after_mention", nullptr,
-			[] { return RabbitSettings::commaAfterMention(); },
-			[](bool value) { RabbitSettings::setCommaAfterMention(value); }
-		);
+    void RabbitChats::SetupStickerShape(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_chats_sticker_shape"));
 
-		AddToggle(
-			container, "rtg_hide_bubble_tails", nullptr,
-			[] { return RabbitSettings::hideBubbleTails(); },
-			[](bool value) { RabbitSettings::setHideBubbleTails(value); }
-		);
-	}
+        container->add(
+            object_ptr<StickerShapePicker>(container),
+            st::defaultSubsectionTitlePadding);
+    }
 
-	void RabbitChats::SetupStickerShape(not_null<Ui::VerticalLayout *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_chats_sticker_shape"));
+    void RabbitChats::SetupStickers(not_null<Ui::VerticalLayout*> container)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_chats_stickers"));
 
-		container->add(
-			object_ptr<StickerShapePicker>(container),
-			st::defaultSubsectionTitlePadding);
-	}
+        AddToggle(
+            container, "rtg_chats_more_recent_stickers", nullptr,
+            [] { return RabbitSettings::moreRecentStickers(); },
+            [](bool value) { RabbitSettings::setMoreRecentStickers(value); }
+        );
+    }
 
-	void RabbitChats::SetupStickers(not_null<Ui::VerticalLayout *> container) {
-		Ui::AddSubsectionTitle(container, rktr("rtg_chats_stickers"));
+    void RabbitChats::SetupRabbitChats(not_null<Ui::VerticalLayout*> container,
+                                       not_null<Window::SessionController*> controller)
+    {
+        Ui::AddSkip(container);
+        SetupChats(container);
 
-		AddToggle(
-			container, "rtg_chats_more_recent_stickers", nullptr,
-			[] { return RabbitSettings::moreRecentStickers(); },
-			[](bool value) { RabbitSettings::setMoreRecentStickers(value); }
-		);
-	}
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupStickerShape(container);
 
-	void RabbitChats::SetupRabbitChats(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
-		Ui::AddSkip(container);
-		SetupChats(container);
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupStickers(container);
+    }
 
-		Ui::AddSkip(container);
-		Ui::AddDivider(container);
-		Ui::AddSkip(container);
-		SetupStickerShape(container);
-		
-		Ui::AddSkip(container);
-		Ui::AddDivider(container);
-		Ui::AddSkip(container);
-		SetupStickers(container);
-	}
+    void RabbitChats::setupContent(not_null<Window::SessionController*> controller)
+    {
+        const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
-	void RabbitChats::setupContent(not_null<Window::SessionController *> controller) {
-		const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
+        SetupRabbitChats(content, controller);
 
-		SetupRabbitChats(content, controller);
-
-		Ui::ResizeFitChild(this, content);
-	}
+        Ui::ResizeFitChild(this, content);
+    }
 } // namespace Settings
