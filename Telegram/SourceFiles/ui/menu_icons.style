@@ -146,7 +146,6 @@ menuIconChatDiscuss: icon {{ "menu/chat_discuss", menuIconColor }};
 menuIconChats: icon {{ "menu/chats", menuIconColor }};
 menuIconBot: icon {{ "menu/bot", menuIconColor }};
 menuIconBotCommands: icon {{ "menu/bot_commands", menuIconColor }};
-menuIconBots: icon {{ "menu/bots", menuIconColor }};
 menuIconPremium: icon {{ "menu/premium", menuIconColor }};
 menuIconShop: icon {{ "menu/shop", menuIconColor }};
 menuIconIpAddress: icon {{ "menu/ip_address", menuIconColor }};

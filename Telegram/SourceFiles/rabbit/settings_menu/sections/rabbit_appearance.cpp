@@ -138,7 +138,7 @@ namespace Settings
             container,
             tr::lng_filters_type_bots(),
             st::settingsButton,
-            IconDescriptor{&st::menuIconBots}
+            IconDescriptor{&st::menuIconBot}
         )->toggleOn(
             rpl::single(RabbitSettings::sidebarBots())
         )->toggledValue(
