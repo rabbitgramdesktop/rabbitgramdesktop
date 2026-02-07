@@ -3262,31 +3262,7 @@ void HistoryWidget::refreshScheduledToggle() {
 }
 
 void HistoryWidget::refreshSendGiftToggle() {
-	using Type = Api::DisallowedGiftType;
-	const auto user = _peer ? _peer->asUser() : nullptr;
-	const auto disallowed = user ? user->disallowedGiftTypes() : Type();
-	const auto all = Type::Premium
-		| Type::Unlimited
-		| Type::Limited
-		| Type::Unique;
-	const auto has = user
-		&& _canSendMessages
-		&& !user->isServiceUser()
-		&& !user->isSelf()
-		&& !user->isBot()
-		&& ((disallowed & Type::SendHide)
-			|| (session().user()->disallowedGiftTypes() & Type::SendHide)
-			|| Data::IsBirthdayToday(user->birthday()))
-		&& ((disallowed & all) != all);
-	if (!_giftToUser && has) {
-		_giftToUser.create(this, st::historyGiftToUser);
-		_giftToUser->setAccessibleName(tr::lng_gift_send_title(tr::now));
-		_giftToUser->show();
-		_giftToUser->addClickHandler([=] {
-			Ui::ShowStarGiftBox(controller(), _peer);
-		});
-		orderWidgets(); // Raise drag areas to the top.
-	} else if (_giftToUser && !has) {
+	if (_giftToUser) {
 		_giftToUser.destroy();
 	}
 }
