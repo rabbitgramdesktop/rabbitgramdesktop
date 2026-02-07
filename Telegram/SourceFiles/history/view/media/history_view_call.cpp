@@ -80,7 +80,7 @@ QSize Call::countOptimalSize() {
 				strong->resolveConferenceCall(id, contextId);
 			}
 		} else if (user) {
-			Core::App().calls().startOutgoingCall(user, video);
+			Core::App().calls().startOutgoingCall(user, { video });
 		}
 	});
 	auto maxWidth = st::historyCallWidth;

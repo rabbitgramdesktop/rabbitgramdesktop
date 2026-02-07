@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace Core {
 
 extern const char kOptionFractionalScalingEnabled[];
+extern const char kOptionHighDpiDownscale[];
 extern const char kOptionFreeType[];
 
 class Launcher {
