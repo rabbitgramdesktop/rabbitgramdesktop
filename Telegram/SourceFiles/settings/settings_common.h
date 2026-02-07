@@ -7,11 +7,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "ui/text/text.h"
 #include "ui/text/text_variant.h"
 #include "ui/rp_widget.h"
 #include "ui/round_rect.h"
 #include "base/object_ptr.h"
+#include "base/weak_qptr.h"
 #include "settings/settings_type.h"
+
+#include <crl/crl.h>
 
 namespace anim {
 enum class repeat : uchar;

@@ -1,4 +1,4 @@
-﻿/*
+/*
 This file is part of rabbitGram Desktop,
 the unofficial app based on Telegram Desktop.
 
@@ -7,7 +7,17 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
-#include "ui/layers/generic_box.h"
+namespace RabbitSettings {
 
-void OutcomingQuickActionBox(not_null<Ui::GenericBox*> box);
-void IncomingQuickActionBox(not_null<Ui::GenericBox*> box);
+enum QuickAction {
+	Disable,
+	Reaction,
+	Reply,
+	Copy,
+	Forward,
+	Edit,
+	Save,
+	Delete
+};
+
+} // namespace RabbitSettings

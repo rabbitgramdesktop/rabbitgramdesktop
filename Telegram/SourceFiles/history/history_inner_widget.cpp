@@ -113,7 +113,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
 
-#include "rabbit/settings_menu/rabbit_settings_menu.h"
 #include "ui/text/format_song_document_name.h"
 
 namespace {

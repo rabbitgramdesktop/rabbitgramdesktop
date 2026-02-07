@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <ui/boxes/single_choice_box.h>
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/settings/quick_action_ui.h"
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings_menu/sections/rabbit_chats.h"
 #include "rabbit/ui/settings/previews.h"
@@ -39,6 +40,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Settings
 {
+    namespace {
+
+    [[nodiscard]] RabbitSettings::QuickAction QuickActionFrom(int value) {
+        return static_cast<RabbitSettings::QuickAction>(value);
+    }
+
+    } // namespace
+
     rpl::producer<QString> RabbitChats::title()
     {
         return rktr("rtg_settings_chats");
@@ -47,7 +56,7 @@ namespace Settings
     RabbitChats::RabbitChats(
         QWidget* parent,
         not_null<Window::SessionController*> controller)
-        : Section(parent)
+        : Section(parent, controller)
     {
         setupContent(controller);
     }
@@ -147,14 +156,27 @@ namespace Settings
                                         not_null<Window::SessionController*> controller)
     {
         Ui::AddSubsectionTitle(container, rktr("rtg_chats_quick_actions"));
+        const auto outcomingAction = QuickActionFrom(
+            RabbitSettings::outcomingQuickAction());
+        const auto incomingAction = QuickActionFrom(
+            RabbitSettings::incomingQuickAction());
         
         AddButtonWithLabel(
             container,
             rktr("rtg_outcoming_quick_actions"),
-            RabbitSettings::QuickActionString((RabbitSettings::QuickAction)RabbitSettings::outcomingQuickAction()),
+            RabbitSettings::QuickActionString(outcomingAction),
             st::settingsButtonNoIcon
         )->addClickHandler([=] {
-            controller->show(Box(QuickActionBox));
+            controller->show(Box(OutcomingQuickActionBox));
+        });
+
+        AddButtonWithLabel(
+            container,
+            rktr("rtg_incoming_quick_actions"),
+            RabbitSettings::QuickActionString(incomingAction),
+            st::settingsButtonNoIcon
+        )->addClickHandler([=] {
+            controller->show(Box(IncomingQuickActionBox));
         });
     }
 

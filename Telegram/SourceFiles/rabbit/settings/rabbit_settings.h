@@ -9,15 +9,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <rpl/producer.h>
 
-#include "rabbit/lang/rabbit_lang.h"
-
 #include <map>
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
 
-#include "export/export_settings.h"
-#include "settings/settings_common.h"
-#include "styles/style_menu_icons.h"
+#include "rabbit/settings/quick_action.h"
 
 namespace RabbitSettings
 {
@@ -32,48 +28,6 @@ namespace RabbitSettings
     const auto SEASONAL_ICON = QString("seasonal");
     const auto TWITCH_ICON = QString("twitch");
     
-    enum QuickAction
-    {
-        Disable,
-        Reaction,
-        Reply,
-        Copy,
-        Forward,
-        Edit,
-        Save,
-        Delete
-    };
-    
-    rpl::producer<QString> QuickActionString(QuickAction action)
-    {
-        switch (action)
-        {
-            case Disable: return rktr("quick_action_disable");
-            case Reaction: return rktr("quick_action_reaction");
-            case Reply: return rktr("quick_action_reply");
-            case Copy: return rktr("quick_action_copy");
-            case Forward: return rktr("quick_action_forward");
-            case Edit: return rktr("quick_action_edit");
-            case Save: return rktr("quick_action_save");
-            case Delete: return rktr("quick_action_delete");
-        }
-    }
-    
-    Settings::IconDescriptor QuickActionIcon(QuickAction action)
-    {
-        switch (action)
-        {
-            case Disable: return { &st::menuIconDisable }; 
-            case Reaction: return { &st::menuIconGroupReactions };
-            case Reply: return { &st::menuIconReply };
-            case Copy: return { &st::menuIconCopy };
-            case Forward: return { &st::menuIconForward };
-            case Edit: return { &st::menuIconEdit };
-            case Save: return { &st::menuIconSavedMessages };
-            case Delete: return { &st::menuIconDelete };
-        }
-    }
-
     namespace JsonSettings
     {
         void Start();

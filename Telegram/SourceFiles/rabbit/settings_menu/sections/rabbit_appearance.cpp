@@ -60,7 +60,7 @@ namespace Settings
     RabbitAppearance::RabbitAppearance(
         QWidget* parent,
         not_null<Window::SessionController*> controller)
-        : Section(parent)
+        : Section(parent, controller)
     {
         setupContent(controller);
     }
