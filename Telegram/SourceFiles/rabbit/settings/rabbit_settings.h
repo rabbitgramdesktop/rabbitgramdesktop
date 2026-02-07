@@ -152,6 +152,7 @@ namespace RabbitSettings
     inline bool sidebarSavedMessages() { return JsonSettings::GetBool("sidebar_saved_messages"); }
     inline bool sidebarNightMode() { return JsonSettings::GetBool("sidebar_night_mode"); }
     inline int stickerSize() { return JsonSettings::GetInt("sticker_size"); }
+    inline int messageRoundness() { return JsonSettings::GetInt("message_roundness"); }
     inline bool showActionsTime() { return JsonSettings::GetBool("show_actions_time"); }
     inline bool showSeconds() { return JsonSettings::GetBool("show_seconds"); }
     inline bool commaAfterMention() { return JsonSettings::GetBool("comma_after_mention"); }
@@ -179,6 +180,7 @@ namespace RabbitSettings
     inline void setSidebarSavedMessages(bool value) { JsonSettings::Set("sidebar_saved_messages", value); }
     inline void setSidebarNightMode(bool value) { JsonSettings::Set("sidebar_night_mode", value); }
     inline void setStickerSize(int value) { JsonSettings::Set("sticker_size", value); }
+    inline void setMessageRoundness(int value) { JsonSettings::Set("message_roundness", value); }
     inline void setShowActionsTime(bool value) { JsonSettings::Set("show_actions_time", value); }
     inline void setShowSeconds(bool value) { JsonSettings::Set("show_seconds", value); }
     inline void setCommaAfterMention(bool value) { JsonSettings::Set("comma_after_mention", value); }

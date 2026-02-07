@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "ui/boxes/about_cocoon_box.h"
 #include "ui/chat/chat_style.h"
+#include "ui/chat/chat_style_radius.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
@@ -29,7 +30,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 
+#include <algorithm>
+
 namespace HistoryView {
+
+[[nodiscard]] int MessageQuoteRadius(const style::QuoteStyle &style) {
+	const auto padding = style.padding;
+	const auto pad = std::max({
+		padding.left(),
+		padding.right(),
+		padding.top(),
+		padding.bottom(),
+	});
+	return std::max(0, Ui::BubbleRadiusLarge() - pad);
+}
 
 SummaryHeader::SummaryHeader()
 : _name(st::maxSignatureSize / 2)
@@ -116,7 +130,8 @@ void SummaryHeader::paint(
 	const auto cache = !inBubble
 		? st->serviceReplyCache(colorPattern).get()
 		: stm->replyCache[colorPattern].get();
-	const auto &quoteSt = st::messageQuoteStyle;
+	auto quoteSt = st::messageQuoteStyle;
+	quoteSt.radius = MessageQuoteRadius(quoteSt);
 	const auto rippleColor = cache->bg;
 	const auto nameColor = !inBubble
 		? st->msgImgReplyBarColor()->c

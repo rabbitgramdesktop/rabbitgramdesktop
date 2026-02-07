@@ -24,6 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/chat/chat_style.h"
+#include "ui/chat/chat_style_radius.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/spoiler_mess.h"
 #include "ui/text/custom_emoji_helper.h"
@@ -35,10 +36,23 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 
+#include <algorithm>
+
 namespace HistoryView {
 namespace {
 
 constexpr auto kNonExpandedLinesLimit = 5;
+
+[[nodiscard]] int MessageQuoteRadius(const style::QuoteStyle &style) {
+	const auto padding = style.padding;
+	const auto pad = std::max({
+		padding.left(),
+		padding.right(),
+		padding.top(),
+		padding.bottom(),
+	});
+	return std::max(0, Ui::BubbleRadiusLarge() - pad);
+}
 
 [[nodiscard]] QImage MakeTaskImage() {
 	const auto diameter = st::normalFont->ascent;
@@ -779,9 +793,13 @@ void Reply::paint(
 		: (_hasQuoteIcon
 			? stm->quoteCache[colorPattern]
 			: stm->replyCache[colorPattern]).get();
-	const auto &quoteSt = _hasQuoteIcon
-		? st::messageTextStyle.blockquote
-		: st::messageQuoteStyle;
+	const auto quoteSt = [&] {
+		auto result = _hasQuoteIcon
+			? st::messageTextStyle.blockquote
+			: st::messageQuoteStyle;
+		result.radius = MessageQuoteRadius(result);
+		return result;
+	}();
 	const auto backgroundEmojiData = backgroundEmojiId
 		? st->backgroundEmojiData(backgroundEmojiId, colorCollectible).get()
 		: nullptr;
@@ -987,7 +1005,7 @@ void Reply::createRippleAnimation(
 		st::defaultRippleAnimation,
 		Ui::RippleAnimation::RoundRectMask(
 			size,
-			st::messageQuoteStyle.radius),
+			MessageQuoteRadius(st::messageQuoteStyle)),
 		[=] {
 			view->repaint(_ripple.lastPaintedPoint.isNull()
 				? QRect()

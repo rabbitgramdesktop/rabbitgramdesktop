@@ -15,6 +15,7 @@
     "rtg_sidebar_editor": "Редактор бокового меню",
     "rtg_settings_chats": "Чаты",
     "rtg_chats_sticker_size": "Размер стикеров: {pixels}px",
+    "rtg_chats_message_rounding": "Закругление сообщений: {radius}",
     "rtg_show_actions_time": "Показывать время действий",
     "rtg_show_seconds": "Показывать время с секундами",
     "rtg_comma_after_mention": "Запятая после упоминания",

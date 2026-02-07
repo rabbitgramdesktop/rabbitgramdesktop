@@ -333,6 +333,13 @@ namespace RabbitSettings::JsonSettings
                 }
             },
             {
+                "message_roundness", {
+                    .type = IntSetting,
+                    .defaultValue = 50,
+                    .limitHandler = IntLimit(0, 50, 50),
+                }
+            },
+            {
                 "show_actions_time", {
                     .type = BoolSetting,
                     .defaultValue = false

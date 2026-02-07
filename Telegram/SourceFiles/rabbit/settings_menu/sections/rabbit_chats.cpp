@@ -23,6 +23,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/vertical_list.h"
 #include "boxes/connection_box.h"
+#include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_instance.h"
@@ -81,7 +82,9 @@ namespace Settings
             | rpl::on_next([=](bool enabled) { setter(enabled); }, container->lifetime());
     }
 
-    void RabbitChats::SetupChats(not_null<Ui::VerticalLayout*> container)
+    void RabbitChats::SetupChats(
+        not_null<Ui::VerticalLayout*> container,
+        not_null<Window::SessionController*> controller)
     {
         Ui::AddSubsectionTitle(container, rktr("rtg_settings_chats"));
 
@@ -117,6 +120,51 @@ namespace Settings
             RabbitSettings::stickerSize(),
             updateStickerSize);
         updateStickerSizeLabel(RabbitSettings::stickerSize());
+
+        const auto messageRoundnessLabel = container->add(
+            object_ptr<Ui::LabelSimple>(
+                container,
+                st::settingsAudioVolumeLabel),
+            st::settingsAudioVolumeLabelPadding);
+        const auto messageRoundnessSlider = container->add(
+            object_ptr<Ui::MediaSlider>(
+                container,
+                st::settingsAudioVolumeSlider),
+            st::settingsAudioVolumeSliderPadding);
+        const auto updateMessageRoundnessLabel = [=](int value)
+        {
+            const auto radius = QString::number(value);
+            messageRoundnessLabel->setText(ktr("rtg_chats_message_rounding", {"radius", radius}));
+        };
+        const auto previousMessageRoundness = container->lifetime().make_state<int>(
+            RabbitSettings::messageRoundness());
+        const auto updateMessageRoundness = [=](int value)
+        {
+            updateMessageRoundnessLabel(value);
+            chatPreview->repaint();
+            RabbitSettings::setMessageRoundness(value);
+        };
+        const auto showRestartRequired = [=](int value)
+        {
+            if (value == *previousMessageRoundness) {
+                return;
+            }
+            *previousMessageRoundness = value;
+            controller->show(Ui::MakeConfirmBox({
+                .text = tr::lng_settings_need_restart(),
+                .confirmed = [] { Core::Restart(); },
+                .confirmText = tr::lng_settings_restart_now(),
+                .cancelText = tr::lng_settings_restart_later(),
+            }));
+        };
+        messageRoundnessSlider->resize(st::settingsAudioVolumeSlider.seekSize);
+        messageRoundnessSlider->setPseudoDiscrete(
+            51,
+            [](int val) { return val; },
+            RabbitSettings::messageRoundness(),
+            updateMessageRoundness,
+            showRestartRequired);
+        updateMessageRoundnessLabel(RabbitSettings::messageRoundness());
 
         AddToggle(
             container, "rtg_show_actions_time", &st::menuIconReschedule,
@@ -191,11 +239,12 @@ namespace Settings
         );
     }
 
-    void RabbitChats::SetupRabbitChats(not_null<Ui::VerticalLayout*> container,
-                                       not_null<Window::SessionController*> controller)
+    void RabbitChats::SetupRabbitChats(
+        not_null<Ui::VerticalLayout*> container,
+        not_null<Window::SessionController*> controller)
     {
         Ui::AddSkip(container);
-        SetupChats(container);
+        SetupChats(container, controller);
 
         Ui::AddSkip(container);
         Ui::AddDivider(container);
