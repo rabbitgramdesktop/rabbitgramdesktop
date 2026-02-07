@@ -158,7 +158,7 @@ namespace RabbitSettings
     inline bool commaAfterMention() { return JsonSettings::GetBool("comma_after_mention"); }
     inline bool hideBubbleTails() { return JsonSettings::GetBool("hide_bubble_tails"); }
     inline int stickerShape() { return JsonSettings::GetInt("sticker_shape"); }
-    inline int outcomingQuickAction() { return JsonSettings::GetInt("outcoming_quick_action"); }
+    inline int outgoingQuickAction() { return JsonSettings::GetInt("outgoing_quick_action"); }
     inline int incomingQuickAction() { return JsonSettings::GetInt("incoming_quick_action"); }
     inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
     inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
@@ -186,7 +186,7 @@ namespace RabbitSettings
     inline void setCommaAfterMention(bool value) { JsonSettings::Set("comma_after_mention", value); }
     inline void setHideBubbleTails(bool value) { JsonSettings::Set("hide_bubble_tails", value); }
     inline void setStickerShape(int value) { JsonSettings::Set("sticker_shape", value); }
-    inline void setOutcomingQuickAction(int value) { JsonSettings::Set("outcoming_quick_action", value); }
+    inline void setOutgoingQuickAction(int value) { JsonSettings::Set("outgoing_quick_action", value); }
     inline void setIncomingQuickAction(int value) { JsonSettings::Set("incoming_quick_action", value); }
     inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
     inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }

@@ -204,18 +204,18 @@ namespace Settings
                                         not_null<Window::SessionController*> controller)
     {
         Ui::AddSubsectionTitle(container, rktr("rtg_chats_quick_actions"));
-        const auto outcomingAction = QuickActionFrom(
-            RabbitSettings::outcomingQuickAction());
+        const auto outgoingAction = QuickActionFrom(
+            RabbitSettings::outgoingQuickAction());
         const auto incomingAction = QuickActionFrom(
             RabbitSettings::incomingQuickAction());
         
         AddButtonWithLabel(
             container,
-            rktr("rtg_outcoming_quick_actions"),
-            RabbitSettings::QuickActionString(outcomingAction),
+            rktr("rtg_outgoing_quick_actions"),
+            RabbitSettings::QuickActionString(outgoingAction),
             st::settingsButtonNoIcon
         )->addClickHandler([=] {
-            controller->show(Box(OutcomingQuickActionBox));
+            controller->show(Box(OutgoingQuickActionBox));
         });
 
         AddButtonWithLabel(

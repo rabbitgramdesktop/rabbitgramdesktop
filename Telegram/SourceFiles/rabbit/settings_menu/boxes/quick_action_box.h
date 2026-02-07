@@ -9,5 +9,5 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/layers/generic_box.h"
 
-void OutcomingQuickActionBox(not_null<Ui::GenericBox*> box);
+void OutgoingQuickActionBox(not_null<Ui::GenericBox*> box);
 void IncomingQuickActionBox(not_null<Ui::GenericBox*> box);

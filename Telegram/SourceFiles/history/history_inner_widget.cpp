@@ -2250,7 +2250,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 			mouseActionCancel();
 			const auto item = view->data();
 			const auto itemId = item->fullId();
-			bool outcoming = view->data()->from()->isSelf();
+			bool outgoing = view->data()->from()->isSelf();
 			auto doCopyAction = [&]
 			{
 				const auto selectedText = getSelectedText();
@@ -2304,8 +2304,8 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 						HistoryView::Context::History);
 				}
 			};
-			switch (outcoming
-				? RabbitSettings::outcomingQuickAction()
+			switch (outgoing
+				? RabbitSettings::outgoingQuickAction()
 				: RabbitSettings::incomingQuickAction())
 			{
 				case RabbitSettings::QuickAction::Reaction:
@@ -2314,7 +2314,8 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 					} break;
 				case RabbitSettings::QuickAction::Reply: 
 					{
-						_widget->replyToMessage(view->data());
+						if (CanSendReply(item)) _widget->replyToMessage(view->data());
+						else toggleFavoriteReaction(view);
 					} break;
 				case RabbitSettings::QuickAction::Copy: 
 					{						
@@ -2328,6 +2329,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 					{
 						const auto t = base::unixtime::now();
 						if (item->allowsEdit(t)) _widget->editMessage(item, TextSelection());
+						else toggleFavoriteReaction(view);
 					} break;
 				case RabbitSettings::QuickAction::Save:
 					{

@@ -371,7 +371,7 @@ namespace RabbitSettings::JsonSettings
                 }
             },
             {
-                "outcoming_quick_action", {
+                "outgoing_quick_action", {
                     .type = IntSetting,
                     .defaultValue = 1,
                     .limitHandler = IntLimit(0, 7, 1),

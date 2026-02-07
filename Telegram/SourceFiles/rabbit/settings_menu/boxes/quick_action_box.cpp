@@ -67,12 +67,12 @@ void BuildQuickActionBox(
 
 } // namespace
 
-void OutcomingQuickActionBox(not_null<Ui::GenericBox*> box) {
+void OutgoingQuickActionBox(not_null<Ui::GenericBox*> box) {
     BuildQuickActionBox(
         box,
-        qsl("outcoming_quick_action"),
+        qsl("outgoing_quick_action"),
         [=](RabbitSettings::QuickAction action) {
-            RabbitSettings::setOutcomingQuickAction(action);
+            RabbitSettings::setOutgoingQuickAction(action);
         });
 }
 
