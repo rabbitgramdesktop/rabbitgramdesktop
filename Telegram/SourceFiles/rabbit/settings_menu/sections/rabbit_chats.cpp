@@ -34,6 +34,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_menu_icons.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
+#include "rabbit/settings_menu/boxes/quick_action_box.h"
 #include "ui/widgets/continuous_sliders.h"
 
 namespace Settings
@@ -141,6 +142,21 @@ namespace Settings
             object_ptr<StickerShapePicker>(container),
             st::defaultSubsectionTitlePadding);
     }
+    
+    void RabbitChats::SetupQuickActions(not_null<Ui::VerticalLayout*> container,
+                                        not_null<Window::SessionController*> controller)
+    {
+        Ui::AddSubsectionTitle(container, rktr("rtg_chats_quick_actions"));
+        
+        AddButtonWithLabel(
+            container,
+            rktr("rtg_outcoming_quick_actions"),
+            RabbitSettings::QuickActionString((RabbitSettings::QuickAction)RabbitSettings::outcomingQuickAction()),
+            st::settingsButtonNoIcon
+        )->addClickHandler([=] {
+            controller->show(Box(QuickActionBox));
+        });
+    }
 
     void RabbitChats::SetupStickers(not_null<Ui::VerticalLayout*> container)
     {
@@ -163,6 +179,11 @@ namespace Settings
         Ui::AddDivider(container);
         Ui::AddSkip(container);
         SetupStickerShape(container);
+        
+        Ui::AddSkip(container);
+        Ui::AddDivider(container);
+        Ui::AddSkip(container);
+        SetupQuickActions(container, controller);
 
         Ui::AddSkip(container);
         Ui::AddDivider(container);

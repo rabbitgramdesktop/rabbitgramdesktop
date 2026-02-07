@@ -1495,6 +1495,8 @@ PRIVATE
     rabbit/lang/rabbit_lang.h
     rabbit/settings/rabbit_settings.cpp
     rabbit/settings/rabbit_settings.h
+    rabbit/settings_menu/boxes/quick_action_box.cpp
+    rabbit/settings_menu/boxes/quick_action_box.h
     rabbit/settings_menu/sections/rabbit_appearance.cpp
     rabbit/settings_menu/sections/rabbit_appearance.h
     rabbit/settings_menu/sections/rabbit_chats.cpp

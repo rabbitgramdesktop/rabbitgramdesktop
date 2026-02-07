@@ -9,8 +9,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <rpl/producer.h>
 
+#include "rabbit/lang/rabbit_lang.h"
+
+#include <map>
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
+
+#include "export/export_settings.h"
+#include "settings/settings_common.h"
+#include "styles/style_menu_icons.h"
 
 namespace RabbitSettings
 {
@@ -24,6 +31,48 @@ namespace RabbitSettings
     const auto OLD_ICON = QString("old");
     const auto SEASONAL_ICON = QString("seasonal");
     const auto TWITCH_ICON = QString("twitch");
+    
+    enum QuickAction
+    {
+        Disable,
+        Reaction,
+        Reply,
+        Copy,
+        Forward,
+        Edit,
+        Save,
+        Delete
+    };
+    
+    rpl::producer<QString> QuickActionString(QuickAction action)
+    {
+        switch (action)
+        {
+            case Disable: return rktr("quick_action_disable");
+            case Reaction: return rktr("quick_action_reaction");
+            case Reply: return rktr("quick_action_reply");
+            case Copy: return rktr("quick_action_copy");
+            case Forward: return rktr("quick_action_forward");
+            case Edit: return rktr("quick_action_edit");
+            case Save: return rktr("quick_action_save");
+            case Delete: return rktr("quick_action_delete");
+        }
+    }
+    
+    Settings::IconDescriptor QuickActionIcon(QuickAction action)
+    {
+        switch (action)
+        {
+            case Disable: return { &st::menuIconDisable }; 
+            case Reaction: return { &st::menuIconGroupReactions };
+            case Reply: return { &st::menuIconReply };
+            case Copy: return { &st::menuIconCopy };
+            case Forward: return { &st::menuIconForward };
+            case Edit: return { &st::menuIconEdit };
+            case Save: return { &st::menuIconSavedMessages };
+            case Delete: return { &st::menuIconDelete };
+        }
+    }
 
     namespace JsonSettings
     {
@@ -154,6 +203,8 @@ namespace RabbitSettings
     inline bool commaAfterMention() { return JsonSettings::GetBool("comma_after_mention"); }
     inline bool hideBubbleTails() { return JsonSettings::GetBool("hide_bubble_tails"); }
     inline int stickerShape() { return JsonSettings::GetInt("sticker_shape"); }
+    inline int outcomingQuickAction() { return JsonSettings::GetInt("outcoming_quick_action"); }
+    inline int incomingQuickAction() { return JsonSettings::GetInt("incoming_quick_action"); }
     inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
     inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
 
@@ -179,6 +230,8 @@ namespace RabbitSettings
     inline void setCommaAfterMention(bool value) { JsonSettings::Set("comma_after_mention", value); }
     inline void setHideBubbleTails(bool value) { JsonSettings::Set("hide_bubble_tails", value); }
     inline void setStickerShape(int value) { JsonSettings::Set("sticker_shape", value); }
+    inline void setOutcomingQuickAction(int value) { JsonSettings::Set("outcoming_quick_action", value); }
+    inline void setIncomingQuickAction(int value) { JsonSettings::Set("incoming_quick_action", value); }
     inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
     inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
 } // namespace RabbitSettings

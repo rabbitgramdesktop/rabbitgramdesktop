@@ -364,6 +364,20 @@ namespace RabbitSettings::JsonSettings
                 }
             },
             {
+                "outcoming_quick_action", {
+                    .type = IntSetting,
+                    .defaultValue = 1,
+                    .limitHandler = IntLimit(0, 7, 1),
+                }
+            },
+            {
+                "incoming_quick_action", {
+                    .type = IntSetting,
+                    .defaultValue = 1,
+                    .limitHandler = IntLimit(0, 7, 1),
+                }
+            },
+            {
                 "more_recent_stickers", {
                     .type = BoolSetting,
                     .defaultValue = false,
