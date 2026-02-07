@@ -43,11 +43,12 @@ void PaintBubbleGeneric(
 		fillBg(args.geometry);
 		return;
 	}
+	const auto hideTails = RabbitSettings::hideBubbleTails();
 	const auto bottomLeft = (bottomWithTailLeft == Corner::Tail)
-		? Corner::None
+		? (hideTails ? Corner::Large : Corner::None)
 		: bottomWithTailLeft;
 	const auto bottomRight = (bottomWithTailRight == Corner::Tail)
-		? Corner::None
+		? (hideTails ? Corner::Large : Corner::None)
 		: bottomWithTailRight;
 	const auto rect = args.geometry;
 	const auto small = BubbleRadiusSmall();
@@ -137,10 +138,10 @@ void PaintBubbleGeneric(
 			}
 		}
 	}
-	const auto leftTail = (bottomWithTailLeft == Corner::Tail && !RabbitSettings::hideBubbleTails())
+	const auto leftTail = (bottomWithTailLeft == Corner::Tail && !hideTails)
 		? paintTail({ rect.x(), rect.y() + rect.height() })
 		: 0;
-	const auto rightTail = (bottomWithTailRight == Corner::Tail && !RabbitSettings::hideBubbleTails())
+	const auto rightTail = (bottomWithTailRight == Corner::Tail && !hideTails)
 		? paintTail({ rect.x() + rect.width(), rect.y() + rect.height() })
 		: 0;
 	if (!args.shadowed) {
