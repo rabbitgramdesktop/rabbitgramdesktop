@@ -2314,7 +2314,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 					} break;
 				case RabbitSettings::QuickAction::Reply: 
 					{
-						if (!item->from()->isChannel() && CanSendReply(item)) _widget->replyToMessage(view->data());
+						if (CanSendReply(item)) _widget->replyToMessage(view->data());
 						else toggleFavoriteReaction(view);
 					} break;
 				case RabbitSettings::QuickAction::Copy: 
@@ -2328,7 +2328,7 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 				case RabbitSettings::QuickAction::Edit:
 					{
 						const auto t = base::unixtime::now();
-						if (!item->from()->isChannel() && item->allowsEdit(t)) _widget->editMessage(item, TextSelection());
+						if (item->allowsEdit(t)) _widget->editMessage(item, TextSelection());
 						else toggleFavoriteReaction(view);
 					} break;
 				case RabbitSettings::QuickAction::Save:
