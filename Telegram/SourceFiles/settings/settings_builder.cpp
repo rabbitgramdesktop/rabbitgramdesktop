@@ -36,6 +36,16 @@ namespace {
 	return result;
 }
 
+[[nodiscard]] QString ResolveSectionTitle(const SectionTitle &title) {
+	return v::match(title,
+		[](const tr::phrase<> *phrase) {
+			return phrase ? (*phrase)(tr::now) : QString();
+		},
+		[](const Fn<QString()> &provider) {
+			return provider ? provider() : QString();
+		});
+}
+
 } // namespace
 
 BuildHelper::BuildHelper(
@@ -101,7 +111,7 @@ std::vector<SearchEntry> SearchRegistry::collectAll(
 	for (const auto &[sectionId, meta] : _sections) {
 		if (meta->parentId) {
 			result.push_back({
-				.title = (*meta->title)(tr::now),
+				.title = ResolveSectionTitle(meta->title),
 				.section = sectionId,
 				.icon = { meta->icon },
 			});
@@ -116,7 +126,9 @@ std::vector<SearchEntry> SearchRegistry::collectAll(
 
 QString SearchRegistry::sectionTitle(Type sectionId) const {
 	const auto it = _sections.find(sectionId);
-	return (it != _sections.end()) ? (*it->second->title)(tr::now) : QString();
+	return (it != _sections.end())
+		? ResolveSectionTitle(it->second->title)
+		: QString();
 }
 
 QString SearchRegistry::sectionPath(Type sectionId, bool parentsOnly) const {

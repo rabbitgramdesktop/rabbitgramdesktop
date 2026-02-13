@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "base/basic_types.h"
+
 namespace RabbitLang::Lang
 {
     struct Var
@@ -178,4 +180,9 @@ inline rpl::producer<TextWithEntities> rktre(
         RabbitLang::Lang::Events() | rpl::map(
             [=] { return RabbitLang::Lang::TranslateWithEntities(key, value, var1, var2, var3, var4); })
     );
+}
+
+inline Fn<QString()> rktr_phrase(const QString &key)
+{
+    return [key] { return RabbitLang::Lang::Translate(key); };
 }

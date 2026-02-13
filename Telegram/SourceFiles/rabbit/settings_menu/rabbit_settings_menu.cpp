@@ -19,6 +19,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang_auto.h"
 #include "mainwindow.h"
 #include "settings/settings_common.h"
+#include "settings/settings_builder.h"
+#include "settings/sections/settings_main.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/buttons.h"
@@ -41,21 +43,120 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/basic_click_handlers.h"
 
-#define SettingsMenuJsonSwitch(LangKey, Option) container->add(object_ptr<Button>( \
-	container, \
-	rktr(#LangKey), \
-	st::settingsButtonNoIcon \
-))->toggleOn( \
-	rpl::single(RabbitSettings::JsonSettings::GetBool(#Option)) \
-)->toggledValue( \
-) | rpl::filter([](bool enabled) { \
-	return (enabled != RabbitSettings::JsonSettings::GetBool(#Option)); \
-}) | rpl::on_next([](bool enabled) { \
-	RabbitSettings::JsonSettings::Set(#Option, enabled); \
-}, container->lifetime());
-
 namespace Settings
 {
+    namespace
+    {
+        using namespace Builder;
+
+        void BuildRabbitSettings(SectionBuilder &builder)
+        {
+            builder.addSubsectionTitle({
+                .id = u"rabbit/categories"_q,
+                .title = rktr("rtg_settings_categories"),
+                .keywords = { u"rabbit"_q, u"settings"_q, u"categories"_q },
+            });
+
+            builder.addSkip();
+            builder.addSectionButton({
+                .title = rktr("rtg_settings_general"),
+                .targetSection = RabbitGeneral::Id(),
+                .icon = { &st::menuIconShowAll },
+                .keywords = { u"general"_q, u"basic"_q },
+            });
+            builder.addSectionButton({
+                .title = rktr("rtg_settings_appearance"),
+                .targetSection = RabbitAppearance::Id(),
+                .icon = { &st::menuIconPalette },
+                .keywords = { u"appearance"_q, u"theme"_q },
+            });
+            builder.addSectionButton({
+                .title = rktr("rtg_settings_chats"),
+                .targetSection = RabbitChats::Id(),
+                .icon = { &st::menuIconChatBubble },
+                .keywords = { u"chats"_q, u"messages"_q },
+            });
+        }
+
+        void BuildRabbitLinks(SectionBuilder &builder)
+        {
+            builder.addSubsectionTitle({
+                .id = u"rabbit/links"_q,
+                .title = rktr("rtg_links"),
+                .keywords = { u"links"_q, u"community"_q },
+            });
+
+            builder.addSkip();
+            builder.addButton({
+                .id = u"rabbit/links/channel"_q,
+                .title = rktr("rtg_channel_title"),
+                .icon = { &st::menuIconChannel },
+                .label = rktr("rtg_channel_label"),
+                .onClick = [] {
+                    Core::App().openLocalUrl(
+                        "tg://resolve?domain=rabbitGramUpdates",
+                        {});
+                },
+                .keywords = { u"channel"_q, u"updates"_q },
+            });
+            builder.addButton({
+                .id = u"rabbit/links/group"_q,
+                .title = rktr("rtg_group_title"),
+                .icon = { &st::menuIconGroups },
+                .label = rktr("rtg_group_label"),
+                .onClick = [] {
+                    Core::App().openLocalUrl(
+                        "tg://resolve?domain=rabbitGramDesktop",
+                        {});
+                },
+                .keywords = { u"group"_q, u"community"_q },
+            });
+            builder.addButton({
+                .id = u"rabbit/links/translate"_q,
+                .title = rktr("rtg_translate_title"),
+                .icon = { &st::menuIconTranslate },
+                .label = rktr("rtg_translate_label"),
+                .onClick = [] {
+                    UrlClickHandler::Open(
+                        "https://crowdin.com/project/rabbitgramdesktop");
+                },
+                .keywords = { u"translate"_q, u"localization"_q },
+            });
+            builder.addButton({
+                .id = u"rabbit/links/source"_q,
+                .title = rktr("rtg_source_title"),
+                .icon = { &st::menuIconDelete },
+                .label = rktr("rtg_source_label"),
+                .onClick = [] {
+                    UrlClickHandler::Open(
+                        "https://github.com/rabbitgramdesktop/rabbitgramdesktop");
+                },
+                .keywords = { u"source"_q, u"github"_q },
+            });
+        }
+
+        void BuildRabbitSection(SectionBuilder &builder)
+        {
+            builder.addSkip();
+            BuildRabbitSettings(builder);
+            builder.addSkip();
+            builder.addDivider();
+            builder.addSkip();
+            BuildRabbitLinks(builder);
+        }
+
+        const auto kMeta = BuildHelper({
+            .id = Rabbit::Id(),
+            .parentId = MainId(),
+            .title = rktr_phrase(u"rtg_settings"_q),
+            .icon = &st::menuIconRabbit,
+        }, [](SectionBuilder &builder) {
+            BuildRabbitSection(builder);
+        });
+
+        const SectionBuildMethod kRabbitSection = kMeta.build;
+    } // namespace
+
     rpl::producer<QString> Rabbit::title()
     {
         return rktr("rtg_settings");
@@ -66,111 +167,13 @@ namespace Settings
         not_null<Window::SessionController*> controller)
         : Section(parent, controller)
     {
-        setupContent(controller);
+        setupContent();
     }
 
-    void Rabbit::SetupRabbitSettings(not_null<Ui::VerticalLayout*> container,
-                                     not_null<Window::SessionController*> controller)
-    {
-        AddSubsectionTitle(container, rktr("rtg_settings_categories"));
-
-        const auto addSection = [&](
-            rpl::producer<QString> label,
-            Type type,
-            IconDescriptor&& descriptor)
-        {
-            AddButtonWithIcon(
-                container,
-                std::move(label),
-                st::settingsButton,
-                std::move(descriptor)
-            )->addClickHandler([=]
-            {
-                showOther(type);
-            });
-        };
-
-        Ui::AddSkip(container);
-        addSection(
-            rktr("rtg_settings_general"),
-            RabbitGeneral::Id(),
-            {&st::menuIconShowAll});
-
-        addSection(
-            rktr("rtg_settings_appearance"),
-            RabbitAppearance::Id(),
-            {&st::menuIconPalette});
-
-        addSection(
-            rktr("rtg_settings_chats"),
-            RabbitChats::Id(),
-            {&st::menuIconChatBubble});
-    }
-
-    void Rabbit::SetupRabbitLinks(not_null<Ui::VerticalLayout*> container,
-                                  not_null<Window::SessionController*> controller)
-    {
-        AddSubsectionTitle(container, rktr("rtg_links"));
-
-        Ui::AddSkip(container);
-
-        AddButtonWithLabel(
-            container,
-            rktr("rtg_channel_title"),
-            rktr("rtg_channel_label"),
-            st::settingsButton,
-            {&st::menuIconChannel}
-        )->setClickedCallback([=]
-        {
-            Core::App().openLocalUrl("tg://resolve?domain=rabbitGramUpdates", {});
-        });
-
-        AddButtonWithLabel(
-            container,
-            rktr("rtg_group_title"),
-            rktr("rtg_group_label"),
-            st::settingsButton,
-            {&st::menuIconGroups}
-        )->setClickedCallback([=]
-        {
-            Core::App().openLocalUrl("tg://resolve?domain=rabbitGramDesktop", {});
-        });
-
-        AddButtonWithLabel(
-            container,
-            rktr("rtg_translate_title"),
-            rktr("rtg_translate_label"),
-            st::settingsButton,
-            {&st::menuIconTranslate}
-        )->setClickedCallback([=]
-        {
-            UrlClickHandler::Open("https://crowdin.com/project/rabbitgramdesktop");
-        });
-
-        AddButtonWithLabel(
-            container,
-            rktr("rtg_source_title"),
-            rktr("rtg_source_label"),
-            st::settingsButton,
-            {&st::menuIconDelete}
-        )->setClickedCallback([=]
-        {
-            UrlClickHandler::Open("https://github.com/rabbitgramdesktop/rabbitgramdesktop");
-        });
-    }
-
-    void Rabbit::setupContent(not_null<Window::SessionController*> controller)
+    void Rabbit::setupContent()
     {
         const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
-
-        Ui::AddSkip(content);
-        SetupRabbitSettings(content, controller);
-
-        Ui::AddSkip(content);
-        Ui::AddDivider(content);
-        Ui::AddSkip(content);
-        SetupRabbitLinks(content, controller);
-
+        build(content, kRabbitSection);
         Ui::ResizeFitChild(this, content);
     }
 } // namespace Settings

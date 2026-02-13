@@ -29,10 +29,6 @@ namespace Settings
         [[nodiscard]] rpl::producer<QString> title() override;
 
     private:
-        void SetupGeneral(not_null<Ui::VerticalLayout*> container);
-        void SetupConnectionBar(not_null<Ui::VerticalLayout*> container);
-
-        void SetupRabbitGeneral(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> null);
-        void setupContent(not_null<Window::SessionController*> controller);
+        void setupContent();
     };
 } // namespace Settings

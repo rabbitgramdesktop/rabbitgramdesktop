@@ -81,10 +81,12 @@ struct SearchIndexerEntry {
 	SearchEntriesIndexer indexer;
 };
 
+using SectionTitle = std::variant<const tr::phrase<>*, Fn<QString()>>;
+
 struct SectionMeta {
 	Type id;
 	Type parentId;
-	not_null<const tr::phrase<>*> title;
+	SectionTitle title;
 	not_null<const style::icon*> icon;
 };
 
