@@ -1285,10 +1285,10 @@ bool FieldAutocomplete::Inner::chooseAtIndex(
 	} else if (!_mrows->empty()) {
 		if (index < _mrows->size()) {
 			const auto user = _mrows->at(index).user;
-			const auto mentionUsername = (RabbitSettings::commaAfterMention() && !user->isBot())
-				? PrimaryUsername(user) + ","
-				: PrimaryUsername(user);			
-			_mentionChosen.fire({ user, mentionUsername, method });
+			const auto mentionUsername = PrimaryUsername(user);
+			const auto addComma = RabbitSettings::commaAfterMention()
+				&& !user->isBot();
+			_mentionChosen.fire({ user, mentionUsername, addComma, method });
 			return true;
 		}
 	} else if (!_hrows->empty()) {
@@ -1672,12 +1672,14 @@ void InitFieldAutocomplete(
 	raw->mentionChosen(
 	) | rpl::on_next([=](FieldAutocomplete::MentionChosen data) {
 		const auto user = data.user;
+		const auto suffix = data.addComma ? u","_q : QString();
 		if (data.mention.isEmpty()) {
-			field->insertTag(
-				user->firstName.isEmpty() ? user->name() : user->firstName,
-				PrepareMentionTag(user));
+			auto name = user->firstName.isEmpty()
+				? user->name()
+				: user->firstName;
+			field->insertTag(name, PrepareMentionTag(user), suffix);
 		} else {
-			field->insertTag('@' + data.mention);
+			field->insertTag('@' + data.mention, QString(), suffix);
 		}
 	}, raw->lifetime());
 

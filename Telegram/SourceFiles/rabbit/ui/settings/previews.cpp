@@ -20,12 +20,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/chat/chat_style_radius.h"
 #include "window/main_window.h"
 
-RoundnessPreview::RoundnessPreview(QWidget* parent) : RpWidget(parent) {
+RoundnessPreview::RoundnessPreview(QWidget* parent) : RpWidget(parent)
+{
     auto sectionHeight = st::rndPreviewSize;
     setMinimumSize(st::boxWidth, sectionHeight);
 }
 
-void RoundnessPreview::paintEvent(QPaintEvent* e) {
+void RoundnessPreview::paintEvent(QPaintEvent* e)
+{
     Painter p(this);
     PainterHighQualityEnabler hq(p);
 
@@ -62,25 +64,30 @@ void RoundnessPreview::paintEvent(QPaintEvent* e) {
     );
 }
 
-ChatPreview::ChatPreview(QWidget* parent) : RpWidget(parent) {
+ChatPreview::ChatPreview(QWidget* parent) : RpWidget(parent)
+{
     auto sectionHeight = st::stickerPreviewSize;
     setMinimumSize(st::boxWidth, sectionHeight);
 }
 
-void ChatPreview::paintEvent(QPaintEvent* e) {
+void ChatPreview::paintEvent(QPaintEvent* e)
+{
     Painter p(this);
     PainterHighQualityEnabler hq(p);
 
     auto sticker_size = RabbitSettings::stickerSize();
     auto size = QSize(sticker_size, sticker_size * 0.7);
-    auto radius = []() -> qreal {
-        switch (RabbitSettings::stickerShape()) {
+    auto radius = []() -> qreal
+    {
+        switch (RabbitSettings::stickerShape())
+        {
         case 1: return st::bubbleRadiusSmall;
         case 2: return st::bubbleRadiusLarge;
         default: return 0;
         }
     };
-    auto message_radius = []() -> int {
+    auto message_radius = []() -> int
+    {
         return Ui::BubbleRadiusLarge();
     };
 
@@ -100,14 +107,15 @@ void ChatPreview::paintEvent(QPaintEvent* e) {
         st::stickerPreviewTimeHeight / 2.
     );
 
-    auto multipliers = { 1.7, 1.5, 1., 1.2 };
+    auto multipliers = {1.7, 1.5, 1., 1.2};
     auto topPadding = size.height() + st::stickerPreviewMargin;
 
-    for (auto multiplier : multipliers) {
+    for (auto multiplier : multipliers)
+    {
         auto spacefillerMsgSkeletonWidth = (st::boxWidth / 2) * multiplier;
 
         p.drawRoundedRect(
-            st::boxWidth - spacefillerMsgSkeletonWidth, 
+            st::boxWidth - spacefillerMsgSkeletonWidth,
             topPadding,
             spacefillerMsgSkeletonWidth,
             st::stickerSpacefillerHeight,
@@ -119,14 +127,16 @@ void ChatPreview::paintEvent(QPaintEvent* e) {
     }
 }
 
-StickerShapePicker::StickerShapePicker(QWidget* parent) : RpWidget(parent) {
+StickerShapePicker::StickerShapePicker(QWidget* parent) : RpWidget(parent)
+{
     setMinimumSize(st::stickerShapeBoxWidth, st::stickerShapeBoxHeight);
 }
 
-void StickerShapePicker::paintEvent(QPaintEvent* e) {
+void StickerShapePicker::paintEvent(QPaintEvent* e)
+{
     Painter p(this);
     PainterHighQualityEnabler hq(p);
-    
+
     auto activePen = QPen(st::windowBgActive, st::stickerShapePenWidth);
     auto inactivePen = QPen(st::rndSkeletonFill, st::stickerShapePenWidth);
     auto stickerBrush = QBrush(st::rndPreviewFill);
@@ -138,21 +148,24 @@ void StickerShapePicker::paintEvent(QPaintEvent* e) {
     auto variantPadding = st::stickerShapePadding;
     auto variantWidth = variantCardWidth - 2 * variantPadding - 2 * st::stickerShapePenWidth;
     auto variantHeight = variantCardHeight - 2 * variantPadding /* - 2 * st::stickerShapePenWidth */;
-    
-    auto radiuses = [](int index) -> int {
-        switch (index) {
-            case 1: return st::bubbleRadiusSmall;
-            case 2: return st::bubbleRadiusLarge;
-            default: return 0;
+
+    auto radiuses = [](int index) -> int
+    {
+        switch (index)
+        {
+        case 1: return st::bubbleRadiusSmall;
+        case 2: return st::bubbleRadiusLarge;
+        default: return 0;
         }
     };
-    
+
     auto gapLeft = st::stickerShapePenWidth;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++)
+    {
         p.setPen(RabbitSettings::stickerShape() == i
-            ? activePen
-            : inactivePen);
+                     ? activePen
+                     : inactivePen);
         p.setBrush(Qt::NoBrush);
 
         p.drawRoundedRect(
@@ -169,21 +182,24 @@ void StickerShapePicker::paintEvent(QPaintEvent* e) {
             variantWidth, variantHeight);
 
         p.drawRoundedRect(rect,
-            radiuses(i), radiuses(i));
-        
+                          radiuses(i), radiuses(i));
+
         gapLeft += variantCardWidth + variantCardMargin;
     }
 }
 
-void StickerShapePicker::mousePressEvent(QMouseEvent *e) {
+void StickerShapePicker::mousePressEvent(QMouseEvent* e)
+{
     auto variantWidth = st::stickerShapeVariantCardWidth;
     auto variantMargin = st::stickerShapeMargins;
 
     auto x = e->pos().x();
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++)
+    {
         auto maxCords = (i + 1) * variantWidth + (i + 1) * variantMargin;
-        if (x < maxCords) {
+        if (x < maxCords)
+        {
             RabbitSettings::setStickerShape(i);
             repaint();
             break;

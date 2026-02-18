@@ -7,11 +7,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "ui/text/text.h"
 #include "ui/text/text_variant.h"
 #include "ui/rp_widget.h"
 #include "ui/round_rect.h"
 #include "base/object_ptr.h"
+#include "base/weak_qptr.h"
 #include "settings/settings_type.h"
+
+#include <crl/crl.h>
 
 namespace anim {
 enum class repeat : uchar;
@@ -56,13 +60,57 @@ namespace Settings {
 
 using Button = Ui::SettingsButton;
 
+enum class HighlightShape {
+	Rect,
+	Ellipse,
+};
+
+struct HighlightArgs {
+	style::margins margin;
+	HighlightShape shape = HighlightShape::Rect;
+	int radius = 0;
+	const style::color *color = nullptr;
+	float64 opacity = 0.4;
+	bool below = false;
+	bool rippleShape = false;
+	bool scroll = true;
+	crl::time showDelay = 400;
+	crl::time showDuration = 600;
+	crl::time shownDuration = 400;
+	crl::time hideDuration = 600;
+};
+
+void HighlightWidget(QWidget *target, HighlightArgs &&args = {});
+void ScrollToWidget(not_null<QWidget*> target);
+
+[[nodiscard]] HighlightArgs SubsectionTitleHighlight();
+
+struct HighlightEntry {
+	QPointer<QWidget> widget;
+	HighlightArgs args;
+};
+
+using HighlightRegistry = std::vector<std::pair<QString, HighlightEntry>>;
+
+using SectionBuildMethod = Fn<void(
+	not_null<Ui::VerticalLayout*> container,
+	not_null<Window::SessionController*> controller,
+	Fn<void(Type)> showOther,
+	rpl::producer<> showFinished)>;
+
 class AbstractSection : public Ui::RpWidget {
 public:
-	using RpWidget::RpWidget;
+	AbstractSection(
+		QWidget *parent,
+		not_null<Window::SessionController*> controller);
+
+	[[nodiscard]] not_null<Window::SessionController*> controller() const {
+		return _controller;
+	}
 
 	[[nodiscard]] virtual Type id() const = 0;
 	[[nodiscard]] virtual rpl::producer<Type> sectionShowOther() {
-		return nullptr;
+		return _showOtherRequests.events();
 	}
 	[[nodiscard]] virtual rpl::producer<> sectionShowBack() {
 		return nullptr;
@@ -81,6 +129,7 @@ public:
 		done();
 	}
 	virtual void showFinished() {
+		_showFinished.fire({});
 	}
 	virtual void setInnerFocus() {
 		setFocus();
@@ -118,6 +167,30 @@ public:
 			QRect clip) {
 		return false;
 	}
+
+	[[nodiscard]] rpl::producer<> showFinishes() const {
+		return _showFinished.events();
+	}
+
+	void showOther(Type type) {
+		_showOtherRequests.fire_copy(type);
+	}
+	[[nodiscard]] Fn<void(Type)> showOtherMethod() {
+		return crl::guard(this, [=](Type type) {
+			showOther(type);
+		});
+	}
+
+protected:
+	void build(
+		not_null<Ui::VerticalLayout*> container,
+		SectionBuildMethod method);
+
+private:
+	const not_null<Window::SessionController*> _controller;
+	rpl::event_stream<Type> _showOtherRequests;
+	rpl::event_stream<> _showFinished;
+
 };
 
 enum class IconType {
@@ -225,5 +298,10 @@ void AddLottieIconWithCircle(
 	object_ptr<Ui::RpWidget> icon,
 	QMargins iconPadding,
 	QSize circleSize);
+
+void AddPremiumStar(
+	not_null<Button*> button,
+	bool credits,
+	Fn<bool()> isPaused);
 
 } // namespace Settings

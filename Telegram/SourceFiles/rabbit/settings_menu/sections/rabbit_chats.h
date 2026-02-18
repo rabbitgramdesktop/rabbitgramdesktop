@@ -12,26 +12,23 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 class BoxContent;
 
-namespace Window {
+namespace Window
+{
     class Controller;
 
     class SessionController;
 } // namespace Window
 
-namespace Settings {
-    class RabbitChats : public Section<RabbitChats> {
+namespace Settings
+{
+    class RabbitChats : public Section<RabbitChats>
+    {
     public:
-        RabbitChats(QWidget *parent, not_null<Window::SessionController *> controller);
+        RabbitChats(QWidget* parent, not_null<Window::SessionController*> controller);
 
         [[nodiscard]] rpl::producer<QString> title() override;
 
     private:
-        void SetupChats(not_null<Ui::VerticalLayout *> container);
-        void SetupStickerShape(not_null<Ui::VerticalLayout *> container);
-        void SetupStickers(not_null<Ui::VerticalLayout *> container);
-
-        void SetupRabbitChats(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> null);
-        void setupContent(not_null<Window::SessionController *> controller);
+        void setupContent();
     };
-
 } // namespace Settings

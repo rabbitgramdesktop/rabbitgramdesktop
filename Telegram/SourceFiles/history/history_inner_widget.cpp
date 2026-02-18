@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_reaction_preview.h"
 #include "history/view/history_view_quick_action.h"
 #include "history/view/history_view_emoji_interactions.h"
+#include "history/view/history_view_top_peers_selector.h"
 #include "history/history_item_components.h"
 #include "history/history_item_text.h"
 #include "payments/payments_reaction_process.h"
@@ -111,6 +112,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
+
+#include "ui/text/format_song_document_name.h"
 
 namespace {
 
@@ -2245,18 +2248,100 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& e->button() == Qt::LeftButton) {
 		if (const auto view = Element::Moused()) {
 			mouseActionCancel();
-			switch (HistoryView::CurrentQuickAction()) {
-			case HistoryView::DoubleClickQuickAction::Reply: {
-				if (!Data::CanSendAnything(view->data()->history())) {
-					toggleFavoriteReaction(view);
-				} else {
-					_widget->replyToMessage(view->data());
+			const auto item = view->data();
+			const auto itemId = item->fullId();
+			bool outgoing = view->data()->from()->isSelf();
+			auto doCopyAction = [&]
+			{
+				const auto selectedText = getSelectedText();
+				if (!selectedText.empty()) {
+					copySelectedText();
+					return;
 				}
-			} break;
-			case HistoryView::DoubleClickQuickAction::React: {
-				toggleFavoriteReaction(view);
-			} break;
-			default: break;
+				const auto mediaView = view->media();
+				if (const auto photo = mediaView ? mediaView->getPhoto() : nullptr) {
+					copyContextImage(photo, itemId);
+					return;
+				}
+				if (const auto document = mediaView ? mediaView->getDocument() : nullptr) {
+					const auto filenameToCopy = [&] {
+						if (document->isAudioFile()) {
+							return TextForMimeData().append(
+								Ui::Text::FormatSongNameFor(document).string());
+						} 
+						if (document->sticker()
+							|| document->isAnimation()
+							|| document->isVideoMessage()
+							|| document->isVideoFile()
+							|| document->isVoiceMessage()) {
+							return TextForMimeData();
+							}
+						return TextForMimeData().append(document->filename());
+					}();
+					if (!filenameToCopy.empty()) {
+						if (!showCopyMediaRestriction(item)) {
+							TextUtilities::SetClipboardText(filenameToCopy);
+						}
+						return;
+					}
+				}
+				if (const auto media = item->media()) {
+					if (const auto contact = media->sharedContact()) {
+						QGuiApplication::clipboard()->setText(contact->phoneNumber);
+						return;
+					}
+				}
+				if (!item->isService() 
+					&& (view->hasVisibleText()
+						|| (mediaView && mediaView->hasTextForCopy()))) {
+					copyContextText(itemId);
+					return;
+				}
+				if (item->hasDirectLink()) {
+					HistoryView::CopyPostLink(
+						_controller,
+						itemId,
+						HistoryView::Context::History);
+				}
+			};
+			switch (outgoing
+				? RabbitSettings::outgoingQuickAction()
+				: RabbitSettings::incomingQuickAction())
+			{
+				case RabbitSettings::QuickAction::Reaction:
+					{
+						toggleFavoriteReaction(view);
+					} break;
+				case RabbitSettings::QuickAction::Reply: 
+					{
+						if (CanSendReply(item)) _widget->replyToMessage(view->data());
+						else toggleFavoriteReaction(view);
+					} break;
+				case RabbitSettings::QuickAction::Copy: 
+					{						
+						doCopyAction();
+					} break;
+				case RabbitSettings::QuickAction::Forward:
+					{
+						forwardItem(view->data()->fullId());
+					} break;
+				case RabbitSettings::QuickAction::Edit:
+					{
+						const auto t = base::unixtime::now();
+						if (item->allowsEdit(t)) _widget->editMessage(item, TextSelection());
+						else toggleFavoriteReaction(view);
+					} break;
+				case RabbitSettings::QuickAction::Save:
+					{
+						Window::ForwardToSelf(
+							_controller->uiShow(),
+							Data::ForwardDraft{ .ids = { 1, itemId } });
+					} break;
+				case RabbitSettings::QuickAction::Delete:
+					{
+						deleteItem(itemId);
+					} break;
+				default: break;
 			}
 		}
 	}
@@ -2313,6 +2398,28 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			e,
 			session().data().reactions().favoriteId())) {
 		return;
+	} else if (link && link->property(kFastShareProperty).value<bool>()) {
+		if (const auto item = _dragStateItem) {
+			const auto view = viewByItem(item);
+			const auto rightSize = view->rightActionSize().value_or(QSize());
+			const auto reactionsSkip = view->embedReactionsInBubble()
+				? 0
+				: view->reactionButtonParameters({}, {}).reactionsHeight;
+			const auto top = itemTop(view)
+				+ view->height()
+				- reactionsSkip
+				- _visibleAreaTop
+				- rightSize.height();
+			const auto right = rect::right(view->innerGeometry())
+				- st::historyFastShareLeft
+				- rightSize.width();
+			HistoryView::ShowTopPeersSelector(
+				this,
+				_controller->uiShow(),
+				item->fullId(),
+				parentWidget()->mapToGlobal(QPoint(right, top)));
+			return;
+		}
 	}
 	auto selectedState = getSelectionState();
 
@@ -4704,6 +4811,12 @@ void HistoryInner::refreshAboutView(bool force) {
 				_history->delegateMixin()->delegate());
 			_aboutView->refreshRequests() | rpl::on_next([=] {
 				updateBotInfo();
+			}, _aboutView->lifetime());
+			_aboutView->destroyRequests() | rpl::on_next([=] {
+				crl::on_main(this, [=] {
+					refreshAboutView(true);
+					update();
+				});
 			}, _aboutView->lifetime());
 			_aboutView->sendIntroSticker() | rpl::start_to_stream(
 				_sendIntroSticker,

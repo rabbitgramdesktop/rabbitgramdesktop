@@ -9,25 +9,24 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #define ICON(name, value) const auto name##_ICON = QStringLiteral(value)
 
-namespace RabbitAssets {
+namespace RabbitAssets
+{
+    ICON(DEFAULT, "default");
+    ICON(ANGEL, "angel");
+    ICON(BLACKOUT, "blackout");
+    ICON(COLOR, "color");
+    ICON(IMPOSTOR, "impostor");
+    ICON(MATRIX, "matrix");
+    ICON(MOON, "moon");
+    ICON(OLD, "old");
+    ICON(SEASONAL, "seasonal");
+    ICON(TWITCH, "twitch");
 
-ICON(DEFAULT, "default");
-ICON(ANGEL, "angel");
-ICON(BLACKOUT, "blackout");
-ICON(COLOR, "color");
-ICON(IMPOSTOR, "impostor");
-ICON(MATRIX, "matrix");
-ICON(MOON, "moon");
-ICON(OLD, "old");
-ICON(SEASONAL, "seasonal");
-ICON(TWITCH, "twitch");
+    void loadAppIco();
 
-void loadAppIco();
+    QImage loadPreview(QString name);
 
-QImage loadPreview(QString name);
-
-QString currentAppLogoName();
-QImage currentAppLogo();
-QImage currentAppLogoNoMargin();
-
+    QString currentAppLogoName();
+    QImage currentAppLogo();
+    QImage currentAppLogoNoMargin();
 }

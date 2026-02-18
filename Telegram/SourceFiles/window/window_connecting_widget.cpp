@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "window/window_connecting_widget.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "ui/widgets/buttons.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/painter.h"
@@ -442,9 +444,9 @@ auto ConnectionState::computeLayout(const State &state) const -> Layout {
 	result.progressShown = (state.type != State::Type::Connected);
 	result.visible = state.exposed
 		&& !state.updateReady
-		&& (state.useProxy
-			|| state.type == State::Type::Connecting
-			|| state.type == State::Type::Waiting);
+		&& ((state.useProxy && RabbitSettings::connectionBarProxy())
+			|| (state.type == State::Type::Connecting && RabbitSettings::connectionBarLost())
+			|| (state.type == State::Type::Waiting && RabbitSettings::connectionBarLost()));
 	switch (state.type) {
 	case State::Type::Connecting:
 		result.text = state.underCursor

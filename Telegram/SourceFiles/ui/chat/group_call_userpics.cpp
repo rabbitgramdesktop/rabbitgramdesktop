@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/painter.h"
 #include "ui/power_saving.h"
 #include "base/random.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
@@ -269,11 +270,15 @@ void GroupCallUserpics::validateCache(Userpic &userpic) {
 		if (userpic.cacheMasked) {
 			auto hq = PainterHighQualityEnabler(p);
 			auto pen = QPen(Qt::transparent);
+			auto radius = size * RabbitSettings::userpicRoundness() / 100.;
 			pen.setWidth(_st.stroke);
 			p.setCompositionMode(QPainter::CompositionMode_Source);
 			p.setBrush(Qt::transparent);
 			p.setPen(pen);
-			p.drawEllipse(skip - size + shift, skip, size, size);
+			p.drawRoundedRect(
+				skip - size + shift, skip,
+				size, size,
+				radius, radius);
 		}
 	}
 }

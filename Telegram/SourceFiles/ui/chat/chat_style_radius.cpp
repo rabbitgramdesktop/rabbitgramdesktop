@@ -8,11 +8,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/chat/chat_style_radius.h"
 #include "ui/chat/chat_style.h"
 #include "base/options.h"
+#include "rabbit/settings/rabbit_settings.h"
 
 #include "ui/chat/chat_theme.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "styles/style_chat.h"
+#include <algorithm>
 
 namespace Ui {
 namespace {
@@ -29,28 +31,29 @@ base::options::toggle UseSmallMsgBubbleRadius({
 const char kOptionUseSmallMsgBubbleRadius[] = "use-small-msg-bubble-radius";
 
 int BubbleRadiusSmall() {
-	return st::bubbleRadiusSmall;
+	const auto setting = std::clamp(RabbitSettings::messageRoundness(), 0, 50);
+	return (st::bubbleRadiusSmall * setting + 25) / 50;
 }
 
 int BubbleRadiusLarge() {
-	return UseSmallMsgBubbleRadius.value()
+	const auto setting = std::clamp(RabbitSettings::messageRoundness(), 0, 50);
+	const auto base = UseSmallMsgBubbleRadius.value()
 		? st::bubbleRadiusSmall
 		: st::bubbleRadiusLarge;
+	return (base * setting + 25) / 50;
 }
 
 int MsgFileThumbRadiusSmall() {
-	return st::msgFileThumbRadiusSmall;
+	const auto setting = std::clamp(RabbitSettings::messageRoundness(), 0, 50);
+	return (st::msgFileThumbRadiusSmall * setting + 25) / 50;
 }
 
 int MsgFileThumbRadiusLarge() {
-	static const auto result = [] {
-		if (UseSmallMsgBubbleRadius.value()) {
-			return st::msgFileThumbRadiusSmall;
-		} else {
-			return st::msgFileThumbRadiusLarge;
-		}
-	}();
-	return result;
+	const auto setting = std::clamp(RabbitSettings::messageRoundness(), 0, 50);
+	const auto base = UseSmallMsgBubbleRadius.value()
+		? st::msgFileThumbRadiusSmall
+		: st::msgFileThumbRadiusLarge;
+	return (base * setting + 25) / 50;
 }
 
 }
