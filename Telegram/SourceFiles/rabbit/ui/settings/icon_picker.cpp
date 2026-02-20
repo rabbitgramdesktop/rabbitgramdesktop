@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_layers.h"
 #include "rabbit/ui/rabbit_assets.h"
 #include "main/main_domain.h"
+#include "styles/palette.h"
 #include "styles/style_rabbit_assets.h"
 #include "ui/painter.h"
 #include "window/main_window.h"
@@ -22,7 +23,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/utils/windows_utils.h"
 #endif
 
-const QVector<QString> icons{
+const QVector icon_variants {
     RabbitAssets::DEFAULT_ICON,
     RabbitAssets::ANGEL_ICON,
     RabbitAssets::BLACKOUT_ICON,
@@ -35,7 +36,8 @@ const QVector<QString> icons{
     RabbitAssets::TWITCH_ICON,
 };
 
-const auto rows = icons.size() / 4 + std::min(1, icons.size()) % 4;
+const int icons_amount = sizeof(icon_variants) / sizeof(icon_variants[0]);
+const auto rows = icons_amount / 4 + std::min(1, icons_amount) % 4;
 
 void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
 {
@@ -92,12 +94,12 @@ void IconPicker::paintEvent(QPaintEvent* e)
 
     for (int row = 0; row < rows; row++)
     {
-        const auto columns = std::min(4, icons.size() - row * 4);
+        const auto columns = std::min(4, icons_amount - row * 4);
         for (int i = 0; i < columns; i++)
         {
             const auto idx = i + row * 4;
 
-            const auto& iconName = icons[idx];
+            const auto& iconName = icon_variants[idx];
             if (iconName.isEmpty())
             {
                 continue;
@@ -135,7 +137,7 @@ void IconPicker::mousePressEvent(QMouseEvent* e)
     auto x = e->pos().x();
     for (int row = 0; row < rows; row++)
     {
-        const auto columns = std::min(4, icons.size() - row * 4);
+        const auto columns = std::min(4, icons_amount - row * 4);
         for (int i = 0; i < columns; i++)
         {
             const auto idx = i + row * 4;
@@ -145,7 +147,7 @@ void IconPicker::mousePressEvent(QMouseEvent* e)
             if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
                 && e->pos().y() <= yOffset + st::cpIconSize)
             {
-                const auto& iconName = icons[idx];
+                const auto& iconName = icon_variants[idx];
                 if (iconName.isEmpty())
                 {
                     break;
