@@ -17,7 +17,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_widgets.h"
 #include "ui/painter.h"
+#include "ui/chat/chat_style.h"
 #include "ui/chat/chat_style_radius.h"
+#include "ui/chat/message_bubble.h"
 #include "window/main_window.h"
 
 RoundnessPreview::RoundnessPreview(QWidget* parent) : RpWidget(parent)
@@ -70,60 +72,92 @@ ChatPreview::ChatPreview(QWidget* parent) : RpWidget(parent)
     setMinimumSize(st::boxWidth, sectionHeight);
 }
 
+void ChatPreview::ensureChatStyle() {
+    auto version = style::PaletteVersion();
+    if (_chatStyle && _paletteVersion == version) {
+        return;
+    }
+    _paletteVersion = version;
+    _chatStyle = std::make_unique<Ui::ChatStyle>(
+        style::main_palette::get());
+}
+
 void ChatPreview::paintEvent(QPaintEvent* e)
 {
+    ensureChatStyle();
+
     Painter p(this);
     PainterHighQualityEnabler hq(p);
 
-    auto sticker_size = RabbitSettings::stickerSize();
-    auto size = QSize(sticker_size, sticker_size * 0.7);
-    auto radius = []() -> qreal
-    {
-        switch (RabbitSettings::stickerShape())
-        {
+    auto stickerSize = RabbitSettings::stickerSize();
+    auto stickerRect = QSize(stickerSize, int(stickerSize * 0.7));
+    auto stickerRadius = [&]() -> qreal {
+        switch (RabbitSettings::stickerShape()) {
         case 1: return st::bubbleRadiusSmall;
         case 2: return st::bubbleRadiusLarge;
         default: return 0;
         }
-    };
-    auto message_radius = []() -> int
-    {
-        return Ui::BubbleRadiusLarge();
-    };
+    }();
 
     p.setPen(Qt::NoPen);
     p.setBrush(st::rndPreviewFill);
     p.drawRoundedRect(
-        QRect(QPoint(0, 0), size),
-        radius(), radius());
+        QRect(QPoint(0, 0), stickerRect),
+        stickerRadius, stickerRadius);
 
     p.setBrush(QBrush(st::rndSkeletonFill));
     p.drawRoundedRect(
-        size.width() + st::stickerPreviewMargin,
-        size.height() - st::stickerPreviewTimeHeight,
+        stickerRect.width() + st::stickerPreviewMargin,
+        stickerRect.height() - st::stickerPreviewTimeHeight,
         st::stickerPreviewTimeWidth,
         st::stickerPreviewTimeHeight,
         st::stickerPreviewTimeHeight / 2.,
-        st::stickerPreviewTimeHeight / 2.
-    );
+        st::stickerPreviewTimeHeight / 2.);
 
-    auto multipliers = {1.7, 1.5, 1., 1.2};
-    auto topPadding = size.height() + st::stickerPreviewMargin;
+    struct BubbleEntry {
+        double widthFraction;
+        bool outgoing;
+    };
+    auto bubbles = std::vector<BubbleEntry>{
+        { 0.85, true },
+        { 0.6, false },
+        { 0.5, true },
+        { 0.7, false },
+    };
 
-    for (auto multiplier : multipliers)
-    {
-        auto spacefillerMsgSkeletonWidth = (st::boxWidth / 2) * multiplier;
+    auto topPadding = stickerRect.height() + st::stickerPreviewMargin;
+    auto bubbleHeight = st::stickerSpacefillerHeight;
+    auto outerWidth = st::boxWidth;
+    auto tailWidth = st::historyBubbleTailInLeft.width();
 
-        p.drawRoundedRect(
-            st::boxWidth - spacefillerMsgSkeletonWidth,
-            topPadding,
-            spacefillerMsgSkeletonWidth,
-            st::stickerSpacefillerHeight,
-            message_radius(),
-            message_radius()
-        );
+    for (const auto &entry : bubbles) {
+        auto bubbleWidth = int(outerWidth * 0.5 * entry.widthFraction);
+        auto bubbleLeft = entry.outgoing
+            ? (outerWidth - bubbleWidth - tailWidth)
+            : tailWidth;
 
-        topPadding += st::stickerPreviewMargin + st::stickerSpacefillerHeight;
+        auto rounding = Ui::BubbleRounding();
+        if (entry.outgoing) {
+            rounding.topLeft = Ui::BubbleCornerRounding::Large;
+            rounding.topRight = Ui::BubbleCornerRounding::Large;
+            rounding.bottomLeft = Ui::BubbleCornerRounding::Large;
+            rounding.bottomRight = Ui::BubbleCornerRounding::Tail;
+        } else {
+            rounding.topLeft = Ui::BubbleCornerRounding::Large;
+            rounding.topRight = Ui::BubbleCornerRounding::Large;
+            rounding.bottomLeft = Ui::BubbleCornerRounding::Tail;
+            rounding.bottomRight = Ui::BubbleCornerRounding::Large;
+        }
+
+        Ui::PaintBubble(p, Ui::SimpleBubble{
+            .st = _chatStyle.get(),
+            .geometry = QRect(bubbleLeft, topPadding, bubbleWidth, bubbleHeight),
+            .outerWidth = outerWidth,
+            .outbg = entry.outgoing,
+            .rounding = rounding,
+        });
+
+        topPadding += st::stickerPreviewMargin + bubbleHeight + st::msgShadow;
     }
 }
 
