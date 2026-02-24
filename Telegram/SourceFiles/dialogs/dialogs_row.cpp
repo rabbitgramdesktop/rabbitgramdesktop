@@ -480,8 +480,10 @@ void Row::PaintCornerBadgeFrame(
 			}
 		}
 		if (peer && (peer->forum() || peer->monoforum())) {
-			const auto radius = context.st->photoSize
-				* Ui::ForumUserpicRadiusMultiplier();
+			auto radius = context.st->photoSize * RabbitSettings::userpicRoundness() / 100.;
+			if (!RabbitSettings::generalRoundness()) {
+				radius *= Ui::ForumUserpicRadiusMultiplier();
+			}
 			Ui::PaintOutlineSegments(q, outline, radius, segments);
 		} else {
 			Ui::PaintOutlineSegments(q, outline, segments);
