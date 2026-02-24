@@ -204,6 +204,7 @@ ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
 		_historyViewsSendingInvertedIcon,
 		st::historyViewsSendingInvertedIcon);
 	make(_historyPinInvertedIcon, st::historyPinInvertedIcon);
+	make(_historyEditedInvertedIcon, st::historyEditedInvertedIcon);
 	make(_historySendingIcon, st::historySendingIcon);
 	make(_historySendingInvertedIcon, st::historySendingInvertedIcon);
 	make(_historySentInvertedIcon, st::historySentInvertedIcon);
@@ -352,6 +353,12 @@ ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
 		st::historyViewsInSelectedIcon,
 		st::historyViewsOutIcon,
 		st::historyViewsOutSelectedIcon);
+	make(
+		&MessageStyle::historyEditedIcon,
+		st::historyEditedInIcon,
+		st::historyEditedInSelectedIcon,
+		st::historyEditedOutIcon,
+		st::historyEditedOutSelectedIcon);
 	make(
 		&MessageStyle::historyPinIcon,
 		st::historyPinInIcon,
