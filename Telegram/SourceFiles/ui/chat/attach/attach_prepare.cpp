@@ -15,6 +15,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/ui_utility.h"
 #include "core/mime_type.h"
 
+#include <QFileInfo>
+
 namespace Ui {
 namespace {
 
@@ -23,6 +25,8 @@ constexpr auto kMaxAlbumCount = 10;
 } // namespace
 
 PreparedFile::PreparedFile(const QString &path) : path(path) {
+	const auto fileInfo = QFileInfo(path);
+	displayName = fileInfo.fileName();
 }
 
 PreparedFile::PreparedFile(PreparedFile &&other) = default;
@@ -235,9 +239,13 @@ bool PreparedList::hasGroupOption(bool slowmode) const {
 
 bool PreparedList::hasSendImagesAsPhotosOption(bool slowmode) const {
 	using Type = PreparedFile::Type;
-	return slowmode
-		? ((files.size() == 1) && (files.front().type == Type::Photo))
-		: ranges::contains(files, Type::Photo, &PreparedFile::type);
+	if (slowmode) {
+		const auto t = files.front().type;
+		return (files.size() == 1)
+			&& (t == Type::Photo || t == Type::Video);
+	}
+	return ranges::contains(files, Type::Photo, &PreparedFile::type)
+		|| ranges::contains(files, Type::Video, &PreparedFile::type);
 }
 
 bool PreparedList::canHaveEditorHintLabel() const {

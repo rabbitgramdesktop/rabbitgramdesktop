@@ -16,6 +16,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "settings/settings_type.h"
 
 #include <crl/crl.h>
+#include <any>
 
 namespace anim {
 enum class repeat : uchar;
@@ -149,6 +150,10 @@ public:
 		return false;
 	}
 	virtual void setStepDataReference(std::any &data) {
+	}
+	virtual void sectionSaveState(std::any &state) {
+	}
+	virtual void sectionRestoreState(const std::any &state) {
 	}
 
 	[[nodiscard]] virtual auto selectedListValue()

@@ -216,6 +216,17 @@ bool ChooseFilterValidator::canAdd() const {
 	return false;
 }
 
+bool ChooseFilterValidator::canAdd(FilterId filterId) const {
+	Expects(filterId != 0);
+
+	const auto list = _history->owner().chatsFilters().list();
+	const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
+	if (i != end(list)) {
+		return !i->contains(_history);
+	}
+	return false;
+}
+
 bool ChooseFilterValidator::canRemove(FilterId filterId) const {
 	Expects(filterId != 0);
 
@@ -457,4 +468,110 @@ bool FillChooseFilterWithAdminedGroupsMenu(
 	}, menu->lifetime());
 
 	return added;
+}
+
+History *HistoryFromMimeData(
+		const QMimeData *mime,
+		not_null<Main::Session*> session) {
+	const auto mimeFormat = u"application/x-telegram-dialog"_q;
+	if (mime->hasFormat(mimeFormat)) {
+		auto peerId = int64(-1);
+		auto isTestMode = false;
+		auto stream = QDataStream(mime->data(mimeFormat));
+		stream >> peerId;
+		stream >> isTestMode;
+		if (isTestMode != session->isTestMode()) {
+			return nullptr;
+		}
+		return session->data().historyLoaded(PeerId(peerId));
+	}
+	if (mime->hasText()) {
+		auto text = mime->text().trimmed();
+		if (text.startsWith('@')) {
+			text = text.mid(1);
+		} else if (text.startsWith(u"https://t.me/"_q)) {
+			text = text.mid(13);
+		} else {
+			return nullptr;
+		}
+		if (const auto peer = session->data().peerByUsername(text)) {
+			return session->data().historyLoaded(peer->id);
+		}
+	}
+	return nullptr;
+}
+
+void SetupFilterDragAndDrop(
+		not_null<Ui::RpWidget*> outer,
+		not_null<Main::Session*> session,
+		Fn<std::optional<FilterId>(QPoint)> filterIdAtPosition,
+		Fn<FilterId()> activeFilterId,
+		Fn<void(FilterId)> selectByFilterId) {
+	const auto hasAction = [=](not_null<QDropEvent*> drop, bool perform) {
+		const auto mimeData = drop->mimeData();
+		const auto filterId = filterIdAtPosition(
+			outer->mapToGlobal(drop->pos()));
+		if (!filterId) {
+			return false;
+		}
+		const auto id = *filterId;
+		if (const auto h = HistoryFromMimeData(mimeData, session)) {
+			auto v = ChooseFilterValidator(h);
+			if (id) {
+				if (v.canAdd(id)) {
+					if (!v.limitReached(id, true).reached) {
+						if (perform) {
+							v.add(id);
+						}
+						selectByFilterId(perform ? FilterId(-1) : id);
+						return true;
+					}
+				}
+			} else {
+				if (const auto active = activeFilterId();
+						active && v.canRemove(active)) {
+					if (perform) {
+						v.remove(active);
+					}
+					selectByFilterId(perform ? FilterId(-1) : active);
+					return true;
+				}
+			}
+		}
+		selectByFilterId(-1);
+		return false;
+	};
+	outer->setAcceptDrops(true);
+	outer->events(
+	) | rpl::filter([](not_null<QEvent*> e) {
+		return e->type() == QEvent::DragEnter
+			|| e->type() == QEvent::DragMove
+			|| e->type() == QEvent::DragLeave
+			|| e->type() == QEvent::Drop;
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::DragEnter) {
+			const auto de = static_cast<QDragEnterEvent*>(e.get());
+			if (hasAction(de, false)) {
+				de->acceptProposedAction();
+			} else {
+				de->ignore();
+			}
+		} else if (e->type() == QEvent::DragMove) {
+			const auto dm = static_cast<QDragMoveEvent*>(e.get());
+			if (hasAction(dm, false)) {
+				dm->acceptProposedAction();
+			} else {
+				dm->ignore();
+			}
+		} else if (e->type() == QEvent::DragLeave) {
+			selectByFilterId(-1);
+		} else if (e->type() == QEvent::Drop) {
+			const auto drop = static_cast<QDropEvent*>(e.get());
+			if (hasAction(drop, true)) {
+				drop->acceptProposedAction();
+			} else {
+				drop->ignore();
+			}
+		}
+	}, outer->lifetime());
 }

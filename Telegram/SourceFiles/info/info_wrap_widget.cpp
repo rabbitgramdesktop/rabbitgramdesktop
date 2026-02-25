@@ -462,6 +462,8 @@ void WrapWidget::setupTopBarMenuToggle() {
 		button->addClickHandler([=] {
 			_controller->showSettings(::Settings::InformationId());
 		});
+	} else if (section.type() == Section::Type::Media) {
+		addTopBarMenuButton();
 	} else if (section.type() == Section::Type::Downloads) {
 		auto &manager = Core::App().downloadManager();
 		rpl::merge(
@@ -609,8 +611,9 @@ void WrapWidget::showTopBarMenu(bool check) {
 	}
 	_topBarMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 	_topBarMenuToggle->setForceRippled(true);
-	_topBarMenu->popup(_topBarMenuToggle->mapToGlobal(
-		st::infoLayerTopBarMenuPosition));
+	_topBarMenu->popup(Ui::PopupMenu::ConstrainToParentScreen(
+		_topBarMenu,
+		_topBarMenuToggle->mapToGlobal(st::infoLayerTopBarMenuPosition)));
 }
 
 bool WrapWidget::requireTopBarSearch() const {

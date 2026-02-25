@@ -927,7 +927,7 @@ void GiftButton::paint(QPainter &p, float64 craftProgress) {
 			return GiftBadge{
 				.text = (onsale
 					? tr::lng_gift_stars_on_sale(tr::now)
-					: (unique && (data.resale || pinned))
+					: (unique && (data.resale || pinned || data.mine))
 					? ('#' + Lang::FormatCountDecimal(unique->number))
 					: data.resale
 					? tr::lng_gift_stars_resale(tr::now)
@@ -1148,10 +1148,7 @@ Delegate::Delegate(not_null<Main::Session*> session, GiftButtonMode mode)
 	_session,
 	st::giftBoxHiddenMark,
 	RectPart::Center))
-, _mode(mode)
-, _craftUnavailableTimer(
-	std::make_unique<base::Timer>(
-		[=] { updateCraftUnavailables(); })) {
+, _mode(mode) {
 	_ministarEmoji = _emojiHelper.paletteDependent(
 		Ui::Earn::IconCreditsEmojiSmall());
 	_starEmoji = _emojiHelper.paletteDependent(
@@ -1300,6 +1297,10 @@ QImage &Delegate::craftUnavailableFrameCache(
 	if (!ranges::contains(_craftUnavailables, weak)) {
 		_craftUnavailables.push_back(weak);
 	}
+	if (!_craftUnavailableTimer) {
+		_craftUnavailableTimer = std::make_unique<base::Timer>(
+			[=] { updateCraftUnavailables(); });
+	}
 	if (!_craftUnavailableTimer->isActive()
 		|| _craftUnavailableUntil > until) {
 		_craftUnavailableUntil = until;
@@ -1311,6 +1312,8 @@ QImage &Delegate::craftUnavailableFrameCache(
 }
 
 void Delegate::updateCraftUnavailables() {
+	Expects(_craftUnavailableTimer != nullptr);
+
 	_craftUnavailableTimer->cancel();
 	_craftUnavailableUntil = 0;
 
