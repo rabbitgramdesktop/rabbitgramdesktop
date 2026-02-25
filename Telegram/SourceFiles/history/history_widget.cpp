@@ -411,8 +411,11 @@ HistoryWidget::HistoryWidget(
 		escape();
 	}, _field->lifetime());
 	_field->tabbed(
-	) | rpl::on_next([=] {
-		fieldTabbed();
+	) | rpl::on_next([=](not_null<bool*> handled) {
+		if (_supportAutocomplete) {
+			_supportAutocomplete->activate(_field.data());
+			*handled = true;
+		}
 	}, _field->lifetime());
 	_field->heightChanges(
 	) | rpl::on_next([=] {
@@ -527,7 +530,7 @@ HistoryWidget::HistoryWidget(
 		supportInitAutocomplete();
 	}
 	_field->rawTextEdit()->installEventFilter(this);
-	_field->setMimeDataHook([=](
+	_field->setMimeDataHook(WrappedMessageFieldMimeHook([=](
 			not_null<const QMimeData*> data,
 			Ui::InputField::MimeAction action) {
 		if (action == Ui::InputField::MimeAction::Check) {
@@ -539,7 +542,7 @@ HistoryWidget::HistoryWidget(
 				Core::ReadMimeText(data));
 		}
 		Unexpected("action in MimeData hook.");
-	});
+	}, _field));
 
 	updateFieldSubmitSettings();
 
@@ -6476,6 +6479,9 @@ bool HistoryWidget::confirmSendingFiles(
 			_field->textCursor().insertText(insertTextOnCancel);
 		}
 	}));
+	box->takeTextWithTagsRequests() | rpl::on_next([=](TextWithTags &&text) {
+		_field->setTextWithTags(std::move(text));
+	}, box->lifetime());
 
 	Window::ActivateWindow(controller());
 	controller()->show(std::move(box));
@@ -7867,14 +7873,6 @@ bool HistoryWidget::showSlowmodeError() {
 	return true;
 }
 
-void HistoryWidget::fieldTabbed() {
-	if (_supportAutocomplete) {
-		_supportAutocomplete->activate(_field.data());
-	}else{
-		focusNextPrevChild(true);
-	}
-}
-
 void HistoryWidget::sendInlineResult(InlineBots::ResultSelected result) {
 	if (!_peer || !_canSendMessages) {
 		return;
@@ -9021,9 +9019,6 @@ bool HistoryWidget::cancelReply(
 			_fieldBarCancel->hide();
 			updateMouseTracking();
 		}
-		if (!keepHighlighterState) {
-			_highlighter.clear();
-		}
 		updateBotKeyboard();
 		refreshTopBarActiveChat();
 		updateCanSendMessage();
@@ -9050,6 +9045,9 @@ bool HistoryWidget::cancelReply(
 		if (_kbReplyTo) {
 			toggleKeyboard(false);
 		}
+	}
+	if (!keepHighlighterState) {
+		_highlighter.clear();
 	}
 	return wasReply;
 }
@@ -9319,6 +9317,8 @@ void HistoryWidget::escape() {
 		} else {
 			cancelEdit();
 		}
+	} else if (readyToForward() && _history) {
+		_history->setForwardDraft(MsgId(), PeerId(), {});
 	} else if (_autocomplete && !_autocomplete->isHidden()) {
 		_autocomplete->hideAnimated();
 	} else if ((_replyTo || _suggestOptions)

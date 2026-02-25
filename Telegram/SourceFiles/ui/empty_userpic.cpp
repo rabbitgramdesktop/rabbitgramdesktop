@@ -497,7 +497,8 @@ void EmptyUserpic::PaintHiddenAuthor(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	p.drawEllipse(x, y, size, size);
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
+	p.drawRoundedRect(x, y, size, size, radius, radius);
 
 	PaintHiddenAuthorInner(p, x, y, size, fg);
 }
@@ -536,7 +537,8 @@ void EmptyUserpic::PaintMyNotes(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	p.drawEllipse(x, y, size, size);
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
+	p.drawRoundedRect(x, y, size, size, radius, radius);
 
 	PaintMyNotesInner(p, x, y, size, fg);
 }
@@ -575,7 +577,8 @@ void EmptyUserpic::PaintCurrency(
 	PainterHighQualityEnabler hq(p);
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	p.drawEllipse(x, y, size, size);
+	auto radius = size * RabbitSettings::userpicRoundness() / 100;
+	p.drawRoundedRect(x, y, size, size, radius, radius);
 
 	PaintCurrencyInner(p, x, y, size, fg);
 }

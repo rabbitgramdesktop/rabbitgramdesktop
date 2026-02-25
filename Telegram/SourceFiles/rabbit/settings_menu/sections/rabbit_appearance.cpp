@@ -110,8 +110,7 @@ namespace Settings
                     .widget = object_ptr<IconPicker>(ctx.container),
                     .margin = st::settingsCheckboxPadding,
                 };
-            });
-            builder.add(nullptr, [] {
+            }, [] {
                 return SearchEntry{
                     .id = u"rabbit/appearance/app_icon_picker"_q,
                     .title = ktr("rtg_settings_app_icon"),

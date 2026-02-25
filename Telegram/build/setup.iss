@@ -1,14 +1,14 @@
 #define MyAppShortName "rabbitGram"
 #define MyAppName "rabbitGram Desktop"
 #define MyAppPublisher "xmdnx"
-#define MyAppVersion "6.5"
+#define MyAppVersion "6.5.1"
 #define MyAppURL "https://t.me/rabbitGramUpdates"
 #define ReleasePath "C:\Users\xmdnusr\source\rtgdesktopdev\out\Release"
 #define MyAppExeName "rabbitGram.exe"
 #define MyAppId "4356CE01-4137-4C55-9F8B-FB4EEBB6EC0C"
 #define CurrentYear GetDateTimeString('yyyy','','')
 #define MyBuildTarget "win64"
-#define MyAppVersionFull "6.5-07022026"
+#define MyAppVersionFull "6.5.1-25022026"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -41,17 +41,17 @@ WizardStyle=modern
 
 #if MyBuildTarget == "winarm"
   ArchitecturesAllowed="arm64"
-  OutputBaseFilename=rtgdsetup-arm64.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-arm64-{#MyAppVersionFull}
   #define ArchModulesFolder "arm64"
   AppVerName={#MyAppName} {#MyAppVersion} arm64
 #elif MyBuildTarget == "win64"
   ArchitecturesAllowed="x64compatible"
   ArchitecturesInstallIn64BitMode="x64compatible"
-  OutputBaseFilename=rtgdsetup-x64.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-x64-{#MyAppVersionFull}
   #define ArchModulesFolder "x64"
   AppVerName={#MyAppName} {#MyAppVersion} 64bit
 #else
-  OutputBaseFilename=rtgdsetup.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-{#MyAppVersionFull}
   #define ArchModulesFolder "x86"
   AppVerName={#MyAppName} {#MyAppVersion} 32bit
 #endif

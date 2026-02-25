@@ -162,6 +162,9 @@ TextState BottomInfo::textState(
 	if (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
 		withTicksWidth += st::historySendStateSpace;
 	}
+	if (_data.flags & Data::Flag::Edited) {
+		withTicksWidth += st::historyEditedWidth;
+	}
 	if (!_views.isEmpty()) {
 		const auto viewsWidth = _views.maxWidth();
 		const auto right = width()
@@ -290,6 +293,17 @@ void BottomInfo::paint(
 		authorEditedWidth,
 		outerWidth);
 
+	if (_data.flags & Data::Flag::Edited) {
+		const auto &icon = inverted
+			? st->historyEditedInvertedIcon()
+			: stm->historyEditedIcon;
+		right -= st::historyEditedWidth;
+		icon.paint(
+			p,
+			right,
+			firstLineBottom + st::historyEditedTop,
+			outerWidth);
+	}
 	if (_data.flags & Data::Flag::Pinned) {
 		const auto &icon = inverted
 			? st->historyPinInvertedIcon()
@@ -448,13 +462,15 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto edited = (_data.flags & Data::Flag::Edited)
-		? (tr::lng_edited(tr::now) + ' ')
-		: (_data.flags & Data::Flag::EstimateDate)
-		? (tr::lng_approximate(tr::now) + ' ')
-		: _data.scheduleRepeatPeriod
-		? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
-		: QString();
+	const auto edited = [&] {
+		if (_data.flags & Data::Flag::EstimateDate) {
+			return tr::lng_approximate(tr::now) + ' ';
+		}
+		if (_data.scheduleRepeatPeriod) {
+			return SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ';
+		}
+		return QString();
+	}();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
 	const auto date = edited + ((_data.flags & Data::Flag::ForwardedDate)
@@ -561,6 +577,9 @@ QSize BottomInfo::countOptimalSize() {
 		width += st::historyViewsSpace
 			+ _replies.maxWidth()
 			+ st::historyViewsWidth;
+	}
+	if (_data.flags & Data::Flag::Edited) {
+		width += st::historyEditedWidth;
 	}
 	if (_data.flags & Data::Flag::Pinned) {
 		width += st::historyPinWidth;

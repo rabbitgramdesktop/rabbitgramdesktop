@@ -9,6 +9,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/rp_widget.h"
 
+#include <memory>
+
+namespace Ui {
+class ChatStyle;
+} // namespace Ui
+
 class RoundnessPreview : public Ui::RpWidget
 {
 public:
@@ -25,6 +31,12 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* e) override;
+
+private:
+    std::unique_ptr<Ui::ChatStyle> _chatStyle;
+    int _paletteVersion = 0;
+
+    void ensureChatStyle();
 };
 
 class StickerShapePicker : public Ui::RpWidget

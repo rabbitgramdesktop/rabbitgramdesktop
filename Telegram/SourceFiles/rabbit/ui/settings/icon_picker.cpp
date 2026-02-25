@@ -36,8 +36,12 @@ const QVector icon_variants {
     RabbitAssets::TWITCH_ICON,
 };
 
-const int icons_amount = sizeof(icon_variants) / sizeof(icon_variants[0]);
-const auto rows = icons_amount / 4 + std::min(1, icons_amount) % 4;
+const auto kColumnsCount = 4;
+
+[[nodiscard]] int rowsCount() {
+	const auto count = static_cast<int>(icon_variants.size());
+	return (count + kColumnsCount - 1) / kColumnsCount;
+}
 
 void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
 {
@@ -82,7 +86,10 @@ void applyIcon()
 IconPicker::IconPicker(QWidget* parent)
     : RpWidget(parent)
 {
-    setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows - st::cpPadding);
+	const auto rows = rowsCount();
+	const auto cellHeight = st::cpIconSize + st::cpSelectedPadding * 2;
+	const auto totalHeight = cellHeight + (rows - 1) * (st::cpIconSize + st::cpSpacingY);
+	setMinimumSize(st::boxWidth, totalHeight);
 }
 
 void IconPicker::paintEvent(QPaintEvent* e)
@@ -90,14 +97,16 @@ void IconPicker::paintEvent(QPaintEvent* e)
     Painter p(this);
     PainterHighQualityEnabler hq(p);
 
+    const auto rows = rowsCount();
+    const auto iconsCount = static_cast<int>(icon_variants.size());
     auto offset = st::boxWidth / 2 - (st::cpIconSize + st::cpSpacingX) * 2;
 
     for (int row = 0; row < rows; row++)
     {
-        const auto columns = std::min(4, icons_amount - row * 4);
+        const auto columns = std::min(kColumnsCount, iconsCount - row * kColumnsCount);
         for (int i = 0; i < columns; i++)
         {
-            const auto idx = i + row * 4;
+            const auto idx = i + row * kColumnsCount;
 
             const auto& iconName = icon_variants[idx];
             if (iconName.isEmpty())
@@ -135,12 +144,14 @@ void IconPicker::mousePressEvent(QMouseEvent* e)
     auto changed = false;
 
     auto x = e->pos().x();
+    const auto rows = rowsCount();
+    const auto iconsCount = static_cast<int>(icon_variants.size());
     for (int row = 0; row < rows; row++)
     {
-        const auto columns = std::min(4, icons_amount - row * 4);
+        const auto columns = std::min(kColumnsCount, iconsCount - row * kColumnsCount);
         for (int i = 0; i < columns; i++)
         {
-            const auto idx = i + row * 4;
+            const auto idx = i + row * kColumnsCount;
             const auto xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
             const auto yOffset = row * (st::cpIconSize + st::cpSpacingY);
 

@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "info/media/info_media_provider.h"
 
+#include "apiwrap.h"
 #include "info/media/info_media_widget.h"
 #include "info/media/info_media_list_section.h"
 #include "info/info_controller.h"
@@ -340,6 +341,47 @@ bool Provider::isAfter(
 
 void Provider::setSearchQuery(QString query) {
 	Unexpected("Media::Provider::setSearchQuery.");
+}
+
+void Provider::jumpToMessage(
+		MsgId messageId,
+		Fn<void(FullMsgId)> callback) {
+	_viewerLifetime.destroy();
+
+	const auto peer = _controller->session().data().peer(_peer->id);
+	const auto request = Api::PrepareSearchRequest(
+		peer,
+		_topicRootId,
+		_monoforumPeerId,
+		_type,
+		QString(),
+		messageId,
+		Data::LoadDirection::Around);
+
+	if (!request) {
+		return;
+	}
+
+	_controller->session().api().request(
+		std::move(*request)
+	).done([=](const Api::SearchRequestResult &result) {
+		const auto parsed = Api::ParseSearchResult(
+			peer,
+			_type,
+			messageId,
+			Data::LoadDirection::Around,
+			result);
+
+		if (!parsed.messageIds.empty()) {
+			const auto fullId = FullMsgId(_peer->id, messageId);
+			_universalAroundId = GetUniversalId(fullId);
+			if (callback) {
+				callback(fullId);
+			}
+			_idsLimit = kMinimalIdsLimit * 2;
+			refreshViewer();
+		}
+	}).send();
 }
 
 SparseIdsMergedSlice::Key Provider::sliceKey(

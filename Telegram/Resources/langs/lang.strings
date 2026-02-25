@@ -3896,6 +3896,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_gift_unique_rarity" = "Only {percent} of such collectibles have this attribute.";
 "lng_gift_unique_sender" = "{from} sent you this gift on {date}";
 "lng_gift_unique_sender_you" = "You bought this gift on {date}";
+"lng_gift_unique_crafter_you" = "You crafted this gift on {date}";
 "lng_gift_unique_availability_label" = "Quantity";
 "lng_gift_unique_availability#one" = "{count} of {amount} issued";
 "lng_gift_unique_availability#other" = "{count} of {amount} issued";
@@ -4988,6 +4989,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_context_animated_emoji_many#one" = "This message contains emoji from **{count} pack**.";
 "lng_context_animated_emoji_many#other" = "This message contains emoji from **{count} packs**.";
 "lng_context_animated_reaction" = "This reaction is from the **{name}** pack.";
+"lng_context_animated_emoji_preview" = "This emoji is from the **{name}** pack.";
 "lng_context_animated_tag" = "This tag is from **{name} pack**.";
 "lng_context_animated_reactions" = "Reactions contain emoji from **{name} pack**.";
 "lng_context_animated_reactions_many#one" = "Reactions contain emoji from **{count} pack**.";
@@ -5115,6 +5117,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_send_grouped" = "Group items";
 "lng_send_compressed_one" = "Compress the image";
 "lng_send_compressed" = "Compress images";
+"lng_send_as_documents_one" = "Send as a document";
+"lng_send_as_documents" = "Send as documents";
 "lng_send_media_invalid_files" = "Sorry, no valid files found.";
 "lng_send_image" = "Send an image";
 "lng_send_file" = "Send as a file";
@@ -5348,10 +5352,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_drag_images_here" = "Drop images here";
 "lng_drag_photos_here" = "Drop photos here";
 "lng_drag_files_here" = "Drop files here";
+"lng_drag_media_here" = "Drop photos and videos";
 
 "lng_drag_to_send_quick" = "to send them in a quick way";
 "lng_drag_to_send_no_compression" = "to send them without compression";
 "lng_drag_to_send_files" = "to send them as documents";
+"lng_drag_to_send_media" = "to send them as media files";
 
 "lng_selected_clear" = "Cancel";
 "lng_selected_delete" = "Delete";
@@ -7523,6 +7529,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_summarize_header_title" = "AI summary";
 "lng_summarize_header_about" = "Click to see original text";
 
+"lng_calendar" = "Calendar";
+
+"lng_new_window_tooltip_ctrl" = "Use Ctrl+Click to open in New Window.";
+"lng_new_window_tooltip_cmd" = "Use Cmd+Click to open in New Window.";
+
 // Wnd specific
 
 "lng_wnd_choose_program_menu" = "Choose Default Program...";
@@ -7588,5 +7599,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_mac_touchbar_favorite_stickers" = "Favorite stickers";
 
 "lng_mac_hold_to_quit" = "Hold {text} to Quit";
+
+"lng_rename_file" = "Rename file";
 
 // Keys finished

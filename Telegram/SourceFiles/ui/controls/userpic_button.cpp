@@ -14,6 +14,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "boxes/peers/edit_peer_info_box.h" // EditPeerInfoBox::Available.
 #include "ui/effects/ripple_animation.h"
 #include "ui/empty_userpic.h"
+
+#include "rabbit/settings/rabbit_settings.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
@@ -1121,12 +1123,11 @@ void UserpicButton::fillShape(QPainter &p, QBrush brush) const {
 	p.setPen(Qt::NoPen);
 	p.setBrush(brush);
 	const auto size = _st.photoSize;
-	if (useForumShape()) {
-		const auto radius = size * Ui::ForumUserpicRadiusMultiplier();
-		p.drawRoundedRect(0, 0, size, size, radius, radius);
-	} else {
-		p.drawEllipse(0, 0, size, size);
+	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
+	if (useForumShape() && !RabbitSettings::generalRoundness()) {
+		radius *= Ui::ForumUserpicRadiusMultiplier();
 	}
+	p.drawRoundedRect(0, 0, size, size, radius, radius);
 }
 
 void UserpicButton::prepareUserpicPixmap() {
@@ -1157,12 +1158,13 @@ void UserpicButton::prepareUserpicPixmap() {
 						QSize(size, size) * ratio,
 						Qt::IgnoreAspectRatio,
 						Qt::SmoothTransformation);
-					image = useForumShape()
-						? Images::Round(
-							std::move(image),
-							Images::CornersMask(size
-								* Ui::ForumUserpicRadiusMultiplier()))
-						: Images::Circle(std::move(image));
+					auto imgRadius = size * RabbitSettings::userpicRoundness() / 100.;
+					if (useForumShape() && !RabbitSettings::generalRoundness()) {
+						imgRadius *= Ui::ForumUserpicRadiusMultiplier();
+					}
+					image = Images::Round(
+						std::move(image),
+						Images::CornersMask(int(imgRadius)));
 					image.setDevicePixelRatio(style::DevicePixelRatio());
 					p.drawImage(0, 0, image);
 				}
@@ -1173,17 +1175,11 @@ void UserpicButton::prepareUserpicPixmap() {
 					((user && user->isInaccessible())
 						? Ui::EmptyUserpic::InaccessibleName()
 						: _peer->name()));
-				if (useForumShape()) {
-					empty.paintRounded(
-						p,
-						0,
-						0,
-						size,
-						size,
-						size * Ui::ForumUserpicRadiusMultiplier());
-				} else {
-					empty.paintCircle(p, 0, 0, size, size);
+				auto emptyRadius = size * RabbitSettings::userpicRoundness() / 100;
+				if (useForumShape() && !RabbitSettings::generalRoundness()) {
+					emptyRadius *= Ui::ForumUserpicRadiusMultiplier();
 				}
+				empty.paintRounded(p, 0, 0, size, size, emptyRadius);
 			}
 		} else {
 			fillShape(p, CreateDefaultGradientBrush(_st.photoSize));

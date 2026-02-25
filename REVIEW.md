@@ -4,7 +4,7 @@ This file contains style and formatting rules that the review subagent must chec
 
 ## Empty line before closing brace
 
-Always add an empty line before the closing brace of a class (after all private fields):
+Always add an empty line before the closing brace of a **class** (which has one or more sections like `public:` / `private:`). Plain **structs** with just data members do NOT get a trailing empty line — they are compact: `struct Foo { data lines; };`.
 
 ```cpp
 // BAD:
@@ -93,6 +93,26 @@ if (const auto peer = session().data().peerLoaded(peerId)
 // GOOD - simple nested ifs when direct lookup isn't available:
 if (const auto peer = session().data().peerLoaded(peerId)) {
 	if (const auto user = peer->asUser()) {
+
+## Always initialize variables of basic types
+
+Never leave variables of basic types (`int`, `float`, `bool`, pointers, etc.) uninitialized. Custom types with constructors are fine — they initialize themselves. But for any basic type, always provide a default value (`= 0`, `= false`, `= nullptr`, etc.). This applies especially to class fields, where uninitialized members are a persistent source of bugs.
+
+The only exception is performance-critical hot paths where you can prove no read-from-uninitialized-memory occurs. For class fields there is no such exception — always initialize.
+
+```cpp
+// BAD:
+int _bulletLeft;
+int _bulletTop;
+bool _expanded;
+SomeType *_pointer;
+
+// GOOD:
+int _bulletLeft = 0;
+int _bulletTop = 0;
+bool _expanded = false;
+SomeType *_pointer = nullptr;
+```
 
 ## std::optional access — avoid value()
 
