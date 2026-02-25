@@ -41,17 +41,17 @@ WizardStyle=modern
 
 #if MyBuildTarget == "winarm"
   ArchitecturesAllowed="arm64"
-  OutputBaseFilename=rtgdsetup-arm64.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-arm64-{#MyAppVersionFull}
   #define ArchModulesFolder "arm64"
   AppVerName={#MyAppName} {#MyAppVersion} arm64
 #elif MyBuildTarget == "win64"
   ArchitecturesAllowed="x64compatible"
   ArchitecturesInstallIn64BitMode="x64compatible"
-  OutputBaseFilename=rtgdsetup-x64.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-x64-{#MyAppVersionFull}
   #define ArchModulesFolder "x64"
   AppVerName={#MyAppName} {#MyAppVersion} 64bit
 #else
-  OutputBaseFilename=rtgdsetup.{#MyAppVersionFull}
+  OutputBaseFilename=rtgdsetup-{#MyAppVersionFull}
   #define ArchModulesFolder "x86"
   AppVerName={#MyAppName} {#MyAppVersion} 32bit
 #endif
