@@ -1516,6 +1516,8 @@ PRIVATE
     profile/profile_block_widget.h
     profile/profile_cover_drop_area.cpp
     profile/profile_cover_drop_area.h
+    rabbit/deep_links/deep_links_rtg.cpp
+    rabbit/deep_links/deep_links_rtg.h
     rabbit/lang/rabbit_lang.cpp
     rabbit/lang/rabbit_lang.h
     rabbit/settings/rabbit_settings.cpp
@@ -1528,6 +1530,8 @@ PRIVATE
     rabbit/settings_menu/sections/rabbit_chats.h
     rabbit/settings_menu/sections/rabbit_general.cpp
     rabbit/settings_menu/sections/rabbit_general.h
+    rabbit/settings_menu/rabbit_context_menu.cpp
+    rabbit/settings_menu/rabbit_context_menu.h
     rabbit/settings_menu/rabbit_settings_menu.cpp
     rabbit/settings_menu/rabbit_settings_menu.h
     rabbit/ui/settings/icon_picker.cpp

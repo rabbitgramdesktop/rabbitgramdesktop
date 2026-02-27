@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings_menu/sections/rabbit_appearance.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
+#include "rabbit/settings_menu/rabbit_context_menu.h"
 #include "rabbit/ui/settings/icon_picker.h"
 #include "rabbit/ui/settings/previews.h"
 
@@ -58,6 +59,7 @@ namespace Settings
             const auto st = icon
                 ? &st::settingsButton
                 : &st::settingsButtonNoIcon;
+            const auto controlId = id;
             if (const auto button = builder.addButton({
                 .id = std::move(id),
                 .title = std::move(title),
@@ -70,6 +72,10 @@ namespace Settings
                     | rpl::filter([=](bool enabled) { return enabled != getter(); })
                     | rpl::on_next([=](bool enabled) { setter(enabled); },
                         button->lifetime());
+                if (const auto controller = builder.controller()) {
+                    RtgMenu::AttachSettingsContextMenu(
+                        button, controlId, controller);
+                }
             }
         }
 
@@ -81,6 +87,7 @@ namespace Settings
             QStringList keywords = {})
         {
             const auto current = RabbitSettings::JsonSettings::GetBool(optionKey);
+            const auto controlId = id;
             if (const auto button = builder.addButton({
                 .id = std::move(id),
                 .title = rktr(titleKey),
@@ -96,6 +103,10 @@ namespace Settings
                     | rpl::on_next([=](bool enabled) {
                         RabbitSettings::JsonSettings::Set(optionKey, enabled);
                     }, button->lifetime());
+                if (const auto controller = builder.controller()) {
+                    RtgMenu::AttachSettingsContextMenu(
+                        button, controlId, controller);
+                }
             }
         }
 
@@ -129,7 +140,7 @@ namespace Settings
                 .keywords = { u"theme"_q, u"color"_q },
             });
             
-            builder.addButton({
+            if (const auto button = builder.addButton({
                 .id = u"rabbit/appearance/theme/apply_accent"_q,
                 .title = rktr("rtg_settings_apply_accent_theme"),
                 .icon = { &st::menuIconChangeColors },
@@ -137,7 +148,14 @@ namespace Settings
                     setAccentTheme();
                 },
                 .keywords = { u"theme"_q, u"color"_q, u"accent"_q },
-            });
+            })) {
+                if (const auto controller = builder.controller()) {
+                    RtgMenu::AttachSettingsContextMenu(
+                        button,
+                        u"rabbit/appearance/theme/apply_accent"_q,
+                        controller);
+                }
+            }
         }
 #endif
 
