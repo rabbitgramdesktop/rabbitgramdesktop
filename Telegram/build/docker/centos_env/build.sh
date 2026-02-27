@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
-cd Telegram
+ScriptPath="$(cd "$(dirname "$0")" && pwd)"
+cd "$ScriptPath/../../.."
 ./configure.sh "$@"
 cmake --build ../out --config "${CONFIG:-Release}"
