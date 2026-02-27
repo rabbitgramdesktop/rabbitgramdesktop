@@ -37,6 +37,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_menu_icons.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
+#include "rabbit/utils/windows_utils.h"
 #include "ui/widgets/continuous_sliders.h"
 
 namespace Settings
@@ -118,12 +119,33 @@ namespace Settings
                 };
             });
         }
+        
+#ifdef Q_OS_WIN
+        void BuildTheme(SectionBuilder &builder)
+        {
+            builder.addSubsectionTitle({
+                .id = u"rabbit/appearance/theme"_q,
+                .title = rktr("rtg_settings_theme"),
+                .keywords = { u"theme"_q, u"color"_q },
+            });
+            
+            builder.addButton({
+                .id = u"rabbit/appearance/theme/apply_accent"_q,
+                .title = rktr("rtg_settings_apply_accent_theme"),
+                .icon = { &st::menuIconChangeColors },
+                .onClick = [=] {
+                    setAccentTheme();
+                },
+                .keywords = { u"theme"_q, u"color"_q, u"accent"_q },
+            });
+        }
+#endif
 
-        void BuildAppearance(SectionBuilder &builder)
+        void BuildUserpic(SectionBuilder &builder)
         {
             builder.addSubsectionTitle({
                 .id = u"rabbit/appearance/roundness"_q,
-                .title = rktr("rtg_settings_appearance"),
+                .title = rktr("rtg_settings_userpic"),
                 .keywords = { u"roundness"_q, u"radius"_q },
             });
 
@@ -255,11 +277,21 @@ namespace Settings
         {
             builder.addSkip();
             BuildAppIcon(builder);
-
+            
+#ifdef Q_OS_WIN
             builder.addSkip();
             builder.addDivider();
             builder.addSkip();
-            BuildAppearance(builder);
+            BuildTheme(builder);
+            
+            builder.addSkip();
+            builder.addDividerText(rktr("rtg_settings_accent_theme_annotation"));
+#else
+            builder.addSkip();
+            builder.addDivider();
+#endif
+            builder.addSkip();
+            BuildUserpic(builder);
 
             builder.addSkip();
             builder.addDivider();
