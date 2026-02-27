@@ -46,15 +46,7 @@ jobs:
     name: Rocky Linux 8
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        defines:
-          - ""
-          - "DESKTOP_APP_DISABLE_X11_INTEGRATION"
-
     env:
-      UPLOAD_ARTIFACT: "true"
-      ONLY_CACHE: "false"
       IMAGE_TAG: tdesktop:centos_env
 
     steps:
@@ -103,56 +95,27 @@ jobs:
           mv ${{ runner.temp }}/.buildx-cache{-new,}
 
       - name: Telegram Desktop build.
-        if: env.ONLY_CACHE == 'false'
         run: |
-          DEFINE=""
-          if [ -n "${{ matrix.defines }}" ]; then
-            DEFINE="-D ${{ matrix.defines }}=ON"
-            echo Define from matrix: $DEFINE
-            echo "ARTIFACT_NAME=Telegram ${{ matrix.defines }}" >> $GITHUB_ENV
-          else
-            echo "ARTIFACT_NAME=Telegram" >> $GITHUB_ENV
-          fi
-
           docker run --rm \
           -u $(id -u) \
           -w /usr/src/tdesktop \
           -v $PWD:/usr/src/tdesktop \
-          -e CONFIG=Debug \
+          -e CONFIG=Release \
           $IMAGE_TAG \
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
-          -D CMAKE_CONFIGURATION_TYPES=Debug \
-          -D CMAKE_C_FLAGS_DEBUG="-O0" \
-          -D CMAKE_CXX_FLAGS_DEBUG="-O0" \
-          -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
-          -D TDESKTOP_API_TEST=ON \
+          -D CMAKE_CONFIGURATION_TYPES=Release \
+          -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
+          -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
-          $DEFINE
-
-      - name: Check.
-        if: env.ONLY_CACHE == 'false'
-        run: |
-          filePath="out/Debug/Telegram"
-          if test -f "$filePath"; then
-            echo "Build successfully done! :)"
-
-            size=$(stat -c %s "$filePath")
-            echo "File size of ${filePath}: ${size} Bytes."
-          else
-            echo "Build error, output file does not exist."
-            exit 1
-          fi
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
 
       - name: Move artifact.
-        if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd out/Debug
+          cd out/Release
           mkdir artifact
-          mv {Telegram,Updater} artifact/
+          mv Telegram artifact/
       - uses: actions/upload-artifact@v6
-        if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: out/Debug/artifact/
+          name: Telegram Linux
+          path: out/Release/artifact/
