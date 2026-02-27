@@ -27,6 +27,8 @@ namespace Settings
         Rabbit(QWidget* parent, not_null<Window::SessionController*> controller);
 
         [[nodiscard]] rpl::producer<QString> title() override;
+        void fillTopBarMenu(
+            const Ui::Menu::MenuCallback &addAction) override;
 
     private:
         void setupContent();

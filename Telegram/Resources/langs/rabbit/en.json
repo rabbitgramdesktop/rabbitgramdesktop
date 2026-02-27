@@ -59,5 +59,11 @@
     "rtg_open": "Open rabbitGram",
     "rtg_close": "Close rabbitGram",
     "rtg_share": "Share",
+    "rtg_share_settings_to_chat": "Share Settings",
+    "rtg_share_settings": "Export Settings",
+    "rtg_restart": "Restart",
+    "rtg_import_config_confirm": "Do you want to apply settings from this file? Your current settings will be replaced.",
+    "rtg_import_config_restart": "Settings applied successfully. Restart now to apply all changes?",
+    "rtg_import_config_apply": "Apply",
     "last_string": null
 }

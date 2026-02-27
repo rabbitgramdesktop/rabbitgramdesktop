@@ -70,6 +70,9 @@ namespace RabbitSettings
             uint64 accountId = 0,
             bool isTestAccount = false);
 
+        [[nodiscard]] QByteArray ExportSettingsJson();
+        bool ImportSettingsFromJson(const QByteArray &json);
+
         inline bool GetBool(
             const QString& key,
             uint64 accountId = 0,

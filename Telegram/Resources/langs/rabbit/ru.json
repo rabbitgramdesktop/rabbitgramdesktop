@@ -59,5 +59,11 @@
     "rtg_open": "Открыть rabbitGram",
     "rtg_close": "Закрыть rabbitGram",
     "rtg_share": "Поделиться",
+    "rtg_share_settings_to_chat": "Поделиться настройками",
+    "rtg_share_settings": "Экспортировать настройки",
+    "rtg_restart": "Перезапуск",
+    "rtg_import_config_confirm": "Применить настройки из этого файла? Текущие настройки будут заменены.",
+    "rtg_import_config_restart": "Настройки успешно применены. Перезапустить сейчас, чтобы применить все изменения?",
+    "rtg_import_config_apply": "Применить",
     "last_string": null
 }
