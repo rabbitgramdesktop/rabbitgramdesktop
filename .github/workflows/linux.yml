@@ -116,6 +116,7 @@ jobs:
 
           docker run --rm \
           -u $(id -u) \
+          -w /usr/src/tdesktop \
           -v $PWD:/usr/src/tdesktop \
           -e CONFIG=Debug \
           $IMAGE_TAG \

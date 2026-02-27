@@ -83,12 +83,26 @@ jobs:
           path: |
             Libraries
             ThirdParty
-          key: ${{ runner.OS }}-libs-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
-          restore-keys: ${{ runner.OS }}-libs-
+          key: ${{ runner.OS }}-${{ runner.arch }}-libs-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH), format('{0}/Telegram/build/prepare/qt_version.py', env.REPO_NAME), format('{0}/.github/workflows/mac.yml', env.REPO_NAME)) }}
+          restore-keys: ${{ runner.OS }}-${{ runner.arch }}-libs-
 
       - name: Libraries.
         run: |
           ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+
+      - name: Validate prepared libraries.
+        run: |
+          QT_DIR=$(find Libraries/local -mindepth 1 -maxdepth 1 -type d -name 'Qt-*' | head -n 1)
+          QT_CORE=""
+          if [ -n "$QT_DIR" ]; then
+            QT_CORE="$QT_DIR/lib/libQt6Core.a"
+          fi
+
+          if [ -z "$QT_CORE" ] || [ ! -f "$QT_CORE" ] || [ ! -f Libraries/crashpad/out/Release/libcrashpad_client.a ]; then
+            echo "Prepared libraries are incomplete, clearing stale cache markers and rebuilding dependencies."
+            rm -f Libraries/cache_keys/qt* Libraries/cache_keys/crashpad
+            ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+          fi
 
       - name: Free up some disk space.
         run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
