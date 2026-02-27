@@ -7,5 +7,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
-void reloadAppIconFromTaskBar();
-void setAccentTheme();
+namespace Core::DeepLinks {
+
+class Router;
+
+void RegisterRtgHandlers(Router &router);
+
+[[nodiscard]] QString RtgSettingsDeepLink(const QString &controlId);
+
+} // namespace Core::DeepLinks

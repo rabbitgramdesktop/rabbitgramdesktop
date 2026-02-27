@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings_menu/sections/rabbit_general.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
+#include "rabbit/settings_menu/rabbit_context_menu.h"
 
 #include "lang_auto.h"
 #include "mainwindow.h"
@@ -52,6 +53,7 @@ namespace Settings
             QStringList keywords = {})
         {
             const auto current = RabbitSettings::JsonSettings::GetBool(optionKey);
+            const auto controlId = id;
             if (const auto button = builder.addButton({
                 .id = std::move(id),
                 .title = rktr(titleKey),
@@ -67,6 +69,10 @@ namespace Settings
                     | rpl::on_next([=](bool enabled) {
                         RabbitSettings::JsonSettings::Set(optionKey, enabled);
                     }, button->lifetime());
+                if (const auto controller = builder.controller()) {
+                    RtgMenu::AttachSettingsContextMenu(
+                        button, controlId, controller);
+                }
             }
         }
 
@@ -82,6 +88,7 @@ namespace Settings
             const auto st = icon
                 ? &st::settingsButton
                 : &st::settingsButtonNoIcon;
+            const auto controlId = id;
             if (const auto button = builder.addButton({
                 .id = std::move(id),
                 .title = std::move(title),
@@ -94,6 +101,10 @@ namespace Settings
                     | rpl::filter([=](bool enabled) { return enabled != getter(); })
                     | rpl::on_next([=](bool enabled) { setter(enabled); },
                         button->lifetime());
+                if (const auto controller = builder.controller()) {
+                    RtgMenu::AttachSettingsContextMenu(
+                        button, controlId, controller);
+                }
             }
         }
 

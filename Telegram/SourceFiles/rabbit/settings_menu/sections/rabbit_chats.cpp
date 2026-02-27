@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings_menu/sections/rabbit_chats.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
+#include "rabbit/settings_menu/rabbit_context_menu.h"
 #include "rabbit/ui/settings/previews.h"
 
 #include "lang_auto.h"
@@ -63,6 +64,7 @@ namespace Settings
         const auto st = icon
             ? &st::settingsButton
             : &st::settingsButtonNoIcon;
+        const auto controlId = id;
         if (const auto button = builder.addButton({
             .id = std::move(id),
             .title = std::move(title),
@@ -75,6 +77,10 @@ namespace Settings
                 | rpl::filter([=](bool enabled) { return enabled != getter(); })
                 | rpl::on_next([=](bool enabled) { setter(enabled); },
                     button->lifetime());
+            if (const auto controller = builder.controller()) {
+                RtgMenu::AttachSettingsContextMenu(
+                    button, controlId, controller);
+            }
         }
     }
 
@@ -253,7 +259,7 @@ namespace Settings
         const auto incomingAction = QuickActionFrom(
             RabbitSettings::incomingQuickAction());
 
-        builder.addButton({
+        if (const auto button = builder.addButton({
             .id = u"rabbit/chats/quick_actions/outgoing"_q,
             .title = rktr("rtg_outgoing_quick_actions"),
             .st = &st::settingsButtonNoIcon,
@@ -262,8 +268,15 @@ namespace Settings
                 ? [=] { controller->show(Box(OutgoingQuickActionBox)); }
                 : Fn<void()>(),
             .keywords = { u"outgoing"_q, u"actions"_q },
-        });
-        builder.addButton({
+        })) {
+            if (controller) {
+                RtgMenu::AttachSettingsContextMenu(
+                    button,
+                    u"rabbit/chats/quick_actions/outgoing"_q,
+                    controller);
+            }
+        }
+        if (const auto button = builder.addButton({
             .id = u"rabbit/chats/quick_actions/incoming"_q,
             .title = rktr("rtg_incoming_quick_actions"),
             .st = &st::settingsButtonNoIcon,
@@ -272,7 +285,14 @@ namespace Settings
                 ? [=] { controller->show(Box(IncomingQuickActionBox)); }
                 : Fn<void()>(),
             .keywords = { u"incoming"_q, u"actions"_q },
-        });
+        })) {
+            if (controller) {
+                RtgMenu::AttachSettingsContextMenu(
+                    button,
+                    u"rabbit/chats/quick_actions/incoming"_q,
+                    controller);
+            }
+        }
     }
 
     void BuildStickers(SectionBuilder &builder)

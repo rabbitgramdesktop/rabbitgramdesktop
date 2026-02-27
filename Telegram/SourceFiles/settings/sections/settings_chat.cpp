@@ -1060,7 +1060,6 @@ void BuildSensitiveContentSection(SectionBuilder &builder) {
 	builder.add([controller, highlights](const WidgetContext &ctx) {
 		auto updateOnTick = rpl::single(
 		) | rpl::then(base::timer_each(60 * crl::time(1000)));
-		Ui::AddDivider(ctx.container.get());
 		SetupSensitiveContent(
 			controller,
 			ctx.container.get(),
@@ -1620,7 +1619,7 @@ void SetupMessages(
 	}
 
 	Ui::AddSkip(inner);
-	Ui::AddDividerText(inner, rktr("rtg_double_click_moved"));
+	Ui::AddDividerText(inner, rktr("rtg_double_click_annotation"));
 }
 
 void SetupArchive(

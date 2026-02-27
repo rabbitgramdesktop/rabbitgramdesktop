@@ -1749,6 +1749,10 @@ bool DocumentData::isTheme() const {
 				|| _nameType == Core::NameType::ThemeFile));
 }
 
+bool DocumentData::isRtgConfig() const {
+	return _filename.endsWith(u".rtgconfig"_q, Qt::CaseInsensitive);
+}
+
 bool DocumentData::isSong() const {
 	return (type == SongDocument);
 }

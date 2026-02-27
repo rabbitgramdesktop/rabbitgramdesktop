@@ -538,9 +538,13 @@ void Row::PaintCornerBadgeFrame(
 		? st::dialogsOnlineBadgeSize
 		: st::dialogsCallBadgeSize;
 	const auto stroke = st::dialogsOnlineBadgeStroke;
-	const auto skip = online
+	const auto roundnessRatio = RabbitSettings::userpicRoundness() / 100.;
+	const auto originalSkip = online
 		? st::dialogsOnlineBadgeSkip
 		: st::dialogsCallBadgeSkip;
+	const auto skip = QPointF(
+		originalSkip.x() * roundnessRatio,
+		originalSkip.y() * roundnessRatio);
 	const auto shrink = (size / 2) * (1. - topLayerProgress);
 
 	auto pen = QPen(Qt::transparent);
