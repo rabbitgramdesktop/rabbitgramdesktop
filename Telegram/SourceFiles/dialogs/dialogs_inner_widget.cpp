@@ -5276,9 +5276,12 @@ void InnerWidget::repaintDialogRowCornerStatus(not_null<History*> history) {
 		? st::dialogsOnlineBadgeSize
 		: st::dialogsCallBadgeSize;
 	const auto stroke = st::dialogsOnlineBadgeStroke;
-	const auto skip = user
+	const auto originalSkip = user
 		? st::dialogsOnlineBadgeSkip
 		: st::dialogsCallBadgeSkip;
+	const auto skip = QPoint(
+		std::min(originalSkip.x(), 0),
+		std::min(originalSkip.y(), 0));
 	const auto updateRect = QRect(
 		_st->photoSize - skip.x() - size,
 		_st->photoSize - skip.y() - size,
