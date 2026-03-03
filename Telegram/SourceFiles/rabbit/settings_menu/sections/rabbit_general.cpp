@@ -118,7 +118,7 @@ namespace Settings
             
             AddToggle(
                 builder,
-                u"rabbit/chats/show_seconds"_q,
+                u"rabbit/general/show_seconds"_q,
                 rktr("rtg_show_seconds"),
                 nullptr,
                 [] { return RabbitSettings::showSeconds(); },

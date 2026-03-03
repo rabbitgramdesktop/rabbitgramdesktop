@@ -22,7 +22,7 @@
     "rtg_chats_sticker_size": "Stickers size: {pixels}px",
     "rtg_chats_message_rounding": "Message rounding: {radius}",
     "rtg_show_actions_time": "Show actions time",
-    "rtg_show_seconds": "Show time with seconds",
+    "rtg_show_seconds": "Format time with seconds",
     "rtg_comma_after_mention": "Add comma after mention",
     "rtg_hide_bubble_tails": "Hide message bubble tail",
     "rtg_chats_quick_actions": "Quick actions",
