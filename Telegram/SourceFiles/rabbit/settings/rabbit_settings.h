@@ -141,6 +141,7 @@ namespace RabbitSettings
     inline bool streamerMode() { return JsonSettings::GetBool("streamer_mode"); }
     inline bool hideNotificationsAutomatically() { return JsonSettings::GetBool("auto_hide_notifications"); }
     inline bool showUserpicInTopBar() { return JsonSettings::GetBool("userpic_in_top_bar"); }
+    inline bool showPeerIdDc() { return JsonSettings::GetBool("show_peer_id_dc"); }
     inline bool connectionBarLost() { return JsonSettings::GetBool("connection_bar_lost"); }
     inline bool connectionBarProxy() { return JsonSettings::GetBool("connection_bar_proxy"); }
     inline QString appIcon() { return JsonSettings::GetString("app_icon"); }
@@ -169,6 +170,7 @@ namespace RabbitSettings
     inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
     inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
     inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set("userpic_in_top_bar", value); }
+    inline void setShowPeerIdDc(bool value) { JsonSettings::Set("show_peer_id_dc", value); }
     inline void setConnectionBarLost(bool value) { JsonSettings::Set("connection_bar_lost", value); }
     inline void setConnectionBarProxy(bool value) { JsonSettings::Set("connection_bar_proxy", value); }
     inline void setAppIcon(QString value) { JsonSettings::Set("app_icon", value); }

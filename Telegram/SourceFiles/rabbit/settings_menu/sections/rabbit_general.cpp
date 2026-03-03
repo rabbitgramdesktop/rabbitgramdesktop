@@ -153,6 +153,13 @@ namespace Settings
                 u"rtg_general_streamer_mode"_q,
                 u"streamer_mode"_q,
                 { u"streamer"_q, u"privacy"_q });
+            
+            AddJsonToggle(
+                builder,
+                u"rabbit/general/show_peer_id_dc"_q,
+                u"rtg_show_peer_id_dc"_q,
+                u"show_peer_id_dc"_q,
+                { u"peer"_q, u"id"_q, u"dc"_q });
         }
 
         void BuildConnectionBar(SectionBuilder &builder)

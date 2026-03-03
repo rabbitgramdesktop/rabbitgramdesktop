@@ -244,6 +244,12 @@ namespace RabbitSettings::JsonSettings
                 }
             },
             {
+                "show_peer_id_dc", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            },
+            {
                 "connection_bar_lost", {
                     .type = BoolSetting,
                     .defaultValue = true,

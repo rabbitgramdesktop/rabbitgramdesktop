@@ -105,18 +105,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+#include "rabbit/settings/rabbit_settings.h"
+
 namespace Info {
 namespace Profile {
 namespace {
 
 constexpr auto kDay = Data::WorkingInterval::kDay;
-
-base::options::toggle ShowPeerIdBelowAbout({
-	.id = kOptionShowPeerIdBelowAbout,
-	.name = "Show Peer IDs in Profile",
-	.description = "Show peer IDs from API below their Bio / Description."
-		" Add contact IDs to exported data.",
-});
 
 base::options::toggle ShowChannelJoinedBelowAbout({
 	.id = kOptionShowChannelJoinedBelowAbout,
@@ -210,7 +205,7 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	return AboutValue(
 		peer
 	) | rpl::map([=](TextWithEntities &&value) {
-		if (ShowPeerIdBelowAbout.value()) {
+		if (RabbitSettings::showPeerIdDc()) {
 			using namespace Ui::Text;
 			if (!value.empty()) {
 				value.append("\n\n");
@@ -220,12 +215,20 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 			value.append(Link(
 				Italic(Lang::FormatCountDecimal(raw)),
 				"internal:~peer_id~:copy:" + QString::number(raw)));
+			const auto &locData = peer->userpicLocation().file().data;
+			if (v::is<StorageFileLocation>(locData)) {
+				const auto dc = v::get<StorageFileLocation>(locData).dcId();
+				if (dc) {
+					value.append(Italic(u", DC"_q));
+					value.append(Italic(QString::number(dc)));
+				}
+			}
 		}
 		if (ShowChannelJoinedBelowAbout.value()) {
 			if (const auto channel = peer->asChannel()) {
 				if (!channel->amCreator() && channel->inviteDate) {
 					if (!value.empty()) {
-						if (ShowPeerIdBelowAbout.value()) {
+						if (RabbitSettings::showPeerIdDc()) {
 							value.append("\n");
 						} else {
 							value.append("\n\n");
@@ -2803,7 +2806,6 @@ object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 
 } // namespace
 
-const char kOptionShowPeerIdBelowAbout[] = "show-peer-id-below-about";
 const char kOptionShowChannelJoinedBelowAbout[] = "show-channel-joined-below-about";
 
 object_ptr<Ui::RpWidget> SetupDetails(
