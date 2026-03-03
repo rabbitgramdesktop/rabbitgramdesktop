@@ -198,14 +198,6 @@ namespace Settings
             { u"actions"_q, u"time"_q });
         AddToggle(
             builder,
-            u"rabbit/chats/show_seconds"_q,
-            rktr("rtg_show_seconds"),
-            nullptr,
-            [] { return RabbitSettings::showSeconds(); },
-            [](bool value) { RabbitSettings::setShowSeconds(value); },
-            { u"seconds"_q, u"time"_q });
-        AddToggle(
-            builder,
             u"rabbit/chats/comma_after_mention"_q,
             rktr("rtg_comma_after_mention"),
             nullptr,

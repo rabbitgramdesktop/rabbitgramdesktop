@@ -110,12 +110,21 @@ namespace Settings
 
         void BuildGeneral(SectionBuilder &builder)
         {
-            AddJsonToggle(
+            builder.addSubsectionTitle({
+                .id = u"rabbit/general/general"_q,
+                .title = rktr("rtg_settings_general"),
+                .keywords = { u"general"_q },
+            });
+            
+            AddToggle(
                 builder,
-                u"rabbit/general/streamer_mode"_q,
-                u"rtg_general_streamer_mode"_q,
-                u"streamer_mode"_q,
-                { u"streamer"_q, u"privacy"_q });
+                u"rabbit/chats/show_seconds"_q,
+                rktr("rtg_show_seconds"),
+                nullptr,
+                [] { return RabbitSettings::showSeconds(); },
+                [](bool value) { RabbitSettings::setShowSeconds(value); },
+                { u"seconds"_q, u"time"_q });
+            
             AddJsonToggle(
                 builder,
                 u"rabbit/general/auto_hide_notifications"_q,
@@ -128,6 +137,22 @@ namespace Settings
                 u"rtg_general_userpic_in_top_bar"_q,
                 u"userpic_in_top_bar"_q,
                 { u"userpic"_q, u"top"_q });
+        }
+        
+        void BuildProfile(SectionBuilder &builder)
+        {
+            builder.addSubsectionTitle({
+                .id = u"rabbit/general/profile"_q,
+                .title = rktr("rtg_profile"),
+                .keywords = { u"profile"_q, u"privacy"_q },
+            });
+            
+            AddJsonToggle(
+                builder,
+                u"rabbit/general/streamer_mode"_q,
+                u"rtg_general_streamer_mode"_q,
+                u"streamer_mode"_q,
+                { u"streamer"_q, u"privacy"_q });
         }
 
         void BuildConnectionBar(SectionBuilder &builder)
@@ -160,6 +185,11 @@ namespace Settings
         {
             builder.addSkip();
             BuildGeneral(builder);
+            
+            builder.addSkip();
+            builder.addDivider();
+            builder.addSkip();
+            BuildProfile(builder);
 
             builder.addSkip();
             builder.addDivider();
