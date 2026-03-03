@@ -1520,6 +1520,7 @@ PRIVATE
     rabbit/deep_links/deep_links_rtg.h
     rabbit/lang/rabbit_lang.cpp
     rabbit/lang/rabbit_lang.h
+    rabbit/settings/quick_action.h
     rabbit/settings/rabbit_settings.cpp
     rabbit/settings/rabbit_settings.h
     rabbit/settings_menu/boxes/quick_action_box.cpp
