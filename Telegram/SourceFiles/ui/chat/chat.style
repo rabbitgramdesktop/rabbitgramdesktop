@@ -259,6 +259,10 @@ historyFileOutDocument: icon {{ "history_file_document", historyFileOutIconFg }}
 historyFileOutDocumentSelected: icon {{ "history_file_document", historyFileOutIconFgSelected }};
 historyFileInDocument: icon {{ "history_file_document", historyFileInIconFg }};
 historyFileInDocumentSelected: icon {{ "history_file_document", historyFileInIconFgSelected }};
+historyFileOutConfig: icon {{ "history_file_config", historyFileOutIconFg }};
+historyFileOutConfigSelected: icon {{ "history_file_config", historyFileOutIconFgSelected }};
+historyFileInConfig: icon {{ "history_file_config", historyFileInIconFg }};
+historyFileInConfigSelected: icon {{ "history_file_config", historyFileInIconFgSelected }};
 historyFileOutDownload: icon {{ "history_file_download", historyFileOutIconFg }};
 historyFileOutDownloadSelected: icon {{ "history_file_download", historyFileOutIconFgSelected }};
 historyFileInDownload: icon {{ "history_file_download", historyFileInIconFg }};

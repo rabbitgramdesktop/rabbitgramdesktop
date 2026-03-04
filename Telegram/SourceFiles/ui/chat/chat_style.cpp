@@ -468,6 +468,12 @@ ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
 		st::historyFileOutDocument,
 		st::historyFileOutDocumentSelected);
 	make(
+		&MessageStyle::historyFileConfig,
+		st::historyFileInConfig,
+		st::historyFileInConfigSelected,
+		st::historyFileOutConfig,
+		st::historyFileOutConfigSelected);
+	make(
 		&MessageStyle::historyAudioDownload,
 		st::historyAudioInDownload,
 		st::historyAudioInDownloadSelected,

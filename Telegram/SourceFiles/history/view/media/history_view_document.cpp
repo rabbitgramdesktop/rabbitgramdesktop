@@ -780,6 +780,8 @@ void Document::draw(
 						: stm->historyFilePlay)
 					: _data->isImage()
 					? stm->historyFileImage
+					: _data->isRtgConfig()
+					? stm->historyFileConfig
 					: stm->historyFileDocument;
 			} else {
 				return _data->isSongWithCover()
