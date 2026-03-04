@@ -16,6 +16,10 @@ namespace style {
 struct ComposeControls;
 } // namespace style
 
+namespace Ui::Text {
+struct MarkedContext;
+} // namespace Ui::Text
+
 namespace Window {
 class SessionController;
 } // namespace Window
@@ -153,6 +157,7 @@ private:
 			not_null<std::vector<Ui::PreparedFile>*> items,
 			int from,
 			int till,
+			const Ui::Text::MarkedContext &captionContext,
 			Fn<bool()> gifPaused,
 			Ui::SendFilesWay way,
 			Fn<bool(
@@ -179,6 +184,9 @@ private:
 		[[nodiscard]] QImage generatePriceTagBackground() const;
 		[[nodiscard]] bool setSingleFileDisplayName(
 			const QString &displayName);
+		[[nodiscard]] bool setSingleFileCaption(
+			int index,
+			const TextWithTags &caption);
 
 	private:
 		base::unique_qptr<Ui::RpWidget> _preview;
@@ -248,6 +256,9 @@ private:
 	[[nodiscard]] bool setDisplayNameInSingleFilePreview(
 		int fileIndex,
 		const QString &displayName);
+	[[nodiscard]] bool setCaptionInSingleFilePreview(
+		int fileIndex,
+		const TextWithTags &caption);
 
 	void enqueueNextPrepare();
 	void addPreparedAsyncFile(Ui::PreparedFile &&file);
@@ -256,6 +267,9 @@ private:
 	void refreshMessagesCount();
 
 	void requestToTakeTextWithTags() const;
+	bool validateSingleCaptionLength(const QString &text) const;
+	bool mainCaptionWillBeAttached() const;
+	void applyMainCaptionToFirstFile();
 
 	[[nodiscard]] Fn<MenuDetails()> prepareSendMenuDetails(
 		const SendFilesBoxDescriptor &descriptor);
@@ -286,6 +300,8 @@ private:
 	QImage _priceTagBg;
 	bool _confirmed = false;
 	bool _invertCaption = false;
+	bool _mainCaptionAttachedToFirstFile = false;
+	std::optional<TextWithTags> _firstFileCaptionBackup;
 
 	object_ptr<Ui::InputField> _caption = { nullptr };
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
@@ -307,7 +323,7 @@ private:
 
 	object_ptr<Ui::ScrollArea> _scroll;
 	QPointer<Ui::VerticalLayout> _inner;
-	std::vector<Block> _blocks;
+	std::deque<Block> _blocks;
 	Fn<void()> _whenReadySend;
 	bool _preparing = false;
 

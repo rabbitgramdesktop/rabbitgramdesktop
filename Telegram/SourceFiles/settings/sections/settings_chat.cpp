@@ -100,6 +100,14 @@ using namespace Builder;
 const auto kSchemesList = Window::Theme::EmbeddedThemes();
 constexpr auto kCustomColorButtonParts = 7;
 
+[[nodiscard]] bool IsSystemAccentColorSupported() {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	return true;
+#else
+	return !Platform::IsWindows() || !Platform::IsWindows8OrGreater();
+#endif
+}
+
 class ColorsPalette final {
 public:
 	using Type = Window::Theme::EmbeddedType;
@@ -279,8 +287,12 @@ void ColorsPalette::show(Type type) {
 		return;
 	}
 	list.insert(list.begin(), scheme->accentColor);
-	const auto color = Core::App().settings().themesAccentColors().get(type);
-	const auto current = color.value_or(scheme->accentColor);
+	const auto &settings = Core::App().settings();
+	const auto color = settings.themesAccentColors().get(type);
+	const auto current = (settings.systemAccentColorEnabled()
+		? Window::Theme::SystemAccentColor()
+		: std::optional<QColor>()).value_or(
+			color.value_or(scheme->accentColor));
 	const auto i = ranges::find(list, current);
 	if (i == end(list)) {
 		list.back() = current;
@@ -806,6 +818,22 @@ void BuildThemeOptionsSection(SectionBuilder &builder) {
 			.keywords = { u"accent"_q, u"color"_q, u"customize"_q },
 		};
 	});
+
+	if (IsSystemAccentColorSupported()) {
+		builder.add(nullptr, [] {
+			return SearchEntry{
+				.id = u"chat/themes-system-accent"_q,
+				.title = tr::lng_settings_theme_system_accent_color(tr::now),
+				.keywords = {
+					u"system"_q,
+					u"accent"_q,
+					u"color"_q,
+					u"theme"_q,
+					u"os"_q,
+				},
+			};
+		});
+	}
 }
 
 void BuildThemeSettingsSection(SectionBuilder &builder) {
@@ -1038,6 +1066,17 @@ void BuildMessagesSection(SectionBuilder &builder) {
 			.id = u"chat/send-enter"_q,
 			.title = tr::lng_settings_send_enter(tr::now),
 			.keywords = { u"send"_q, u"enter"_q, u"keyboard"_q },
+		};
+	});
+
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"chat/corner-reply"_q,
+			.title = tr::lng_settings_chat_corner_reply(tr::now),
+			.keywords = { u"corner"_q, u"reply"_q },
+			.checkIcon = Core::App().settings().cornerReply()
+				? SearchEntryCheckIcon::Checked
+				: SearchEntryCheckIcon::Unchecked,
 		};
 	});
 
@@ -1598,6 +1637,148 @@ void SetupMessages(
 	});
 
 	Ui::AddSkip(inner, st::settingsCheckboxesSkip);
+
+	const auto groupQuick = std::make_shared<Ui::RadioenumGroup<Quick>>(
+		Core::App().settings().chatQuickAction());
+	const auto addQuick = [&](Quick value, const QString &text) {
+		return inner->add(
+			object_ptr<Ui::Radioenum<Quick>>(
+				inner,
+				groupQuick,
+				value,
+				text,
+				st::settingsSendType),
+			st::settingsSendTypePadding);
+	};
+	addQuick(Quick::Reply, tr::lng_settings_chat_quick_action_reply(tr::now));
+	const auto react = addQuick(
+		Quick::React,
+		tr::lng_settings_chat_quick_action_react(tr::now));
+	if (highlights) {
+		highlights->push_back({ u"chat/quick-reaction"_q, {
+			react,
+			{ .radius = st::boxRadius },
+		} });
+	}
+
+	const auto buttonRight = Ui::CreateSimpleCircleButton(
+		inner,
+		st::stickersRemove.ripple);
+	buttonRight->resize(st::stickersRemove.width, st::stickersRemove.height);
+	const auto toggleButtonRight = [=](bool value) {
+		buttonRight->setAttribute(Qt::WA_TransparentForMouseEvents, !value);
+	};
+	toggleButtonRight(false);
+
+	struct State {
+		struct {
+			std::vector<rpl::lifetime> lifetimes;
+			bool flag = false;
+		} icons;
+	};
+	const auto state = buttonRight->lifetime().make_state<State>();
+	state->icons.lifetimes = std::vector<rpl::lifetime>(2);
+
+	const auto &reactions = controller->session().data().reactions();
+	auto idValue = rpl::single(
+		reactions.favoriteId()
+	) | rpl::then(
+		reactions.favoriteUpdates() | rpl::map([=] {
+			return controller->session().data().reactions().favoriteId();
+		})
+	) | rpl::filter([](const Data::ReactionId &id) {
+		return !id.empty();
+	});
+	auto selected = rpl::duplicate(idValue);
+	std::move(
+		selected
+	) | rpl::on_next([=, idValue = std::move(idValue)](
+			const Data::ReactionId &id) {
+		const auto index = state->icons.flag ? 1 : 0;
+		const auto iconSize = st::settingsReactionRightIcon;
+		const auto &reactions = controller->session().data().reactions();
+		const auto &list = reactions.list(Data::Reactions::Type::All);
+		const auto i = ranges::find(list, id, &Data::Reaction::id);
+		state->icons.lifetimes[index] = rpl::lifetime();
+		if (i != end(list)) {
+			AddReactionAnimatedIcon(
+				inner,
+				buttonRight->geometryValue(
+				) | rpl::map([=](const QRect &r) {
+					return QPoint(
+						r.left() + (r.width() - iconSize) / 2,
+						r.top() + (r.height() - iconSize) / 2);
+				}),
+				iconSize,
+				*i,
+				buttonRight->events(
+				) | rpl::filter([=](not_null<QEvent*> event) {
+					return event->type() == QEvent::Enter;
+				}) | rpl::to_empty,
+				rpl::duplicate(idValue) | rpl::skip(1) | rpl::to_empty,
+				&state->icons.lifetimes[index]);
+		} else if (const auto customId = id.custom()) {
+			AddReactionCustomIcon(
+				inner,
+				buttonRight->geometryValue(
+				) | rpl::map([=](const QRect &r) {
+					return QPoint(
+						r.left() + (r.width() - iconSize) / 2,
+						r.top() + (r.height() - iconSize) / 2);
+				}),
+				iconSize,
+				controller,
+				customId,
+				rpl::duplicate(idValue) | rpl::skip(1) | rpl::to_empty,
+				&state->icons.lifetimes[index]);
+		}
+		state->icons.flag = !state->icons.flag;
+		toggleButtonRight(true);
+	}, buttonRight->lifetime());
+
+	react->geometryValue(
+	) | rpl::on_next([=](const QRect &r) {
+		const auto rightSize = buttonRight->size();
+		buttonRight->moveToRight(
+			st::settingsButtonRightSkip,
+			r.y() + (r.height() - rightSize.height()) / 2);
+	}, buttonRight->lifetime());
+
+	groupQuick->setChangedCallback([=](Quick value) {
+		Core::App().settings().setChatQuickAction(value);
+		Core::App().saveSettingsDelayed();
+	});
+
+	buttonRight->setClickedCallback([=, show = controller->uiShow()] {
+		show->showBox(Box(ReactionsSettingsBox, controller));
+	});
+	if (highlights) {
+		highlights->push_back({ u"chat/quick-reaction-choose"_q, {
+			buttonRight.get(),
+			{ .shape = HighlightShape::Ellipse },
+		} });
+	}
+
+	Ui::AddSkip(inner, st::settingsSendTypeSkip);
+
+	const auto cornerReply = inner->add(
+		object_ptr<Ui::Checkbox>(
+			inner,
+			tr::lng_settings_chat_corner_reply(tr::now),
+			Core::App().settings().cornerReply(),
+			st::settingsCheckbox),
+		st::settingsCheckboxPadding);
+	cornerReply->checkedChanges(
+	) | rpl::on_next([=](bool checked) {
+		Core::App().settings().setCornerReply(checked);
+		Core::App().saveSettingsDelayed();
+	}, inner->lifetime());
+	if (highlights) {
+		highlights->push_back({ u"chat/corner-reply"_q, {
+			cornerReply,
+			{ .radius = st::boxRadius },
+		} });
+	}
 
 	const auto cornerReaction = inner->add(
 		object_ptr<Ui::Checkbox>(
@@ -2161,6 +2342,16 @@ void SetupDefaultThemes(
 	const auto palette = Ui::CreateChild<ColorsPalette>(
 		container.get(),
 		container.get());
+	const auto systemAccentWrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
+			container,
+			object_ptr<Ui::Checkbox>(
+				container,
+				tr::lng_settings_theme_system_accent_color(tr::now),
+				Core::App().settings().systemAccentColorEnabled(),
+				st::settingsCheckbox)),
+		st::settingsCheckboxPadding);
+	systemAccentWrap->setDuration(0);
 
 	const auto chosen = [] {
 		const auto &object = Background()->themeObject();
@@ -2236,20 +2427,28 @@ void SetupDefaultThemes(
 			palette->show(type);
 		}
 
-		const auto &colors = Core::App().settings().themesAccentColors();
+		const auto &settings = Core::App().settings();
 		const auto i = checks.find(type);
 		const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
 		if (scheme == end(kSchemesList)) {
 			return;
 		}
+		const auto color = settings.systemAccentColorEnabled()
+			? Window::Theme::SystemAccentColor()
+			: settings.themesAccentColors().get(type);
 		if (i != end(checks)) {
-			if (const auto color = colors.get(type)) {
+			if (color) {
 				const auto colorizer = ColorizerFrom(*scheme, *color);
 				i->second->setColors(ColorsFromScheme(*scheme, colorizer));
 			} else {
 				i->second->setColors(ColorsFromScheme(*scheme));
 			}
 		}
+	};
+	const auto refreshSystemAccentVisibility = [=](Type type) {
+		systemAccentWrap->toggle(
+			IsSystemAccentColorSupported() && (type != Type(-1)),
+			anim::type::instant);
 	};
 	group->setChangedCallback([=](Type type) {
 		const auto scheme = ranges::find(
@@ -2265,6 +2464,22 @@ void SetupDefaultThemes(
 	for (const auto &scheme : kSchemesList) {
 		refreshColorizer(scheme.type);
 	}
+	refreshSystemAccentVisibility(chosen());
+	systemAccentWrap->entity()->checkedChanges(
+	) | rpl::on_next([=](bool checked) {
+		auto &settings = Core::App().settings();
+		if (settings.systemAccentColorEnabled() == checked) {
+			return;
+		}
+		settings.setSystemAccentColorEnabled(checked);
+		Local::writeSettings();
+
+		const auto type = chosen();
+		const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
+		if (scheme != end(kSchemesList)) {
+			apply(*scheme);
+		}
+	}, container->lifetime());
 
 	if (highlights) {
 		const auto add = st::roundRadiusSmall;
@@ -2275,6 +2490,12 @@ void SetupDefaultThemes(
 				.shape = HighlightShape::Ellipse,
 			},
 		} });
+		if (IsSystemAccentColorSupported()) {
+			highlights->push_back({ u"chat/themes-system-accent"_q, {
+				systemAccentWrap->entity(),
+				{ .radius = st::boxRadius }
+			} });
+		}
 	}
 
 	Background()->updates(
@@ -2284,6 +2505,7 @@ void SetupDefaultThemes(
 		return chosen();
 	}) | rpl::on_next([=](Type type) {
 		refreshColorizer(type);
+		refreshSystemAccentVisibility(type);
 		group->setValue(type);
 	}, container->lifetime());
 
@@ -2333,9 +2555,19 @@ void SetupDefaultThemes(
 		if (scheme == end(kSchemesList)) {
 			return;
 		}
-		auto &colors = Core::App().settings().themesAccentColors();
+		auto &settings = Core::App().settings();
+		auto changed = false;
+		if (settings.systemAccentColorEnabled()) {
+			settings.setSystemAccentColorEnabled(false);
+			systemAccentWrap->entity()->setChecked(false);
+			changed = true;
+		}
+		auto &colors = settings.themesAccentColors();
 		if (colors.get(type) != color) {
 			colors.set(type, color);
+			changed = true;
+		}
+		if (changed) {
 			Local::writeSettings();
 		}
 		apply(*scheme);

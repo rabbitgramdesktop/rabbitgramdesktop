@@ -856,7 +856,8 @@ void InnerWidget::preloadMore(Direction direction) {
 			| ((f & LocalFlag::GroupCall) ? Flag::f_group_call : empty)
 			| ((f & LocalFlag::Invites) ? Flag::f_invites : empty)
 			| ((f & LocalFlag::Topics) ? Flag::f_forums : empty)
-			| ((f & LocalFlag::SubExtend) ? Flag::f_sub_extend : empty);
+			| ((f & LocalFlag::SubExtend) ? Flag::f_sub_extend : empty)
+			| ((f & LocalFlag::EditRank) ? Flag::f_edit_rank : empty);
 	}();
 	if (_filter.flags != 0) {
 		flags |= MTPchannels_GetAdminLog::Flag::f_events_filter;
@@ -1579,6 +1580,7 @@ void InnerWidget::suggestRestrictParticipant(
 				user,
 				hasAdminRights,
 				currentRights,
+				QString(),
 				by,
 				since);
 			box->setSaveCallback([=](
@@ -1691,6 +1693,7 @@ void InnerWidget::restrictParticipant(
 		restrictParticipantDone(participant, newRights);
 	};
 	const auto callback = SaveRestrictedCallback(
+		_controller->uiShow(),
 		_channel,
 		participant,
 		crl::guard(this, done),

@@ -47,8 +47,8 @@ You can build rabbitGram Desktop yourself using [build instructions][build_instr
 
 ## Build instructions
 
-* Windows [(32-bit)][win32] [(64-bit)][win64]
-* [macOS][macos]
+* [Windows (32-bit and 64-bit)][win]
+* [macOS][mac]
 * [GNU/Linux using Docker][linux]
 
 ## Special thanks to
@@ -62,8 +62,8 @@ You can build rabbitGram Desktop yourself using [build instructions][build_instr
 [//]: # (LINKS)
 [telegram]: https://telegram.org
 [license]: LICENSE
-[win32]: docs/building-win.md
-[win64]: docs/building-win-x64.md
+[win]: docs/building-win.md
+[mac]: docs/building-mac.md
 [linux]: docs/building-linux.md
 [macos]: docs/building-mac.md
 [build_instructions]: https://github.com/rabbitGramDesktop/rabbitGramDesktop#build-instructions

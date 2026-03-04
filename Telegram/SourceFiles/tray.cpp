@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "tray.h"
+#include "tray_accounts_menu.h"
 
 #include "rabbit/lang/rabbit_lang.h"
 
@@ -53,6 +54,10 @@ void Tray::create() {
 		rebuildMenu();
 	}, _tray.lifetime());
 
+	TrayAccountsMenu::SetupChangesSubscription(
+		[=] { rebuildMenu(); },
+		_tray.lifetime());
+
 	_tray.iconClicks(
 	) | rpl::on_next([=] {
 		const auto skipTrayClick = (_lastTrayClickTime > 0)
@@ -98,6 +103,8 @@ void Tray::rebuildMenu() {
 	}
 
 	_tray.addAction(rktr("rtg_close"), [] { Core::Quit(); });
+
+	TrayAccountsMenu::Fill(_tray);
 
 	updateMenuText();
 }
