@@ -102,16 +102,10 @@ Widget::Widget(
 		_playbackSlider->setValue(value);
 	});
 	_playbackSlider->setChangeProgressCallback([=](float64 value) {
-		if (_type != AudioMsgId::Type::Song) {
-			return; // Round video seek is not supported for now :(
-		}
 		_playbackProgress->setValue(value, false);
 		handleSeekProgress(value);
 	});
 	_playbackSlider->setChangeFinishedCallback([=](float64 value) {
-		if (_type != AudioMsgId::Type::Song) {
-			return; // Round video seek is not supported for now :(
-		}
 		_playbackProgress->setValue(value, false);
 		handleSeekFinished(value);
 	});
@@ -278,7 +272,7 @@ void Widget::setShadowGeometryToLeft(int x, int y, int w, int h) {
 
 void Widget::showShadowAndDropdowns() {
 	_shadow->show();
-	_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
+	_playbackSlider->setVisible(true);
 	if (_volumeHidden) {
 		_volumeHidden = false;
 		_volume->show();
@@ -590,7 +584,7 @@ void Widget::updateControlsVisibility() {
 	_orderToggle->setVisible(_type == AudioMsgId::Type::Song);
 	_speedToggle->setVisible(hasPlaybackSpeedControl());
 	if (!_shadow->isHidden()) {
-		_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
+		_playbackSlider->setVisible(true);
 	}
 	updateControlsGeometry();
 }
@@ -647,8 +641,8 @@ void Widget::updateTimeText(const TrackState &state) {
 		display = state.position;
 	} else if (state.length) {
 		display = state.length;
-	} else if (document->song()) {
-		display = (document->duration() * frequency) / 1000;
+	} else if (const auto duration = document->duration()) {
+		display = (duration * frequency) / 1000;
 	}
 
 	_lastDurationMs = (state.length * 1000LL) / frequency;
