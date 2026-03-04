@@ -396,13 +396,18 @@ namespace RabbitSettings::JsonSettings
                     .defaultValue = false,
                 }
             },
-            //   Miscellaneous
             {
                 "spoof_webview_as_android", {
                     .type = BoolSetting,
                     .defaultValue = false,
                 }
             },
+            {
+                "precise_time", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            }
         };
 
         using OldOptionKey = QString;

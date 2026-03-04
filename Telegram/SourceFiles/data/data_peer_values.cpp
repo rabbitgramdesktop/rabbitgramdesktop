@@ -19,6 +19,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_app_config.h"
 #include "ui/image/image_prepare.h"
 #include "base/unixtime.h"
+#include "rabbit/settings/rabbit_settings.h"
 
 namespace Data {
 namespace {
@@ -441,7 +442,28 @@ crl::time OnlineChangeTimeout(not_null<UserData*> user, TimeId now) {
 	return OnlineChangeTimeout(user->lastseen(), now);
 }
 
+QString PreciseOnlineText(Data::LastseenStatus status, TimeId now) {
+	if (const auto common = OnlineTextCommon(status, now)) {
+		return *common;
+	}
+	const auto till = status.onlineTill();
+	const auto onlineFull = base::unixtime::parse(till);
+	const auto nowFull = base::unixtime::parse(now);
+	const auto locale = QLocale();
+	const auto onlineTime = RabbitSettings::showSeconds()
+		? locale.toString(onlineFull.time(), QLocale::LongFormat).remove(" t")
+		: locale.toString(onlineFull.time(), QLocale::ShortFormat);
+	if (onlineFull.date() == nowFull.date()) {
+		return tr::lng_status_lastseen_today(tr::now, lt_time, onlineTime);
+	}
+	const auto date = locale.toString(onlineFull.date(), QLocale::ShortFormat);
+	return tr::lng_status_lastseen_date_time(tr::now, lt_date, date, lt_time, onlineTime);
+}
+
 QString OnlineText(Data::LastseenStatus status, TimeId now) {
+	if (RabbitSettings::preciseTime()) {
+		return PreciseOnlineText(status, now);
+	}
 	if (const auto common = OnlineTextCommon(status, now)) {
 		return *common;
 	}
@@ -460,11 +482,12 @@ QString OnlineText(Data::LastseenStatus status, TimeId now) {
 	const auto onlineFull = base::unixtime::parse(till);
 	const auto nowFull = base::unixtime::parse(now);
 	const auto locale = QLocale();
+	const auto onlineTime = RabbitSettings::showSeconds()
+		? locale.toString(onlineFull.time(), QLocale::LongFormat).remove(" t")
+		: locale.toString(onlineFull.time(), QLocale::ShortFormat);
 	if (onlineFull.date() == nowFull.date()) {
-		const auto onlineTime = locale.toString(onlineFull.time(), QLocale::ShortFormat);
 		return tr::lng_status_lastseen_today(tr::now, lt_time, onlineTime);
 	} else if (onlineFull.date().addDays(1) == nowFull.date()) {
-		const auto onlineTime = locale.toString(onlineFull.time(), QLocale::ShortFormat);
 		return tr::lng_status_lastseen_yesterday(tr::now, lt_time, onlineTime);
 	}
 	const auto date = locale.toString(onlineFull.date(), QLocale::ShortFormat);
@@ -488,16 +511,16 @@ QString OnlineTextFull(not_null<UserData*> user, TimeId now) {
 	const auto onlineFull = base::unixtime::parse(till);
 	const auto nowFull = base::unixtime::parse(now);
 	const auto locale = QLocale();
+	const auto onlineTime = RabbitSettings::showSeconds()
+		? locale.toString(onlineFull.time(), QLocale::LongFormat).remove(" t")
+		: locale.toString(onlineFull.time(), QLocale::ShortFormat);
 	if (onlineFull.date() == nowFull.date()) {
-		const auto onlineTime = locale.toString(onlineFull.time(), QLocale::ShortFormat);
 		return tr::lng_status_lastseen_today(tr::now, lt_time, onlineTime);
 	} else if (onlineFull.date().addDays(1) == nowFull.date()) {
-		const auto onlineTime = locale.toString(onlineFull.time(), QLocale::ShortFormat);
 		return tr::lng_status_lastseen_yesterday(tr::now, lt_time, onlineTime);
 	}
 	const auto date = locale.toString(onlineFull.date(), QLocale::ShortFormat);
-	const auto time = locale.toString(onlineFull.time(), QLocale::ShortFormat);
-	return tr::lng_status_lastseen_date_time(tr::now, lt_date, date, lt_time, time);
+	return tr::lng_status_lastseen_date_time(tr::now, lt_date, date, lt_time, onlineTime);
 }
 
 bool OnlineTextActive(not_null<UserData*> user, TimeId now) {

@@ -67,5 +67,6 @@
     "rtg_import_config_restart": "Settings applied successfully. Restart now to apply all changes?",
     "rtg_import_config_apply": "Apply",
     "rtg_show_peer_id_dc": "Show peer ID and DC",
+    "rtg_precise_time": "Precise time",
     "last_string": null
 }

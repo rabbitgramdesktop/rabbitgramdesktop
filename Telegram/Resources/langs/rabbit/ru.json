@@ -67,5 +67,6 @@
     "rtg_import_config_restart": "Настройки успешно применены. Перезапустить сейчас, чтобы применить все изменения?",
     "rtg_import_config_apply": "Применить",
     "rtg_show_peer_id_dc": "Показывать ID и DC",
+    "rtg_precise_time": "Показывать точное время",
     "last_string": null
 }

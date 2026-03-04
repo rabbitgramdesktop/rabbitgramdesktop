@@ -124,7 +124,12 @@ namespace Settings
                 [] { return RabbitSettings::showSeconds(); },
                 [](bool value) { RabbitSettings::setShowSeconds(value); },
                 { u"seconds"_q, u"time"_q });
-            
+            AddJsonToggle(
+                builder,
+                u"rabbit/general/precise_time"_q,
+                u"rtg_precise_time"_q,
+                u"precise_time"_q,
+                { u"precise"_q, u"time"_q });
             AddJsonToggle(
                 builder,
                 u"rabbit/general/auto_hide_notifications"_q,
