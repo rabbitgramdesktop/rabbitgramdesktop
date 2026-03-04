@@ -1671,6 +1671,7 @@ void InitFieldAutocomplete(
 	raw->mentionChosen(
 	) | rpl::on_next([=](FieldAutocomplete::MentionChosen data) {
 		const auto user = data.user;
+		const auto suffix = data.addComma ? u","_q : QString();
 		if (data.mention.isEmpty()) {
 			field->insertTag(
 				user->firstName.isEmpty() ? user->name() : user->firstName,
