@@ -15,36 +15,36 @@ namespace Ui {
 class ChatStyle;
 } // namespace Ui
 
-class RoundnessPreview : public Ui::RpWidget
-{
+class RoundnessPreview : public Ui::RpWidget {
 public:
-    RoundnessPreview(QWidget* parent);
+	RoundnessPreview(QWidget *parent);
 
 protected:
-    void paintEvent(QPaintEvent* e) override;
+	void paintEvent(QPaintEvent *e) override;
+
 };
 
-class ChatPreview : public Ui::RpWidget
-{
+class ChatPreview : public Ui::RpWidget {
 public:
-    ChatPreview(QWidget* parent);
+	ChatPreview(QWidget *parent);
 
 protected:
-    void paintEvent(QPaintEvent* e) override;
+	void paintEvent(QPaintEvent *e) override;
 
 private:
-    std::unique_ptr<Ui::ChatStyle> _chatStyle;
-    int _paletteVersion = 0;
+	void ensureChatStyle();
 
-    void ensureChatStyle();
+	std::unique_ptr<Ui::ChatStyle> _chatStyle;
+	int _paletteVersion = 0;
+
 };
 
-class StickerShapePicker : public Ui::RpWidget
-{
+class StickerShapePicker : public Ui::RpWidget {
 public:
-    StickerShapePicker(QWidget* parent);
+	StickerShapePicker(QWidget *parent);
 
 protected:
-    void paintEvent(QPaintEvent* e) override;
-    void mousePressEvent(QMouseEvent* e) override;
+	void paintEvent(QPaintEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+
 };
