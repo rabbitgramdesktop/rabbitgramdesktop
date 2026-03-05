@@ -25,6 +25,7 @@
     "rtg_show_seconds": "Format time with seconds",
     "rtg_comma_after_mention": "Add comma after mention",
     "rtg_hide_bubble_tails": "Hide message bubble tail",
+    "rtg_show_online_indicator": "Show online indicator",
     "rtg_chats_quick_actions": "Quick actions",
     "rtg_outgoing_quick_actions": "Outgoing",
     "rtg_incoming_quick_actions": "Incoming",

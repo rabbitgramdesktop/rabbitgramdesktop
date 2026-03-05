@@ -212,6 +212,14 @@ namespace Settings
             [] { return RabbitSettings::hideBubbleTails(); },
             [](bool value) { RabbitSettings::setHideBubbleTails(value); },
             { u"bubble"_q, u"tails"_q });
+        AddToggle(
+            builder,
+            u"rabbit/chats/show_online_indicator"_q,
+            rktr("rtg_show_online_indicator"),
+            nullptr,
+            [] { return RabbitSettings::showOnlineIndicator(); },
+            [](bool value) { RabbitSettings::setShowOnlineIndicator(value); },
+            { u"online"_q, u"indicator"_q });
     }
 
     void BuildStickerShape(SectionBuilder &builder)

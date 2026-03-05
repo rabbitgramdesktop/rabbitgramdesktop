@@ -25,6 +25,7 @@
     "rtg_show_seconds": "Показывать время с секундами",
     "rtg_comma_after_mention": "Запятая после упоминания",
     "rtg_hide_bubble_tails": "Убрать хвост у сообщений",
+    "rtg_show_online_indicator": "Показывать индикатор онлайна",
     "rtg_chats_quick_actions": "Быстрые действия",
     "rtg_outgoing_quick_actions": "Исходящие",
     "rtg_incoming_quick_actions": "Входящие",

@@ -167,6 +167,7 @@ namespace RabbitSettings
     inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
     inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
     inline bool preciseTime() { return JsonSettings::GetBool("precise_time"); }
+    inline bool showOnlineIndicator() { return JsonSettings::GetBool("show_online_indicator"); }
 
     inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
     inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
@@ -197,4 +198,5 @@ namespace RabbitSettings
     inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
     inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
     inline void setPreciseTime(bool value) { JsonSettings::Set("precise_time", value); }
+    inline void setShowOnlineIndicator(bool value) { JsonSettings::Set("show_online_indicator", value); }
 } // namespace RabbitSettings

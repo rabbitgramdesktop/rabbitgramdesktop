@@ -407,6 +407,12 @@ namespace RabbitSettings::JsonSettings
                     .type = BoolSetting,
                     .defaultValue = false,
                 }
+            },
+            {
+                "show_online_indicator", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
             }
         };
 

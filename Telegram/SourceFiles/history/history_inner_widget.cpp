@@ -1377,7 +1377,9 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 							- context.gestureHorizontal.translation,
 						st::msgPhotoSize));
 			}
+			PeerData *currentPeer = nullptr;
 			if (const auto from = item->displayFrom()) {
+				currentPeer = from;
 				Dialogs::Ui::PaintUserpic(
 					p,
 					from,
@@ -1411,6 +1413,34 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				}
 			} else {
 				Unexpected("Corrupt forwarded information in message.");
+			}
+			const auto now = base::unixtime::now();
+			if (RabbitSettings::showOnlineIndicator() && currentPeer) {
+				if (const auto user = currentPeer->asUser()) {
+					if (!user->isBot() && !user->isServiceUser() && user->lastseen().isOnline(now)) {
+						const auto dotDiameter = 10.0;
+						const auto borderWidth = 2.0;
+						const auto totalSize = dotDiameter + borderWidth * 2;
+						const double userpicX = st::historyPhotoLeft;
+						const double userpicY = userpicTop;
+						const double userpicSize = st::msgPhotoSize;
+						const auto dotX = userpicX + userpicSize - totalSize + borderWidth;
+						const auto dotY = userpicY + userpicSize - totalSize + borderWidth;
+						const auto outlineRect = QRectF(dotX - borderWidth, dotY - borderWidth, totalSize, totalSize);
+						const auto dotRect = QRectF(dotX, dotY, dotDiameter, dotDiameter);
+						
+						p.save();
+						PainterHighQualityEnabler hq(p);
+						
+						p.setPen(Qt::NoPen);
+						p.setBrush(st::windowBg);
+						p.drawEllipse(outlineRect);
+						p.setBrush(st::dialogsOnlineBadgeFg);
+						p.drawEllipse(dotRect);
+						
+						p.restore();
+					}
+				}
 			}
 			if (hasTranslation) {
 				p.translate(-_gestureHorizontal.translation, 0);
