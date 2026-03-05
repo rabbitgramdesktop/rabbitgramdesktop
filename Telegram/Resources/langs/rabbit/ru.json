@@ -68,5 +68,6 @@
     "rtg_import_config_apply": "Применить",
     "rtg_show_peer_id_dc": "Показывать ID и DC",
     "rtg_precise_time": "Показывать точное время",
+    "rtg_update": "Обновить rabbitGram",
     "last_string": null
 }

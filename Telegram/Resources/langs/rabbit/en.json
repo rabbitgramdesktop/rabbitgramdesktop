@@ -68,5 +68,6 @@
     "rtg_import_config_apply": "Apply",
     "rtg_show_peer_id_dc": "Show peer ID and DC",
     "rtg_precise_time": "Precise time",
+    "rtg_update": "Update rabbitGram",
     "last_string": null
 }
