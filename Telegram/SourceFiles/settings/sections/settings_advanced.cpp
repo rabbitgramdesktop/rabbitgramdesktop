@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/localstorage.h"
 #include "storage/storage_domain.h"
 #include "tray.h"
+#include "rabbit/lang/rabbit_lang.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/gl/gl_detection.h"
@@ -346,6 +347,70 @@ void BuildWindowTitleSection(SectionBuilder &builder) {
 
 	builder.addSkip();
 }
+
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+void BuildWindowCloseBehaviorSection(SectionBuilder &builder) {
+	using Behavior = Core::Settings::CloseBehavior;
+
+	const auto settings = &Core::App().settings();
+	auto shown = Platform::TrayIconSupported()
+		? (Core::App().settings().workModeValue(
+			) | rpl::map([](Core::Settings::WorkMode mode) {
+				return (mode == Core::Settings::WorkMode::WindowOnly);
+			}) | rpl::distinct_until_changed() | rpl::type_erased)
+		: rpl::producer<bool>(nullptr);
+
+	builder.scope([&] {
+		builder.addDivider();
+		builder.addSkip();
+		builder.addSubsectionTitle({
+			.id = u"advanced/window_close"_q,
+			.title = tr::lng_settings_window_close(),
+			.keywords = { u"close"_q, u"window"_q, u"background"_q, u"quit"_q, u"taskbar"_q, u"minimize"_q },
+		});
+
+		builder.add([settings](const WidgetContext &ctx) {
+			const auto container = ctx.container.get();
+			auto wrap = object_ptr<Ui::VerticalLayout>(container);
+			const auto inner = wrap.data();
+
+			const auto group = std::make_shared<Ui::RadioenumGroup<Behavior>>(
+				settings->closeBehavior());
+			const auto addRadio = [&](Behavior value, const QString &label) {
+				inner->add(
+					object_ptr<Ui::Radioenum<Behavior>>(
+						inner,
+						group,
+						value,
+						label,
+						st::settingsSendType),
+					st::settingsSendTypePadding);
+			};
+
+			addRadio(
+				Behavior::RunInBackground,
+				tr::lng_settings_run_in_background(tr::now));
+			addRadio(
+				Behavior::CloseToTaskbar,
+				tr::lng_settings_close_to_taskbar(tr::now));
+			addRadio(
+				Behavior::Quit,
+				tr::lng_settings_quit_on_close(tr::now));
+
+			group->value() | rpl::filter([=](Behavior value) {
+				return (value != settings->closeBehavior());
+			}) | rpl::on_next([=](Behavior value) {
+				settings->setCloseBehavior(value);
+				Local::writeSettings();
+			}, inner->lifetime());
+
+			return SectionBuilder::WidgetToAdd{ .widget = std::move(wrap) };
+		});
+
+		builder.addSkip();
+	}, std::move(shown));
+}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 
 void BuildSystemIntegrationSection(SectionBuilder &builder) {
 	const auto controller = builder.controller();
@@ -798,7 +863,6 @@ void BuildSpellcheckerSection(SectionBuilder &builder) {
 	const auto session = builder.session();
 	const auto settings = &Core::App().settings();
 	const auto isSystem = Platform::Spellchecker::IsSystemSpellchecker();
-	const auto container = builder.container();
 
 	builder.addDivider();
 	builder.addSkip();
@@ -961,7 +1025,7 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 	if (check && container) {
 		const auto update = Ui::CreateChild<Ui::SettingsButton>(
 			check,
-			tr::lng_update_telegram(),
+			rktr("rtg_update"),
 			st::settingsUpdate);
 		update->hide();
 		check->widthValue() | rpl::on_next([=](int width) {
@@ -1127,6 +1191,9 @@ const auto kMeta = BuildHelper({
 	BuildDataStorageSection(builder);
 	BuildAutoDownloadSection(builder);
 	BuildWindowTitleSection(builder);
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	BuildWindowCloseBehaviorSection(builder);
+#endif
 	BuildSystemIntegrationSection(builder);
 	BuildPerformanceSection(builder);
 	BuildSpellcheckerSection(builder);
@@ -1233,7 +1300,7 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButtonNoIcon));
 	const auto update = Ui::CreateChild<Button>(
 		check,
-		tr::lng_update_telegram(),
+		rktr("rtg_update"),
 		st::settingsUpdate);
 	update->hide();
 	check->widthValue() | rpl::on_next([=](int width) {

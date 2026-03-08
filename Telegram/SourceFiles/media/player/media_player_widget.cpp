@@ -83,6 +83,10 @@ Widget::Widget(
 	_speedController->realtimeValue(
 	) | rpl::on_next([=](float64 speed) {
 		_speedToggle->setSpeed(speed);
+		_speedToggle->setAccessibleName(tr::lng_mediaview_playback_speed(
+			tr::now,
+			lt_speed,
+			QString::number(base::SafeRound(speed * 10) / 10.) + "x"));
 	}, _speedToggle->lifetime());
 	_speedToggle->finishAnimating();
 
@@ -91,6 +95,11 @@ Widget::Widget(
 	resize(width(), st::mediaPlayerHeight + st::lineWidth);
 
 	setupRightControls();
+
+	_volumeToggle->setAccessibleName(tr::lng_ringtones_box_volume(tr::now));
+	_repeatToggle->setAccessibleName(tr::lng_schedule_repeat_label(tr::now));
+	_orderToggle->setAccessibleName(tr::lng_sr_playback_order(tr::now));
+	_close->setAccessibleName(tr::lng_sr_player_close(tr::now));
 
 	_nameLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 	_timeLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -102,16 +111,10 @@ Widget::Widget(
 		_playbackSlider->setValue(value);
 	});
 	_playbackSlider->setChangeProgressCallback([=](float64 value) {
-		if (_type != AudioMsgId::Type::Song) {
-			return; // Round video seek is not supported for now :(
-		}
 		_playbackProgress->setValue(value, false);
 		handleSeekProgress(value);
 	});
 	_playbackSlider->setChangeFinishedCallback([=](float64 value) {
-		if (_type != AudioMsgId::Type::Song) {
-			return; // Round video seek is not supported for now :(
-		}
 		_playbackProgress->setValue(value, false);
 		handleSeekFinished(value);
 	});
@@ -278,7 +281,7 @@ void Widget::setShadowGeometryToLeft(int x, int y, int w, int h) {
 
 void Widget::showShadowAndDropdowns() {
 	_shadow->show();
-	_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
+	_playbackSlider->setVisible(true);
 	if (_volumeHidden) {
 		_volumeHidden = false;
 		_volume->show();
@@ -590,7 +593,7 @@ void Widget::updateControlsVisibility() {
 	_orderToggle->setVisible(_type == AudioMsgId::Type::Song);
 	_speedToggle->setVisible(hasPlaybackSpeedControl());
 	if (!_shadow->isHidden()) {
-		_playbackSlider->setVisible(_type == AudioMsgId::Type::Song);
+		_playbackSlider->setVisible(true);
 	}
 	updateControlsGeometry();
 }
@@ -635,6 +638,9 @@ void Widget::handleSongUpdate(const TrackState &state) {
 		: showPause
 		? &st::mediaPlayerPauseIcon
 		: nullptr);
+	_playPause->setAccessibleName(showPause
+		? tr::lng_shortcuts_media_pause(tr::now)
+		: tr::lng_shortcuts_media_play(tr::now));
 
 	updateTimeText(state);
 }
@@ -647,8 +653,8 @@ void Widget::updateTimeText(const TrackState &state) {
 		display = state.position;
 	} else if (state.length) {
 		display = state.length;
-	} else if (document->song()) {
-		display = (document->duration() * frequency) / 1000;
+	} else if (const auto duration = document->duration()) {
+		display = (duration * frequency) / 1000;
 	}
 
 	_lastDurationMs = (state.length * 1000LL) / frequency;
@@ -730,11 +736,13 @@ void Widget::createPrevNextButtons() {
 		_previousTrack->setClickedCallback([=]() {
 			instance()->previous(_type);
 		});
+		_previousTrack->setAccessibleName(tr::lng_shortcuts_media_previous(tr::now));
 		_nextTrack.create(this, st::mediaPlayerNextButton);
 		_nextTrack->show();
 		_nextTrack->setClickedCallback([=]() {
 			instance()->next(_type);
 		});
+		_nextTrack->setAccessibleName(tr::lng_shortcuts_media_next(tr::now));
 		hidePlaylistOn(_previousTrack);
 		hidePlaylistOn(_nextTrack);
 		updatePlayPrevNextPositions();

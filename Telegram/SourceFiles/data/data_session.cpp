@@ -235,6 +235,7 @@ Session::Session(not_null<Main::Session*> session)
 , _contactsList(Dialogs::SortMode::Name)
 , _contactsNoChatsList(Dialogs::SortMode::Name)
 , _ttlCheckTimer([=] { checkTTLs(); })
+, _formattedDateTimer([=] { checkFormattedDateUpdates(); })
 , _selfDestructTimer([=] { checkSelfDestructItems(); })
 , _pollsClosingTimer([=] { checkPollsClosings(); })
 , _watchForOfflineTimer([=] { checkLocalUsersWentOffline(); })
@@ -564,6 +565,28 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			result->setStarsPerMessage(0);
 		}
 
+		if (!minimal) {
+			result->setBotInfoVersion(data.vbot_info_version().value_or(-1));
+			if (const auto info = result->botInfo.get()) {
+				info->readsAllHistory = data.is_bot_chat_history();
+				if (info->cantJoinGroups != data.is_bot_nochats()) {
+					info->cantJoinGroups = data.is_bot_nochats();
+					flags |= UpdateFlag::BotCanBeInvited;
+				}
+				if (const auto value = data.vbot_inline_placeholder()) {
+					info->inlinePlaceholder = '_' + qs(*value);
+				} else {
+					info->inlinePlaceholder = QString();
+				}
+				info->supportsAttachMenu = data.is_bot_attach_menu();
+				info->supportsBusiness = data.is_bot_business();
+				info->canEditInformation = data.is_bot_can_edit();
+				info->activeUsers = data.vbot_active_users().value_or_empty();
+				info->hasMainApp = data.is_bot_has_main_app();
+				info->userCreatesTopics = data.is_bot_forum_can_manage_topics();
+			}
+		}
+
 		using Flag = UserDataFlag;
 		const auto flagsMask = Flag::Deleted
 			| Flag::Verified
@@ -725,12 +748,14 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			status = data.vstatus();
 			if (!minimal) {
 				const auto newUsername = uname;
-				const auto newUsernames = data.vusernames()
-					? Api::Usernames::FromTL(*data.vusernames())
-					: !newUsername.isEmpty()
-					? Data::Usernames{{ newUsername, true, true }}
-					: Data::Usernames();
-				result->setUsernames(newUsernames);
+				if (data.vusernames()) {
+					result->setUsernames(
+						Api::Usernames::FromTL(*data.vusernames()));
+				} else if (!newUsername.isEmpty()) {
+					result->setUsernames({{ newUsername, true, true }});
+				} else {
+					result->setUsernames({});
+				}
 			}
 		}
 		if (const auto &status = data.vemoji_status()) {
@@ -739,28 +764,6 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 			result->setEmojiStatus(EmojiStatusId());
 		}
 		if (!minimal) {
-			if (const auto botInfoVersion = data.vbot_info_version()) {
-				result->setBotInfoVersion(botInfoVersion->v);
-				result->botInfo->readsAllHistory = data.is_bot_chat_history();
-				if (result->botInfo->cantJoinGroups != data.is_bot_nochats()) {
-					result->botInfo->cantJoinGroups = data.is_bot_nochats();
-					flags |= UpdateFlag::BotCanBeInvited;
-				}
-				if (const auto placeholder = data.vbot_inline_placeholder()) {
-					result->botInfo->inlinePlaceholder = '_' + qs(*placeholder);
-				} else {
-					result->botInfo->inlinePlaceholder = QString();
-				}
-				result->botInfo->supportsAttachMenu = data.is_bot_attach_menu();
-				result->botInfo->supportsBusiness = data.is_bot_business();
-				result->botInfo->canEditInformation = data.is_bot_can_edit();
-				result->botInfo->activeUsers = data.vbot_active_users().value_or_empty();
-				result->botInfo->hasMainApp = data.is_bot_has_main_app();
-				result->botInfo->canManageTopics
-					= data.is_bot_forum_can_manage_topics();
-			} else {
-				result->setBotInfoVersion(-1);
-			}
 			result->setIsContact(data.is_contact()
 				|| data.is_mutual_contact());
 		}
@@ -956,15 +959,17 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 
 		{
 			const auto newUsername = qs(data.vusername().value_or_empty());
-			const auto newUsernames = data.vusernames()
-				? Api::Usernames::FromTL(*data.vusernames())
-				: !newUsername.isEmpty()
-				? Data::Usernames{ Data::Username{ newUsername, true, true } }
-				: Data::Usernames();
 			channel->setName(
 				qs(data.vtitle()),
 				TextUtilities::SingleLine(newUsername));
-			channel->setUsernames(newUsernames);
+			if (data.vusernames()) {
+				channel->setUsernames(
+					Api::Usernames::FromTL(*data.vusernames()));
+			} else if (!newUsername.isEmpty()) {
+				channel->setUsernames({ { newUsername, true, true } });
+			} else {
+				channel->setUsernames({});
+			}
 		}
 		const auto hasUsername = !channel->username().isEmpty();
 
@@ -1306,6 +1311,21 @@ void Session::maybeStopWatchForOffline(not_null<UserData*> user) {
 		&& _watchingForOffline.empty()) {
 		_watchForOfflineTimer.cancel();
 	}
+}
+
+void Session::recordSharingDisabledTime(not_null<UserData*> user) {
+	_sharingDisabledTimes[user] = base::unixtime::now();
+}
+
+bool Session::sharingRecentlyDisabledByMe(
+		not_null<UserData*> user) const {
+	const auto i = _sharingDisabledTimes.find(user);
+	return (i != end(_sharingDisabledTimes))
+		&& (base::unixtime::now() - i->second < 86400);
+}
+
+void Session::clearSharingDisabledTime(not_null<UserData*> user) {
+	_sharingDisabledTimes.remove(user);
 }
 
 void Session::checkLocalUsersWentOffline() {
@@ -1689,7 +1709,7 @@ void Session::enumerateItemViews(
 		not_null<const HistoryItem*> item,
 		Method method) {
 	if (const auto i = _views.find(item); i != _views.end()) {
-		for (const auto view : i->second) {
+		for (const auto &view : i->second) {
 			method(view);
 		}
 	}
@@ -2277,7 +2297,7 @@ void Session::unloadHeavyViewParts(
 				remove.push_back(view);
 			}
 		}
-		for (const auto view : remove) {
+		for (const auto &view : remove) {
 			view->unloadHeavyPart();
 		}
 	}
@@ -2297,7 +2317,7 @@ void Session::unloadHeavyViewParts(
 			remove.push_back(view);
 		}
 	}
-	for (const auto view : remove) {
+	for (const auto &view : remove) {
 		view->unloadHeavyPart();
 	}
 }
@@ -2803,6 +2823,49 @@ void Session::checkTTLs() {
 		_ttlMessages.begin()->second.front()->destroy();
 	}
 	scheduleNextTTLs();
+}
+
+void Session::registerFormattedDateUpdate(
+		TimeId when,
+		not_null<HistoryView::Element*> view) {
+	_formattedDateUpdates[when].push_back(
+		base::make_weak(view.get()));
+	const auto nearest = _formattedDateUpdates.begin()->first;
+	if (nearest < when && _formattedDateTimer.isActive()) {
+		return;
+	}
+	scheduleNextFormattedDateUpdate();
+}
+
+void Session::scheduleNextFormattedDateUpdate() {
+	if (_formattedDateUpdates.empty()) {
+		return;
+	}
+	const auto nearest = _formattedDateUpdates.begin()->first;
+	const auto now = base::unixtime::now();
+	const auto maxTimeout = TimeId(86400);
+	const auto timeout = std::min(
+		std::max(now, nearest) - now,
+		maxTimeout);
+	_formattedDateTimer.callOnce(timeout * crl::time(1000));
+}
+
+void Session::checkFormattedDateUpdates() {
+	_formattedDateTimer.cancel();
+	const auto now = base::unixtime::now();
+	auto expired = std::vector<base::weak_ptr<HistoryView::Element>>();
+	while (!_formattedDateUpdates.empty()
+		&& _formattedDateUpdates.begin()->first <= now) {
+		auto &list = _formattedDateUpdates.begin()->second;
+		expired.insert(expired.end(), list.begin(), list.end());
+		_formattedDateUpdates.erase(_formattedDateUpdates.begin());
+	}
+	for (const auto &weak : expired) {
+		if (const auto strong = weak.get()) {
+			requestItemTextRefresh(strong->data());
+		}
+	}
+	scheduleNextFormattedDateUpdate();
 }
 
 void Session::processMessagesDeleted(
@@ -4407,6 +4470,12 @@ void Session::applyUpdate(const MTPDupdateChatParticipantAdmin &update) {
 	}
 }
 
+void Session::applyUpdate(const MTPDupdateChatParticipantRank &update) {
+	if (const auto chat = chatLoaded(update.vchat_id().v)) {
+		ApplyChatUpdate(chat, update);
+	}
+}
+
 void Session::applyUpdate(const MTPDupdateChatDefaultBannedRights &update) {
 	if (const auto peer = peerLoaded(peerFromMTP(update.vpeer()))) {
 		if (const auto chat = peer->asChat()) {
@@ -4610,7 +4679,7 @@ void Session::registerContactItem(
 	}
 
 	if (const auto i = _views.find(item); i != _views.end()) {
-		for (const auto view : i->second) {
+		for (const auto &view : i->second) {
 			if (const auto media = view->media()) {
 				media->updateSharedContactUserId(contactId);
 			}
@@ -4677,7 +4746,7 @@ void Session::unregisterStoryItem(
 void Session::refreshStoryItemViews(FullStoryId id) {
 	const auto i = _storyItems.find(id);
 	if (i != _storyItems.end()) {
-		for (const auto item : i->second) {
+		for (const auto &item : i->second) {
 			if (const auto media = item->media()) {
 				if (media->storyMention()) {
 					item->updateStoryMentionText();
@@ -5111,6 +5180,7 @@ void Session::insertCheckedServiceNotification(
 				MTP_int(0), // Not used (would've been trimmed to 32 bits).
 				peerToMTP(PeerData::kServiceNotificationsId),
 				MTPint(), // from_boosts_applied
+				MTPstring(), // from_rank
 				peerToMTP(PeerData::kServiceNotificationsId),
 				MTPPeer(), // saved_peer_id
 				MTPMessageFwdHeader(),

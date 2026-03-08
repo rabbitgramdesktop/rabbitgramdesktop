@@ -24,6 +24,8 @@ rndSkeletonFill: windowBgOver;
 
 rndPreviewSize: 48px;
 rndPenSize: 2px;
+rndSkeletonLeft: 16px;
+rndSkeletonHeight: 10px;
 
 stickerPreviewTimeWidth: 36px;
 stickerPreviewTimeHeight: 18px;

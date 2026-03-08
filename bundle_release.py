@@ -1,18 +1,20 @@
 # Bundle rabbitGram Desktop release artifacts.
 #
 # Usage:
-#   python bundle_release.py                 Bundle both portable and installer
-#   python bundle_release.py --no-portable   Bundle installer only
-#   python bundle_release.py --no-installer  Bundle portable only
+#   python bundle_release.py                 Bundle all (portable + update + installer)
+#   python bundle_release.py --no-portable   Skip portable archive
+#   python bundle_release.py --no-update     Skip OTA update package
+#   python bundle_release.py --no-installer  Skip installer
 #
 # The script reads the version from Telegram/SourceFiles/core/version.h,
 # updates Telegram/build/setup.iss with the resolved version, then
-# produces a portable .zip archive and/or an Inno Setup installer
-# into out/Release/releases/rtgdrelease-<version>/.
+# produces a portable .zip archive, an OTA update package (via Packer.exe),
+# and/or an Inno Setup installer into out/Release/releases/rtgdrelease-<version>/.
 #
 # Requirements:
 #   - Python 3.10+
 #   - Inno Setup (iscc) on PATH when building the installer
+#   - Packer.exe and Updater.exe in out/Release/ for OTA updates
 #   - A completed Release build in out/Release/
 
 import argparse
@@ -103,6 +105,55 @@ def bundle_portable(root: Path, version: VersionInfo) -> None:
     print(f"Portable archive created: {archive_base}.zip")
 
 
+def bundle_update(root: Path, version: VersionInfo) -> None:
+    print("Bundling OTA update package...")
+
+    release_dir = root / "out" / "Release"
+    packer = release_dir / "Packer.exe"
+    if not packer.exists():
+        sys.exit(
+            f"Packer.exe not found: {packer}\n"
+            "Make sure to configure with -D DESKTOP_APP_SPECIAL_TARGET=win64 "
+            "and build the Packer target."
+        )
+
+    exe = release_dir / "rabbitGram.exe"
+    updater = release_dir / "Updater.exe"
+    if not exe.exists():
+        sys.exit(f"rabbitGram.exe not found: {exe}")
+    if not updater.exists():
+        sys.exit(f"Updater.exe not found: {updater}")
+
+    cmd = [
+        str(packer),
+        "-version", version.version_num,
+        "-path", "rabbitGram.exe",
+        "-path", "Updater.exe",
+    ]
+
+    d3d = release_dir / "modules" / "x64" / "d3d" / "d3dcompiler_47.dll"
+    if d3d.exists():
+        cmd.extend(["-path", "modules\\x64\\d3d\\d3dcompiler_47.dll"])
+
+    cmd.extend(["-target", "win64"])
+
+    if version.is_beta:
+        cmd.append("-beta")
+
+    result = subprocess.run(cmd, cwd=str(release_dir))
+    if result.returncode != 0:
+        sys.exit(f"Packer failed with exit code {result.returncode}")
+
+    update_file = release_dir / f"tx64upd{version.version_num}"
+    if not update_file.exists():
+        sys.exit(f"Update file not created: {update_file}")
+
+    output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(update_file, output_dir / update_file.name)
+    print(f"Update package created: {output_dir / update_file.name}")
+
+
 def bundle_installer(root: Path) -> None:
     print("Bundling installer...")
 
@@ -117,6 +168,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Bundle rabbitGram release artifacts.")
     parser.add_argument("--no-portable", action="store_true", help="Skip portable bundle")
     parser.add_argument("--no-installer", action="store_true", help="Skip installer bundle")
+    parser.add_argument("--no-update", action="store_true", help="Skip OTA update package")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent
@@ -127,6 +179,8 @@ def main() -> None:
 
     if not args.no_portable:
         bundle_portable(root, version)
+    if not args.no_update:
+        bundle_update(root, version)
     if not args.no_installer:
         bundle_installer(root)
 

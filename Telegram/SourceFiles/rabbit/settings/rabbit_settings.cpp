@@ -244,6 +244,12 @@ namespace RabbitSettings::JsonSettings
                 }
             },
             {
+                "show_peer_id_dc", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            },
+            {
                 "connection_bar_lost", {
                     .type = BoolSetting,
                     .defaultValue = true,
@@ -390,13 +396,24 @@ namespace RabbitSettings::JsonSettings
                     .defaultValue = false,
                 }
             },
-            //   Miscellaneous
             {
                 "spoof_webview_as_android", {
                     .type = BoolSetting,
                     .defaultValue = false,
                 }
             },
+            {
+                "precise_time", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            },
+            {
+                "show_online_indicator", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            }
         };
 
         using OldOptionKey = QString;

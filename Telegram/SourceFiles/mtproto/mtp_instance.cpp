@@ -932,9 +932,10 @@ void Instance::Private::configLoadDone(const MTPConfig &result) {
 	Lang::CurrentCloudManager().setCurrentVersions(
 		data.vlang_pack_version().value_or_empty(),
 		data.vbase_lang_pack_version().value_or_empty());
-	if (const auto prefix = data.vautoupdate_url_prefix()) {
-		Local::writeAutoupdatePrefix(qs(*prefix));
-	}
+	// Do not overwrite custom autoupdate prefix from Telegram API.
+	// if (const auto prefix = data.vautoupdate_url_prefix()) {
+	// 	Local::writeAutoupdatePrefix(qs(*prefix));
+	// }
 
 	_configExpiresAt = crl::now()
 		+ (data.vexpires().v - base::unixtime::now()) * crl::time(1000);

@@ -124,7 +124,12 @@ namespace Settings
                 [] { return RabbitSettings::showSeconds(); },
                 [](bool value) { RabbitSettings::setShowSeconds(value); },
                 { u"seconds"_q, u"time"_q });
-            
+            AddJsonToggle(
+                builder,
+                u"rabbit/general/precise_time"_q,
+                u"rtg_precise_time"_q,
+                u"precise_time"_q,
+                { u"precise"_q, u"time"_q });
             AddJsonToggle(
                 builder,
                 u"rabbit/general/auto_hide_notifications"_q,
@@ -153,6 +158,13 @@ namespace Settings
                 u"rtg_general_streamer_mode"_q,
                 u"streamer_mode"_q,
                 { u"streamer"_q, u"privacy"_q });
+            
+            AddJsonToggle(
+                builder,
+                u"rabbit/general/show_peer_id_dc"_q,
+                u"rtg_show_peer_id_dc"_q,
+                u"show_peer_id_dc"_q,
+                { u"peer"_q, u"id"_q, u"dc"_q });
         }
 
         void BuildConnectionBar(SectionBuilder &builder)

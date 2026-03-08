@@ -85,6 +85,7 @@ struct MessageStyle {
 	style::icon historyFilePause = { Qt::Uninitialized };
 	style::icon historyFileImage = { Qt::Uninitialized };
 	style::icon historyFileDocument = { Qt::Uninitialized };
+	style::icon historyFileConfig = { Qt::Uninitialized };
 	style::icon historyAudioDownload = { Qt::Uninitialized };
 	style::icon historyAudioCancel = { Qt::Uninitialized };
 	style::icon historyQuizTimer = { Qt::Uninitialized };

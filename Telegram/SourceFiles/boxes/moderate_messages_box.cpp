@@ -350,7 +350,8 @@ void ProccessCommonGroups(
 void CreateModerateMessagesBox(
 		not_null<Ui::GenericBox*> box,
 		const HistoryItemsList &items,
-		Fn<void()> confirmed) {
+		Fn<void()> confirmed,
+		ModerateMessagesBoxOptions options) {
 	Expects(!items.empty());
 
 	using Controller = Ui::ExpandablePeerListController;
@@ -582,7 +583,7 @@ void CreateModerateMessagesBox(
 			object_ptr<Ui::Checkbox>(
 				box,
 				tr::lng_report_spam(tr::now),
-				false,
+				options.reportSpam,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
 		const auto controller = box->lifetime().make_state<Controller>(
@@ -613,7 +614,7 @@ void CreateModerateMessagesBox(
 						lt_user,
 						tr::bold(firstItem->from()->name()),
 						tr::marked),
-				false,
+				options.deleteAll,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
 		auto messagesCounts = MessagesCountValue(history, participants);
@@ -729,7 +730,7 @@ void CreateModerateMessagesBox(
 						rpl::single(isSingle),
 						tr::lng_ban_user(),
 						tr::lng_ban_users())),
-				false,
+				options.banUser,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
 		const auto controller = box->lifetime().make_state<Controller>(
@@ -834,7 +835,7 @@ void CreateModerateMessagesBox(
 				box,
 				prepareFlags,
 				disabledMessages,
-				{ .isForum = peer->isForum() });
+				{ .isForum = peer->isForum(), .isUserSpecific = true });
 			computeRestrictions = getRestrictions;
 			std::move(changes) | rpl::on_next([=] {
 				ban->setChecked(true);
@@ -1168,4 +1169,14 @@ void DeleteSublistBox(
 		close();
 	}, st::attentionBoxButton);
 	box->addButton(tr::lng_cancel(), close);
+}
+
+ModerateMessagesBoxOptions DefaultModerateMessagesBoxOptions() {
+	return base::IsCtrlPressed()
+		? ModerateMessagesBoxOptions{
+			.reportSpam = true,
+			.deleteAll = true,
+			.banUser = true,
+		}
+		: ModerateMessagesBoxOptions{};
 }

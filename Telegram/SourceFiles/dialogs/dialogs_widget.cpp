@@ -99,6 +99,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTextEdit>
 
+#include "rabbit/lang/rabbit_lang.h"
+
 namespace Dialogs {
 namespace {
 
@@ -587,14 +589,20 @@ Widget::Widget(
 	_cancelSearch->setClickedCallback([=] {
 		cancelSearch({ .jumpBackToSearchedChat = true });
 	});
+	_cancelSearch->setAccessibleName(tr::lng_sr_cancel_search(tr::now));
 	_jumpToDate->entity()->setClickedCallback([=] { showCalendar(); });
+	_jumpToDate->entity()->setAccessibleName(
+		tr::lng_sr_search_date(tr::now));
 	_chooseFromUser->entity()->setClickedCallback([=] { showSearchFrom(); });
+	_chooseFromUser->entity()->setAccessibleName(
+		tr::lng_search_messages_from(tr::now));
 	rpl::single(rpl::empty) | rpl::then(
 		session().domain().local().localPasscodeChanged()
 	) | rpl::on_next([=] {
 		updateLockUnlockVisibility();
 	}, lifetime());
 	const auto lockUnlock = _lockUnlock->entity();
+	lockUnlock->setAccessibleName(tr::lng_shortcuts_lock(tr::now));
 	lockUnlock->setClickedCallback([=] {
 		lockUnlock->setIconOverride(
 			&st::dialogsUnlockIcon,
@@ -609,6 +617,7 @@ Widget::Widget(
 		setupStories();
 	}
 
+	_searchForNarrowLayout->setAccessibleName(tr::lng_dlg_filter(tr::now));
 	_searchForNarrowLayout->setClickedCallback([=] {
 		_search->setFocusFast();
 		if (_childList) {
@@ -1047,6 +1056,7 @@ void Widget::scrollToDefaultChecked(bool verytop) {
 
 void Widget::setupScrollUpButton() {
 	_scrollToTop->setClickedCallback([=] { scrollToDefaultChecked(); });
+	_scrollToTop->setAccessibleName(tr::lng_sr_scroll_to_top(tr::now));
 	trackScroll(_scrollToTop);
 	trackScroll(this);
 	updateScrollUpVisibility();
@@ -2155,7 +2165,7 @@ void Widget::checkUpdateStatus() {
 		}
 		_updateTelegram.create(
 			this,
-			tr::lng_update_telegram(tr::now),
+			ktr("rtg_update"),
 			st::dialogsUpdateButton,
 			st::dialogsInstallUpdate,
 			st::dialogsInstallUpdateOver,
@@ -3335,6 +3345,11 @@ void Widget::updateCancelSearch() {
 		|| (!_searchState.inChat
 			&& (_searchHasFocus || _searchSuggestionsLocked));
 	_cancelSearch->toggle(shown, anim::type::normal);
+	if (_searchState.inChat) {
+		_cancelSearch->setAccessibleName(shown
+			? tr::lng_sr_clear_search(tr::now)
+			: tr::lng_sr_cancel_search(tr::now));
+	}
 }
 
 QString Widget::validateSearchQuery() {

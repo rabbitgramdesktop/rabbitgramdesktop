@@ -141,6 +141,7 @@ namespace RabbitSettings
     inline bool streamerMode() { return JsonSettings::GetBool("streamer_mode"); }
     inline bool hideNotificationsAutomatically() { return JsonSettings::GetBool("auto_hide_notifications"); }
     inline bool showUserpicInTopBar() { return JsonSettings::GetBool("userpic_in_top_bar"); }
+    inline bool showPeerIdDc() { return JsonSettings::GetBool("show_peer_id_dc"); }
     inline bool connectionBarLost() { return JsonSettings::GetBool("connection_bar_lost"); }
     inline bool connectionBarProxy() { return JsonSettings::GetBool("connection_bar_proxy"); }
     inline QString appIcon() { return JsonSettings::GetString("app_icon"); }
@@ -165,10 +166,13 @@ namespace RabbitSettings
     inline int incomingQuickAction() { return JsonSettings::GetInt("incoming_quick_action"); }
     inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
     inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
+    inline bool preciseTime() { return JsonSettings::GetBool("precise_time"); }
+    inline bool showOnlineIndicator() { return JsonSettings::GetBool("show_online_indicator"); }
 
     inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
     inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
     inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set("userpic_in_top_bar", value); }
+    inline void setShowPeerIdDc(bool value) { JsonSettings::Set("show_peer_id_dc", value); }
     inline void setConnectionBarLost(bool value) { JsonSettings::Set("connection_bar_lost", value); }
     inline void setConnectionBarProxy(bool value) { JsonSettings::Set("connection_bar_proxy", value); }
     inline void setAppIcon(QString value) { JsonSettings::Set("app_icon", value); }
@@ -193,4 +197,6 @@ namespace RabbitSettings
     inline void setIncomingQuickAction(int value) { JsonSettings::Set("incoming_quick_action", value); }
     inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
     inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
+    inline void setPreciseTime(bool value) { JsonSettings::Set("precise_time", value); }
+    inline void setShowOnlineIndicator(bool value) { JsonSettings::Set("show_online_indicator", value); }
 } // namespace RabbitSettings
