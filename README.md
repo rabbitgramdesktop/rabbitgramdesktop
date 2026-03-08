@@ -4,7 +4,8 @@
 
 # rabbitGram Desktop
 
-# ⚠️ Now closed-source. Updates are available on [GitHub][updates_gh] and [Telegram][updates_tg].
+# ⚠️ Now closed-source. Updates are available on [GitHub][updates_gh] and [Telegram][updates_tg]. 
+## You can also receive updates via OTA by enabling "Update automatically" in Settings → Advanced.
 
 ### Telegram Desktop based messenger with special features
 
