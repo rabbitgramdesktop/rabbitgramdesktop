@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "data/data_types.h"
 #include "data/data_cloud_file.h"
+#include "core/file_location.h"
 
 namespace Main {
 class Session;
@@ -150,8 +151,7 @@ public:
 	[[nodiscard]] bool videoCanBePlayed() const;
 	[[nodiscard]] auto createStreamingLoader(
 		Data::FileOrigin origin,
-		bool forceRemoteLoader,
-		HistoryItem *item) const
+		bool forceRemoteLoader) const
 	-> std::unique_ptr<Media::Streaming::Loader>;
 
 	[[nodiscard]] bool hasAttachedStickers() const;
@@ -160,6 +160,10 @@ public:
 	// For now they return size of the 'large' image.
 	[[nodiscard]] int width() const;
 	[[nodiscard]] int height() const;
+
+	[[nodiscard]] MediaKey mediaKey() const;
+	[[nodiscard]] const Core::FileLocation &location(bool check) const;
+	void setLocation(const Core::FileLocation &loc);
 
 	PhotoId id = 0;
 
@@ -195,5 +199,7 @@ private:
 	std::weak_ptr<Data::PhotoMedia> _media;
 
 	not_null<Data::Session*> _owner;
+
+	Core::FileLocation _location;
 
 };

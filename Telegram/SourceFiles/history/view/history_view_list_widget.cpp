@@ -3055,6 +3055,11 @@ void ListWidget::mousePressEvent(QMouseEvent *e) {
 		e->accept();
 		return; // ignore mouse press, that was hiding context menu
 	}
+	if (_middleClickAutoscroll.active()) {
+		_middleClickAutoscroll.stop();
+		e->accept();
+		return;
+	}
 	if (e->button() == Qt::MiddleButton) {
 		mouseActionCancel();
 		ClickHandler::unpressed();
@@ -3882,7 +3887,7 @@ void ListWidget::mouseActionUpdate() {
 		lnkhost = reactionView;
 	} else if (overReplyBtn) {
 		dragState = replyBtnState;
-		lnkhost = replyBtnView;
+		lnkhost = _replyButtonManager.get();
 	} else if (view) {
 		auto cursorDeltaLength = [&] {
 			auto cursorDelta = (_overState.point - _pressState.point);

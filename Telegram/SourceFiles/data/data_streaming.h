@@ -11,7 +11,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 class PhotoData;
 class DocumentData;
-class HistoryItem;
 
 namespace Media::Streaming {
 class Reader;
@@ -65,7 +64,6 @@ private:
 		base::flat_map<not_null<Data*>, std::weak_ptr<Reader>> &readers,
 		not_null<Data*> data,
 		FileOrigin origin,
-		HistoryItem *context,
 		bool forceRemoteLoader = false);
 
 	template <typename Data>

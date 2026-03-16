@@ -547,8 +547,8 @@ void DocumentData::setVideoQualities(
 		return document->isVideoFile()
 			&& !document->dimensions.isEmpty()
 			&& !document->inappPlaybackFailed()
-			&& document->useStreamingLoader(nullptr)
-			&& document->canBeStreamed(nullptr);
+			&& document->useStreamingLoader()
+			&& document->canBeStreamed();
 	};
 	ranges::sort(
 		qualities,
@@ -1533,35 +1533,20 @@ bool DocumentData::hasRemoteLocation() const {
 	return (_dc != 0 && _access != 0);
 }
 
-bool DocumentData::canVideoBeStreamed(HistoryItem *item) const {
-	if (!isVideoFile()) {
-		return false;
-	}
-	// Streaming couldn't be used with external player
-	// Maybe someone brave will implement this once upon a time...
-	static const auto &ExternalVideoPlayer = base::options::lookup<bool>(
-		Data::kOptionExternalVideoPlayer);
-	return storyMedia()
-		|| !ExternalVideoPlayer.value()
-		|| (item && !item->allowsForward());
-}
-
-bool DocumentData::useStreamingLoader(HistoryItem *item) const {
+bool DocumentData::useStreamingLoader() const {
 	if (size <= 0) {
 		return false;
 	} else if (const auto info = sticker()) {
 		return info->isWebm();
 	}
 	return isAnimation()
-		|| canVideoBeStreamed(item)
+		|| isVideoFile()
 		|| isAudioFile()
 		|| isVoiceMessage();
 }
 
-bool DocumentData::canBeStreamed(HistoryItem *item) const {
-	return hasRemoteLocation()
-		&& supportsStreaming()
-		&& (!isVideoFile() || canVideoBeStreamed(item));
+bool DocumentData::canBeStreamed() const {
+	return hasRemoteLocation() && supportsStreaming();
 }
 
 void DocumentData::setInappPlaybackFailed() {
@@ -1591,10 +1576,9 @@ StorageFileLocation DocumentData::videoPreloadLocation() const {
 
 auto DocumentData::createStreamingLoader(
 	Data::FileOrigin origin,
-	bool forceRemoteLoader,
-	HistoryItem *item) const
+	bool forceRemoteLoader) const
 -> std::unique_ptr<Media::Streaming::Loader> {
-	if (!useStreamingLoader(item)) {
+	if (!useStreamingLoader()) {
 		return nullptr;
 	}
 	if (!forceRemoteLoader) {

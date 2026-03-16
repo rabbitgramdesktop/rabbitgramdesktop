@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "data/data_photo.h"
 
+#include "data/data_document.h"
 #include "data/data_session.h"
 #include "data/data_reply_preview.h"
 #include "data/data_photo_media.h"
@@ -15,6 +16,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_item.h"
 #include "media/streaming/media_streaming_loader_local.h"
 #include "media/streaming/media_streaming_loader_mtproto.h"
+#include "storage/storage_account.h"
 #include "storage/file_download.h"
 #include "core/application.h"
 
@@ -475,6 +477,28 @@ int PhotoData::height() const {
 	return _images[PhotoSizeIndex(PhotoSize::Large)].location.height();
 }
 
+MediaKey PhotoData::mediaKey() const {
+	return ::mediaKey(UnknownFileLocation, _dc, id);
+}
+
+const Core::FileLocation &PhotoData::location(bool check) const {
+	if (check && !_location.check()) {
+		const auto location = session().local().readFileLocation(mediaKey());
+		const auto that = const_cast<PhotoData*>(this);
+		if (!location.inMediaCache()) {
+			that->_location = location;
+		}
+	}
+	return _location;
+}
+
+void PhotoData::setLocation(const Core::FileLocation &loc) {
+	if (!loc.inMediaCache() && loc.check()) {
+		_location = loc;
+		session().local().writeFileLocation(mediaKey(), _location);
+	}
+}
+
 Data::CloudFile &PhotoData::videoFile(PhotoSize size) {
 	Expects(_videoSizes != nullptr);
 
@@ -565,8 +589,7 @@ bool PhotoData::videoCanBePlayed() const {
 
 auto PhotoData::createStreamingLoader(
 	Data::FileOrigin origin,
-	bool forceRemoteLoader,
-	HistoryItem *item) const
+	bool forceRemoteLoader) const
 -> std::unique_ptr<Media::Streaming::Loader> {
 	if (!hasVideo()) {
 		return nullptr;
