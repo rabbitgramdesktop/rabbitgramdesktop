@@ -8,7 +8,7 @@
 #define MyAppId "4356CE01-4137-4C55-9F8B-FB4EEBB6EC0C"
 #define CurrentYear GetDateTimeString('yyyy','','')
 #define MyBuildTarget "win64"
-#define MyAppVersionFull "6.6.2-06032026"
+#define MyAppVersionFull "6.6.2-10032026"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
