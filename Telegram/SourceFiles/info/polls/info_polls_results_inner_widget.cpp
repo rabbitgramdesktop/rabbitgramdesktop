@@ -28,6 +28,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_info.h"
+#include "styles/style_polls.h"
 
 namespace Info::Polls {
 namespace {

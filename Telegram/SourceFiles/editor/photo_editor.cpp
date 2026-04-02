@@ -22,7 +22,7 @@ namespace Editor {
 namespace {
 
 constexpr auto kPrecision = 100000;
-constexpr auto kBrushesVersion = -1;
+constexpr auto kBrushesVersion = -2;
 constexpr auto kDefaultBrushSizeRatio = 0.9;
 
 [[nodiscard]] int ToolIndex(Brush::Tool tool) {
@@ -122,6 +122,7 @@ struct BrushState {
 		return result;
 	}
 	if (head < 0) {
+		const auto version = head;
 		auto toolValue = qint32(int(Brush::Tool::Pen));
 		auto count = qint32(0);
 		stream >> toolValue >> count;
@@ -145,7 +146,7 @@ struct BrushState {
 			}
 			const auto tool = ToolFromSerialized(entryTool);
 			const auto index = ToolIndex(tool);
-			if (size > 0) {
+			if (version == kBrushesVersion && size > 0) {
 				result.brushes[index].sizeRatio = size / float(kPrecision);
 			}
 			if (color.isValid()) {
@@ -155,7 +156,6 @@ struct BrushState {
 		}
 		return result;
 	}
-	auto size = head;
 	auto color = QColor();
 	stream >> color;
 	if (stream.status() != QDataStream::Ok) {
@@ -170,9 +170,6 @@ struct BrushState {
 	}
 	const auto tool = ToolFromSerialized(toolValue);
 	const auto index = ToolIndex(tool);
-	if (size > 0) {
-		result.brushes[index].sizeRatio = size / float(kPrecision);
-	}
 	if (color.isValid()) {
 		result.brushes[index].color = color;
 	}
@@ -227,7 +224,8 @@ PhotoEditor::PhotoEditor(
 	this,
 	_controllers,
 	_modifications,
-	data))
+	data,
+	photo->size()))
 , _brushes(Deserialize(Core::App().settings().photoEditorBrush()).brushes)
 , _brushTool(Deserialize(Core::App().settings().photoEditorBrush()).tool)
 , _colorPicker(std::make_unique<ColorPicker>(
@@ -286,6 +284,10 @@ PhotoEditor::PhotoEditor(
 	) | rpl::on_next([=] {
 		_modifications.flipped = !_modifications.flipped;
 		_content->applyModifications(_modifications);
+	}, lifetime());
+
+	_controls->aspectRatioChanges() | rpl::on_next([=](float64 ratio) {
+		_content->applyAspectRatio(ratio);
 	}, lifetime());
 
 	_controls->paintModeRequests(

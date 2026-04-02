@@ -25,12 +25,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_self_destruct.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_global_privacy.h"
+#include "api/api_reactions_notify_settings.h"
 #include "api/api_updates.h"
 #include "api/api_user_privacy.h"
+#include "api/api_read_metrics.h"
 #include "api/api_views.h"
 #include "api/api_confirm_phone.h"
 #include "api/api_unread_things.h"
 #include "api/api_ringtones.h"
+#include "api/api_compose_with_ai.h"
 #include "api/api_transcribes.h"
 #include "api/api_premium.h"
 #include "api/api_user_names.h"
@@ -177,10 +180,13 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _selfDestruct(std::make_unique<Api::SelfDestruct>(this))
 , _sensitiveContent(std::make_unique<Api::SensitiveContent>(this))
 , _globalPrivacy(std::make_unique<Api::GlobalPrivacy>(this))
+, _reactionsNotifySettings(
+	std::make_unique<Api::ReactionsNotifySettings>(this))
 , _userPrivacy(std::make_unique<Api::UserPrivacy>(this))
 , _inviteLinks(std::make_unique<Api::InviteLinks>(this))
 , _chatLinks(std::make_unique<Api::ChatLinks>(this))
 , _views(std::make_unique<Api::ViewsManager>(this))
+, _readMetrics(std::make_unique<Api::ReadMetrics>(this))
 , _confirmPhone(std::make_unique<Api::ConfirmPhone>(this))
 , _peerPhoto(std::make_unique<Api::PeerPhoto>(this))
 , _polls(std::make_unique<Api::Polls>(this))
@@ -188,6 +194,7 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _chatParticipants(std::make_unique<Api::ChatParticipants>(this))
 , _unreadThings(std::make_unique<Api::UnreadThings>(this))
 , _ringtones(std::make_unique<Api::Ringtones>(this))
+, _composeWithAi(std::make_unique<Api::ComposeWithAi>(this))
 , _transcribes(std::make_unique<Api::Transcribes>(this))
 , _premium(std::make_unique<Api::Premium>(this))
 , _usernames(std::make_unique<Api::Usernames>(this))
@@ -203,6 +210,7 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 			requestMoreDialogsIfNeeded();
 		}, _session->lifetime());
 
+		_reactionsNotifySettings->reload();
 		setupSupportMode();
 	});
 }
@@ -3818,6 +3826,7 @@ void ApiWrap::editMedia(
 				.spoiler = false,
 				.album = nullptr,
 				.forceFile = false,
+				.sendLargePhotos = false,
 				.idOverride = 0,
 			})
 			: nullptr),
@@ -3827,6 +3836,7 @@ void ApiWrap::editMedia(
 		.spoiler = file.spoiler,
 		.album = nullptr,
 		.forceFile = forceFile,
+		.sendLargePhotos = file.sendLargePhotos,
 		.idOverride = 0,
 		.displayName = file.displayName,
 	}));
@@ -3870,6 +3880,7 @@ void ApiWrap::sendFiles(
 					.spoiler = false,
 					.album = nullptr,
 					.forceFile = false,
+					.sendLargePhotos = false,
 					.idOverride = 0,
 				})
 				: nullptr),
@@ -3879,6 +3890,7 @@ void ApiWrap::sendFiles(
 			.spoiler = file.spoiler,
 			.album = album,
 			.forceFile = forceFile,
+			.sendLargePhotos = file.sendLargePhotos,
 			.idOverride = 0,
 			.displayName = file.displayName,
 		}));
@@ -4437,7 +4449,8 @@ void ApiWrap::uploadAlbumMedia(
 					fields.vid(),
 					fields.vaccess_hash(),
 					fields.vfile_reference()),
-				MTP_int(data.vttl_seconds().value_or_empty()));
+				MTP_int(data.vttl_seconds().value_or_empty()),
+				MTPInputDocument()); // video
 			sendAlbumWithUploaded(item, groupId, media);
 		} break;
 
@@ -4959,6 +4972,10 @@ Api::GlobalPrivacy &ApiWrap::globalPrivacy() {
 	return *_globalPrivacy;
 }
 
+Api::ReactionsNotifySettings &ApiWrap::reactionsNotifySettings() {
+	return *_reactionsNotifySettings;
+}
+
 Api::UserPrivacy &ApiWrap::userPrivacy() {
 	return *_userPrivacy;
 }
@@ -4973,6 +4990,10 @@ Api::ChatLinks &ApiWrap::chatLinks() {
 
 Api::ViewsManager &ApiWrap::views() {
 	return *_views;
+}
+
+Api::ReadMetrics &ApiWrap::readMetrics() {
+	return *_readMetrics;
 }
 
 Api::ConfirmPhone &ApiWrap::confirmPhone() {
@@ -5001,6 +5022,10 @@ Api::UnreadThings &ApiWrap::unreadThings() {
 
 Api::Ringtones &ApiWrap::ringtones() {
 	return *_ringtones;
+}
+
+Api::ComposeWithAi &ApiWrap::composeWithAi() {
+	return *_composeWithAi;
 }
 
 Api::Transcribes &ApiWrap::transcribes() {

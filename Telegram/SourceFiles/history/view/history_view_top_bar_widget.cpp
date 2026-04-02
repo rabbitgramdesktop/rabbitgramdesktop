@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/shadow.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/boxes/report_box_graphics.h" // Ui::ReportReason
@@ -389,7 +390,8 @@ void TopBarWidget::showPeerMenu() {
 				QPoint(
 					width()
 						+ st::topBarMenuPosition.x()
-						+ _menu->st().shadow.extend.right(),
+						+ Ui::BoxShadow::ExtendFor(
+							_menu->st().shadow).right(),
 					st::topBarMenuPosition.y()))));
 	}
 }

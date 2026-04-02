@@ -114,7 +114,7 @@ bool _expanded = false;
 SomeType *_pointer = nullptr;
 ```
 
-## Prefer tr:: projections over Ui::Text:: in localization calls
+## Use tr:: projections for TextWithEntities
 
 Inside `tr::lng_...()` calls, always use the `tr::` projection helpers instead of their `Ui::Text::` equivalents. The `tr::` helpers are shorter and work uniformly as both placeholder wrappers and final projectors.
 
@@ -143,6 +143,19 @@ tr::lng_some_key(
     lt_group,
     tr::bold(group),
     tr::rich)
+```
+
+Also use `tr::marked()` as the standard way to create `TextWithEntities` — not just as a projector:
+
+```cpp
+// BAD - verbose constructor:
+auto text = TextWithEntities();
+auto text = TextWithEntities{ u"hello"_q };
+auto text = TextWithEntities().append(u"hello"_q);
+
+// GOOD - concise:
+auto text = tr::marked();
+auto text = tr::marked(u"hello"_q);
 ```
 
 ## Multi-line calls — one argument per line
@@ -268,6 +281,224 @@ const auto duration = static_cast<int>(base::take(_listenedMs) / 1000);
 if (!document || duration <= 0) {
     return;
 }
+```
+
+## Don't wrap tr:: lang keys in rpl::single
+
+`tr::lng_*()` (without `tr::now`) already returns an `rpl::producer`. Wrapping a snapshot in `rpl::single()` defeats live language switching — the value is captured once and never updates. Just call the lang key without `tr::now`.
+
+```cpp
+// BAD - frozen snapshot, won't update on language change:
+rpl::single(tr::lng_ai_compose_title(tr::now))
+
+// GOOD - live producer that updates automatically:
+tr::lng_ai_compose_title()
+```
+
+## Extract method definitions from local classes
+
+When defining local classes (e.g. in anonymous namespaces), keep the class body compact — only declarations. Put all method definitions **after** all class definitions. This avoids unnecessary nesting inside the class body and keeps methods at the same indentation level as free functions.
+
+```cpp
+// BAD - methods defined inline, adding a nesting level:
+class MyWidget final : public Ui::RpWidget {
+public:
+    MyWidget(QWidget *parent)
+    : RpWidget(parent) {
+        // ... 20 lines of setup
+    }
+
+    void setActive(bool active) {
+        _active = active;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *e) override {
+        // ... 30 lines of painting
+    }
+
+private:
+    bool _active = false;
+
+};
+
+// GOOD - class is a compact declaration, methods defined after:
+class MyWidget final : public Ui::RpWidget {
+public:
+    MyWidget(QWidget *parent, QString label);
+
+    void setActive(bool active);
+
+protected:
+    void paintEvent(QPaintEvent *e) override;
+
+private:
+    bool _active = false;
+
+};
+
+MyWidget::MyWidget(QWidget *parent, QString label)
+: RpWidget(parent) {
+    // ... 20 lines of setup
+}
+
+void MyWidget::setActive(bool active) {
+    _active = active;
+    update();
+}
+
+void MyWidget::paintEvent(QPaintEvent *e) {
+    // ... 30 lines of painting
+}
+```
+
+When there are multiple local classes, put **all class definitions first**, then **all method definitions** after. This keeps the declarations readable as an overview.
+
+## Use RAII for resource cleanup
+
+When working with raw resources (Win32 HANDLEs, file descriptors, COM objects), use `gsl::finally` or a dedicated RAII wrapper for cleanup instead of calling release functions manually. Manual cleanup breaks when early returns are added later.
+
+```cpp
+// BAD - manual cleanup, fragile with early returns:
+const auto snapshot = CreateToolhelp32Snapshot(...);
+if (snapshot != INVALID_HANDLE_VALUE) {
+	// ... logic that might grow early returns ...
+	CloseHandle(snapshot);
+}
+
+// GOOD - RAII guard, cleanup runs on any exit path:
+const auto snapshot = CreateToolhelp32Snapshot(...);
+if (snapshot == INVALID_HANDLE_VALUE) {
+	return;
+}
+const auto guard = gsl::finally([&] {
+	CloseHandle(snapshot);
+});
+// ... logic, early returns are safe ...
+```
+
+## Extract substantial logic from lambdas
+
+When a lambda grows beyond a few lines of self-contained logic, extract it into a named function (free function in anonymous namespace, or a private method). Lambdas should primarily be glue — captures, dispatch, short transforms. This applies when the lambda's captures are minimal and can easily become function parameters. When a lambda captures many variables from its surrounding context, it may be cleaner to keep it inline.
+
+```cpp
+// BAD - substantial logic buried in a lambda:
+crl::async([=] {
+	auto found = false;
+	auto pe = PROCESSENTRY32();
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	const auto snapshot = CreateToolhelp32Snapshot(...);
+	if (snapshot != INVALID_HANDLE_VALUE) {
+		for (...) {
+			if (/* match */) {
+				found = true;
+				break;
+			}
+		}
+		CloseHandle(snapshot);
+	}
+	crl::on_main(weak, [=] { handle(found); });
+});
+
+// GOOD - logic extracted, lambda is just glue:
+crl::async([=] {
+	const auto found = FindRunningReader();
+	crl::on_main(weak, [=] { handle(found); });
+});
+```
+
+## Data-driven matching over chained conditions
+
+When comparing a value against multiple known constants, store them in a collection and loop instead of chaining `||` conditions. Easier to extend, less repetition, and reads as data rather than logic.
+
+```cpp
+// BAD - repetitive chain, hard to extend:
+if (_wcsicmp(name, L"Narrator.exe") == 0
+	|| _wcsicmp(name, L"nvda.exe") == 0
+	|| _wcsicmp(name, L"jfw.exe") == 0
+	|| _wcsicmp(name, L"Zt.exe") == 0) {
+
+// GOOD - data-driven, easy to extend:
+const auto list = std::array{
+	L"Narrator.exe",
+	L"nvda.exe",
+	L"jfw.exe",
+	L"Zt.exe",
+};
+for (const auto &entry : list) {
+	if (_wcsicmp(name, entry) == 0) {
+		return true;
+	}
+}
+```
+
+## Use !isHidden() for logic checks, not isVisible()
+
+When you call `show()` / `hide()` / `setVisible()` on a widget and later branch on that state, always check `!isHidden()` (the widget's own flag) — never `isVisible()`. `isVisible()` returns `true` only when the widget **and every ancestor** are visible, so it silently returns `false` during parent show-animations, before the parent is laid out, etc. `isHidden()` reflects exactly the flag you set.
+
+```cpp
+// BAD — breaks when parent is still animating / not yet shown:
+child->setVisible(true);
+// ... later, in resizeGetHeight or similar:
+if (child->isVisible()) {   // false if parent isn't visible yet!
+    child->moveToRight(x, y, w);
+}
+
+// GOOD — checks the widget's own state:
+if (!child->isHidden()) {
+    child->moveToRight(x, y, w);
+}
+```
+
+The same applies to any logic that depends on a previous `show()`/`hide()` call: skip blocks, layout branches, opacity decisions, etc.
+
+## Consolidate make_state calls into a single State struct
+
+Every `make_state` is a separate heap allocation. When a function needs multiple pieces of lambda-captured mutable state, define a local `struct State` with all fields and call `make_state<State>()` once, then capture the resulting pointer everywhere.
+
+```cpp
+// BAD - two allocations:
+const auto shown = lifetime.make_state<bool>(false);
+const auto count = lifetime.make_state<int>(0);
+
+// GOOD - one allocation:
+struct State {
+	bool shown = false;
+	int count = 0;
+};
+const auto state = lifetime.make_state<State>();
+```
+
+## Use trailing return type when the return type doesn't fit on one line
+
+When a function's return type is long enough that the declaration would need a line break between the return type and the function name, use trailing return type syntax (`auto ... -> Type`) to keep the function name on the opening line.
+
+```cpp
+// BAD - return type orphaned on its own line:
+not_null<HistoryView::Controls::ComposeAiButton*>
+SetupCaptionAiButton(SetupCaptionAiButtonArgs &&args);
+
+// GOOD - trailing return type keeps name visible:
+auto SetupCaptionAiButton(SetupCaptionAiButtonArgs &&args)
+-> not_null<HistoryView::Controls::ComposeAiButton*>;
+```
+
+## Mind data structure sizes and alignment
+
+When adding fields to a class or struct, consider the memory layout. A standalone `bool` between two pointer-sized fields wastes 7 bytes to alignment padding. Review new fields for packing opportunities:
+
+- If the struct already has bitfields, pack new boolean flags as `: 1` members rather than standalone `bool`.
+- If alignment leaves a gap (e.g., an `int` followed by a pointer), consider whether a new small field can fill it.
+- For classes instantiated in large quantities (per-message, per-element, per-row), every wasted byte is multiplied thousands of times.
+
+```cpp
+// BAD - standalone bool adds 8 bytes (1 + 7 padding) before the next pointer:
+mutable bool _myFlag = false;
+mutable std::unique_ptr<Foo> _foo;
+
+// GOOD - packed into existing bitfield group, no extra bytes:
+mutable uint32 _myFlag : 1 = 0;
 ```
 
 ## Static member functions use PascalCase

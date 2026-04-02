@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "editor/photo_editor_common.h"
 #include "lang/lang_keys.h"
+#include "menu/menu_checked_action.h"
 #include "ui/chat/attach/attach_controls.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/effects/spoiler_mess.h"
@@ -78,6 +79,11 @@ void AbstractSingleMediaPreview::setSpoiler(bool spoiler) {
 	_spoiler = spoiler
 		? std::make_unique<SpoilerAnimation>([=] { update(); })
 		: nullptr;
+	update();
+}
+
+void AbstractSingleMediaPreview::setCanShowHighQualityBadge(bool value) {
+	_canShowHighQualityBadge = value;
 	update();
 }
 
@@ -249,6 +255,12 @@ void AbstractSingleMediaPreview::paintEvent(QPaintEvent *e) {
 		auto icon = &st::historyFileInPlay;
 		icon->paintInCenter(p, inner);
 	}
+	if (_canShowHighQualityBadge && _sendWay.sendLargePhotos()) {
+		PaintHighQualityBadge(
+			p,
+			_st,
+			QRect(_previewLeft, _previewTop, _previewWidth, _previewHeight));
+	}
 }
 
 void AbstractSingleMediaPreview::mousePressEvent(QMouseEvent *e) {
@@ -290,12 +302,15 @@ void AbstractSingleMediaPreview::showContextMenu(QPoint position) {
 		&& _sendWay.sendImagesAsPhotos()
 		&& supportsSpoilers()) {
 		const auto spoilered = hasSpoiler();
-		_menu->addAction(spoilered
-			? tr::lng_context_disable_spoiler(tr::now)
-			: tr::lng_context_spoiler_effect(tr::now), [=] {
-			setSpoiler(!spoilered);
-			_spoileredChanges.fire_copy(!spoilered);
-		}, spoilered ? &icons.menuSpoilerOff : &icons.menuSpoiler);
+		::Menu::AddCheckedAction(
+			_menu.get(),
+			tr::lng_context_spoiler_effect(tr::now),
+			[=] {
+				setSpoiler(!spoilered);
+				_spoileredChanges.fire_copy(!spoilered);
+			},
+			&icons.menuSpoiler,
+			spoilered);
 	}
 	if (_actionAllowed(AttachActionType::EditCover)) {
 		_menu->addAction(tr::lng_context_edit_cover(tr::now), [=] {

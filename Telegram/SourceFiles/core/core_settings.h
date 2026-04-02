@@ -36,6 +36,9 @@ enum class StickedTooltip;
 
 namespace Core {
 
+inline constexpr auto kScreenReaderModeDisabledKey
+	= "screen-reader-mode-disabled"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
@@ -924,7 +927,6 @@ public:
 	void setTtlVoiceClickTooltipHidden(bool value) {
 		_ttlVoiceClickTooltipHidden = value;
 	}
-
 	[[nodiscard]] const WindowPosition &ivPosition() const {
 		return _ivPosition;
 	}
@@ -1000,10 +1002,34 @@ public:
 		_notificationsVolume = value;
 	}
 
+	template <typename Type, typename Other>
+	void writePref(std::string_view key, Other &&value) {
+		writePrefImpl<Type>(key, std::forward<Other>(value));
+	}
+	void clearPref(std::string_view key);
+
+	template <typename Type, typename Other = Type>
+	[[nodiscard]] Type readPref(
+			std::string_view key,
+			Other &&fallback = Type()) {
+		return readPrefImpl<Type>(key).value_or(
+			std::forward<Other>(fallback));
+	}
+
 	void resetOnLastLogout();
 
 private:
 	void resolveRecentEmoji() const;
+
+	template <typename Type>
+	void writePrefImpl(std::string_view key, Type value);
+
+	template <typename Type>
+	[[nodiscard]] std::optional<Type> readPrefImpl(std::string_view key);
+
+	void writePrefGeneric(std::string_view key, const QByteArray &value);
+	[[nodiscard]] std::optional<QByteArray> readPrefGeneric(
+		std::string_view key);
 
 	static constexpr auto kDefaultThirdColumnWidth = 0;
 	static constexpr auto kDefaultDialogsWidthRatio = 5. / 14;
@@ -1134,6 +1160,7 @@ private:
 	rpl::variable<int> _ivZoom = 0;
 	Media::VideoQuality _videoQuality;
 	rpl::variable<bool> _chatFiltersHorizontal = false;
+	base::flat_map<QByteArray, QByteArray> _prefs;
 
 	bool _tabbedReplacedWithInfo = false; // per-window
 	rpl::event_stream<bool> _tabbedReplacedWithInfoValue; // per-window

@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "ui/chat/attach/attach_album_preview.h"
 
+#include "menu/menu_checked_action.h"
 #include "ui/chat/attach/attach_album_thumbnail.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/effects/spoiler_mess.h"
@@ -381,11 +382,23 @@ void AlbumPreview::paintAlbum(Painter &p) const {
 	const auto top = contentTop();
 	for (const auto &thumb : _thumbs) {
 		if (thumb.get() != _paintedAbove) {
-			thumb->paintInAlbum(p, left, top, shrink, moveProgress);
+			thumb->paintInAlbum(
+				p,
+				left,
+				top,
+				shrink,
+				moveProgress,
+				_sendWay.sendLargePhotos());
 		}
 	}
 	if (_paintedAbove) {
-		_paintedAbove->paintInAlbum(p, left, top, shrink, moveProgress);
+		_paintedAbove->paintInAlbum(
+			p,
+			left,
+			top,
+			shrink,
+			moveProgress,
+			_sendWay.sendLargePhotos());
 	}
 }
 
@@ -403,7 +416,12 @@ void AlbumPreview::paintPhotos(Painter &p, QRect clip) const {
 		} else if (bottom <= clip.y()) {
 			continue;
 		}
-		thumb->paintPhoto(p, left, top, outerWidth);
+		thumb->paintPhoto(
+			p,
+			left,
+			top,
+			outerWidth,
+			_sendWay.sendLargePhotos());
 	}
 }
 
@@ -626,11 +644,14 @@ void AlbumPreview::showContextMenu(
 	if (_actionAllowed(index, AttachActionType::ToggleSpoiler)
 		&& _sendWay.sendImagesAsPhotos()) {
 		const auto spoilered = thumb->hasSpoiler();
-		_menu->addAction(spoilered
-			? tr::lng_context_disable_spoiler(tr::now)
-			: tr::lng_context_spoiler_effect(tr::now), [=] {
-			thumb->setSpoiler(!spoilered);
-		}, spoilered ? &st::menuIconSpoilerOff : &st::menuIconSpoiler);
+		::Menu::AddCheckedAction(
+			_menu.get(),
+			tr::lng_context_spoiler_effect(tr::now),
+			[=] {
+				thumb->setSpoiler(!spoilered);
+			},
+			&st::menuIconSpoiler,
+			spoilered);
 	}
 	if (_actionAllowed(index, AttachActionType::EditCover)) {
 		_menu->addAction(tr::lng_context_edit_cover(tr::now), [=] {
@@ -698,7 +719,7 @@ QImage AlbumPreview::generatePriceTagBackground() const {
 		p.translate(geometry.center());
 		p.scale(wscale, hscale);
 		p.translate(-geometry.center());
-		thumb->paintInAlbum(p, 0, 0, 1., 1.);
+		thumb->paintInAlbum(p, 0, 0, 1., 1., _sendWay.sendLargePhotos());
 		p.restore();
 	}
 	p.end();

@@ -141,6 +141,9 @@ public:
 		const PaintContext &context,
 		int top) const {
 	}
+	[[nodiscard]] virtual QRect groupItemRect(int index) const {
+		return {};
+	}
 	virtual void draw(Painter &p, const PaintContext &context) const = 0;
 	[[nodiscard]] virtual PointState pointState(QPoint point) const;
 	[[nodiscard]] virtual TextState textState(
@@ -182,6 +185,12 @@ public:
 	virtual void clickHandlerActiveChanged(const ClickHandlerPtr &p, bool active) {
 	}
 	virtual void clickHandlerPressedChanged(const ClickHandlerPtr &p, bool pressed) {
+	}
+
+	[[nodiscard]] virtual QRect addOptionRect(int innerWidth) const {
+		return {};
+	}
+	virtual void setAddOptionActive(bool active) {
 	}
 
 	[[nodiscard]] virtual bool uploading() const {

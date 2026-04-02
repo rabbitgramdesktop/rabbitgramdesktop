@@ -63,8 +63,8 @@ rpl::producer<TextWithEntities> Text3() {
 } // namespace
 
 void AboutBox(not_null<Ui::GenericBox*> box) {
-	box->setTitle(rpl::single(u"rabbitGram Desktop"_q));
-	
+	box->setTitle(u"rabbitGram Desktop"_q);
+
 	auto layout = box->verticalLayout();
 
 	const auto version = layout->add(
@@ -105,7 +105,7 @@ void AboutBox(not_null<Ui::GenericBox*> box) {
 			box->getDelegate()->show(
 				Ui::MakeInformBox(
 					"The link to the current private alpha "
-					"version of Telegram Desktop was copied "
+					"version of rabbitGram Desktop was copied "
 					"to the clipboard."));
 		} else {
 			File::OpenUrl(Core::App().changelogLink());
