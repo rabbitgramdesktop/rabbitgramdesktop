@@ -1445,6 +1445,97 @@ void ProxiesBoxController::ShowApplyConfirmation(
 		} else if (type == Type::Mtproto) {
 			add(proxy.password, tr::lng_proxy_box_secret);
 		}
+
+		const auto ping = box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			QString(),
+			st::proxyApplyBoxLabel));
+		ping->setMarkedText(tr::link(u"Check ping"_q));
+		Ui::AddSkip(box->verticalLayout());
+
+		struct PingState {
+			Checker checker;
+			Checker checkerv6;
+		};
+		auto state = std::make_shared<PingState>();
+		const auto statePtr = state.get();
+		box->lifetime().add([state = std::move(state)] {});
+
+		const auto startCheck = [=] {
+			if (!controller || statePtr->checker || statePtr->checkerv6) {
+				return;
+			}
+			ping->setText(tr::lng_proxy_checking(tr::now));
+
+			using Variants = MTP::DcOptions::Variants;
+			const auto mtproto = &controller->session().mtp();
+			const auto dcId = mtproto->mainDcId();
+			const auto forFiles = false;
+			const auto protocol = Variants::Tcp;
+			const auto options = mtproto->dcOptions().lookup(
+				dcId,
+				MTP::DcType::Regular,
+				true);
+
+			const auto setup = [&](Checker &checker, const bytes::vector &secret) {
+				checker = MTP::details::AbstractConnection::Create(
+					mtproto,
+					protocol,
+					QThread::currentThread(),
+					secret,
+					proxy);
+				const auto pointer = checker.get();
+				pointer->connect(pointer, &MTP::details::AbstractConnection::connected, box, [=] {
+					const auto pingTime = pointer->pingTime();
+					statePtr->checker = nullptr;
+					statePtr->checkerv6 = nullptr;
+					ping->setText(tr::lng_proxy_available(
+						tr::now,
+						lt_ping,
+						QString::number(pingTime)));
+				});
+				const auto failed = [=] {
+					if (statePtr->checker.get() == pointer) {
+						statePtr->checker = nullptr;
+					} else if (statePtr->checkerv6.get() == pointer) {
+						statePtr->checkerv6 = nullptr;
+					}
+					if (!statePtr->checker && !statePtr->checkerv6) {
+						ping->setText(tr::lng_proxy_unavailable(tr::now));
+					}
+				};
+				pointer->connect(pointer, &MTP::details::AbstractConnection::disconnected, box, failed);
+				pointer->connect(pointer, &MTP::details::AbstractConnection::error, box, failed);
+			};
+
+			const auto connect = [&](Checker &checker, Variants::Address address) {
+				const auto &list = options.data[address][protocol];
+				if (list.empty()
+					|| ((address == Variants::IPv6)
+						&& !Core::App().settings().proxy().tryIPv6())) {
+					checker = nullptr;
+					return;
+				}
+				const auto &endpoint = list.front();
+				setup(checker, endpoint.secret);
+				checker->connectToServer(
+					QString::fromStdString(endpoint.ip),
+					endpoint.port,
+					endpoint.secret,
+					dcId,
+					forFiles);
+			};
+
+			connect(statePtr->checker, Variants::IPv4);
+			connect(statePtr->checkerv6, Variants::IPv6);
+			if (!statePtr->checker && !statePtr->checkerv6) {
+				ping->setText(tr::lng_proxy_unavailable(tr::now));
+			}
+		};
+		if (controller) {
+			ping->overrideLinkClickHandler(startCheck);
+		}
+
 		const auto enableButton = box->addButton(tr::lng_sure_enable(), [=] {
 			auto &proxies = Core::App().settings().proxy().list();
 			if (!ranges::contains(proxies, proxy)) {
