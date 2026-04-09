@@ -56,7 +56,9 @@ void HistoryStreamedDrafts::apply(
 	_drafts.emplace(rootId, Draft{
 		.message = _history->addNewLocalMessage({
 			.id = _history->owner().nextLocalMessageId(),
-			.flags = MessageFlag::Local | MessageFlag::HasReplyInfo,
+			.flags = (MessageFlag::Local
+				| MessageFlag::HasReplyInfo
+				| MessageFlag::TextAppearing),
 			.from = fromId,
 			.replyTo = {
 				.messageId = replyToId,
@@ -92,6 +94,13 @@ void HistoryStreamedDrafts::clear(MsgId rootId) {
 	if (_drafts.empty()) {
 		scheduleDestroy();
 	}
+}
+
+bool HistoryStreamedDrafts::hasFor(not_null<HistoryItem*> item) const {
+	const auto rootId = item->topicRootId();
+	const auto i = _drafts.find(rootId);
+	return (i != end(_drafts))
+		&& (i->second.message->from() == item->from());
 }
 
 void HistoryStreamedDrafts::applyItemAdded(not_null<HistoryItem*> item) {

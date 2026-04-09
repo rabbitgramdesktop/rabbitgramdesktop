@@ -268,7 +268,6 @@ void Controller::Unsupported::setup(not_null<PeerData*> peer) {
 		wrap,
 		rktr("rtg_update"),
 		st::storiesUnsupportedUpdate);
-	_button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	_button->show();
 
 	rpl::combine(

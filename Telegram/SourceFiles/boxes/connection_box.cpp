@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/call_delayed.h"
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
+#include "base/weak_ptr.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/local_url_handlers.h"
@@ -39,6 +40,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/table_layout.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/vertical_list.h"
 #include "ui/ui_utility.h"
@@ -74,7 +76,7 @@ using ProxyData = MTP::ProxyData;
 
 [[nodiscard]] QString ProxyDataToString(const ProxyData &proxy) {
 	using Type = ProxyData::Type;
-	return u"https://t.me/"_q
+	return u"tg://"_q
 		+ (proxy.type == Type::Socks5 ? "socks" : "proxy")
 		+ "?server=" + proxy.host + "&port=" + QString::number(proxy.port)
 		+ ((proxy.type == Type::Socks5 && !proxy.user.isEmpty())
@@ -151,9 +153,13 @@ void AddProxyFromClipboard(
 				const auto type = isSocks
 					? ProxyData::Type::Socks5
 					: ProxyData::Type::Mtproto;
-				const auto fields = url_parse_params(
+				auto fields = url_parse_params(
 					match->captured(1),
 					qthelp::UrlParamNameTransform::ToLower);
+				if (type == ProxyData::Type::Mtproto) {
+					auto &secret = fields[u"secret"_q];
+					secret.replace('+', '-').replace('/', '_');
+				}
 				const auto proxy = ProxyDataFromFields(type, fields);
 				if (!proxy) {
 					const auto status = proxy.status();
@@ -1352,6 +1358,97 @@ void ProxyBox::addLabel(
 		st::proxyEditTitlePadding);
 }
 
+using Connection = MTP::details::AbstractConnection;
+using Checker = MTP::details::ConnectionPointer;
+
+void ResetProxyCheckers(Checker &v4, Checker &v6) {
+	v4 = nullptr;
+	v6 = nullptr;
+}
+
+void DropProxyChecker(Checker &v4, Checker &v6, not_null<Connection*> raw) {
+	if (v4.get() == raw) {
+		v4 = nullptr;
+	} else if (v6.get() == raw) {
+		v6 = nullptr;
+	}
+}
+
+[[nodiscard]] bool HasProxyCheckers(const Checker &v4, const Checker &v6) {
+	return v4 || v6;
+}
+
+void StartProxyCheck(
+		not_null<MTP::Instance*> mtproto,
+		const ProxyData &proxy,
+		Checker &v4,
+		Checker &v6,
+		Fn<void(Connection *raw, int ping)> done,
+		Fn<void(Connection *raw)> fail) {
+	using Variants = MTP::DcOptions::Variants;
+
+	ResetProxyCheckers(v4, v6);
+	const auto connType = (proxy.type == ProxyData::Type::Http)
+		? Variants::Http
+		: Variants::Tcp;
+	const auto dcId = mtproto->mainDcId();
+	const auto setup = [&](Checker &checker, const bytes::vector &secret) {
+		checker = Connection::Create(
+			mtproto,
+			connType,
+			QThread::currentThread(),
+			secret,
+			proxy);
+		const auto raw = checker.get();
+		raw->connect(raw, &Connection::connected, [=] {
+			if (done) {
+				done(raw, raw->pingTime());
+			}
+		});
+		const auto failed = [=] {
+			if (fail) {
+				fail(raw);
+			}
+		};
+		raw->connect(raw, &Connection::disconnected, failed);
+		raw->connect(raw, &Connection::error, failed);
+	};
+	if (proxy.type == ProxyData::Type::Mtproto) {
+		const auto secret = proxy.secretFromMtprotoPassword();
+		setup(v4, secret);
+		v4->connectToServer(
+			proxy.host,
+			proxy.port,
+			secret,
+			dcId,
+			false);
+		return;
+	}
+	const auto options = mtproto->dcOptions().lookup(
+		dcId,
+		MTP::DcType::Regular,
+		true);
+	const auto tryConnect = [&](Checker &checker, Variants::Address address) {
+		const auto &list = options.data[address][connType];
+		if (list.empty()
+			|| ((address == Variants::IPv6)
+				&& !Core::App().settings().proxy().tryIPv6())) {
+			checker = nullptr;
+			return;
+		}
+		const auto &endpoint = list.front();
+		setup(checker, endpoint.secret);
+		checker->connectToServer(
+			QString::fromStdString(endpoint.ip),
+			endpoint.port,
+			endpoint.secret,
+			dcId,
+			false);
+	};
+	tryConnect(v4, Variants::IPv4);
+	tryConnect(v6, Variants::IPv6);
+}
+
 } // namespace
 
 ProxiesBoxController::ProxiesBoxController(not_null<Main::Account*> account)
@@ -1416,144 +1513,177 @@ void ProxiesBoxController::ShowApplyConfirmation(
 		QString()
 	).replace(UrlEndRegExp, QString());
 	const auto box = [=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(tr::lng_proxy_box_title());
-		if (type == Type::Mtproto) {
-			box->addRow(object_ptr<Ui::FlatLabel>(
+		box->setTitle(tr::lng_proxy_box_table_title());
+		box->setStyle(st::proxyApplyBox);
+		box->addTopButton(st::boxTitleClose, [=] {
+			box->closeBox();
+		});
+
+		const auto table = box->addRow(
+			object_ptr<Ui::TableLayout>(
 				box,
-				tr::lng_proxy_sponsor_warning(),
-				st::boxDividerLabel));
-			Ui::AddSkip(box->verticalLayout());
-			Ui::AddSkip(box->verticalLayout());
-		}
-		const auto &stL = st::proxyApplyBoxLabel;
-		const auto &stSubL = st::boxDividerLabel;
-		const auto add = [&](const QString &s, tr::phrase<> phrase) {
-			if (!s.isEmpty()) {
-				box->addRow(object_ptr<Ui::FlatLabel>(box, s, stL));
-				box->addRow(object_ptr<Ui::FlatLabel>(box, phrase(), stSubL));
-				Ui::AddSkip(box->verticalLayout());
-				Ui::AddSkip(box->verticalLayout());
+				st::proxyApplyBoxTable),
+			st::proxyApplyBoxTableMargin);
+		const auto addRow = [&](
+				rpl::producer<QString> label,
+				object_ptr<Ui::RpWidget> value) {
+			table->addRow(
+				object_ptr<Ui::FlatLabel>(
+					table,
+					std::move(label),
+					table->st().defaultLabel),
+				std::move(value),
+				st::proxyApplyBoxTableLabelMargin,
+				st::proxyApplyBoxTableValueMargin);
+		};
+		const auto add = [&](
+				const QString &value,
+				rpl::producer<QString> label) {
+			if (!value.isEmpty()) {
+				constexpr auto kOneLineCount = 20;
+				const auto oneLine = value.length() <= kOneLineCount;
+				auto widget = object_ptr<Ui::FlatLabel>(
+					table,
+					rpl::single(Ui::Text::Wrapped(
+						{ value },
+						EntityType::Code,
+						{})),
+					(oneLine
+						? table->st().defaultValue
+						: st::proxyApplyBoxValueMultiline),
+					st::defaultPopupMenu);
+				addRow(std::move(label), std::move(widget));
 			}
 		};
 		if (!displayServer.isEmpty()) {
-			add(displayServer, tr::lng_proxy_box_server);
+			add(displayServer, tr::lng_proxy_box_server());
 		}
-		add(QString::number(proxy.port), tr::lng_proxy_box_port);
+		add(QString::number(proxy.port), tr::lng_proxy_box_port());
 		if (type == Type::Socks5) {
-			add(proxy.user, tr::lng_proxy_box_username);
-			add(proxy.password, tr::lng_proxy_box_password);
+			add(proxy.user, tr::lng_proxy_box_username());
+			add(proxy.password, tr::lng_proxy_box_password());
 		} else if (type == Type::Mtproto) {
-			add(proxy.password, tr::lng_proxy_box_secret);
+			add(proxy.password, tr::lng_proxy_box_secret());
 		}
 
-		const auto ping = box->addRow(object_ptr<Ui::FlatLabel>(
-			box,
-			QString(),
-			st::proxyApplyBoxLabel));
-		ping->setMarkedText(tr::link(u"Check ping"_q));
-		Ui::AddSkip(box->verticalLayout());
-
-		struct PingState {
-			Checker checker;
-			Checker checkerv6;
-		};
-		auto state = std::make_shared<PingState>();
-		const auto statePtr = state.get();
-		box->lifetime().add([state = std::move(state)] {});
-
-		const auto startCheck = [=] {
-			if (!controller || statePtr->checker || statePtr->checkerv6) {
-				return;
-			}
-			ping->setText(tr::lng_proxy_checking(tr::now));
-
-			using Variants = MTP::DcOptions::Variants;
-			const auto mtproto = &controller->session().mtp();
-			const auto dcId = mtproto->mainDcId();
-			const auto forFiles = false;
-			const auto protocol = Variants::Tcp;
-			const auto options = mtproto->dcOptions().lookup(
-				dcId,
-				MTP::DcType::Regular,
-				true);
-
-			const auto setup = [&](Checker &checker, const bytes::vector &secret) {
-				checker = MTP::details::AbstractConnection::Create(
-					mtproto,
-					protocol,
-					QThread::currentThread(),
-					secret,
-					proxy);
-				const auto pointer = checker.get();
-				pointer->connect(pointer, &MTP::details::AbstractConnection::connected, box, [=] {
-					const auto pingTime = pointer->pingTime();
-					statePtr->checker = nullptr;
-					statePtr->checkerv6 = nullptr;
-					ping->setText(tr::lng_proxy_available(
-						tr::now,
-						lt_ping,
-						QString::number(pingTime)));
-				});
-				const auto failed = [=] {
-					if (statePtr->checker.get() == pointer) {
-						statePtr->checker = nullptr;
-					} else if (statePtr->checkerv6.get() == pointer) {
-						statePtr->checkerv6 = nullptr;
-					}
-					if (!statePtr->checker && !statePtr->checkerv6) {
-						ping->setText(tr::lng_proxy_unavailable(tr::now));
-					}
-				};
-				pointer->connect(pointer, &MTP::details::AbstractConnection::disconnected, box, failed);
-				pointer->connect(pointer, &MTP::details::AbstractConnection::error, box, failed);
+		{
+			struct ProxyCheckStatusState {
+				Checker v4;
+				Checker v6;
+				rpl::variable<TextWithEntities> statusValue;
+				bool finished = false;
 			};
-
-			const auto connect = [&](Checker &checker, Variants::Address address) {
-				const auto &list = options.data[address][protocol];
-				if (list.empty()
-					|| ((address == Variants::IPv6)
-						&& !Core::App().settings().proxy().tryIPv6())) {
-					checker = nullptr;
+			const auto state
+				= box->lifetime().make_state<ProxyCheckStatusState>();
+			state->statusValue = Ui::Text::Link(
+				tr::lng_proxy_box_check_status(tr::now));
+			const auto weak = base::make_weak(box);
+			auto statusWidget = object_ptr<Ui::FlatLabel>(
+				table,
+				state->statusValue.value(),
+				table->st().defaultValue,
+				st::defaultPopupMenu);
+			const auto statusLabel = statusWidget.data();
+			addRow(tr::lng_proxy_box_status(), std::move(statusWidget));
+			const auto relayout = [=] {
+				table->resizeToWidth(table->width());
+			};
+			const auto setUnavailable = [=] {
+				state->statusValue = TextWithEntities{
+					tr::lng_proxy_box_table_unavailable(tr::now),
+				};
+				statusLabel->setTextColorOverride(
+					st::proxyRowStatusFgOffline->c);
+				relayout();
+			};
+			const auto runCheck = [=] {
+				if (!weak) {
 					return;
 				}
-				const auto &endpoint = list.front();
-				setup(checker, endpoint.secret);
-				checker->connectToServer(
-					QString::fromStdString(endpoint.ip),
-					endpoint.port,
-					endpoint.secret,
-					dcId,
-					forFiles);
+				const auto account = controller
+					? &controller->session().account()
+					: &Core::App().activeAccount();
+				state->finished = false;
+				state->statusValue = TextWithEntities{
+					tr::lng_proxy_box_table_checking(tr::now),
+				};
+				statusLabel->setTextColorOverride(st::proxyRowStatusFg->c);
+				relayout();
+				StartProxyCheck(
+					&account->mtp(),
+					proxy,
+					state->v4,
+					state->v6,
+					[=](Connection *raw, int ping) {
+						if (!weak || state->finished) {
+							return;
+						}
+						DropProxyChecker(state->v4, state->v6, raw);
+						state->finished = true;
+						ResetProxyCheckers(state->v4, state->v6);
+						state->statusValue = TextWithEntities{
+							tr::lng_proxy_box_table_available(
+								tr::now,
+								lt_ping,
+								QString::number(ping)),
+						};
+						statusLabel->setTextColorOverride(
+							st::proxyRowStatusFgAvailable->c);
+						relayout();
+					},
+					[=](Connection *raw) {
+						if (!weak || state->finished) {
+							return;
+						}
+						DropProxyChecker(state->v4, state->v6, raw);
+						if (!HasProxyCheckers(state->v4, state->v6)) {
+							state->finished = true;
+							setUnavailable();
+						}
+					});
+				if (!HasProxyCheckers(state->v4, state->v6)) {
+					state->finished = true;
+					setUnavailable();
+				}
 			};
-
-			connect(statePtr->checker, Variants::IPv4);
-			connect(statePtr->checkerv6, Variants::IPv6);
-			if (!statePtr->checker && !statePtr->checkerv6) {
-				ping->setText(tr::lng_proxy_unavailable(tr::now));
-			}
-		};
-		if (controller) {
-			ping->overrideLinkClickHandler(startCheck);
+			statusLabel->setClickHandlerFilter([=](const auto &...) {
+				runCheck();
+				return false;
+			});
 		}
 
-		const auto enableButton = box->addButton(tr::lng_sure_enable(), [=] {
-			auto &proxies = Core::App().settings().proxy().list();
-			if (!ranges::contains(proxies, proxy)) {
-				proxies.push_back(proxy);
-			}
-			Core::App().setCurrentProxy(proxy, ProxyData::Settings::Enabled);
-			Local::writeSettings();
-			box->closeBox();
-		});
-		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
-		box->events(
-		) | rpl::on_next([=](not_null<QEvent*> e) {
+		if (type == Type::Mtproto) {
+			table->addRow(
+				object_ptr<Ui::FlatLabel>(
+					table,
+					tr::lng_proxy_sponsor_warning(),
+					st::proxyApplyBoxSponsorLabel),
+				object_ptr<Ui::RpWidget>(nullptr),
+				st::proxyApplyBoxSponsorMargin,
+				st::proxyApplyBoxSponsorMargin);
+		}
+
+		const auto enableButton = box->addButton(
+			tr::lng_proxy_box_table_button(),
+			[=] {
+				auto &proxies = Core::App().settings().proxy().list();
+				if (!ranges::contains(proxies, proxy)) {
+					proxies.push_back(proxy);
+				}
+				Core::App().setCurrentProxy(
+					proxy,
+					ProxyData::Settings::Enabled);
+				Local::writeSettings();
+				box->closeBox();
+			});
+		enableButton->setFullRadius(true);
+		box->events() | rpl::on_next([=](not_null<QEvent*> e) {
 			if ((e->type() != QEvent::KeyPress) || !enableButton) {
 				return;
 			}
 			const auto k = static_cast<QKeyEvent*>(e.get());
 			if (k->key() == Qt::Key_Enter || k->key() == Qt::Key_Return) {
-				enableButton->clicked(Qt::KeyboardModifiers(), Qt::LeftButton);
+				enableButton->clicked({}, Qt::LeftButton);
 			}
 		}, box->lifetime());
 	};
@@ -1572,96 +1702,47 @@ auto ProxiesBoxController::proxySettingsValue() const
 }
 
 void ProxiesBoxController::refreshChecker(Item &item) {
-	using Variants = MTP::DcOptions::Variants;
-	const auto type = (item.data.type == Type::Http)
-		? Variants::Http
-		: Variants::Tcp;
-	const auto mtproto = &_account->mtp();
-	const auto dcId = mtproto->mainDcId();
-	const auto forFiles = false;
-
 	item.state = ItemState::Checking;
-	const auto setup = [&](Checker &checker, const bytes::vector &secret) {
-		checker = MTP::details::AbstractConnection::Create(
-			mtproto,
-			type,
-			QThread::currentThread(),
-			secret,
-			item.data);
-		setupChecker(item.id, checker);
-	};
-	if (item.data.type == Type::Mtproto) {
-		const auto secret = item.data.secretFromMtprotoPassword();
-		setup(item.checker, secret);
-		item.checker->connectToServer(
-			item.data.host,
-			item.data.port,
-			secret,
-			dcId,
-			forFiles);
-		item.checkerv6 = nullptr;
-	} else {
-		const auto options = mtproto->dcOptions().lookup(
-			dcId,
-			MTP::DcType::Regular,
-			true);
-		const auto connect = [&](
-				Checker &checker,
-				Variants::Address address) {
-			const auto &list = options.data[address][type];
-			if (list.empty()
-				|| ((address == Variants::IPv6)
-					&& !Core::App().settings().proxy().tryIPv6())) {
-				checker = nullptr;
+	const auto id = item.id;
+	StartProxyCheck(
+		&_account->mtp(),
+		item.data,
+		item.checker,
+		item.checkerv6,
+		[=](Connection *raw, int pingTime) {
+			const auto item = ranges::find(
+				_list,
+				id,
+				[](const Item &item) { return item.id; });
+			if (item == end(_list)) {
 				return;
 			}
-			const auto &endpoint = list.front();
-			setup(checker, endpoint.secret);
-			checker->connectToServer(
-				QString::fromStdString(endpoint.ip),
-				endpoint.port,
-				endpoint.secret,
-				dcId,
-				forFiles);
-		};
-		connect(item.checker, Variants::IPv4);
-		connect(item.checkerv6, Variants::IPv6);
-		if (!item.checker && !item.checkerv6) {
-			item.state = ItemState::Unavailable;
-		}
+			DropProxyChecker(item->checker, item->checkerv6, raw);
+			ResetProxyCheckers(item->checker, item->checkerv6);
+			if (item->state == ItemState::Checking) {
+				item->state = ItemState::Available;
+				item->ping = pingTime;
+				updateView(*item);
+			}
+		},
+		[=](Connection *raw) {
+			const auto item = ranges::find(
+				_list,
+				id,
+				[](const Item &item) { return item.id; });
+			if (item == end(_list)) {
+				return;
+			}
+			DropProxyChecker(item->checker, item->checkerv6, raw);
+			if (!HasProxyCheckers(item->checker, item->checkerv6)
+				&& item->state == ItemState::Checking) {
+				item->state = ItemState::Unavailable;
+				updateView(*item);
+			}
+		});
+	if (!HasProxyCheckers(item.checker, item.checkerv6)) {
+		item.state = ItemState::Unavailable;
 	}
-}
-
-void ProxiesBoxController::setupChecker(int id, const Checker &checker) {
-	using Connection = MTP::details::AbstractConnection;
-	const auto pointer = checker.get();
-	pointer->connect(pointer, &Connection::connected, [=] {
-		const auto item = findById(id);
-		const auto pingTime = pointer->pingTime();
-		item->checker = nullptr;
-		item->checkerv6 = nullptr;
-		if (item->state == ItemState::Checking) {
-			item->state = ItemState::Available;
-			item->ping = pingTime;
-			updateView(*item);
-		}
-	});
-	const auto failed = [=] {
-		const auto item = findById(id);
-		if (item->checker == pointer) {
-			item->checker = nullptr;
-		} else if (item->checkerv6 == pointer) {
-			item->checkerv6 = nullptr;
-		}
-		if (!item->checker
-			&& !item->checkerv6
-			&& item->state == ItemState::Checking) {
-			item->state = ItemState::Unavailable;
-			updateView(*item);
-		}
-	};
-	pointer->connect(pointer, &Connection::disconnected, failed);
-	pointer->connect(pointer, &Connection::error, failed);
 }
 
 object_ptr<Ui::BoxContent> ProxiesBoxController::CreateOwningBox(

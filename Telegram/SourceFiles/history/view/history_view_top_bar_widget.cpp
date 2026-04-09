@@ -134,6 +134,11 @@ TopBarWidget::TopBarWidget(
 , _onlineUpdater([=] { updateOnlineDisplay(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
+	_clear->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_forward->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_sendNow->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_delete->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+
 	Lang::Updated(
 	) | rpl::on_next([=] {
 		refreshLang();
@@ -1079,7 +1084,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	_delete->moveToLeft(buttonsLeft, selectedButtonsTop);
 	{
-		const auto large = _forward->height() / 3;
+		const auto large = st::topBarActionButtonLargeRadius;
 		const auto &buttonSt = st::defaultActiveButton;
 		const auto small = buttonSt.radius
 			? buttonSt.radius
@@ -1415,7 +1420,8 @@ void TopBarWidget::showSelected(SelectedState state) {
 			_delete->finishNumbersAnimation();
 		}
 	}
-	if (visibilityChanged) {
+	if (visibilityChanged
+		|| (!wasSelectedState && nowSelectedState)) {
 		updateControlsVisibility();
 	}
 	if (wasSelectedState != nowSelectedState && !_chooseForReportReason) {

@@ -1074,6 +1074,7 @@ topBarInfo: IconButton(topBarSearch) {
 }
 topBarInfoActive: icon {{ "top_bar_profile", windowActiveTextFg }};
 topBarActionSkip: 10px;
+topBarActionButtonLargeRadius: 8px;
 
 topBarInfoButtonSize: size(52px, topBarHeight);
 topBarInfoButtonInnerSize: 42px;
@@ -1463,3 +1464,6 @@ infoMusicButtonPadding: margins(16px, 6px, 13px, 6px);
 infoMusicButtonMargin: 2px;
 
 memberTagPillPadding: margins(5px, -1px, 5px, 0px);
+
+infoSecurityRiskIconSize: 16px;
+infoSecurityRiskIconMargin: margins(0px, 2px, 0px, 0px);
