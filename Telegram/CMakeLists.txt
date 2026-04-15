@@ -1683,6 +1683,8 @@ PRIVATE
     settings/sections/settings_local_passcode.h
     settings/sections/settings_main.cpp
     settings/sections/settings_main.h
+    settings/settings_recent_searches.cpp
+    settings/settings_recent_searches.h
     settings/settings_search.cpp
     settings/settings_search.h
     settings/settings_faq_suggestions.cpp
@@ -1874,6 +1876,7 @@ PRIVATE
     window/window_section_common.h
     window/window_separate_id.cpp
     window/window_separate_id.h
+    window/session/window_session_media.cpp
     window/window_session_controller.cpp
     window/window_session_controller.h
     window/window_session_controller_link_info.h

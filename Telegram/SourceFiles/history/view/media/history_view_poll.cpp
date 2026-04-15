@@ -1531,7 +1531,8 @@ struct Poll::Options : public Poll::Part {
 		Answer &answer,
 		const PollAnswer &original,
 		int percent,
-		int maxVotes);
+		int maxVotes,
+		bool showPercent);
 
 	std::vector<Answer> _answers;
 	mutable std::unique_ptr<AnswersAnimation> _answersAnimation;
@@ -2825,8 +2826,9 @@ void Poll::Options::updateAnswerVotesFromOriginal(
 		Answer &answer,
 		const PollAnswer &original,
 		int percent,
-		int maxVotes) {
-	if (!_owner->showVotes()) {
+		int maxVotes,
+		bool showPercent) {
+	if (!_owner->showVotes() || !showPercent) {
 		answer.votesPercent = 0;
 		answer.votesPercentString.clear();
 		answer.votesPercentWidth = 0;
@@ -2839,7 +2841,7 @@ void Poll::Options::updateAnswerVotesFromOriginal(
 	}
 	answer.chosen = original.chosen;
 	answer.votes = original.votes;
-	answer.filling = answer.votes / float64(maxVotes);
+	answer.filling = percent / 100.;
 	if (_owner->showVotes() && answer.votes) {
 		answer.votesCountString = Lang::FormatCountDecimal(answer.votes);
 		answer.votesCountWidth = st::normalFont->width(
@@ -2877,7 +2879,11 @@ void Poll::Options::updateAnswerVotes() {
 		|| _owner->_poll->answers.empty()) {
 		return;
 	}
-	const auto totalVotes = std::max(1, _owner->_poll->totalVoters);
+	const auto totalVotes = _owner->_poll->totalVoters;
+	const auto showPercent = (totalVotes > 0)
+		&& ranges::all_of(_owner->_poll->answers, [=](const PollAnswer &a) {
+			return a.votes <= totalVotes;
+		});
 	const auto maxVotes = std::max(1, ranges::max_element(
 		_owner->_poll->answers,
 		ranges::less(),
@@ -2895,10 +2901,12 @@ void Poll::Options::updateAnswerVotes() {
 		) | ranges::views::transform(&PollAnswer::votes),
 		ranges::begin(VotesStorage));
 
-	CountNicePercent(
-		gsl::make_span(VotesStorage).subspan(0, count),
-		totalVotes,
-		gsl::make_span(PercentsStorage).subspan(0, count));
+	if (showPercent) {
+		CountNicePercent(
+			gsl::make_span(VotesStorage).subspan(0, count),
+			totalVotes,
+			gsl::make_span(PercentsStorage).subspan(0, count));
+	}
 
 	for (auto &answer : _answers) {
 		const auto i = ranges::find(
@@ -2911,7 +2919,8 @@ void Poll::Options::updateAnswerVotes() {
 			answer,
 			*i,
 			PercentsStorage[index],
-			maxVotes);
+			maxVotes,
+			showPercent);
 	}
 }
 
