@@ -202,18 +202,9 @@ bool Sticker::readyToDrawAnimationFrame() {
 }
 
 QSize Sticker::Size() {
-	// const auto currentStickerHeight = RabbitSettings::stickerSize();
-	// const auto maxHeight = int(st::maxStickerSize / 256.0 * currentStickerHeight);
-	// return { maxHeight, maxHeight };
-	const auto side = std::min(st::maxStickerSize, kMaxSizeFixed);
-	if (OptionStickerSize.value() > 0) [[unlikely]] {
-		const auto scaled = std::clamp(
-			style::ConvertScale(OptionStickerSize.value()),
-			style::ConvertScale(50),
-			side);
-		return { scaled, scaled };
-	}
-	return { side, side };
+	const auto currentStickerHeight = RabbitSettings::stickerSize();
+	const auto maxHeight = int(st::maxStickerSize / 256.0 * currentStickerHeight);
+	return { maxHeight, maxHeight };
 }
 
 QSize Sticker::Size(not_null<DocumentData*> document) {
