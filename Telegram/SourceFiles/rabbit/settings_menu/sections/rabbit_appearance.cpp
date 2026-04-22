@@ -130,34 +130,6 @@ namespace Settings
                 };
             });
         }
-        
-#ifdef Q_OS_WIN
-        void BuildTheme(SectionBuilder &builder)
-        {
-            builder.addSubsectionTitle({
-                .id = u"rabbit/appearance/theme"_q,
-                .title = rktr("rtg_settings_theme"),
-                .keywords = { u"theme"_q, u"color"_q },
-            });
-            
-            if (const auto button = builder.addButton({
-                .id = u"rabbit/appearance/theme/apply_accent"_q,
-                .title = rktr("rtg_settings_apply_accent_theme"),
-                .icon = { &st::menuIconChangeColors },
-                .onClick = [=] {
-                    setAccentTheme();
-                },
-                .keywords = { u"theme"_q, u"color"_q, u"accent"_q },
-            })) {
-                if (const auto controller = builder.controller()) {
-                    RtgMenu::AttachSettingsContextMenu(
-                        button,
-                        u"rabbit/appearance/theme/apply_accent"_q,
-                        controller);
-                }
-            }
-        }
-#endif
 
         void BuildUserpic(SectionBuilder &builder)
         {
@@ -296,18 +268,8 @@ namespace Settings
             builder.addSkip();
             BuildAppIcon(builder);
             
-#ifdef Q_OS_WIN
             builder.addSkip();
             builder.addDivider();
-            builder.addSkip();
-            BuildTheme(builder);
-            
-            builder.addSkip();
-            builder.addDividerText(rktr("rtg_settings_accent_theme_annotation"));
-#else
-            builder.addSkip();
-            builder.addDivider();
-#endif
             builder.addSkip();
             BuildUserpic(builder);
 
