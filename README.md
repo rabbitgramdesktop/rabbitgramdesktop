@@ -3,10 +3,6 @@
 <img src="docs/assets/logo.png" alt="rabbitGram logo" width="200"/>
 
 # rabbitGram Desktop
-
-# ⚠️ Now closed-source. Updates are available on [GitHub][updates_gh] and [Telegram][updates_tg]. 
-## You can also receive updates via OTA by enabling "Update automatically" in Settings → Advanced.
-
 ### Telegram Desktop based messenger with special features
 
 This is the complete source code and the build instructions for the app based on the official [Telegram][telegram] messenger desktop client.
@@ -16,6 +12,11 @@ This is the complete source code and the build instructions for the app based on
 The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
 
 </div>
+
+## Install
+### Windows:
+* Download from [Telegram][updates_tg]
+* Download from [GitHub Releases][updates_gh]
 
 ## Features
 
@@ -76,4 +77,4 @@ You can build rabbitGram Desktop yourself using [build instructions][build_instr
 [materialgram]: https://github.com/kukuruzka165/materialgram
 [64gram]: https://github.com/TDesktop-x64/tdesktop
 [updates_tg]: https://t.me/rabbitGramUpdates
-[updates_gh]: https://github.com/rabbitgramdesktop/rtgdupdates/releases
+[updates_gh]: https://github.com/rabbitgramdesktop/rabbitgramdesktop/releases
