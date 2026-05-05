@@ -50,6 +50,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mainwidget.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_numbers_animation.h"
+#include "menu/menu_send.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
 #include "styles/style_info.h"
 #include "styles/style_profile.h"
@@ -91,6 +92,7 @@ const style::InfoTopBar &TopBarStyle(Wrap wrap) {
 			case Type::Link: return tr::lng_media_selected_link;
 			case Type::RoundVoiceFile: return tr::lng_media_selected_audio;
 			case Type::PhotoVideo: return tr::lng_stories_row_count;
+			case Type::Poll: return tr::lng_media_selected_poll;
 			}
 			Unexpected("Type in TopBar::generateSelectedText()");
 		}()(tr::now, lt_count, count, Ui::StringWithNumbers::FromString);
@@ -897,6 +899,16 @@ std::shared_ptr<Window::SectionMemento> WrapWidget::createMemento() {
 	_controller = nullptr;
 
 	return std::make_shared<Memento>(std::move(stack));
+}
+
+SendMenu::Details WrapWidget::sendMenuDetails() const {
+	return _content ? _content->sendMenuDetails() : SendMenu::Details();
+}
+
+bool WrapWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	return _content
+		? _content->processChosenSticker(std::move(chosen))
+		: false;
 }
 
 rpl::producer<int> WrapWidget::desiredHeightValue() const {

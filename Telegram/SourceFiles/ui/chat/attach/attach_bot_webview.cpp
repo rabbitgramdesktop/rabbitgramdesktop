@@ -48,7 +48,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace Ui::BotWebView {
 namespace {
 
-constexpr auto kProcessClickTimeout = crl::time(1000);
 constexpr auto kClipboardReadTimeout = crl::time(10000);
 constexpr auto kProgressDuration = crl::time(200);
 constexpr auto kProgressOpacity = 0.3;
@@ -1027,6 +1026,8 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			processBottomBarColor(arguments);
 		} else if (command == "web_app_send_prepared_message") {
 			processSendMessageRequest(arguments);
+		} else if (command == "web_app_request_chat") {
+			processRequestChat(arguments);
 		} else if (command == "web_app_set_emoji_status") {
 			processEmojiStatusRequest(arguments);
 		} else if (command == "web_app_request_emoji_status_access") {
@@ -1210,6 +1211,34 @@ void Panel::processSendMessageRequest(const QJsonObject &args) {
 	});
 	_delegate->botSendPreparedMessage({
 		.id = id,
+		.callback = std::move(callback),
+	});
+}
+
+void Panel::processRequestChat(const QJsonObject &args) {
+	if (args.isEmpty()) {
+		_delegate->botClose();
+		return;
+	}
+	const auto requestId = args["req_id"].toString();
+	if (requestId.isEmpty()) {
+		return;
+	}
+	auto callback = crl::guard(this, [=](QString error) {
+		if (error.isEmpty()) {
+			postEvent(
+				"requested_chat_sent",
+				u"{ req_id: \"%1\" }"_q.arg(requestId));
+		} else {
+			postEvent(
+				"requested_chat_failed",
+				u"{ req_id: \"%1\", error: \"%2\" }"_q.arg(
+					requestId,
+					error));
+		}
+	});
+	_delegate->botRequestChat({
+		.requestId = requestId,
 		.callback = std::move(callback),
 	});
 }

@@ -24,8 +24,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_peer_values.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "settings/sections/settings_premium.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "menu/menu_send.h"
+#include "settings/sections/settings_premium.h"
 #include "window/section_memento.h"
 #include "window/window_slide_animation.h"
 #include "window/window_session_controller.h"
@@ -239,6 +241,14 @@ AbstractSectionWidget::AbstractSectionWidget(
 
 Main::Session &AbstractSectionWidget::session() const {
 	return _controller->session();
+}
+
+SendMenu::Details AbstractSectionWidget::sendMenuDetails() const {
+	return {};
+}
+
+bool AbstractSectionWidget::processChosenSticker(ChatHelpers::FileChosen &&) {
+	return false;
 }
 
 SectionWidget::SectionWidget(

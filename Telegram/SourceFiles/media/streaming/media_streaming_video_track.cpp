@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ffmpeg/ffmpeg_utility.h"
 #include "media/audio/media_audio.h"
+#include "media/media_common.h"
 #include "base/concurrent_timer.h"
 #include "core/crash_reports.h"
 #include "base/debug_log.h"
@@ -17,10 +18,11 @@ namespace Media {
 namespace Streaming {
 namespace {
 
-constexpr auto kMaxFrameArea = 3840 * 2160; // usual 4K
 constexpr auto kDisplaySkipped = crl::time(-1);
 constexpr auto kFinishedPosition = std::numeric_limits<crl::time>::max();
 static_assert(kDisplaySkipped != kTimeUnknown);
+
+using ::Media::ValidFrameSize;
 
 [[nodiscard]] QImage ConvertToARGB32(
 		FrameFormat format,
@@ -35,6 +37,9 @@ static_assert(kDisplaySkipped != kTimeUnknown);
 	//}
 
 	auto result = FFmpeg::CreateFrameStorage(data.size);
+	if (result.isNull()) {
+		return QImage();
+	}
 	const auto swscale = FFmpeg::MakeSwscalePointer(
 		data.size,
 		(format == FrameFormat::YUV420
@@ -373,6 +378,15 @@ auto VideoTrackObject::readFrame(not_null<Frame*> frame) -> FrameResult {
 		_waitingForData.fire({});
 		return FrameResult::Waiting;
 	}
+	const auto decodedFrame = _stream.decodedFrame.get();
+	const auto valid = ValidFrameSize(
+		decodedFrame->width,
+		decodedFrame->height,
+		kMaxFrameArea);
+	if (!valid) {
+		fail(Error::InvalidData);
+		return FrameResult::Error;
+	}
 	const auto position = currentFramePosition();
 	if (position == kTimeUnknown) {
 		fail(Error::InvalidData);
@@ -649,7 +663,11 @@ bool VideoTrackObject::tryReadFirstFrame(FFmpeg::Packet &&packet) {
 
 bool VideoTrackObject::processFirstFrame() {
 	const auto decodedFrame = _stream.decodedFrame.get();
-	if (decodedFrame->width * decodedFrame->height > kMaxFrameArea) {
+	const auto valid = ValidFrameSize(
+		decodedFrame->width,
+		decodedFrame->height,
+		kMaxFrameArea);
+	if (!valid) {
 		return false;
 	} else if (decodedFrame->hw_frames_ctx) {
 		if (!_stream.transferredFrame) {
@@ -716,6 +734,10 @@ void VideoTrackObject::callReady() {
 	const auto frame = _shared->frameForPaint();
 	++_frameIndex;
 
+	const auto frameSize = frame->original.isNull()
+		? frame->yuv.size
+		: frame->original.size();
+
 	base::take(_ready)({ VideoInformation{
 		.state = {
 			.position = _syncTimePoint.trackTime,
@@ -725,10 +747,14 @@ void VideoTrackObject::callReady() {
 			.duration = _stream.duration,
 		},
 		.size = FFmpeg::TransposeSizeByRotation(
-			FFmpeg::CorrectByAspect(frame->original.size(), _stream.aspect),
+			FFmpeg::CorrectByAspect(frameSize, _stream.aspect),
+			_stream.rotation),
+		.realSize = FFmpeg::TransposeSizeByRotation(
+			frameSize,
 			_stream.rotation),
 		.cover = frame->original,
 		.rotation = _stream.rotation,
+		.fps = _stream.fps,
 		.alpha = frame->alpha,
 	} });
 }

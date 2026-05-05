@@ -51,7 +51,7 @@ void SingleFilePreview::preparePreview(const PreparedFile &file) {
 	auto preview = QImage();
 	if (const auto image = std::get_if<PreparedFileInformation::Image>(
 		&file.information->media)) {
-		preview = image->data;
+		preview = file.preview.isNull() ? image->data : file.preview;
 	} else if (const auto video = std::get_if<PreparedFileInformation::Video>(
 		&file.information->media)) {
 		preview = video->thumbnail;
@@ -64,8 +64,13 @@ void SingleFilePreview::preparePreview(const PreparedFile &file) {
 			? fallbackName
 			: file.displayName;
 		data.name = displayName;
-		data.statusText = FormatImageSizeText(file.originalDimensions);
-		data.fileIsImage = true;
+		if (file.originalDimensions.isValid()) {
+			data.statusText = FormatImageSizeText(file.originalDimensions);
+			data.fileIsImage = true;
+		} else {
+			data.statusText = FormatSizeText(file.size);
+			data.fileIsImage = false;
+		}
 	} else {
 		auto fileinfo = QFileInfo(filepath);
 		auto filename = file.displayName.isEmpty()

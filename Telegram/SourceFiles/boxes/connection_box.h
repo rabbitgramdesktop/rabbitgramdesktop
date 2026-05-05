@@ -85,6 +85,8 @@ public:
 	object_ptr<Ui::BoxContent> addNewItemBox();
 	bool setProxySettings(ProxyData::Settings value);
 	void setProxyForCalls(bool enabled);
+	void setProxyRotationEnabled(bool enabled);
+	void setProxyRotationTimeout(int value);
 	void setTryIPv6(bool enabled);
 	rpl::producer<ProxyData::Settings> proxySettingsValue() const;
 
@@ -117,7 +119,6 @@ private:
 	void share(const ProxyData &proxy, bool qr = false);
 	void saveDelayed();
 	void refreshChecker(Item &item);
-	void setupChecker(int id, const Checker &checker);
 
 	void replaceItemWith(
 		std::vector<Item>::iterator which,

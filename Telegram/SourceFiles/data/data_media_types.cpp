@@ -101,11 +101,11 @@ struct AlbumCounts {
 };
 
 [[nodiscard]] TextWithEntities WithCaptionNotificationText(
-		const QString &attachType,
+		TextWithEntities attachType,
 		const TextWithEntities &caption,
 		bool hasMiniImages = false) {
 	if (caption.text.isEmpty()) {
-		return Ui::Text::Colorized(attachType);
+		return Ui::Text::Colorized(std::move(attachType));
 	}
 	auto wrapped = st::wrap_rtl(caption);
 	return hasMiniImages
@@ -116,11 +116,21 @@ struct AlbumCounts {
 			tr::lng_dialogs_text_media_wrapped(
 				tr::now,
 				lt_media,
-				Ui::Text::Colorized(attachType),
+				Ui::Text::Colorized(std::move(attachType)),
 				tr::marked),
 			lt_caption,
 			wrapped,
 			tr::marked);
+}
+
+[[nodiscard]] TextWithEntities WithCaptionNotificationText(
+		const QString &attachType,
+		const TextWithEntities &caption,
+		bool hasMiniImages = false) {
+	return WithCaptionNotificationText(
+		Ui::Text::WithEntities(attachType),
+		caption,
+		hasMiniImages);
 }
 
 [[nodiscard]] QImage PreparePreviewImage(
@@ -1209,27 +1219,35 @@ ItemPreview MediaFile::toPreview(ToPreviewOptions options) const {
 			}
 		}
 	}
-	const auto type = [&] {
+	const auto type = [&]() -> TextWithEntities {
 		using namespace Ui::Text;
 		if (_document->isVideoMessage()) {
-			return (item->media() && item->media()->ttlSeconds())
+			return WithEntities((item->media() && item->media()->ttlSeconds())
 				? tr::lng_in_dlg_video_message_ttl(tr::now)
-				: tr::lng_in_dlg_video_message(tr::now);
+				: tr::lng_in_dlg_video_message(tr::now));
 		} else if (_document->isAnimation()) {
-			return u"GIF"_q;
+			return WithEntities(u"GIF"_q);
 		} else if (_document->isVideoFile()) {
-			return tr::lng_in_dlg_video(tr::now);
+			return WithEntities(tr::lng_in_dlg_video(tr::now));
 		} else if (_document->isVoiceMessage()) {
-			return (item->media() && item->media()->ttlSeconds())
-				? tr::lng_in_dlg_voice_message_ttl(tr::now)
-				: tr::lng_in_dlg_audio(tr::now);
+			if (item->media() && item->media()->ttlSeconds()) {
+				return WithEntities(
+					tr::lng_in_dlg_voice_message_ttl(tr::now));
+			} else if (item->isUnreadMedia()) {
+				return tr::lng_in_dlg_audio_unread(
+					tr::now,
+					lt_emoji,
+					IconEmoji(&st::dialogsUnreadMediaDotEmoji),
+					tr::rich);
+			}
+			return WithEntities(tr::lng_in_dlg_audio(tr::now));
 		} else if (const auto name = FormatSongNameFor(_document).string();
 				!name.isEmpty()) {
-			return name;
+			return WithEntities(name);
 		} else if (_document->isAudioFile()) {
-			return tr::lng_in_dlg_audio_file(tr::now);
+			return WithEntities(tr::lng_in_dlg_audio_file(tr::now));
 		}
-		return tr::lng_in_dlg_file(tr::now);
+		return WithEntities(tr::lng_in_dlg_file(tr::now));
 	}();
 	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
@@ -1342,7 +1360,7 @@ bool MediaFile::forwardedBecomesUnread() const {
 }
 
 bool MediaFile::dropForwardedInfo() const {
-	return _document->isSong();
+	return false;
 }
 
 bool MediaFile::hasSpoiler() const {
@@ -2309,11 +2327,30 @@ MediaPoll::~MediaPoll() {
 }
 
 std::unique_ptr<Media> MediaPoll::clone(not_null<HistoryItem*> parent) {
-	return std::make_unique<MediaPoll>(parent, _poll);
+	auto result = std::make_unique<MediaPoll>(parent, _poll);
+	result->_consumedText = _consumedText;
+	return result;
 }
 
 PollData *MediaPoll::poll() const {
 	return _poll;
+}
+
+Storage::SharedMediaTypesMask MediaPoll::sharedMediaTypes() const {
+	return Storage::SharedMediaTypesMask{}
+		.added(Storage::SharedMediaType::Poll);
+}
+
+ItemPreview MediaPoll::toPreview(ToPreviewOptions options) const {
+	const auto caption = (options.hideCaption || options.ignoreMessageText)
+		? TextWithEntities()
+		: Dialogs::Ui::DialogsPreviewText(options.translated
+			? parent()->translatedText()
+			: parent()->originalText());
+	const auto type = u"\xD83D\xDCCA "_q + _poll->question.text;
+	return {
+		.text = WithCaptionNotificationText(type, caption),
+	};
 }
 
 TextWithEntities MediaPoll::notificationText() const {
@@ -2330,6 +2367,9 @@ QString MediaPoll::pinnedTextSubstring() const {
 
 TextForMimeData MediaPoll::clipboardText() const {
 	auto result = TextWithEntities();
+	if (!_consumedText.text.isEmpty()) {
+		result.append(_consumedText).append(u"\n"_q);
+	}
 	result
 		.append(u"[ "_q)
 		.append(tr::lng_in_dlg_poll(tr::now))
@@ -2340,6 +2380,15 @@ TextForMimeData MediaPoll::clipboardText() const {
 		result.append(u"\n- "_q).append(answer.text);
 	}
 	return TextForMimeData::Rich(std::move(result));
+}
+
+bool MediaPoll::consumeMessageText(const TextWithEntities &text) {
+	_consumedText = text;
+	return true;
+}
+
+TextWithEntities MediaPoll::consumedMessageText() const {
+	return _consumedText;
 }
 
 bool MediaPoll::updateInlineResultMedia(const MTPMessageMedia &media) {
@@ -2354,7 +2403,7 @@ std::unique_ptr<HistoryView::Media> MediaPoll::createView(
 		not_null<HistoryView::Element*> message,
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
-	return std::make_unique<HistoryView::Poll>(message, _poll);
+	return std::make_unique<HistoryView::Poll>(message, _poll, _consumedText);
 }
 
 MediaTodoList::MediaTodoList(
@@ -2404,7 +2453,7 @@ TextForMimeData MediaTodoList::clipboardText() const {
 }
 
 bool MediaTodoList::allowsEdit() const {
-	return parent()->out();
+	return parent()->out() || parent()->history()->peer->isSelf();
 }
 
 bool MediaTodoList::updateInlineResultMedia(const MTPMessageMedia &media) {

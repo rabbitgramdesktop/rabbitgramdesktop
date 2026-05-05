@@ -83,7 +83,6 @@ notifySendReply: IconButton {
 notifyFadeRight: icon {{ "fade_horizontal", notificationBg }};
 
 titleUnreadCounterTop: 6px;
-titleUnreadCounterRight: 35px;
 
 mainMenuWidth: 274px;
 mainMenuCoverHeight: 134px;
@@ -206,6 +205,21 @@ windowOutdatedClose: IconButton(defaultIconButton) {
 	icon: icon {{ "info/info_close", outdatedFg }};
 	iconOver: icon {{ "info/info_close", outdatedFg }};
 	iconPosition: point(-1px, -1px);
+}
+
+windowScreenReaderLabel: FlatLabel(defaultFlatLabel) {
+	align: align(left);
+	textFg: activeButtonFg;
+	style: semiboldTextStyle;
+}
+windowScreenReaderPadding: margins(12px, 4px, 4px, 4px);
+windowScreenReaderDisableTextStyle: semiboldTextStyle;
+windowScreenReaderButtonPadding: margins(12px, 0px, 12px, 0px);
+windowScreenReaderButtonHeight: 28px;
+windowScreenReaderButtonBorderWidth: 2px;
+windowScreenReaderButtonRadius: 14px;
+windowScreenReaderButtonRipple: RippleAnimation(defaultRippleAnimation) {
+	color: activeButtonBgRipple;
 }
 
 createThemeImportButton: SettingsButton(defaultSettingsButton) {

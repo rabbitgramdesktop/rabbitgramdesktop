@@ -184,6 +184,7 @@ struct ChatPaintHighlight {
 	float64 collapsion = 0.;
 	TextSelection range;
 	int todoItemId = 0;
+	QByteArray pollOption;
 };
 
 struct ChatPaintContext {

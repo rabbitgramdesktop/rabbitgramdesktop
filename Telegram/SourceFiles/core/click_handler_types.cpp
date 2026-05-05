@@ -17,7 +17,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_session.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/toast/toast.h"
-#include "ui/toast/toast_lottie_icon.h"
 #include "ui/widgets/popup_menu.h"
 #include "base/qthelp_regex.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -73,6 +72,19 @@ constexpr auto kReminderSetToastDuration = 4 * crl::time(1000);
 		}
 	}
 	return result;
+}
+
+[[nodiscard]] bool IsTelegramShortLinkHost(const QUrl &url) {
+	using namespace qthelp;
+
+	return regex_match(
+		"(^|\\.)(telegram\\.(me|dog)|t\\.me)$",
+		url.host(),
+		RegExOption::CaseInsensitive).valid();
+}
+
+[[nodiscard]] bool HiddenUrlRequiresConfirmation(const QUrl &url) {
+	return UrlRequiresConfirmation(url) || IsTelegramShortLinkHost(url);
 }
 
 // Possible context owners: media viewer, profile, history widget.
@@ -185,20 +197,15 @@ void DoneSetReminder(std::shared_ptr<ChatHelpers::Show> show) {
 		}
 		return false;
 	};
-	const auto toast = show->showToast({
+	show->showToast({
 		.text = text,
 		.filter = filter,
+		.iconLottie = u"toast/saved_messages"_q,
+		.iconPadding = st::selfForwardsTaggerIconPadding,
 		.st = &st::selfForwardsTaggerToast,
 		.attach = RectPart::Top,
 		.duration = kReminderSetToastDuration,
 	});
-	if (const auto strong = toast.get()) {
-		Ui::AddLottieToToast(
-			strong->widget(),
-			st::selfForwardsTaggerToast,
-			st::selfForwardsTaggerIcon,
-			u"toast/saved_messages"_q);
-	}
 };
 
 } // namespace
@@ -260,7 +267,8 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		const auto parsedUrl = url.startsWith(u"tonsite://"_q)
 			? QUrl(url)
 			: QUrl::fromUserInput(url);
-		if (UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
+		if (HiddenUrlRequiresConfirmation(parsedUrl)
+			&& !base::IsCtrlPressed()) {
 			const auto my = context.value<ClickHandlerContext>();
 			if (!my.show) {
 				Core::App().hideMediaView();

@@ -20,6 +20,7 @@ set(style_files
     ui/effects/premium.style
     ui/color_indices.style
     boxes/boxes.style
+    boxes/polls.style
     dialogs/dialogs.style
     chat_helpers/chat_helpers.style
     calls/calls.style
@@ -147,6 +148,10 @@ PRIVATE
     editor/scene/scene_item_image.h
     editor/scene/scene_item_line.cpp
     editor/scene/scene_item_line.h
+    editor/scene/scene_item_text.cpp
+    editor/scene/scene_item_text.h
+    editor/scene/scene_emoji_document.cpp
+    editor/scene/scene_emoji_document.h
 
     ui/boxes/about_cocoon_box.h
     ui/boxes/about_cocoon_box.cpp
@@ -219,10 +224,17 @@ PRIVATE
 
     menu/gift_resale_filter.cpp
     menu/gift_resale_filter.h
+    menu/menu_action_with_thumbnail.cpp
+    menu/menu_action_with_thumbnail.h
+    menu/menu_checked_action.cpp
+    menu/menu_checked_action.h
     menu/menu_check_item.cpp
     menu/menu_check_item.h
     menu/menu_item_rate_transcribe.cpp
     menu/menu_item_rate_transcribe.h
+    menu/menu_send_details.h
+    menu/menu_timecode_action.cpp
+    menu/menu_timecode_action.h
     menu/menu_ttl.cpp
     menu/menu_ttl.h
 
@@ -423,6 +435,8 @@ PRIVATE
     ui/controls/invite_link_buttons.h
     ui/controls/invite_link_label.cpp
     ui/controls/invite_link_label.h
+    ui/controls/labeled_emoji_tabs.cpp
+    ui/controls/labeled_emoji_tabs.h
     ui/controls/peer_list_dummy.cpp
     ui/controls/peer_list_dummy.h
     ui/controls/popup_selector.cpp
@@ -454,6 +468,8 @@ PRIVATE
     ui/controls/window_outdated_bar.cpp
     ui/controls/window_outdated_bar_dummy.cpp
     ui/controls/window_outdated_bar.h
+    ui/controls/window_screen_reader_bar.cpp
+    ui/controls/window_screen_reader_bar.h
     ui/effects/fireworks_animation.cpp
     ui/effects/fireworks_animation.h
     ui/effects/glare.cpp
@@ -478,12 +494,18 @@ PRIVATE
     ui/effects/round_checkbox.h
     ui/effects/scroll_content_shadow.cpp
     ui/effects/scroll_content_shadow.h
+    ui/effects/skeleton_animation.cpp
+    ui/effects/skeleton_animation.h
     ui/effects/shake_animation.cpp
     ui/effects/shake_animation.h
     ui/effects/snowflakes.cpp
     ui/effects/snowflakes.h
     ui/effects/toggle_arrow.cpp
     ui/effects/toggle_arrow.h
+    ui/effects/upload_progress_overlay.cpp
+    ui/effects/upload_progress_overlay.h
+    ui/effects/ttl_icon.cpp
+    ui/effects/ttl_icon.h
     ui/search_field_controller.cpp
     ui/search_field_controller.h
     ui/text/format_song_name.cpp
@@ -504,6 +526,8 @@ PRIVATE
     ui/widgets/chat_filters_tabs_slider.h
     ui/widgets/chat_filters_tabs_slider_reorder.cpp
     ui/widgets/chat_filters_tabs_slider_reorder.h
+    ui/widgets/cross_fade_label.cpp
+    ui/widgets/cross_fade_label.h
     ui/widgets/color_editor.cpp
     ui/widgets/color_editor.h
     ui/widgets/continuous_sliders.cpp

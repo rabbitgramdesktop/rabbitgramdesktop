@@ -19,7 +19,7 @@ RUN dnf -y install epel-release \
 		pulseaudio-libs-devel mesa-libGL-devel mesa-libEGL-devel mesa-libgbm-devel \
 		libdrm-devel vulkan-devel libva-devel libvdpau-devel libselinux-devel \
 		libmount-devel systemd-devel glib2-devel gobject-introspection-devel \
-		at-spi2-core-devel gtk3-devel boost1.78-devel \
+		at-spi2-core-devel gtk3-devel \
 	&& dnf clean all
 
 RUN alternatives --set python3 /usr/bin/python3.11
@@ -164,6 +164,19 @@ RUN git clone -b 1.0.7 --depth=1 https://github.com/google/highway.git \
 	&& cd .. \
 	&& rm -rf highway
 
+FROM builder AS mozjpeg
+RUN git clone -b v4.1.5 --depth=1 https://github.com/mozilla/mozjpeg.git \
+	&& cd mozjpeg \
+	&& cmake -B build . \
+		-DCMAKE_INSTALL_PREFIX=/usr/local \
+		-DENABLE_SHARED=OFF \
+		-DWITH_JPEG8=ON \
+		-DPNG_SUPPORTED=OFF \
+	&& cmake --build build --parallel \
+	&& DESTDIR=/usr/src/mozjpeg-cache cmake --install build \
+	&& cd .. \
+	&& rm -rf mozjpeg
+
 FROM builder AS opus
 RUN git clone -b v1.5.2 --depth=1 https://github.com/xiph/opus.git \
 	&& cd opus \
@@ -296,14 +309,11 @@ COPY --link --from=highway /usr/src/highway-cache /
 
 RUN git clone -b v0.11.2 --depth=1 https://github.com/libjxl/libjxl.git \
 	&& cd libjxl \
-	&& git submodule update --init --recursive --depth=1 third_party/libjpeg-turbo \
-	&& curl -sSL https://github.com/libjxl/libjxl/commit/ee3955b1553bcc10304d45b85dfef9afa9349d72.patch | sed 's/offset + t/offset + i/' | git apply \
 	&& cmake -B build . \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DBUILD_TESTING=OFF \
 		-DJPEGXL_ENABLE_DEVTOOLS=OFF \
 		-DJPEGXL_ENABLE_TOOLS=OFF \
-		-DJPEGXL_INSTALL_JPEGLI_LIBJPEG=ON \
 		-DJPEGXL_ENABLE_DOXYGEN=OFF \
 		-DJPEGXL_ENABLE_MANPAGES=OFF \
 		-DJPEGXL_ENABLE_BENCHMARK=OFF \
@@ -316,11 +326,6 @@ RUN git clone -b v0.11.2 --depth=1 https://github.com/libjxl/libjxl.git \
 	&& export DESTDIR=/usr/src/jxl-cache \
 	&& cmake --install build \
 	&& sed -i 's/-lstdc++//' $DESTDIR/usr/local/lib64/pkgconfig/libjxl*.pc \
-	&& rm $DESTDIR/usr/local/lib64/libjpeg.so* \
-	&& cp build/lib/libjpegli-static.a $DESTDIR/usr/local/lib64/libjpeg.a \
-	&& mkdir build/hwy \
-	&& ar --output=build/hwy x /usr/local/lib64/libhwy.a \
-	&& ar rcs $DESTDIR/usr/local/lib64/libjpeg.a build/lib/CMakeFiles/jpegli-libjpeg-obj.dir/jpegli/libjpeg_wrapper.cc.o build/hwy/* \
 	&& cd .. \
 	&& rm -rf libjxl
 
@@ -726,8 +731,8 @@ RUN git clone -b xkbcommon-1.6.0 --depth=1 https://github.com/xkbcommon/libxkbco
 FROM patches AS qt
 COPY --link --from=zlib /usr/src/zlib-cache /
 COPY --link --from=lcms2 /usr/src/lcms2-cache /
+COPY --link --from=mozjpeg /usr/src/mozjpeg-cache /
 COPY --link --from=webp /usr/src/webp-cache /
-COPY --link --from=jxl /usr/src/jxl-cache /
 COPY --link --from=xcb /usr/src/xcb-cache /
 COPY --link --from=xcb-wm /usr/src/xcb-wm-cache /
 COPY --link --from=xcb-util /usr/src/xcb-util-cache /
@@ -739,14 +744,11 @@ COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
 ENV QT=6.11.0
-RUN git clone -b v$QT-rc1 --depth=1 https://github.com/qt/qt5.git \
+RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 	&& cd qt5 \
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
-	&& cd qtbase \
-	&& find ../../patches/qtbase_$QT -type f -print0 | sort -z | xargs -r0 git apply \
-	&& cd ../qtwayland \
-	&& find ../../patches/qtwayland_$QT -type f -print0 | sort -z | xargs -r0 git apply \
-	&& cd .. \
+	&& find $PWD/../patches/qtbase_$QT -type f -print0 | sort -z | xargs -r0 git -C qtbase apply \
+	&& find $PWD/../patches/qtwayland_$QT -type f -print0 | sort -z | xargs -r0 git -C qtwayland apply \
 	&& cmake -B build . \
 		-DCMAKE_INSTALL_PREFIX=/usr/local \
 		-DBUILD_SHARED_LIBS=OFF \
@@ -767,6 +769,14 @@ RUN git clone -b v$QT-rc1 --depth=1 https://github.com/qt/qt5.git \
 	&& cd .. \
 	&& rm -rf qt5
 
+FROM builder AS boost
+RUN curl -sSL https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz | tar -xz \
+	&& cd boost_* \
+	&& ./bootstrap.sh --prefix=/usr/src/boost-cache/usr/local --with-libraries=regex \
+	&& ./b2 release link=static install \
+	&& cd .. \
+	&& rm -rf boost_*
+
 FROM builder AS breakpad
 RUN git clone -b v2024.02.16 --depth=1 https://chromium.googlesource.com/breakpad/breakpad.git \
 	&& cd breakpad \
@@ -779,11 +789,11 @@ RUN git clone -b v2024.02.16 --depth=1 https://chromium.googlesource.com/breakpa
 
 FROM builder AS webrtc
 COPY --link --from=zlib /usr/src/zlib-cache /
+COPY --link --from=mozjpeg /usr/src/mozjpeg-cache /
 COPY --link --from=opus /usr/src/opus-cache /
 COPY --link --from=openh264 /usr/src/openh264-cache /
 COPY --link --from=dav1d /usr/src/dav1d-cache /
 COPY --link --from=vpx /usr/src/vpx-cache /
-COPY --link --from=jxl /usr/src/jxl-cache /
 COPY --link --from=ffmpeg /usr/src/ffmpeg-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xext /usr/src/xext-cache /
@@ -843,6 +853,7 @@ COPY --link --from=protobuf /usr/src/protobuf-cache /
 COPY --link --from=lcms2 /usr/src/lcms2-cache /
 COPY --link --from=brotli /usr/src/brotli-cache /
 COPY --link --from=highway /usr/src/highway-cache /
+COPY --link --from=mozjpeg /usr/src/mozjpeg-cache /
 COPY --link --from=opus /usr/src/opus-cache /
 COPY --link --from=dav1d /usr/src/dav1d-cache /
 COPY --link --from=openh264 /usr/src/openh264-cache /
@@ -873,6 +884,7 @@ COPY --link --from=openal /usr/src/openal-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 COPY --link --from=qt /usr/src/qt-cache /
+COPY --link --from=boost /usr/src/boost-cache /
 COPY --link --from=breakpad /usr/src/breakpad-cache /
 COPY --link --from=webrtc /usr/src/webrtc-cache /
 COPY --link --from=ada /usr/src/ada-cache /
@@ -882,9 +894,6 @@ COPY --link --from=patches /usr/src/patches patches
 RUN patch -p1 -d /usr/lib64/gobject-introspection -i $PWD/patches/gobject-introspection.patch && rm -rf patches
 
 WORKDIR /usr/src/rtgdesktopdev
-ENV BOOST_INCLUDEDIR=/usr/include/boost1.78
-ENV BOOST_LIBRARYDIR=/usr/lib64/boost1.78
-
 USER user
 VOLUME [ "/usr/src/rtgdesktopdev" ]
 CMD [ "/usr/src/rtgdesktopdev/Telegram/build/docker/centos_env/build.sh" ]

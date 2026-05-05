@@ -44,7 +44,7 @@ jobs:
 
   linux:
     name: Rocky Linux 8
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/')) && 'depot-ubuntu-latest-16' || 'ubuntu-latest' }}
 
     env:
       IMAGE_TAG: tdesktop:centos_env
@@ -71,7 +71,7 @@ jobs:
           tool-cache: true
 
       - name: Set up Docker Buildx.
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Libraries cache.
         uses: actions/cache@v5
@@ -81,7 +81,7 @@ jobs:
           restore-keys: ${{ runner.OS }}-libs-
 
       - name: Libraries.
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: Telegram/build/docker/centos_env
           load: ${{ env.ONLY_CACHE == 'false' }}

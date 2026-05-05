@@ -11,22 +11,11 @@ using "ui/widgets/widgets.style";
 using "ui/effects/premium.style";
 using "settings/settings.style";
 
-creditsSettingsBigBalance: FlatLabel(defaultFlatLabel) {
-	style: TextStyle(defaultTextStyle) {
-		font: font(24px semibold);
-	}
-}
-creditsSettingsBigBalanceSkip: 4px;
 creditsSettingsBigBalanceButton: RoundButton(defaultActiveButton) {
 	width: 240px;
 	height: 40px;
 	textTop: 11px;
 	style: semiboldTextStyle;
-}
-creditsSettingsBigBalanceButtonGift: RoundButton(defaultLightButton) {
-	height: 42px;
-	textTop: 12px;
-	style: defaultTextStyle;
 }
 
 creditsPremiumCover: PremiumCover(defaultPremiumCover) {
@@ -165,6 +154,12 @@ giftBoxTabStyle: semiboldTextStyle;
 giftBoxTabFg: windowSubTextFg;
 giftBoxTabFgActive: windowBoldFg;
 giftBoxTabBgActive: windowBgRipple;
+giftBoxPillTabs: PillTabs(defaultPillTabs) {
+	borderWidth: 6px;
+	fg: windowSubTextFg;
+	fgActive: windowBoldFg;
+	bgActive: windowBgRipple;
+}
 giftBoxResaleTabsMargin: margins(11px, 10px, 11px, 8px);
 giftBoxResaleTabSkip: 8px;
 giftBoxResaleTabsDropdown: IconEmoji {
@@ -204,8 +199,6 @@ giftBoxByStarsStyle: TextStyle(defaultTextStyle) {
 }
 giftBoxByStarsSkip: 2px;
 giftBoxByStarsStarTop: 3px;
-giftBoxPremiumIconSize: 64px;
-giftBoxPremiumIconTop: 10px;
 giftBoxPremiumTextTop: 84px;
 giftBoxPremiumTextTopByStars: 78px;
 giftBoxButtonBottomSmall: 4px;
@@ -303,8 +296,6 @@ uniqueGiftNumber: FlatLabel(uniqueGiftTitle) {
 uniqueGiftResalePrice: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;
 }
-uniqueGiftResalePadding: margins(4px, 4px, 8px, 4px);
-uniqueGiftResaleMargin: margins(10px, 10px, 10px, 10px);
 uniqueGiftTitleTop: 140px;
 uniqueGiftSubtitle: FlatLabel(defaultFlatLabel) {
 	minWidth: 64px;
@@ -355,7 +346,6 @@ uniqueGiftSenderBadge: FlatLabel(defaultFlatLabel) {
 }
 
 uniqueAttributeTop: 10px;
-uniqueAttributeSkip: 8px;
 uniqueAttributePadding: margins(6px, 8px, 6px, 8px);
 uniqueAttributeName: TextStyle(semiboldTextStyle) {
 	font: font(12px semibold);
@@ -543,8 +533,6 @@ videoStreamStarsCover: PremiumCover(creditsLowBalancePremiumCover) {
 	}
 }
 
-auctionInfoPreviewMargin: margins(0px, 24px, 0px, 8px);
-auctionInfoSubtitleSkip: 8px;
 auctionInfoTableMargin: margins(0px, 12px, 0px, 12px);
 auctionInfoValueMultiline: FlatLabel(defaultTableValue) {
 	minWidth: 96px;
@@ -555,10 +543,9 @@ auctionBidEmoji: IconEmoji {
 	padding: margins(-4px, -2px, -4px, 0px);
 }
 auctionBidToast: Toast(defaultToast) {
-	padding: margins(54px, 13px, 19px, 12px);
-	icon: icon {{ "settings/toast_auction", toastFg }};
-	iconPosition: point(18px, 18px);
+	padding: margins(19px, 13px, 19px, 12px);
 }
+auctionBidToastIcon: icon {{ "toast/auction", toastFg }};
 auctionAboutLogo: icon {{ "settings/large_auctions", windowFgActive }};
 auctionAboutLogoPadding: margins(8px, 8px, 8px, 8px);
 auctionAboutTextPadding: margins(0px, 6px, 0px, 8px);

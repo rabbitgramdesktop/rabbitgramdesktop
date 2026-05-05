@@ -124,8 +124,8 @@ public:
 		PeerId monoforumPeerId,
 		MsgId msgId);
 
-	[[nodiscard]] bool verticalSubsectionTabs(PeerId peerId) const;
-	void setVerticalSubsectionTabs(PeerId peerId, bool vertical);
+	[[nodiscard]] qint32 subsectionTabsMode(PeerId peerId) const;
+	void setSubsectionTabsMode(PeerId peerId, qint32 mode);
 
 	[[nodiscard]] bool dialogsFiltersEnabled() const {
 		return _dialogsFiltersEnabled;
@@ -187,6 +187,13 @@ public:
 		return _moderateCommonGroups;
 	}
 
+	void setPhoneNumberHidden(bool hidden) {
+		_phoneNumberHidden = hidden;
+	}
+	[[nodiscard]] bool phoneNumberHidden() const {
+		return _phoneNumberHidden;
+	}
+
 private:
 	static constexpr auto kDefaultSupportChatsLimitSlice = 7 * 24 * 60 * 60;
 	static constexpr auto kPhotoEditorHintMaxShowsCount = 5;
@@ -211,7 +218,7 @@ private:
 	rpl::variable<bool> _archiveInMainMenu = false;
 	rpl::variable<bool> _skipArchiveInSearch = false;
 	base::flat_map<ThreadId, MsgId> _hiddenPinnedMessages;
-	base::flat_set<PeerId> _verticalSubsectionTabs;
+	base::flat_map<PeerId, qint32> _subsectionTabsModes;
 	base::flat_map<Data::DefaultNotify, ushort> _ringtoneDefaultVolumes;
 	base::flat_map<ThreadId, ushort> _ringtoneVolumes;
 	bool _dialogsFiltersEnabled = false;
@@ -236,6 +243,8 @@ private:
 	Data::SetupEmailState _setupEmailState;
 
 	std::vector<int32> _moderateCommonGroups;
+
+	bool _phoneNumberHidden = false;
 
 };
 

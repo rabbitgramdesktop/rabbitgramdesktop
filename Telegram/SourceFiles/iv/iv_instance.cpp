@@ -163,7 +163,6 @@ private:
 	base::flat_map<QByteArray, QByteArray> _embeds;
 	base::flat_map<QString, MapPreview> _maps;
 	std::vector<QByteArray> _resources;
-	int _resource = -1;
 
 	rpl::event_stream<Controller::Event> _events;
 
@@ -476,10 +475,7 @@ void Shown::streamFile(
 		requestFail(std::move(request));
 		return;
 	}
-	auto loader = document->createStreamingLoader(
-		fileOrigin(page),
-		false,
-		nullptr);
+	auto loader = document->createStreamingLoader(fileOrigin(page), false);
 	if (!loader) {
 		if (document->size >= Storage::kMaxFileInMemory) {
 			requestFail(std::move(request));
@@ -849,6 +845,10 @@ void Instance::show(
 	if (Platform::IsMac()) {
 		// Otherwise IV is not visible under the media viewer.
 		Core::App().hideMediaView();
+	}
+
+	if (Core::App().settings().normalizeIvZoom()) {
+		Core::App().saveSettingsDelayed();
 	}
 
 	const auto guard = gsl::finally([&] {

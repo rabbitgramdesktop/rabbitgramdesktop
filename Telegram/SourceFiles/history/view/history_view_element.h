@@ -34,6 +34,7 @@ namespace Ui {
 class PathShiftGradient;
 struct BubblePattern;
 struct ChatPaintContext;
+struct ChatPaintHighlight;
 class ChatStyle;
 struct ReactionFlyAnimationArgs;
 class ReactionFlyAnimation;
@@ -107,6 +108,12 @@ public:
 	virtual void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context) = 0;
+	virtual void elementShowAddPollOption(
+		not_null<Element*> view,
+		not_null<PollData*> poll,
+		FullMsgId context,
+		QRect optionRect) = 0;
+	virtual void elementSubmitAddPollOption(FullMsgId context) = 0;
 	virtual void elementOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) = 0;
@@ -163,6 +170,12 @@ public:
 	void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context) override;
+	void elementShowAddPollOption(
+		not_null<Element*> view,
+		not_null<PollData*> poll,
+		FullMsgId context,
+		QRect optionRect) override;
+	void elementSubmitAddPollOption(FullMsgId context) override;
 	void elementOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) override;
@@ -475,6 +488,7 @@ public:
 	[[nodiscard]] HistoryItem *textItem() const;
 	[[nodiscard]] Ui::Text::IsolatedEmoji isolatedEmoji() const;
 	[[nodiscard]] Ui::Text::OnlyCustomEmoji onlyCustomEmoji() const;
+	void skipInactiveTextAppearing();
 
 	[[nodiscard]] OnlyEmojiAndSpaces isOnlyEmojiAndSpaces() const;
 
@@ -637,6 +651,7 @@ public:
 
 	[[nodiscard]] virtual QRect effectIconGeometry() const;
 	[[nodiscard]] virtual QRect innerGeometry() const = 0;
+	[[nodiscard]] virtual QPoint mediaTopLeft() const;
 
 	void customEmojiRepaint();
 	void prepareCustomEmojiPaint(
@@ -707,7 +722,8 @@ protected:
 	virtual void refreshDataIdHook();
 
 	[[nodiscard]] const Ui::Text::String &text() const;
-	[[nodiscard]] int textHeightFor(int textWidth);
+	[[nodiscard]] int textHeightFor(int textWidth) const;
+	[[nodiscard]] int textRealWidth() const { return _textRealWidth; }
 	void validateText();
 	void validateTextSkipBlock(bool has, int width, int height);
 	void validateInlineKeyboard(HistoryMessageReplyMarkup *markup);
@@ -743,8 +759,11 @@ private:
 
 	virtual QSize performCountOptimalSize() = 0;
 	virtual QSize performCountCurrentSize(int newWidth) = 0;
+	virtual void invalidateTextDependentCache() {
+	}
 
 	void refreshMedia(Element *replacing);
+	void invalidateTextSizeCache();
 	void setTextWithLinks(
 		const TextWithEntities &text,
 		const std::vector<ClickHandlerPtr> &links = {});
@@ -765,7 +784,8 @@ private:
 
 	HistoryItem *_textItem = nullptr;
 	mutable Ui::Text::String _text;
-	mutable int _textWidth = -1;
+	mutable uint32 _textWidth : 16 = 0;
+	mutable uint32 _textRealWidth : 16 = 0;
 	mutable int _textHeight = 0;
 
 	int _y = 0;
@@ -785,6 +805,29 @@ private:
 	not_null<Element*> view,
 	int taskId,
 	int yfrom = 0);
+
+[[nodiscard]] int FindViewPollOptionY(
+	not_null<Element*> view,
+	const QByteArray &option,
+	int yfrom = 0);
+
+struct HighlightYRange {
+	int begin = 0;
+	int end = 0;
+
+	explicit operator bool() const {
+		return begin != end;
+	}
+};
+
+[[nodiscard]] HighlightYRange FindHighlightYRange(
+	not_null<Element*> view,
+	const Ui::ChatPaintHighlight &highlight);
+
+[[nodiscard]] int AdjustScrollForRange(
+	int viewTop,
+	int available,
+	HighlightYRange range);
 
 [[nodiscard]] Window::SessionController *ExtractController(
 	const ClickContext &context);

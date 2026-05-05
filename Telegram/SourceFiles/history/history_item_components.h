@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #pragma once
 
 #include "data/data_cloud_file.h"
+#include "data/data_poll.h"
 #include "history/history_item.h"
 #include "spellcheck/spellcheck_types.h" // LanguageId.
 #include "ui/empty_userpic.h"
@@ -286,6 +287,7 @@ struct ReplyFields {
 	MsgId topMessageId = 0;
 	StoryId storyId = 0;
 	int todoItemId = 0;
+	QByteArray pollOption;
 	uint32 quoteOffset : 30 = 0;
 	uint32 manualQuote : 1 = 0;
 	uint32 topicPost : 1 = 0;
@@ -420,6 +422,8 @@ public:
 	void setFullDisplayed(bool full) {
 		_fullDisplayed = full;
 	}
+
+	QString dragText() const override;
 
 	// Copy to clipboard support.
 	QString copyToClipboardText() const override;
@@ -673,6 +677,11 @@ struct HistoryServicePinned
 , HistoryServiceDependentData {
 };
 
+struct HistoryServiceClearHistory
+: RuntimeComponent<HistoryServiceClearHistory, HistoryItem>
+, HistoryServiceDependentData {
+};
+
 struct HistoryServiceTopicInfo
 : RuntimeComponent<HistoryServiceTopicInfo, HistoryItem>
 , HistoryServiceDependentData {
@@ -714,6 +723,18 @@ struct HistoryServiceTodoAppendTasks
 
 [[nodiscard]] TextWithEntities ComposeTodoTasksList(
 	not_null<HistoryServiceTodoAppendTasks*> append);
+
+struct HistoryServicePollAppendAnswer
+: RuntimeComponent<HistoryServicePollAppendAnswer, HistoryItem>
+, HistoryServiceDependentData {
+	PollAnswer answer;
+};
+
+struct HistoryServicePollDeleteAnswer
+: RuntimeComponent<HistoryServicePollDeleteAnswer, HistoryItem>
+, HistoryServiceDependentData {
+	PollAnswer answer;
+};
 
 struct HistoryServiceSuggestDecision
 : RuntimeComponent<HistoryServiceSuggestDecision, HistoryItem>

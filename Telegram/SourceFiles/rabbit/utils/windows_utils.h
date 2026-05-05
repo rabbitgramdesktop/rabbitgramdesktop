@@ -8,4 +8,3 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #pragma once
 
 void reloadAppIconFromTaskBar();
-void setAccentTheme();

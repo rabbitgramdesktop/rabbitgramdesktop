@@ -98,6 +98,7 @@ private:
 	Data::SavedSublist * const _sublist = nullptr;
 
 	bool _inResize = false;
+	bool _aboutVerificationAdded = false;
 	rpl::event_stream<Ui::ScrollToRequest> _scrollToRequests;
 	rpl::event_stream<int> _desiredHeight;
 
@@ -106,8 +107,6 @@ private:
 	rpl::event_stream<int> _onlineCount;
 	rpl::event_stream<> _showFinished;
 
-	PeerData *_reactionGroup = nullptr;
-
 	std::shared_ptr<Data::PhotoMedia> _nonPersonalView;
 
 	rpl::variable<std::optional<QColor>> _topBarColor;
@@ -115,8 +114,6 @@ private:
 	Members *_members = nullptr;
 	Ui::SlideWrap<RpWidget> *_sharedMediaWrap = nullptr;
 	object_ptr<RpWidget> _content;
-
-	bool _aboutVerificationAdded = false;
 
 };
 

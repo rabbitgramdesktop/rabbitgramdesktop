@@ -35,7 +35,6 @@ void PrepareFullWidthRoundButton(
 		not_null<Ui::RoundButton*> button,
 		not_null<Ui::VerticalLayout*> content,
 		const style::margins &padding) {
-	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	button->setFullRadius(true);
 	const auto paddingHorizontal = padding.left() + padding.right();
 	content->widthValue() | rpl::on_next([=](int w) {
@@ -50,7 +49,8 @@ void ShowMatchCodesBox(
 		Fn<std::shared_ptr<Ui::DynamicImage>(QString)> emojiImageFactory,
 		const QString &domain,
 		const QStringList &codes,
-		Fn<void(QString)> callback) {
+		Fn<void(QString)> callback,
+		bool isApp) {
 	box->setWidth(st::boxWidth);
 	box->setStyle(st::urlAuthBox);
 
@@ -164,7 +164,6 @@ void ShowMatchCodesBox(
 					(overlay->height() - visible) / 2);
 			});
 		}
-		button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 		button->setFullRadius(true);
 		button->setClickedCallback([=] {
 			callback(code);
@@ -175,8 +174,8 @@ void ShowMatchCodesBox(
 
 	Ui::AddSkip(content);
 
-	const auto domainUrl = qthelp::validate_url(domain);
-	if (!domainUrl.isEmpty()) {
+	const auto domainUrl = isApp ? QString() : qthelp::validate_url(domain);
+	if (!domainUrl.isEmpty() || isApp) {
 		Ui::AddSkip(content);
 		Ui::AddSkip(content);
 		content->add(
@@ -184,7 +183,9 @@ void ShowMatchCodesBox(
 				content,
 				tr::lng_url_auth_login_title(
 					lt_domain,
-					rpl::single(Ui::Text::Link(domain, domainUrl)),
+					rpl::single(isApp
+						? tr::bold(domain)
+						: Ui::Text::Link(domain, domainUrl)),
 					tr::marked),
 				st::urlAuthCheckboxAbout),
 			st::boxRowPadding,
@@ -433,7 +434,8 @@ void ShowDetails(
 		const QString &platform,
 		const QString &ip,
 		const QString &region,
-		rpl::producer<QStringList> matchCodes) {
+		rpl::producer<QStringList> matchCodes,
+		bool isApp) {
 	box->setWidth(st::boxWidth);
 	box->setStyle(st::urlAuthBox);
 
@@ -451,7 +453,7 @@ void ShowDetails(
 		Ui::AddSkip(content);
 	}
 
-	const auto domainUrl = qthelp::validate_url(domain);
+	const auto domainUrl = isApp ? QString() : qthelp::validate_url(domain);
 	const auto userpicButtonWidth = st::restoreUserpicIcon.photoSize;
 	const auto titlePadding = style::margins(
 		st::boxRowPadding.left(),
@@ -461,12 +463,17 @@ void ShowDetails(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			domainUrl.isEmpty()
-				? tr::lng_url_auth_login_button(tr::marked)
-				: tr::lng_url_auth_login_title(
+			(isApp
+				? tr::lng_url_auth_login_title(
 					lt_domain,
-					rpl::single(Ui::Text::Link(domain, domainUrl)),
-					tr::marked),
+					rpl::single(tr::bold(domain)),
+					tr::marked)
+				: domainUrl.isEmpty()
+					? tr::lng_url_auth_login_button(tr::marked)
+					: tr::lng_url_auth_login_title(
+						lt_domain,
+						rpl::single(Ui::Text::Link(domain, domainUrl)),
+						tr::marked)),
 			st::boxTitle),
 		titlePadding,
 		style::al_top);
@@ -475,7 +482,9 @@ void ShowDetails(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			tr::lng_url_auth_site_access(tr::rich),
+			(isApp
+				? tr::lng_url_auth_app_access(tr::rich)
+				: tr::lng_url_auth_site_access(tr::rich)),
 			st::urlAuthCheckboxAbout),
 		st::boxRowPadding);
 
@@ -564,7 +573,8 @@ void ShowDetails(
 								&& allowMessages->toggled()),
 							.matchCode = std::move(matchCode),
 						});
-					});
+					},
+					isApp);
 			}));
 		});
 	}

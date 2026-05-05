@@ -88,6 +88,16 @@ void UpdateStickerSetIdentifier(
 	});
 }
 
+[[nodiscard]] int ResolveAttributeVsTranscodeQuality(
+		int attributesQuality,
+		int transcodeMax) {
+	return (transcodeMax > 0
+		&& (attributesQuality < transcodeMax
+			|| attributesQuality > transcodeMax * 1.5))
+		? transcodeMax
+		: attributesQuality;
+}
+
 } // namespace
 
 QString FileNameUnsafe(
@@ -547,8 +557,7 @@ void DocumentData::setVideoQualities(
 		return document->isVideoFile()
 			&& !document->dimensions.isEmpty()
 			&& !document->inappPlaybackFailed()
-			&& document->useStreamingLoader(nullptr)
-			&& document->canBeStreamed(nullptr);
+			&& document->useStreamingLoader();
 	};
 	ranges::sort(
 		qualities,
@@ -578,18 +587,58 @@ void DocumentData::setVideoQualities(
 	}
 	qualities.erase(qualities.begin() + count, qualities.end());
 	if (!qualities.empty()) {
-		if (const auto mine = resolveVideoQuality()) {
-			if (mine > qualities.front()->resolveVideoQuality()) {
-				qualities.insert(begin(qualities), this);
+		auto transcodeMax = 0;
+		for (const auto &quality : qualities) {
+			const auto qres = quality->resolveVideoQuality();
+			if (qres > transcodeMax) {
+				transcodeMax = qres;
 			}
+		}
+		const auto attributesSize = isVideoFile() ? dimensions : QSize();
+		const auto attributesQuality = attributesSize.isEmpty()
+			? 0
+			: std::min(attributesSize.width(), attributesSize.height());
+		auto mine = ResolveAttributeVsTranscodeQuality(
+			attributesQuality,
+			transcodeMax);
+		if (mine) {
+			qualities.insert(begin(qualities), this);
 		}
 	}
 	data->qualities = std::move(qualities);
 }
 
 int DocumentData::resolveVideoQuality() const {
-	const auto size = isVideoFile() ? dimensions : QSize();
-	return size.isEmpty() ? 0 : std::min(size.width(), size.height());
+	if (const auto data = video()) {
+		if (!data->realVideoSize.isEmpty()) {
+			const auto size = data->realVideoSize;
+			return std::min(size.width(), size.height());
+		}
+		const auto attributesSize = isVideoFile() ? dimensions : QSize();
+		const auto attributesQuality = attributesSize.isEmpty()
+			? 0
+			: std::min(attributesSize.width(), attributesSize.height());
+		if (!data->qualities.empty()) {
+			auto transcodeMax = 0;
+			for (const auto &quality : data->qualities) {
+				if (quality != this) {
+					const auto qres = quality->resolveVideoQuality();
+					if (qres > transcodeMax) {
+						transcodeMax = qres;
+					}
+				}
+			}
+			if (transcodeMax > 0) {
+				return ResolveAttributeVsTranscodeQuality(
+					attributesQuality,
+					transcodeMax);
+			}
+		}
+	}
+	const auto attributesSize = isVideoFile() ? dimensions : QSize();
+	return attributesSize.isEmpty()
+		? 0
+		: std::min(attributesSize.width(), attributesSize.height());
 }
 
 auto DocumentData::resolveQualities(HistoryItem *context) const
@@ -611,19 +660,28 @@ not_null<DocumentData*> DocumentData::chooseQuality(
 		return this;
 	}
 	const auto height = int(request.height);
-	auto closest = this;
-	auto closestAbs = std::abs(height - resolveVideoQuality());
-	auto closestSize = size;
+	if (request.original) {
+		return this;
+	}
+
+	auto closest = (DocumentData*)nullptr;
+	auto closestAbs = -1;
+	auto closestSize = -1;
+
 	for (const auto &quality : list) {
-		const auto abs = std::abs(height - quality->resolveVideoQuality());
-		if (abs < closestAbs
-			|| (abs == closestAbs && quality->size < closestSize)) {
+		const auto qres = quality->resolveVideoQuality();
+		const auto abs = std::abs(height - qres);
+		if (!closest
+			|| abs < closestAbs
+			|| (abs == closestAbs && (quality->size < closestSize
+				|| (closest == this && quality != this)))) {
 			closest = quality;
 			closestAbs = abs;
 			closestSize = quality->size;
 		}
 	}
-	return closest;
+
+	return closest ? closest : this;
 }
 
 void DocumentData::validateLottieSticker() {
@@ -1533,35 +1591,20 @@ bool DocumentData::hasRemoteLocation() const {
 	return (_dc != 0 && _access != 0);
 }
 
-bool DocumentData::canVideoBeStreamed(HistoryItem *item) const {
-	if (!isVideoFile()) {
-		return false;
-	}
-	// Streaming couldn't be used with external player
-	// Maybe someone brave will implement this once upon a time...
-	static const auto &ExternalVideoPlayer = base::options::lookup<bool>(
-		Data::kOptionExternalVideoPlayer);
-	return storyMedia()
-		|| !ExternalVideoPlayer.value()
-		|| (item && !item->allowsForward());
-}
-
-bool DocumentData::useStreamingLoader(HistoryItem *item) const {
+bool DocumentData::useStreamingLoader() const {
 	if (size <= 0) {
 		return false;
 	} else if (const auto info = sticker()) {
 		return info->isWebm();
 	}
 	return isAnimation()
-		|| canVideoBeStreamed(item)
+		|| isVideoFile()
 		|| isAudioFile()
 		|| isVoiceMessage();
 }
 
-bool DocumentData::canBeStreamed(HistoryItem *item) const {
-	return hasRemoteLocation()
-		&& supportsStreaming()
-		&& (!isVideoFile() || canVideoBeStreamed(item));
+bool DocumentData::canBeStreamed() const {
+	return hasRemoteLocation() && supportsStreaming();
 }
 
 void DocumentData::setInappPlaybackFailed() {
@@ -1591,10 +1634,9 @@ StorageFileLocation DocumentData::videoPreloadLocation() const {
 
 auto DocumentData::createStreamingLoader(
 	Data::FileOrigin origin,
-	bool forceRemoteLoader,
-	HistoryItem *item) const
+	bool forceRemoteLoader) const
 -> std::unique_ptr<Media::Streaming::Loader> {
-	if (!useStreamingLoader(item)) {
+	if (!useStreamingLoader()) {
 		return nullptr;
 	}
 	if (!forceRemoteLoader) {

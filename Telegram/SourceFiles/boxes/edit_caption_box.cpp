@@ -13,6 +13,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/event_filter.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
+#include "boxes/send_files_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "chat_helpers/field_autocomplete.h"
 #include "chat_helpers/message_field.h"
@@ -35,7 +36,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_drag_area.h"
 #include "history/history_item.h"
 #include "history/history.h"
+#include "history/view/controls/history_view_compose_ai_button.h"
 #include "lang/lang_keys.h"
+#include "menu/menu_checked_action.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "mainwidget.h" // controller->content() -> QWidget*
@@ -49,6 +52,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/chat/attach/attach_item_single_media_preview.h"
 #include "ui/chat/attach/attach_single_file_preview.h"
 #include "ui/chat/attach/attach_single_media_preview.h"
+#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/effects/scroll_content_shadow.h"
 #include "ui/image/image.h"
@@ -57,6 +61,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -65,6 +70,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
 
 #include <QtCore/QMimeData>
 
@@ -182,6 +188,7 @@ void EditPhotoImage(
 		not_null<Window::SessionController*> controller,
 		std::shared_ptr<Data::PhotoMedia> media,
 		bool spoilered,
+		int sideLimit,
 		Fn<void(Ui::PreparedList)> done) {
 	const auto large = media
 		? media->image(Data::PhotoSize::Large)
@@ -208,7 +215,6 @@ void EditPhotoImage(
 		const auto image = std::get_if<ImageInfo>(&file.information->media);
 
 		image->modifications = mods;
-		const auto sideLimit = PhotoSideLimit();
 		Storage::UpdateImageDetails(file, previewWidth, sideLimit);
 		done(std::move(list));
 	};
@@ -263,6 +269,7 @@ EditCaptionBox::EditCaptionBox(
 	Expects(item->allowsEditMedia());
 
 	_asFile = !AlbumTypeCompressed(_albumType);
+	_sendLargePhotos = Core::App().settings().sendFilesWay().sendLargePhotos();
 
 	_mediaEditManager.start(item, spoilered, invertCaption);
 
@@ -368,22 +375,26 @@ void EditCaptionBox::StartPhotoEdit(
 	if (!item) {
 		return;
 	}
-	EditPhotoImage(controller, media, spoilered, [=](
-			Ui::PreparedList &&list) mutable {
-		const auto item = session->data().message(itemId);
-		if (!item) {
-			return;
-		}
-		controller->show(Box<EditCaptionBox>(
-			controller,
-			item,
-			std::move(text),
-			suggest,
-			spoilered,
-			invertCaption,
-			std::move(list),
-			std::move(saved)));
-	});
+	EditPhotoImage(
+		controller,
+		media,
+		spoilered,
+		PhotoSideLimit(true),
+		[=](Ui::PreparedList &&list) mutable {
+			const auto item = session->data().message(itemId);
+			if (!item) {
+				return;
+			}
+			controller->show(Box<EditCaptionBox>(
+				controller,
+				item,
+				std::move(text),
+				suggest,
+				spoilered,
+				invertCaption,
+				std::move(list),
+				std::move(saved)));
+		});
 }
 
 void EditCaptionBox::showFinished() {
@@ -417,10 +428,20 @@ void EditCaptionBox::prepare() {
 			: _mediaEditManager.invertCaption()
 			? SendMenu::CaptionState::Above
 			: SendMenu::CaptionState::Below;
+		result.photoQuality = !hasSendLargePhotosOption()
+			? SendMenu::PhotoQualityState::None
+			: _sendLargePhotos
+			? SendMenu::PhotoQualityState::High
+			: SendMenu::PhotoQualityState::Standard;
 		return result;
 	});
 	const auto callback = [=](SendMenu::Action action, const auto &) {
-		_mediaEditManager.apply(action);
+		using Type = SendMenu::ActionType;
+		switch (action.type) {
+		case Type::PhotoQualityOn: _sendLargePhotos = true; break;
+		case Type::PhotoQualityOff: _sendLargePhotos = false; break;
+		default: _mediaEditManager.apply(action); break;
+		}
 		rebuildPreview();
 	};
 	SendMenu::SetupMenuAndShortcuts(
@@ -488,19 +509,11 @@ void EditCaptionBox::rebuildPreview() {
 			st::defaultComposeControls,
 			gifPaused,
 			file,
-			[=](Ui::AttachActionType type) {
-				return (type != Ui::AttachActionType::EditCover) || _isVideo;
-			},
 			Ui::AttachControls::Type::EditOnly);
 		_isPhoto = (media && media->isPhoto());
 		if (media && !_asFile) {
-			media->spoileredChanges(
-			) | rpl::on_next([=](bool spoilered) {
-				_mediaEditManager.apply({ .type = spoilered
-					? SendMenu::ActionType::SpoilerOn
-					: SendMenu::ActionType::SpoilerOff
-				});
-			}, media->lifetime());
+			media->setSendWay(currentSendWay());
+			media->setCanShowHighQualityBadge(file.canUseHighQualityPhoto());
 			_content.reset(media);
 		} else {
 			_content.reset(Ui::CreateChild<Ui::SingleFilePreview>(
@@ -530,16 +543,26 @@ void EditCaptionBox::rebuildPreview() {
 	_content->modifyRequests(
 	) | rpl::start_to_stream(_photoEditorOpens, _content->lifetime());
 
-	_content->editCoverRequests() | rpl::on_next([=] {
-		setupEditCoverHandler();
-	}, _content->lifetime());
-
-	_content->clearCoverRequests() | rpl::on_next([=] {
-		setupClearCoverHandler();
-	}, _content->lifetime());
-
 	_content->heightValue(
 	) | rpl::start_to_stream(_contentHeight, _content->lifetime());
+
+	if (const auto file = dynamic_cast<Ui::AbstractSingleFilePreview*>(
+			_content.get())) {
+		file->setRenameEnabled(!_preparedList.files.empty());
+		file->renameRequests(
+		) | rpl::on_next([=] {
+			renameCurrentFile();
+		}, _content->lifetime());
+	}
+
+	base::install_event_filter(_content.get(), [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu) {
+			const auto mouse = static_cast<QContextMenuEvent*>(e.get());
+			showMenu(mouse->globalPos(), false);
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	}, _content->lifetime());
 
 	_scroll->setOwnedWidget(
 		object_ptr<Ui::RpWidget>::fromRaw(_content.get()));
@@ -554,11 +577,16 @@ void EditCaptionBox::setupField() {
 	const auto allow = [=](not_null<DocumentData*> emoji) {
 		return Data::AllowEmojiWithoutPremium(peer, emoji);
 	};
-	InitMessageFieldHandlers(
-		_controller,
-		_field.get(),
-		Window::GifPauseReason::Layer,
-		allow);
+	const auto chatStyle = InitMessageFieldHandlers({
+		.session = &_controller->session(),
+		.show = _controller->uiShow(),
+		.field = _field.get(),
+		.customEmojiPaused = [=] {
+			return _controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Layer);
+		},
+		.allowPremiumEmoji = allow,
+	});
 	setupFieldAutocomplete();
 	Ui::Emoji::SuggestionsController::Init(
 		getDelegate()->outerContainer(),
@@ -594,6 +622,14 @@ void EditCaptionBox::setupField() {
 			return fileFromClipboard(data);
 		}
 		Unexpected("Action in MimeData hook.");
+	});
+
+	_aiButton = Ui::SetupCaptionAiButton({
+		.parent = this,
+		.field = _field.get(),
+		.session = &_controller->session(),
+		.show = _controller->uiShow(),
+		.chatStyle = chatStyle,
 	});
 }
 
@@ -713,11 +749,105 @@ void EditCaptionBox::setupControls() {
 void EditCaptionBox::setupEditEventHandler() {
 	_editMediaClicks.events(
 	) | rpl::on_next([=] {
-		ChooseReplacement(_controller, _albumType, crl::guard(this, [=](
-				Ui::PreparedList &&list) {
-			setPreparedList(std::move(list));
-		}));
+		showMenu(QCursor::pos(), true);
 	}, lifetime());
+}
+
+void EditCaptionBox::showMenu(QPoint globalPos, bool forceTopRight) {
+	_previewMenu = base::make_unique_q<Ui::PopupMenu>(
+		this,
+		st::popupMenuWithIcons);
+	if (forceTopRight) {
+		_previewMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
+	}
+	if (_isAllowedEditMedia) {
+		_previewMenu->addAction(tr::lng_attach_replace(tr::now), [=] {
+			ChooseReplacement(
+				_controller,
+				_albumType,
+				crl::guard(this, [=](Ui::PreparedList &&list) {
+					setPreparedList(std::move(list));
+				}));
+		}, &st::menuIconReplace);
+	}
+	if (dynamic_cast<Ui::AbstractSingleFilePreview*>(_content.get())
+		&& !_preparedList.files.empty()) {
+		_previewMenu->addAction(tr::lng_rename_file(tr::now), [=] {
+			renameCurrentFile();
+		}, &st::menuIconEdit);
+	}
+	using Type = Ui::PreparedFile::Type;
+	const auto canDraw = !_preparedList.files.empty()
+		? (_preparedList.files.front().type == Type::Photo)
+		: (_isPhoto && !_asFile);
+	if (canDraw) {
+		_previewMenu->addAction(tr::lng_context_draw(tr::now), [=] {
+			_photoEditorOpens.fire({});
+		}, &st::menuIconDraw);
+	}
+	if (!_asFile && (_isPhoto || _isVideo)) {
+		if (hasSendLargePhotosOption()) {
+			const auto enabled = _sendLargePhotos;
+			Menu::AddCheckedAction(
+				_previewMenu.get(),
+				tr::lng_send_high_quality(tr::now),
+				[=] {
+					_sendLargePhotos = !enabled;
+					rebuildPreview();
+				},
+				&st::menuIconQualityHigh,
+				enabled);
+		}
+		if (_preparedList.hasSpoilerMenu(!_asFile)) {
+			const auto spoilered = hasSpoiler();
+			Menu::AddCheckedAction(
+				_previewMenu.get(),
+				tr::lng_context_spoiler_effect(tr::now),
+				[=] {
+					_mediaEditManager.apply({ .type = spoilered
+						? SendMenu::ActionType::SpoilerOff
+						: SendMenu::ActionType::SpoilerOn
+					});
+					rebuildPreview();
+				},
+				&st::menuIconSpoiler,
+				spoilered);
+		}
+		if (_isVideo && !_preparedList.files.empty()) {
+			_previewMenu->addAction(tr::lng_context_edit_cover(tr::now), [=] {
+				setupEditCoverHandler();
+			}, &st::menuIconEdit);
+			if (_preparedList.files.front().videoCover != nullptr) {
+				_previewMenu->addAction(
+					tr::lng_context_clear_cover(tr::now),
+					[=] { setupClearCoverHandler(); },
+					&st::menuIconCancel);
+			}
+		}
+	}
+	if (_previewMenu->empty()) {
+		_previewMenu = nullptr;
+	} else {
+		_previewMenu->popup(globalPos);
+	}
+}
+
+void EditCaptionBox::renameCurrentFile() {
+	if (_preparedList.files.empty()) {
+		return;
+	}
+	const auto &file = _preparedList.files.front();
+	const auto allowExtensionEdit = file.path.isEmpty();
+	_controller->show(Box(RenameFileBox, file.displayName, allowExtensionEdit, [=](
+			QString displayName) {
+		_preparedList.files.front().displayName = displayName;
+		if (const auto filePreview = dynamic_cast<Ui::AbstractSingleFilePreview*>(
+				_content.get())) {
+			filePreview->setDisplayName(displayName);
+		} else {
+			rebuildPreview();
+		}
+	}));
 }
 
 void EditCaptionBox::setupPhotoEditorEventHandler() {
@@ -743,12 +873,17 @@ void EditCaptionBox::setupPhotoEditorEventHandler() {
 				controller->uiShow(),
 				&_preparedList.files.front(),
 				st::sendMediaPreviewSize,
-				[=](bool ok) { if (ok) rebuildPreview(); });
+				[=](bool ok) { if (ok) rebuildPreview(); },
+				PhotoSideLimit(true));
 		} else {
-			EditPhotoImage(_controller, _photoMedia, hasSpoiler(), [=](
-					Ui::PreparedList &&list) {
-				setPreparedList(std::move(list));
-			});
+			EditPhotoImage(
+				_controller,
+				_photoMedia,
+				hasSpoiler(),
+				PhotoSideLimit(true),
+				[=](Ui::PreparedList &&list) {
+					setPreparedList(std::move(list));
+				});
 		}
 	}, lifetime());
 }
@@ -792,6 +927,7 @@ void EditCaptionBox::setupEditCoverHandler() {
 				}
 				rebuildPreview();
 			}),
+			PhotoSideLimit(true),
 			video->thumbnail.size());
 	};
 	const auto checkResult = [=](const Ui::PreparedList &list) {
@@ -973,6 +1109,32 @@ bool EditCaptionBox::hasSpoiler() const {
 	return _mediaEditManager.spoilered();
 }
 
+bool EditCaptionBox::hasSendLargePhotosOption() const {
+	const auto compressed = CanToggleCompressed(_albumType)
+		? (!_asFile)
+		: AlbumTypeCompressed(_albumType);
+	return compressed
+		&& !_preparedList.files.empty()
+		&& _preparedList.hasSendLargePhotosOption(compressed);
+}
+
+Ui::SendFilesWay EditCaptionBox::currentSendWay() const {
+	auto way = Core::App().settings().sendFilesWay();
+	way.setSendImagesAsPhotos(!_asFile);
+	way.setSendLargePhotos(_sendLargePhotos);
+	return way;
+}
+
+void EditCaptionBox::saveSendWaySettings() {
+	auto way = Core::App().settings().sendFilesWay();
+	if (way.sendLargePhotos() == _sendLargePhotos) {
+		return;
+	}
+	way.setSendLargePhotos(_sendLargePhotos);
+	Core::App().settings().setSendFilesWay(way);
+	Core::App().saveSettingsDelayed();
+}
+
 void EditCaptionBox::captionResized() {
 	updateBoxSize();
 	resizeEvent(0);
@@ -1047,6 +1209,11 @@ void EditCaptionBox::resizeEvent(QResizeEvent *e) {
 		_field->y() + st::boxAttachEmojiTop);
 	_emojiToggle->update();
 
+	if (_aiButton) {
+		Ui::UpdateCaptionAiButtonGeometry(_aiButton, _field.get());
+		_aiButton->raise();
+	}
+
 	if (!_controls->isHidden()) {
 		_controls->resizeToWidth(width());
 		_controls->moveToLeft(
@@ -1081,6 +1248,7 @@ bool EditCaptionBox::validateLength(const QString &text) const {
 void EditCaptionBox::applyChanges() {
 	if (!_preparedList.files.empty()) {
 		_preparedList.files.front().spoiler = _mediaEditManager.spoilered();
+		_preparedList.files.front().sendLargePhotos = _sendLargePhotos;
 	}
 }
 
@@ -1132,6 +1300,7 @@ void EditCaptionBox::save() {
 		const auto compressed = CanToggleCompressed(_albumType)
 			? (!_asFile)
 			: AlbumTypeCompressed(_albumType);
+		saveSendWaySettings();
 		_controller->session().api().editMedia(
 			std::move(_preparedList),
 			(compressed ? SendMediaType::Photo : SendMediaType::File),

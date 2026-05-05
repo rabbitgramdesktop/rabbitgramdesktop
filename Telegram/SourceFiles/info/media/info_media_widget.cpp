@@ -64,6 +64,8 @@ tr::phrase<> SharedMediaTitle(Type type) {
 		return tr::lng_media_type_links;
 	case Type::RoundFile:
 		return tr::lng_media_type_rounds;
+	case Type::Poll:
+		return tr::lng_media_type_polls;
 	}
 	Unexpected("Bad media type in Info::TitleValue()");
 }
@@ -169,8 +171,8 @@ void Widget::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			.date = QDate::currentDate(),
 			.mediaPhoto = (type == Type::Photo),
 			.mediaVideo = (type == Type::Video),
-			.customJump = [=](MsgId msgId, Fn<void()> close) {
-				_inner->jumpToMessage(msgId);
+			.customJump = [=](FullMsgId id, Fn<void()> close) {
+				_inner->jumpToMessage(id.msg);
 				close();
 			},
 		});

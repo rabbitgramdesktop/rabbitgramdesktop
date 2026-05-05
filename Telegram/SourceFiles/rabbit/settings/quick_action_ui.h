@@ -32,7 +32,7 @@ inline rpl::producer<QString> QuickActionString(QuickAction action) {
 
 inline Settings::IconDescriptor QuickActionIcon(QuickAction action) {
 	switch (action) {
-	case Disable: return { &st::menuIconDisable };
+	case Disable: return { &st::menuIconBlock };
 	case Reaction: return { &st::menuIconGroupReactions };
 	case Reply: return { &st::menuIconReply };
 	case Copy: return { &st::menuIconCopy };
