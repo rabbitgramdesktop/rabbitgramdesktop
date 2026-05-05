@@ -44,7 +44,7 @@ jobs:
 
   windows:
     name: Windows x64
-    runs-on: depot-windows-latest-16
+    runs-on: windows-latest
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"

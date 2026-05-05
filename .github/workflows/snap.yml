@@ -40,7 +40,7 @@ jobs:
 
   snap:
     name: Ubuntu Snap
-    runs-on: depot-ubuntu-latest-16
+    runs-on: ubuntu-latest
 
     steps:
       - name: Clone.
