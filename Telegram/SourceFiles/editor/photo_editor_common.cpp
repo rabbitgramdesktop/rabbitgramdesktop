@@ -12,10 +12,19 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/userpic_view.h"
 
 namespace Editor {
-namespace {
 
-void ApplyShapeMask(QImage &image, EditorData::CropType type) {
+void ApplyShapeMask(QImage &image, const PhotoModifications &mods) {
+	if (mods.cropMode != EditorData::CropMode::Mask) {
+		return;
+	}
+	const auto type = mods.cropType;
 	if (type == EditorData::CropType::Rect) {
+		return;
+	}
+	const auto multiplier = (type == EditorData::CropType::RoundedRect)
+		? RoundedCornersMultiplier(mods.cornersLevel)
+		: Ui::ForumUserpicRadiusMultiplier();
+	if (type == EditorData::CropType::RoundedRect && multiplier <= 0.) {
 		return;
 	}
 	if (image.format() != QImage::Format_ARGB32_Premultiplied) {
@@ -33,7 +42,7 @@ void ApplyShapeMask(QImage &image, EditorData::CropType type) {
 			p.drawEllipse(rect);
 		} else {
 			const auto radius = std::min(rect.width(), rect.height())
-				* Ui::ForumUserpicRadiusMultiplier();
+				* multiplier;
 			p.drawRoundedRect(rect, radius, radius);
 		}
 	}
@@ -42,7 +51,15 @@ void ApplyShapeMask(QImage &image, EditorData::CropType type) {
 	p.drawImage(0, 0, mask);
 }
 
-} // namespace
+float64 RoundedCornersMultiplier(RoundedCornersLevel level) {
+	switch (level) {
+	case RoundedCornersLevel::Large: return Ui::ForumUserpicRadiusMultiplier();
+	case RoundedCornersLevel::Medium: return 0.2;
+	case RoundedCornersLevel::Small: return 0.12;
+	case RoundedCornersLevel::None: return 0.;
+	}
+	Unexpected("Unknown RoundedCornersLevel in RoundedCornersMultiplier.");
+}
 
 QImage ImageModified(QImage image, const PhotoModifications &mods) {
 	Expects(!image.isNull());
@@ -64,7 +81,6 @@ QImage ImageModified(QImage image, const PhotoModifications &mods) {
 	auto cropped = mods.crop.isValid()
 		? image.copy(mods.crop)
 		: image;
-	ApplyShapeMask(cropped, mods.cropType);
 	QTransform transform;
 	if (mods.flipped) {
 		transform.scale(-1, 1);
@@ -76,11 +92,7 @@ QImage ImageModified(QImage image, const PhotoModifications &mods) {
 }
 
 bool PhotoModifications::empty() const {
-	return !angle
-		&& !flipped
-		&& !crop.isValid()
-		&& cropType == EditorData::CropType::Rect
-		&& !paint;
+	return !angle && !flipped && !crop.isValid() && !paint;
 }
 
 PhotoModifications::operator bool() const {

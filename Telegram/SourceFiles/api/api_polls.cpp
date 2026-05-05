@@ -164,6 +164,12 @@ void Polls::sendVotes(
 	if (showSending) {
 		poll->sendingVotes = options;
 		_session->data().requestItemRepaint(item);
+	} else if (poll && options.empty() && poll->voted()) {
+		for (auto &answer : poll->answers) {
+			answer.chosen = false;
+		}
+		++poll->version;
+		_session->data().notifyPollUpdateDelayed(poll);
 	}
 
 	auto prepared = QVector<MTPbytes>();

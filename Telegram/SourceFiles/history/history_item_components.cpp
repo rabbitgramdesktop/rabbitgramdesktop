@@ -1060,7 +1060,8 @@ ClickHandlerPtr ReplyKeyboard::getLink(QPoint point) const {
 
 			if (rect.contains(point)) {
 				if (_item->isAdminLogEntry()
-					&& button.type != HistoryMessageMarkupButton::Type::Url) {
+					&& button.type != HistoryMessageMarkupButton::Type::Url
+					&& button.type != HistoryMessageMarkupButton::Type::Callback) {
 					return ClickHandlerPtr();
 				}
 				_savedCoords = point;

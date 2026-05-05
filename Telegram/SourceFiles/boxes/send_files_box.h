@@ -93,6 +93,11 @@ using SendFilesCheck = Fn<bool(
 [[nodiscard]] SendFilesCheck DefaultCheckForPeer(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<PeerData*> peer);
+void RenameFileBox(
+	not_null<Ui::GenericBox*> box,
+	const QString &currentName,
+	bool allowExtensionEdit,
+	Fn<void(QString)> apply);
 
 using SendFilesConfirmed = Fn<void(
 	std::shared_ptr<Ui::PreparedBundle>,
@@ -178,6 +183,7 @@ private:
 		[[nodiscard]] rpl::producer<int> itemDeleteRequest() const;
 		[[nodiscard]] rpl::producer<int> itemReplaceRequest() const;
 		[[nodiscard]] rpl::producer<int> itemModifyRequest() const;
+		[[nodiscard]] rpl::producer<int> itemRenameRequest() const;
 		[[nodiscard]] rpl::producer<> orderUpdated() const;
 
 		void setSendWay(Ui::SendFilesWay way);
@@ -270,7 +276,7 @@ private:
 	void checkCharsLimitation();
 	void refreshMessagesCount();
 
-	void requestToTakeTextWithTags() const;
+	void requestToTakeTextWithTags();
 	bool validateLength(const QString &text) const;
 
 	[[nodiscard]] Fn<MenuDetails()> prepareSendMenuDetails(
@@ -303,6 +309,7 @@ private:
 	std::unique_ptr<Ui::RpWidget> _priceTag;
 	QImage _priceTagBg;
 	bool _confirmed = false;
+	bool _textTaken = false;
 	bool _invertCaption = false;
 
 	const object_ptr<Ui::InputField> _caption;

@@ -82,7 +82,8 @@ Crop::Crop(
 	: QRectF(QPoint(), _imageSize))
 , _angle(modifications.angle)
 , _flipped(modifications.flipped)
-, _keepAspectRatio(_data.keepAspectRatio) {
+, _keepAspectRatio(_data.keepAspectRatio)
+, _cornersLevel(modifications.cornersLevel) {
 
 	setMouseTracking(true);
 
@@ -158,9 +159,15 @@ QPainterPath Crop::cropPath() const {
 	if (_data.cropType == EditorData::CropType::Ellipse) {
 		result.addEllipse(_cropPaint);
 	} else if (_data.cropType == EditorData::CropType::RoundedRect) {
-		const auto radius = std::min(_cropPaint.width(), _cropPaint.height())
-			* Ui::ForumUserpicRadiusMultiplier();
-		result.addRoundedRect(_cropPaint, radius, radius);
+		const auto multiplier = RoundedCornersMultiplier(_cornersLevel);
+		if (multiplier <= 0.) {
+			result.addRect(_cropPaint);
+		} else {
+			const auto radius = std::min(
+				_cropPaint.width(),
+				_cropPaint.height()) * multiplier;
+			result.addRoundedRect(_cropPaint, radius, radius);
+		}
 	} else {
 		result.addRect(_cropPaint);
 	}
@@ -177,10 +184,6 @@ void Crop::paintFrame(QPainter &p) {
 	p.save();
 	p.setRenderHint(QPainter::Antialiasing, true);
 	p.fillPath(frameShape, st::photoCropPointFg);
-	if (_data.fixedCrop) {
-		p.restore();
-		return;
-	}
 	{
 		const auto cornerLength = std::min(
 			float64(st::photoEditorCropPointSize * 2),
@@ -290,10 +293,6 @@ void Crop::convertCropPaintToOriginal() {
 }
 
 void Crop::updateEdges() {
-	if (_data.fixedCrop) {
-		_edges.clear();
-		return;
-	}
 	const auto &s = _pointSize;
 	const auto &m = _edgePointMargins;
 	const auto &r = _cropPaint;
@@ -346,7 +345,7 @@ Qt::Edges Crop::mouseState(const QPoint &p) {
 }
 
 void Crop::mousePressEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	computeDownState(e->pos());
@@ -356,7 +355,7 @@ void Crop::mousePressEvent(QMouseEvent *e) {
 }
 
 void Crop::mouseReleaseEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	const auto hadEdge = bool(_down.edge);
@@ -488,9 +487,6 @@ void Crop::performMove(const QPoint &pos) {
 }
 
 void Crop::mouseMoveEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
-		return;
-	}
 	const auto pos = e->pos();
 	const auto pressedEdge = _down.edge;
 
@@ -501,6 +497,10 @@ void Crop::mouseMoveEvent(QMouseEvent *e) {
 			performCrop(pos);
 		}
 		update();
+	}
+
+	if (_data.fixedCrop && (e->buttons() & Qt::MiddleButton)) {
+		return;
 	}
 
 	const auto edge = pressedEdge ? pressedEdge : mouseState(pos);
@@ -562,6 +562,17 @@ void Crop::setAspectRatio(float64 ratio) {
 	} else {
 		updateEdges();
 	}
+	update();
+}
+
+void Crop::setCornersLevel(RoundedCornersLevel level) {
+	if (_cornersLevel == level) {
+		return;
+	}
+	_cornersLevel = level;
+	_painterPath.clear();
+	_painterPath.addRect(_innerRect);
+	_painterPath.addPath(cropPath());
 	update();
 }
 

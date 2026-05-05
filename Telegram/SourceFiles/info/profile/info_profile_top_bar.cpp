@@ -1144,6 +1144,7 @@ void TopBar::setupUserpicButton(
 			: (user && !user->isSelf() && !_peer->isBot())
 			? &tr::lng_profile_set_personal_sure
 			: nullptr;
+		const auto useForumShape = _peer->isForum() && !_peer->isBot();
 		return Editor::EditorData{
 			.about = (phrase
 				? (*phrase)(
@@ -1155,7 +1156,9 @@ void TopBar::setupUserpicButton(
 			.confirm = ((type == ChosenType::Suggest)
 				? tr::lng_profile_suggest_button(tr::now)
 				: tr::lng_profile_set_photo_button(tr::now)),
-			.cropType = Editor::EditorData::CropType::Ellipse,
+			.cropType = (useForumShape
+				? Editor::EditorData::CropType::RoundedRect
+				: Editor::EditorData::CropType::Ellipse),
 			.keepAspectRatio = true,
 		};
 	};
@@ -1787,6 +1790,7 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 				geometry.width() * radius);
 
 			p.save();
+			auto hq = PainterHighQualityEnabler(p);
 			p.setClipPath(path);
 			p.drawImage(geometry, frame);
 			p.restore();
@@ -1835,19 +1839,22 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		_cachedUserpic.setDevicePixelRatio(style::DevicePixelRatio());
 	}
 
-	auto radius = RabbitSettings::userpicRoundness() / 100.0;
-	if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
-	
-	auto path = QPainterPath();
-	path.addRoundedRect(
-		geometry,
-		geometry.width() * radius,
-		geometry.width() * radius);
+	{
+		auto radius = RabbitSettings::userpicRoundness() / 100.0;
+		if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
+		
+		auto path = QPainterPath();
+		path.addRoundedRect(
+			geometry,
+			geometry.width() * radius,
+			geometry.width() * radius);
 
-	p.save();
-	p.setClipPath(path);
-	p.drawImage(geometry, _cachedUserpic);
-	p.restore();
+		p.save();
+		auto hq = PainterHighQualityEnabler(p);
+		p.setClipPath(path);
+		p.drawImage(geometry, _cachedUserpic);
+		p.restore();
+	}
 	
 	if (_uploadOverlay && _uploadOverlay->shown()) {
 		_uploadOverlay->paint(p, geometry, {

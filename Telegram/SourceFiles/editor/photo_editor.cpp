@@ -238,6 +238,7 @@ PhotoEditor::PhotoEditor(
 	_brushes,
 	_brushTool)) {
 	_modifications.cropType = data.cropType;
+	_modifications.cropMode = data.cropMode;
 
 	sizeValue(
 	) | rpl::on_next([=](const QSize &size) {
@@ -293,6 +294,12 @@ PhotoEditor::PhotoEditor(
 
 	_controls->aspectRatioChanges() | rpl::on_next([=](float64 ratio) {
 		_content->applyAspectRatio(ratio);
+	}, lifetime());
+
+	_controls->cornersLevelChanges(
+	) | rpl::on_next([=](RoundedCornersLevel level) {
+		_modifications.cornersLevel = level;
+		_content->applyModifications(_modifications);
 	}, lifetime());
 
 	_controls->paintModeRequests(

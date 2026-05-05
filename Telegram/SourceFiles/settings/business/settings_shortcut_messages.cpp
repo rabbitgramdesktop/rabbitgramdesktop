@@ -93,6 +93,7 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 	[[nodiscard]] rpl::producer<> sectionShowBack() override;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen) override;
 	void setInnerFocus() override;
 
 	rpl::producer<Info::SelectedItems> selectedListValue() override;
@@ -1445,6 +1446,14 @@ void ShortcutMessages::finishSending() {
 	//if (_previewData && _previewData->pendingTill) previewCancel();
 	doSetInnerFocus();
 	showAtEnd();
+}
+
+bool ShortcutMessages::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	if (!_composeControls) {
+		return false;
+	}
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
 }
 
 void ShortcutMessages::showAtEnd() {

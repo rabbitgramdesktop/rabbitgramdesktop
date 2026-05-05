@@ -550,7 +550,8 @@ bool ResolveUsernameOrPhone(
 			UrlAuthBox::ActivateUrl(
 				controller->uiShow(),
 				&controller->session(),
-				u"tg://resolve?domain=oauth&startapp="_q + token,
+				u"tg://resolve?domain=oauth&startapp="_q
+					+ qthelp::url_encode(token),
 				context);
 			return true;
 		}
@@ -1629,7 +1630,7 @@ bool ResolveOAuth(
 	UrlAuthBox::ActivateUrl(
 		controller->uiShow(),
 		&controller->session(),
-		u"tg://oauth?token="_q + token,
+		u"tg://oauth?token="_q + qthelp::url_encode(token),
 		context);
 	return true;
 }
@@ -2001,46 +2002,64 @@ QString TryConvertUrlToLocal(QString url) {
 	return url;
 }
 
-bool InternalPassportOrOAuthLink(const QString &url) {
+struct InternalLinkCheckResult {
+	QString command;
+	QString username;
+};
+
+[[nodiscard]] InternalLinkCheckResult InternalLinkCheck(const QString &url) {
 	const auto urlTrimmed = url.trimmed();
 	if (!urlTrimmed.startsWith(u"tg://"_q, Qt::CaseInsensitive)) {
-		return false;
+		return {};
 	}
 	const auto command = base::StringViewMid(urlTrimmed, u"tg://"_q.size());
 
 	using namespace qthelp;
 	const auto matchOptions = RegExOption::CaseInsensitive;
-	const auto authMatch = regex_match(
-		u"^passport/?\\?(.+)(#|$)"_q,
-		command,
-		matchOptions);
-	const auto oauthMatch = regex_match(
-		u"^oauth/?\\?(.+)(#|$)"_q,
-		command,
-		matchOptions);
 	const auto usernameMatch = regex_match(
 		u"^resolve/?\\?(.+)(#|$)"_q,
 		command,
 		matchOptions);
-	auto usernameValue = QString();
+	auto username = QString();
 	if (usernameMatch->hasMatch()) {
 		const auto params = url_parse_params(
 			usernameMatch->captured(1),
 			UrlParamNameTransform::ToLower);
-		usernameValue = params.value(u"domain"_q);
+		username = params.value(u"domain"_q);
 	}
-	const auto authLegacy = (usernameValue == u"telegrampassport"_q);
-	const auto oauthLegacy = (usernameValue == u"oauth"_q);
-	return authMatch->hasMatch()
+	return { .command = command.toString(), .username = username };
+}
+
+bool InternalPassportLink(const QString &url) {
+	const auto result = InternalLinkCheck(url);
+
+	using namespace qthelp;
+	const auto matchOptions = RegExOption::CaseInsensitive;
+	const auto authMatch = regex_match(
+		u"^passport/?\\?(.+)(#|$)"_q,
+		result.command,
+		matchOptions);
+	const auto authLegacy = (result.username == u"telegrampassport"_q);
+	return authMatch->hasMatch() || authLegacy;
+}
+
+bool InternalPassportOrOAuthLink(const QString &url) {
+	const auto result = InternalLinkCheck(url);
+
+	using namespace qthelp;
+	const auto matchOptions = RegExOption::CaseInsensitive;
+	const auto oauthMatch = regex_match(
+		u"^oauth/?\\?(.+)(#|$)"_q,
+		result.command,
+		matchOptions);
+	const auto oauthLegacy = (result.username == u"oauth"_q);
+	return InternalPassportLink(url)
 		|| oauthMatch->hasMatch()
-		|| authLegacy
 		|| oauthLegacy;
 }
 
 bool StartUrlRequiresActivate(const QString &url) {
-	return Core::App().passcodeLocked()
-		? true
-		: !InternalPassportOrOAuthLink(url);
+	return Core::App().passcodeLocked() || !InternalPassportLink(url);
 }
 
 void ResolveAndShowUniqueGift(

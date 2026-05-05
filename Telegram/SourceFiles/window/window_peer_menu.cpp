@@ -2543,7 +2543,7 @@ void PeerMenuBlockUserBox(
 		: v::is<ClearReply>(suggestClear)
 		? box->addRow(object_ptr<Ui::Checkbox>(
 			box,
-			tr::lng_context_delete_msg(tr::now),
+			tr::lng_blocked_list_confirm_reply(tr::now),
 			true,
 			st::defaultBoxCheckbox))
 		: nullptr;
@@ -2553,7 +2553,7 @@ void PeerMenuBlockUserBox(
 	const auto allFromUser = v::is<ClearReply>(suggestClear)
 		? box->addRow(object_ptr<Ui::Checkbox>(
 			box,
-			tr::lng_delete_all_from_user(
+			tr::lng_blocked_list_confirm_reply_all(
 				tr::now,
 				lt_user,
 				tr::bold(peer->name()),
@@ -4130,13 +4130,19 @@ void AddSenderUserpicModerateAction(
 		&& CanCreateModerateMessagesBox(
 			HistoryItemsList{ not_null<HistoryItem*>(moderateItem) });
 	if (canDeleteAndBan) {
+		const auto itemId = moderateItem->fullId();
 		addAction({ .isSeparator = true });
 		addAction({
 			.text = tr::lng_context_delete_and_ban(tr::now),
 			.handler = [=] {
+				const auto item = controller->session().data().message(
+					itemId);
+				if (!item) {
+					return;
+				}
 				controller->show(Box(
 					CreateModerateMessagesBox,
-					HistoryItemsList{ not_null<HistoryItem*>(moderateItem) },
+					HistoryItemsList{ not_null<HistoryItem*>(item) },
 					nullptr,
 					ModerateMessagesBoxOptions{
 						.reportSpam = true,

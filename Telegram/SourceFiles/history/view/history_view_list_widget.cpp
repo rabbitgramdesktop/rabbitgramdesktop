@@ -2758,9 +2758,9 @@ SelectedItems ListWidget::getSelectedItems() const {
 	return collectSelectedItems();
 }
 
-const TextSelection &ListWidget::getSelectedTextRange(
+TextSelection ListWidget::getSelectedTextRange(
 		not_null<HistoryItem*> item) const {
-	return _selectedTextRange;
+	return (_selectedTextItem == item) ? _selectedTextRange : TextSelection();
 }
 
 int ListWidget::findItemIndexByY(int y) const {

@@ -1822,6 +1822,11 @@ SendMenu::Details ChatWidget::sendMenuDetails() const {
 	return SendMenu::Details{ .type = type };
 }
 
+bool ChatWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
+}
+
 FullReplyTo ChatWidget::replyTo() const {
 	if (auto custom = _composeControls->replyingToMessage()) {
 		const auto item = custom.messageId

@@ -14,10 +14,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/widgets/popup_menu.h"
 #include "styles/style_editor.h"
+#include "styles/style_media_view.h"
 #include "styles/style_menu_icons.h"
 
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneContextMenuEvent>
+#include <QtWidgets/QApplication>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -38,6 +40,7 @@ constexpr auto kLinePadHFactor = 1. / 3.;
 constexpr auto kLinePadVFactor = 1. / 8.;
 constexpr auto kMergeRadiusFactor = 1.5;
 constexpr auto kLineShiftFactor = 1. / 7.;
+constexpr auto kTextStyleClickDelay = crl::time(120);
 
 struct LayoutMetrics {
 	int contentWidth = 0;
@@ -255,6 +258,18 @@ QPainterPath BuildConnectedBackground(
 	return path;
 }
 
+TextStyle NextTextStyle(TextStyle style) {
+	switch (style) {
+	case TextStyle::Plain:
+		return TextStyle::Framed;
+	case TextStyle::Framed:
+		return TextStyle::SemiTransparent;
+	case TextStyle::SemiTransparent:
+		return TextStyle::Plain;
+	}
+	Unexpected("Text style in NextTextStyle.");
+}
+
 } // namespace
 
 QColor EffectiveTextColor(const QColor &color, TextStyle style) {
@@ -278,7 +293,11 @@ ItemText::ItemText(
 , _color(color)
 , _fontSize(fontSize)
 , _textStyle(style)
-, _imageSize(imageSize) {
+, _imageSize(imageSize)
+, _textStyleClickTimer([=] {
+	setTextStyle(NextTextStyle(_textStyle));
+	_textStyleClickChanged = true;
+}) {
 	renderContent();
 }
 
@@ -573,7 +592,80 @@ void ItemText::setTextStyle(TextStyle style) {
 	update();
 }
 
+void ItemText::mousePressEvent(QGraphicsSceneMouseEvent *event) {
+	_textStyleClickTimer.cancel();
+	_textStyleClickChanged = false;
+	_textStyleClickCandidate = (event->button() == Qt::LeftButton)
+		&& contentRect().contains(event->pos());
+	_textStyleClickDragging = false;
+	if (_textStyleClickCandidate) {
+		_textStyleClickItemPosition = pos();
+		_textStyleClickInitialStyle = _textStyle;
+		event->accept();
+		return;
+	}
+	ItemBase::mousePressEvent(event);
+}
+
+void ItemText::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
+	if (!_textStyleClickCandidate) {
+		ItemBase::mouseMoveEvent(event);
+		return;
+	}
+	const auto delta = event->screenPos()
+		- event->buttonDownScreenPos(Qt::LeftButton);
+	if (!_textStyleClickDragging
+		&& delta.manhattanLength() >= QApplication::startDragDistance()) {
+		_textStyleClickDragging = true;
+		if (scene()) {
+			scene()->clearSelection();
+			setSelected(true);
+		}
+		raiseToTop();
+		setCursor(Qt::ClosedHandCursor);
+	}
+	if (_textStyleClickDragging) {
+		const auto sceneDelta = event->scenePos()
+			- event->buttonDownScenePos(Qt::LeftButton);
+		setPos(_textStyleClickItemPosition + sceneDelta);
+	}
+	event->accept();
+}
+
+void ItemText::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
+	const auto textStyleClickCandidate = _textStyleClickCandidate;
+	const auto textStyleClickDragging = _textStyleClickDragging;
+	_textStyleClickCandidate = false;
+	_textStyleClickDragging = false;
+	if (!textStyleClickCandidate) {
+		ItemBase::mouseReleaseEvent(event);
+		return;
+	}
+	if (textStyleClickDragging) {
+		unsetCursor();
+		event->accept();
+		return;
+	}
+	if (event->button() == Qt::LeftButton) {
+		const auto delta = event->screenPos()
+			- event->buttonDownScreenPos(Qt::LeftButton);
+		if (delta.manhattanLength() >= QApplication::startDragDistance()) {
+			event->accept();
+			return;
+		}
+		_textStyleClickTimer.callOnce(kTextStyleClickDelay);
+		event->accept();
+	}
+}
+
 void ItemText::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) {
+	_textStyleClickCandidate = false;
+	_textStyleClickDragging = false;
+	_textStyleClickTimer.cancel();
+	if (_textStyleClickChanged) {
+		setTextStyle(_textStyleClickInitialStyle);
+		_textStyleClickChanged = false;
+	}
 	if (const auto s = static_cast<Scene*>(scene())) {
 		s->startTextEditing(this);
 	}
@@ -587,34 +679,43 @@ void ItemText::contextMenuEvent(QGraphicsSceneContextMenuEvent *event) {
 
 	_contextMenu = base::make_unique_q<Ui::PopupMenu>(
 		nullptr,
-		st::popupMenuWithIcons);
-	const auto add = [&](const QString &text, TextStyle style) {
+		st::mediaviewPopupMenu);
+	const auto add = [&](
+			const QString &text,
+			TextStyle style,
+			const style::icon *icon) {
 		const auto checked = (_textStyle == style);
-		auto action = _contextMenu->addAction(text, [=] {
-			setTextStyle(style);
-		});
+		auto action = _contextMenu->addAction(
+			text,
+			[=] { setTextStyle(style); },
+			icon);
 		if (checked) {
 			action->setChecked(true);
 		}
 	};
-	add(tr::lng_photo_editor_text_style_plain(tr::now), TextStyle::Plain);
+	add(
+		tr::lng_photo_editor_text_style_plain(tr::now),
+		TextStyle::Plain,
+		&st::mediaMenuIconTextStylePlain);
 	add(
 		tr::lng_photo_editor_text_style_framed(tr::now),
-		TextStyle::Framed);
+		TextStyle::Framed,
+		&st::mediaMenuIconTextStyleFramed);
 	add(
 		tr::lng_photo_editor_text_style_semi_transparent(tr::now),
-		TextStyle::SemiTransparent);
+		TextStyle::SemiTransparent,
+		&st::mediaMenuIconTextStyleSemiTransparent);
 
 	_contextMenu->addSeparator();
 
 	_contextMenu->addAction(
-		tr::lng_photo_editor_menu_delete(tr::now),
-		[=] { actionDelete(); },
-		&st::menuIconDelete);
-	_contextMenu->addAction(
 		tr::lng_photo_editor_menu_duplicate(tr::now),
 		[=] { actionDuplicate(); },
-		&st::menuIconCopy);
+		&st::mediaMenuIconCopy);
+	_contextMenu->addAction(
+		tr::lng_photo_editor_menu_delete(tr::now),
+		[=] { actionDelete(); },
+		&st::mediaMenuIconDelete);
 
 	_contextMenu->popup(event->screenPos());
 }

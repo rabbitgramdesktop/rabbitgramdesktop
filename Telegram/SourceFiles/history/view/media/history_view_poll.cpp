@@ -485,57 +485,166 @@ struct Poll::Footer : public Poll::Part {
 	mutable base::Timer _closeTimer;
 
 private:
-	[[nodiscard]] int topSkip() const;
-	[[nodiscard]] int textTop() const;
-	[[nodiscard]] bool hasTimerLine(int innerWidth) const;
+	struct Layout {
+		enum class Kind {
+			PassiveLabel,
+			SaveOption,
+			AdminVotes,
+			AdminBack,
+			LinkButton,
+		};
+		Kind kind = Kind::PassiveLabel;
+		ClickHandlerPtr link;
+		bool compact = false;
+		bool timerFolded = false;
+		bool timerSeparate = false;
+		int topSkip = 0;
+		int textY = 0;
+		int timerY = 0;
+		int totalHeight = 0;
+	};
+	[[nodiscard]] Layout computeLayout(int innerWidth) const;
 	[[nodiscard]] bool hasCloseDate() const;
 	[[nodiscard]] QString closeTimerText() const;
+	[[nodiscard]] QRect timerRect(
+		const Layout &layout,
+		int left,
+		int innerWidth) const;
 	[[nodiscard]] bool timerFooterMultiline(int paintw) const;
 	[[nodiscard]] bool centeredOverlapsInfo(
 		int textWidth,
 		int innerWidth) const;
-	[[nodiscard]] int bottomLineWidth(int innerWidth) const;
-	[[nodiscard]] int dateInfoPadding(int innerWidth) const;
+	[[nodiscard]] QString linkButtonText() const;
 	void toggleLinkRipple(bool pressed);
 };
-
-int Poll::Footer::topSkip() const {
-	return _owner->canAddOption()
-		? 0
-		: st::historyPollTotalVotesSkip;
-}
-
-int Poll::Footer::textTop() const {
-	return topSkip()
-		+ st::msgPadding.bottom()
-		+ st::historyPollBottomButtonTop;
-}
 
 bool Poll::Footer::hasCloseDate() const {
 	return _owner->_poll->closeDate > 0
 		&& !(_owner->_flags & PollData::Flag::Closed);
 }
 
-bool Poll::Footer::hasTimerLine(int innerWidth) const {
-	if (_owner->inlineFooter() || _owner->showVotersCount()) {
-		return timerFooterMultiline(innerWidth);
+auto Poll::Footer::computeLayout(int innerWidth) const -> Layout {
+	Layout result;
+	result.compact = _owner->inlineFooter();
+	result.topSkip = _owner->canAddOption()
+		? 0
+		: st::historyPollTotalVotesSkip;
+
+	const auto timerText = closeTimerText();
+	const auto hasTimer = !timerText.isEmpty();
+	const auto lineHeight = st::msgDateFont->height;
+
+	if (result.compact) {
+		result.kind = Layout::Kind::PassiveLabel;
+		if (hasTimer) {
+			if (timerFooterMultiline(innerWidth)) {
+				result.timerSeparate = true;
+			} else {
+				result.timerFolded = true;
+			}
+		}
+	} else if (_owner->_addOptionActive) {
+		result.kind = Layout::Kind::SaveOption;
+		result.link = _saveOptionLink;
+	} else if (_owner->isAuthorNotVoted()
+		&& !_owner->_adminShowResults
+		&& !_owner->canSendVotes()) {
+		if (_owner->_totalVotes > 0) {
+			result.kind = Layout::Kind::AdminVotes;
+			result.link = _adminVotesLink;
+		} else {
+			result.kind = Layout::Kind::PassiveLabel;
+		}
+	} else if (_owner->_adminShowResults
+		&& _owner->isAuthorNotVoted()) {
+		result.kind = Layout::Kind::AdminBack;
+		result.link = _adminBackVoteLink;
+	} else if (_owner->showVotersCount()) {
+		result.kind = Layout::Kind::PassiveLabel;
+		if (hasTimer) {
+			if (timerFooterMultiline(innerWidth)) {
+				result.timerSeparate = true;
+			} else {
+				result.timerFolded = true;
+			}
+		}
+	} else {
+		result.kind = Layout::Kind::LinkButton;
+		const auto votedPublic = _owner->_voted
+			&& (_owner->_flags & PollData::Flag::PublicVotes);
+		result.link = (_owner->showVotes() || votedPublic)
+			? _showResultsLink
+			: _owner->canSendVotes()
+			? _sendVotesLink
+			: nullptr;
+		if (hasTimer) {
+			result.timerSeparate = true;
+		}
 	}
-	return hasCloseDate();
+
+	const auto buttonSkip = result.compact
+		? 0
+		: st::historyPollBottomButtonSkip;
+	result.textY = result.compact
+		? st::msgPadding.bottom()
+		: (result.topSkip
+			+ st::msgPadding.bottom()
+			+ st::historyPollBottomButtonTop);
+	result.timerY = result.textY + lineHeight;
+
+	auto bottomW = 0;
+	if (result.timerSeparate) {
+		bottomW = st::msgDateFont->width(timerText);
+	} else if (!result.timerFolded) {
+		switch (result.kind) {
+		case Layout::Kind::PassiveLabel:
+			bottomW = _totalVotesLabel.maxWidth();
+			break;
+		case Layout::Kind::SaveOption:
+			bottomW = st::semiboldFont->width(
+				tr::lng_polls_add_option_save(tr::now));
+			break;
+		case Layout::Kind::AdminVotes:
+			bottomW = _adminVotesLabel.maxWidth();
+			break;
+		case Layout::Kind::AdminBack:
+			bottomW = _adminBackVoteLabel.maxWidth();
+			break;
+		case Layout::Kind::LinkButton:
+			bottomW = st::semiboldFont->width(linkButtonText());
+			break;
+		}
+	}
+	const auto dateInfoPad = (bottomW > 0
+		&& centeredOverlapsInfo(bottomW, innerWidth))
+		? lineHeight
+		: 0;
+
+	result.totalHeight = result.topSkip
+		+ buttonSkip
+		+ lineHeight
+		+ (result.timerSeparate ? lineHeight : 0)
+		+ dateInfoPad
+		+ st::msgPadding.bottom();
+
+	return result;
+}
+
+QString Poll::Footer::linkButtonText() const {
+	const auto votedPublic = _owner->_voted
+		&& (_owner->_flags & PollData::Flag::PublicVotes);
+	return (_owner->showVotes() || votedPublic)
+		? ((_owner->_flags & PollData::Flag::PublicVotes)
+			? tr::lng_polls_view_votes(
+				tr::now,
+				lt_count,
+				_owner->_totalVotes)
+			: tr::lng_polls_view_results(tr::now))
+		: tr::lng_polls_submit_votes(tr::now);
 }
 
 int Poll::Footer::countHeight(int innerWidth) const {
-	const auto inline_ = _owner->inlineFooter();
-	const auto top = topSkip();
-	const auto buttonSkip = inline_
-		? 0
-		: st::historyPollBottomButtonSkip;
-	const auto timerLine = hasTimerLine(innerWidth);
-	return top
-		+ buttonSkip
-		+ st::msgDateFont->height
-		+ (timerLine ? st::msgDateFont->height : 0)
-		+ dateInfoPadding(innerWidth)
-		+ st::msgPadding.bottom();
+	return computeLayout(innerWidth).totalHeight;
 }
 
 void Poll::Footer::draw(
@@ -544,65 +653,19 @@ void Poll::Footer::draw(
 		int innerWidth,
 		int outerWidth,
 		const PaintContext &context) const {
+	const auto layout = computeLayout(innerWidth);
 	const auto stm = context.messageStyle();
-	const auto inline_ = _owner->inlineFooter();
 
-	if (inline_) {
-		const auto top = st::msgPadding.bottom();
-		p.setPen(stm->msgDateFg);
-		const auto timerText = closeTimerText();
-		if (timerText.isEmpty()) {
-			const auto labelWidth = _totalVotesLabel.maxWidth();
-			const auto labelLeft = left + (innerWidth - labelWidth) / 2;
-			_totalVotesLabel.drawLeftElided(
-				p,
-				labelLeft,
-				top,
-				labelWidth,
-				outerWidth);
-		} else if (timerFooterMultiline(innerWidth)) {
-			const auto labelWidth = _totalVotesLabel.maxWidth();
-			const auto labelLeft = left + (innerWidth - labelWidth) / 2;
-			_totalVotesLabel.drawLeftElided(
-				p,
-				labelLeft,
-				top,
-				labelWidth,
-				outerWidth);
-			p.setFont(st::msgDateFont);
-			const auto timerw = st::msgDateFont->width(timerText);
-			p.drawTextLeft(
-				left + (innerWidth - timerw) / 2,
-				top + st::msgDateFont->height,
-				outerWidth,
-				timerText,
-				timerw);
-		} else {
-			p.setFont(st::msgDateFont);
-			const auto sep = QString::fromUtf8(" \xC2\xB7 ");
-			const auto full = _totalVotesLabel.toString()
-				+ sep
-				+ timerText;
-			const auto fullw = st::msgDateFont->width(full);
-			p.drawTextLeft(
-				left + (innerWidth - fullw) / 2,
-				top,
-				outerWidth,
-				full,
-				fullw);
-		}
-		return;
+	if (!layout.link) {
+		_linkRipple.reset();
 	}
 
-	const auto stringtop = textTop();
-
-	if (_linkRipple) {
-		const auto rippleTop = topSkip();
+	if (_linkRipple && !layout.compact) {
 		p.setOpacity(st::historyPollRippleOpacity);
 		_linkRipple->paint(
 			p,
 			left - st::msgPadding.left() - _linkRippleShift,
-			rippleTop,
+			layout.topSkip,
 			outerWidth,
 			&stm->msgWaveformInactive->c);
 		if (_linkRipple->empty()) {
@@ -610,131 +673,99 @@ void Poll::Footer::draw(
 		}
 		p.setOpacity(1.);
 	}
-	if (_owner->_addOptionActive) {
+
+	switch (layout.kind) {
+	case Layout::Kind::PassiveLabel: {
+		p.setPen(stm->msgDateFg);
+		if (layout.timerFolded) {
+			p.setFont(st::msgDateFont);
+			const auto sep = QString::fromUtf8(" \xC2\xB7 ");
+			const auto full = _totalVotesLabel.toString()
+				+ sep
+				+ closeTimerText();
+			const auto fullw = st::msgDateFont->width(full);
+			p.drawTextLeft(
+				left + (innerWidth - fullw) / 2,
+				layout.textY,
+				outerWidth,
+				full,
+				fullw);
+		} else {
+			const auto labelWidth = _totalVotesLabel.maxWidth();
+			const auto labelLeft = left
+				+ (innerWidth - labelWidth) / 2;
+			_totalVotesLabel.drawLeftElided(
+				p,
+				labelLeft,
+				layout.textY,
+				labelWidth,
+				outerWidth);
+		}
+		break;
+	}
+	case Layout::Kind::SaveOption: {
 		p.setFont(st::semiboldFont);
 		p.setPen(stm->msgFileThumbLinkFg);
 		const auto text = tr::lng_polls_add_option_save(tr::now);
 		const auto textw = st::semiboldFont->width(text);
 		p.drawTextLeft(
 			left + (innerWidth - textw) / 2,
-			stringtop,
+			layout.textY,
 			outerWidth,
 			text,
 			textw);
-		return;
+		break;
 	}
-	if (_owner->isAuthorNotVoted()
-		&& !_owner->_adminShowResults
-		&& !_owner->canSendVotes()) {
-		if (_owner->_totalVotes > 0) {
-			p.setPen(stm->msgFileThumbLinkFg);
-			const auto labelWidth = _adminVotesLabel.maxWidth();
-			_adminVotesLabel.drawLeft(
-				p,
-				left + (innerWidth - labelWidth) / 2,
-				stringtop,
-				labelWidth,
-				outerWidth);
-		} else {
-			p.setPen(stm->msgDateFg);
-			const auto textw = _totalVotesLabel.maxWidth();
-			_totalVotesLabel.drawLeft(
-				p,
-				left + (innerWidth - textw) / 2,
-				stringtop,
-				textw,
-				outerWidth);
-		}
-	} else if (_owner->_adminShowResults && _owner->isAuthorNotVoted()) {
+	case Layout::Kind::AdminVotes: {
+		p.setPen(stm->msgFileThumbLinkFg);
+		const auto labelWidth = _adminVotesLabel.maxWidth();
+		_adminVotesLabel.drawLeft(
+			p,
+			left + (innerWidth - labelWidth) / 2,
+			layout.textY,
+			labelWidth,
+			outerWidth);
+		break;
+	}
+	case Layout::Kind::AdminBack: {
 		p.setPen(stm->msgFileThumbLinkFg);
 		const auto backw = _adminBackVoteLabel.maxWidth();
 		_adminBackVoteLabel.drawLeft(
 			p,
 			left + (innerWidth - backw) / 2,
-			stringtop,
+			layout.textY,
 			backw,
 			outerWidth);
-	} else if (_owner->showVotersCount()) {
-		_linkRipple.reset();
-		p.setPen(stm->msgDateFg);
-		const auto timerText = closeTimerText();
-		if (timerText.isEmpty()) {
-			const auto labelWidth = _totalVotesLabel.maxWidth();
-			const auto labelLeft = left + (innerWidth - labelWidth) / 2;
-			_totalVotesLabel.draw(
-				p,
-				labelLeft,
-				stringtop,
-				labelWidth,
-				style::al_top);
-		} else if (timerFooterMultiline(innerWidth)) {
-			const auto labelWidth = _totalVotesLabel.maxWidth();
-			const auto labelLeft = left + (innerWidth - labelWidth) / 2;
-			_totalVotesLabel.draw(
-				p,
-				labelLeft,
-				stringtop,
-				labelWidth,
-				style::al_top);
-			p.setFont(st::msgDateFont);
-			const auto timerw = st::msgDateFont->width(timerText);
-			p.drawTextLeft(
-				left + (innerWidth - timerw) / 2,
-				stringtop + st::msgDateFont->height,
-				outerWidth,
-				timerText,
-				timerw);
-		} else {
-			p.setFont(st::msgDateFont);
-			const auto sep = QString::fromUtf8(" \xC2\xB7 ");
-			const auto full = _totalVotesLabel.toString()
-				+ sep
-				+ timerText;
-			const auto fullw = st::msgDateFont->width(full);
-			p.drawTextLeft(
-				left + (innerWidth - fullw) / 2,
-				stringtop,
-				outerWidth,
-				full,
-				fullw);
-		}
-	} else {
-		const auto votedPublic = _owner->_voted
-			&& (_owner->_flags & PollData::Flag::PublicVotes);
-		const auto link = (_owner->showVotes() || votedPublic)
-			? _showResultsLink
-			: _owner->canSendVotes()
-			? _sendVotesLink
-			: nullptr;
+		break;
+	}
+	case Layout::Kind::LinkButton: {
 		p.setFont(st::semiboldFont);
-		p.setPen(link ? stm->msgFileThumbLinkFg : stm->msgDateFg);
-		const auto string = (_owner->showVotes() || votedPublic)
-			? ((_owner->_flags & PollData::Flag::PublicVotes)
-				? tr::lng_polls_view_votes(
-					tr::now,
-					lt_count,
-					_owner->_totalVotes)
-				: tr::lng_polls_view_results(tr::now))
-			: tr::lng_polls_submit_votes(tr::now);
+		p.setPen(layout.link
+			? stm->msgFileThumbLinkFg
+			: stm->msgDateFg);
+		const auto string = linkButtonText();
 		const auto stringw = st::semiboldFont->width(string);
 		p.drawTextLeft(
 			left + (innerWidth - stringw) / 2,
-			stringtop,
+			layout.textY,
 			outerWidth,
 			string,
 			stringw);
+		break;
+	}
+	}
+
+	if (layout.timerSeparate) {
+		p.setFont(st::msgDateFont);
+		p.setPen(stm->msgDateFg);
 		const auto timerText = closeTimerText();
-		if (!timerText.isEmpty()) {
-			p.setFont(st::msgDateFont);
-			p.setPen(stm->msgDateFg);
-			const auto timerw = st::msgDateFont->width(timerText);
-			p.drawTextLeft(
-				left + (innerWidth - timerw) / 2,
-				stringtop + st::semiboldFont->height,
-				outerWidth,
-				timerText,
-				timerw);
-		}
+		const auto timerw = st::msgDateFont->width(timerText);
+		p.drawTextLeft(
+			left + (innerWidth - timerw) / 2,
+			layout.timerY,
+			outerWidth,
+			timerText,
+			timerw);
 	}
 }
 
@@ -744,35 +775,27 @@ TextState Poll::Footer::textState(
 		int innerWidth,
 		int outerWidth,
 		StateRequest request) const {
+	const auto layout = computeLayout(innerWidth);
 	TextState result;
-	if (_owner->inlineFooter()) {
+
+	const auto timer = timerRect(layout, left, innerWidth);
+	if (!timer.isEmpty() && timer.contains(point)) {
+		result.customTooltip = true;
+		using Flag = Ui::Text::StateRequest::Flag;
+		if (request.flags & Flag::LookupCustomTooltip) {
+			result.customTooltipText = langDateTimeFull(
+				base::unixtime::parse(_owner->_poll->closeDate));
+		}
+	}
+	if (layout.compact) {
 		return result;
 	}
-	const auto top = topSkip();
-	const auto h = countHeight(innerWidth);
-	if (point.y() < top || point.y() >= h) {
+	if (point.y() < layout.topSkip
+		|| point.y() >= layout.totalHeight) {
 		return result;
 	}
 	_owner->_lastLinkPoint = point;
-	if (_owner->_addOptionActive) {
-		result.link = _saveOptionLink;
-	} else if (_owner->isAuthorNotVoted()
-		&& !_owner->_adminShowResults
-		&& !_owner->canSendVotes()) {
-		if (_owner->_totalVotes > 0) {
-			result.link = _adminVotesLink;
-		}
-	} else if (_owner->_adminShowResults && _owner->isAuthorNotVoted()) {
-		result.link = _adminBackVoteLink;
-	} else if (!_owner->showVotersCount()) {
-		const auto votedPublic = _owner->_voted
-			&& (_owner->_flags & PollData::Flag::PublicVotes);
-		result.link = (_owner->showVotes() || votedPublic)
-			? _showResultsLink
-			: _owner->canSendVotes()
-			? _sendVotesLink
-			: nullptr;
-	}
+	result.link = layout.link;
 	return result;
 }
 
@@ -791,10 +814,12 @@ void Poll::Footer::clickHandlerPressedChanged(
 void Poll::Footer::toggleLinkRipple(bool pressed) {
 	if (pressed) {
 		const auto outerWidth = _owner->width();
-		const auto h = countHeight(
-			outerWidth - st::msgPadding.left() - st::msgPadding.right());
-		const auto rippleTop = topSkip();
-		const auto linkHeight = h - rippleTop;
+		const auto innerWidth = outerWidth
+			- st::msgPadding.left()
+			- st::msgPadding.right();
+		const auto layout = computeLayout(innerWidth);
+		const auto rippleTop = layout.topSkip;
+		const auto linkHeight = layout.totalHeight - rippleTop;
 		if (!_linkRipple) {
 			auto mask = _owner->isRoundedInBubbleBottom()
 				? static_cast<Message*>(_owner->_parent.get())
@@ -1791,6 +1816,7 @@ Poll::Footer::Footer(not_null<Poll*> owner)
 				owner->_adminShowResults = true;
 				owner->_optionsPart->updateAnswerVotes();
 				owner->_optionsPart->startAnswersAnimation();
+				owner->history()->owner().requestViewResize(owner->_parent);
 			}
 		})))
 , _adminBackVoteLink(
@@ -1801,6 +1827,7 @@ Poll::Footer::Footer(not_null<Poll*> owner)
 			owner->_adminShowResults = false;
 			owner->_optionsPart->updateAnswerVotes();
 			owner->_optionsPart->startAnswersAnimation();
+			owner->history()->owner().requestViewResize(owner->_parent);
 		})))
 , _saveOptionLink(
 	std::make_shared<LambdaClickHandler>(crl::guard(
@@ -1868,7 +1895,7 @@ bool Poll::showVotes() const {
 		return true;
 	}
 	if (_flags & PollData::Flag::HideResultsUntilClose) {
-		return (_flags & PollData::Flag::Closed) || _parent->data()->out();
+		return (_flags & PollData::Flag::Closed) || _poll->creator();
 	}
 	return _voted || (_flags & PollData::Flag::Closed);
 }
@@ -3996,6 +4023,36 @@ QString Poll::Footer::closeTimerText() const {
 		: tr::lng_polls_ends_in_time(tr::now, lt_time, timer);
 }
 
+QRect Poll::Footer::timerRect(
+		const Layout &layout,
+		int left,
+		int innerWidth) const {
+	const auto timerText = closeTimerText();
+	if (timerText.isEmpty()) {
+		return {};
+	}
+	const auto lineHeight = st::msgDateFont->height;
+	const auto timerw = st::msgDateFont->width(timerText);
+	if (layout.timerSeparate) {
+		return QRect(
+			left + (innerWidth - timerw) / 2,
+			layout.timerY,
+			timerw,
+			lineHeight);
+	} else if (layout.timerFolded) {
+		const auto sep = QString::fromUtf8(" \xC2\xB7 ");
+		const auto label = _totalVotesLabel.toString();
+		const auto prefixw = st::msgDateFont->width(label + sep);
+		const auto fullw = prefixw + timerw;
+		return QRect(
+			left + (innerWidth - fullw) / 2 + prefixw,
+			layout.textY,
+			timerw,
+			lineHeight);
+	}
+	return {};
+}
+
 bool Poll::Footer::timerFooterMultiline(int paintw) const {
 	const auto timerText = closeTimerText();
 	if (timerText.isEmpty()) {
@@ -4016,62 +4073,6 @@ bool Poll::Footer::centeredOverlapsInfo(
 		int innerWidth) const {
 	const auto skipw = _owner->_parent->skipBlockWidth();
 	return (innerWidth + textWidth) / 2 > innerWidth - skipw;
-}
-
-int Poll::Footer::bottomLineWidth(int innerWidth) const {
-	const auto inline_ = _owner->inlineFooter();
-	const auto timerText = closeTimerText();
-	const auto timerLine = hasTimerLine(innerWidth);
-
-	if (inline_ || _owner->showVotersCount()) {
-		if (timerText.isEmpty()) {
-			return _totalVotesLabel.maxWidth();
-		} else if (timerLine) {
-			return st::msgDateFont->width(timerText);
-		}
-		// Single-line timer — timerFooterMultiline already handles.
-		return 0;
-	}
-
-	if (_owner->_addOptionActive) {
-		return timerLine
-			? 0
-			: st::semiboldFont->width(
-				tr::lng_polls_add_option_save(tr::now));
-	} else if (_owner->isAuthorNotVoted()
-		&& !_owner->_adminShowResults
-		&& !_owner->canSendVotes()) {
-		return timerLine
-			? 0
-			: (_owner->_totalVotes > 0)
-			? _adminVotesLabel.maxWidth()
-			: _totalVotesLabel.maxWidth();
-	} else if (_owner->_adminShowResults
-		&& _owner->isAuthorNotVoted()) {
-		return timerLine ? 0 : _adminBackVoteLabel.maxWidth();
-	}
-
-	if (timerLine) {
-		return st::msgDateFont->width(timerText);
-	}
-	const auto votedPublic = _owner->_voted
-		&& (_owner->_flags & PollData::Flag::PublicVotes);
-	const auto string = (_owner->showVotes() || votedPublic)
-		? ((_owner->_flags & PollData::Flag::PublicVotes)
-			? tr::lng_polls_view_votes(
-				tr::now,
-				lt_count,
-				_owner->_totalVotes)
-			: tr::lng_polls_view_results(tr::now))
-		: tr::lng_polls_submit_votes(tr::now);
-	return st::semiboldFont->width(string);
-}
-
-int Poll::Footer::dateInfoPadding(int innerWidth) const {
-	const auto w = bottomLineWidth(innerWidth);
-	return (w > 0 && centeredOverlapsInfo(w, innerWidth))
-		? st::msgDateFont->height
-		: 0;
 }
 
 Poll::~Poll() {

@@ -312,7 +312,8 @@ private:
 		mtpRequestId *const saveEditMsgRequestId,
 		bool spoilered);
 	void chooseAttach(std::optional<bool> overrideSendImagesAsPhotos);
-	[[nodiscard]] SendMenu::Details sendMenuDetails() const;
+	[[nodiscard]] SendMenu::Details sendMenuDetails() const override;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen) override;
 	[[nodiscard]] FullReplyTo replyTo() const;
 	[[nodiscard]] HistoryItem *lookupRepliesRoot() const;
 	[[nodiscard]] Data::ForumTopic *lookupTopic();

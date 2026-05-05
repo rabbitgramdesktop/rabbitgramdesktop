@@ -153,7 +153,7 @@ void FillChooseOwnedSetMenu(
 		const auto identifier = set->identifier();
 		const auto coverDocument = set->lookupThumbnailDocument();
 		auto thumbnail = coverDocument
-			? Ui::MakeDocumentThumbnail(
+			? Ui::MakeDocumentThumbnailFit(
 				coverDocument,
 				Data::FileOriginStickerSet(set->id, set->accessHash))
 			: nullptr;
@@ -305,6 +305,24 @@ void AddAddToEmojiSetAction(
 		},
 		.submenuSt = &st::popupMenuWithIcons,
 	});
+}
+
+void AddAddToOwnedSetAction(
+		const Ui::Menu::MenuCallback &addAction,
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<DocumentData*> document) {
+	const auto sticker = document->sticker();
+	const auto isLottie = sticker && sticker->isLottie();
+	const auto size = document->dimensions;
+	const auto fitsEmoji = !size.isEmpty()
+		&& (size.width() <= kEmojiStickerSideMax)
+		&& (size.height() <= kEmojiStickerSideMax);
+	if (isLottie || !fitsEmoji) {
+		AddAddToStickerSetAction(addAction, show, document);
+	}
+	if (isLottie || fitsEmoji) {
+		AddAddToEmojiSetAction(addAction, std::move(show), document);
+	}
 }
 
 void DeleteStickerSet(
