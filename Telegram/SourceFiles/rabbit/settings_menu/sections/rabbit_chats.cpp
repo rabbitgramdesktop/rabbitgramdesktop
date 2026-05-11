@@ -249,6 +249,13 @@ namespace Settings
             RabbitSettings::outgoingQuickAction());
         const auto incomingAction = QuickActionFrom(
             RabbitSettings::incomingQuickAction());
+        
+        builder.add([](const WidgetContext &ctx) {
+            return SectionBuilder::WidgetToAdd{
+                .widget = object_ptr<QuickActionsPreview>(ctx.container),
+                .margin = st::defaultSubsectionTitlePadding,
+            };
+        });
 
         if (const auto button = builder.addButton({
             .id = u"rabbit/chats/quick_actions/outgoing"_q,

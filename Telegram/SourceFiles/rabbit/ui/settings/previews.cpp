@@ -212,3 +212,34 @@ void StickerShapePicker::mousePressEvent(QMouseEvent *e) {
 		update();
 	}
 }
+
+QuickActionsPreview::QuickActionsPreview(QWidget *parent) : RpWidget(parent) {
+	setMinimumSize(st::quickActionPreviewWidth, st::quickActionPreviewHeight);
+}
+
+void QuickActionsPreview::paintEvent(QPaintEvent *e) {
+	Painter p(this);
+	PainterHighQualityEnabler hq(p);
+	
+	const auto radius = st::quickActionBoxHeight / 4;
+
+	p.setPen(QPen(st::quickActionBoxStroke, 1.));
+	p.setBrush(st::windowBgOver);
+	p.drawRoundedRect(
+		1, 
+		1, 
+		st::quickActionBoxWidth, 
+		st::quickActionBoxHeight, 
+		radius, 
+		radius);
+	
+	p.drawRoundedRect(
+		st::quickActionPreviewWidth - st::quickActionBoxWidth - 1, 
+		st::quickActionPreviewHeight - st::quickActionBoxHeight - 1, 
+		st::quickActionBoxWidth, 
+		st::quickActionBoxHeight, 
+		radius, 
+		radius);
+	
+	// TODO: implement drawing current icons
+}
