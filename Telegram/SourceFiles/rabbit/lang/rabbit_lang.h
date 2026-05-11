@@ -54,9 +54,10 @@ namespace RabbitLang::Lang
     QString Translate(
         const QString& key,
         float64 value,
-        const Var& var1 = Var(),
-        const Var& var2 = Var(),
-        const Var& var3 = Var());
+        Var var1 = Var(),
+        Var var2 = Var(),
+        Var var3 = Var(),
+        Var var4 = Var());
 
     TextWithEntities TranslateWithEntities(
         const QString& key,
@@ -67,9 +68,9 @@ namespace RabbitLang::Lang
     TextWithEntities TranslateWithEntities(
         const QString& key,
         float64 value,
-        const EntVar& var1 = EntVar(),
-        const EntVar& var2 = EntVar(),
-        const EntVar& var3 = EntVar(),
+        EntVar var1 = EntVar(),
+        EntVar var2 = EntVar(),
+        EntVar var3 = EntVar(),
         EntVar var4 = EntVar());
 
     rpl::producer<> Events();
