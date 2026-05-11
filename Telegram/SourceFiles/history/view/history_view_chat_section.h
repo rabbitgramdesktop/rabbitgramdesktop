@@ -420,6 +420,7 @@ private:
 	std::unique_ptr<SubsectionTabs> _subsectionTabs;
 	rpl::lifetime _subsectionTabsLifetime;
 	rpl::lifetime _subsectionCheckLifetime;
+	rpl::lifetime _subsectionTopicsLifetime;
 	bool _canSendTexts = false;
 	bool _skipScrollEvent = false;
 	bool _synteticScrollEvent = false;

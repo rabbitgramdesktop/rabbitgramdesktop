@@ -39,13 +39,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "api/api_user_names.h"
 #include "api/api_websites.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/credits.h"
 #include "data/components/scheduled_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
+#include "data/data_media_types.h"
 #include "data/data_web_page.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
 #include "data/data_forum.h"
+#include "data/data_message_reaction_id.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
@@ -73,6 +76,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_session_settings.h"
 #include "main/main_account.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/boxes/emoji_stake_box.h"
+#include "ui/controls/ton_common.h"
 #include "boxes/sticker_set_box.h"
 #include "boxes/premium_limits_box.h"
 #include "window/notifications_manager.h"
@@ -558,6 +563,30 @@ void ApiWrap::sendMessageFail(
 			}
 		}
 		peer->updateFull();
+	} else if (error == u"BALANCE_TOO_LOW"_q) {
+		const auto item = _session->data().message(itemId);
+		const auto stake = (item && item->media())
+			? item->media()->diceGameOutcome().stakeNanoTon
+			: int64(0);
+		if (stake > 0) {
+			const auto required = CreditsAmount(
+				stake / Ui::kNanosInOne,
+				stake % Ui::kNanosInOne,
+				CreditsType::Ton);
+			if (randomId) {
+				_session->data().unregisterMessageRandomId(randomId);
+			}
+			item->destroy();
+			if (show) {
+				show->show(Box(
+					Ui::InsufficientTonBox,
+					_session,
+					required));
+			}
+			return;
+		} else if (show) {
+			show->showToast(error);
+		}
 	} else if (show) {
 		show->showToast(error);
 	}
@@ -1419,6 +1448,43 @@ void ApiWrap::deleteAllFromParticipantSend(
 		} else if (const auto history = _session->data().historyLoaded(channel)) {
 			history->requestChatListMessage();
 		}
+	}).send();
+}
+
+void ApiWrap::deleteAllReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		not_null<PeerData*> participant,
+		MsgId originMsgId,
+		const Data::ReactionId &originReaction) {
+	_session->data().removeReactionsFromParticipant(
+		peer,
+		0,
+		participant,
+		originReaction,
+		originMsgId);
+	request(MTPmessages_DeleteParticipantReactions(
+		peer->input(),
+		participant->input()
+	)).send();
+}
+
+void ApiWrap::deleteParticipantReaction(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const Data::ReactionId &reaction) {
+	_session->data().removeReactionsFromParticipant(
+		peer,
+		msgId,
+		participant,
+		reaction,
+		0);
+	request(MTPmessages_DeleteParticipantReaction(
+		peer->input(),
+		MTP_int(msgId.bare),
+		participant->input()
+	)).done([=](const MTPUpdates &result) {
+		applyUpdates(result);
 	}).send();
 }
 

@@ -1088,11 +1088,18 @@ moderateBoxUserpic: UserpicButton(defaultUserpicButton) {
 	photoSize: 34px;
 	photoPosition: point(0px, 4px);
 }
-moderateBoxExpand: icon {{ "chat/reply_type_group", boxTextFg }};
+moderateBoxExpand: IconEmoji {
+	icon: icon {{ "chat/reply_type_group", boxTextFg }};
+	padding: margins(1px, 3px, 1px, 0px);
+	useIconColor: true;
+}
 moderateBoxExpandHeight: 20px;
 moderateBoxExpandRight: 10px;
 moderateBoxExpandInnerSkip: 2px;
 moderateBoxExpandFont: font(11px);
+moderateBoxExpandTextStyle: TextStyle(boxTextStyle) {
+	font: moderateBoxExpandFont;
+}
 moderateBoxExpandToggleSize: 4px;
 moderateBoxExpandToggleFourStrokes: 3px;
 moderateBoxExpandIcon: IconEmoji{
@@ -1246,10 +1253,120 @@ aiComposeBadge: RoundButton(customEmojiTextBadge) {
 }
 aiComposeBadgeMargin: margins(0px, 2px, 0px, 0px);
 
+aiComposeAddStyleIcon: icon {{ "menu/edit_stars_add", aiComposeButtonFg }};
+aiComposeAddStyleIconOver: icon {{ "menu/edit_stars_add", aiComposeButtonFgActive }};
+
+aiToneIconPreviewSize: 80px;
+aiToneIconPreviewBottomSkip: 12px;
+aiToneIconPreviewTopSkip: 4px;
+aiToneIconPreviewBg: boxBg;
+aiToneIconPreviewInnerSize: 54px;
+
+aiToneIconPreviewPlaceholder: icon {{ "chat/ai_style_tone", windowSubTextFg }};
+
+aiToneFieldBg: boxBg;
+aiToneFieldRadius: 12px;
+aiToneFieldPadding: margins(16px, 12px, 16px, 12px);
+aiToneFieldsMargin: margins(16px, 0px, 16px, 0px);
+aiToneFieldsSkip: 8px;
+
+aiToneNameField: InputField(defaultInputField) {
+	textBg: transparent;
+	textBgActive: transparent;
+	textMargins: margins(16px, 12px, 16px, 12px);
+	border: 0px;
+	borderActive: 0px;
+	heightMin: 44px;
+}
+aiTonePromptField: InputField(newGroupDescription) {
+	textBg: transparent;
+	textBgActive: transparent;
+	textMargins: margins(16px, 12px, 16px, 12px);
+	border: 0px;
+	borderActive: 0px;
+	heightMin: 140px;
+	heightMax: 240px;
+}
+aiTonePlaceholderLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 80px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(14px);
+	}
+}
+aiToneAuthorCheckboxMargin: margins(0px, 12px, 0px, 8px);
+aiToneDeleteButton: RoundButton(defaultActiveButton) {
+	textFg: attentionButtonFg;
+	textFgOver: attentionButtonFg;
+	textBg: boxBg;
+	textBgOver: boxBg;
+	height: 42px;
+	textTop: 12px;
+	style: semiboldTextStyle;
+	ripple: defaultRippleAnimation;
+}
+aiToneDeleteButtonMargin: margins(16px, 8px, 16px, 0px);
+aiComposeToneToastIconSize: size(32px, 32px);
+aiComposeToneToastIconPadding: margins(12px, 6px, 12px, 6px);
+
+aiTonePreviewTitleLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowFg;
+	minWidth: 0px;
+	maxHeight: 28px;
+	align: align(top);
+	style: TextStyle(semiboldTextStyle) {
+		font: font(17px semibold);
+	}
+}
+aiTonePreviewTitleMargin: margins(16px, 6px, 16px, 0px);
+
+aiTonePreviewAboutLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 20px;
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(14px);
+	}
+}
+aiTonePreviewAboutMargin: margins(28px, 6px, 28px, 6px);
+
+aiTonePreviewAttributionLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 0px;
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+		linkUnderline: kLinkUnderlineActive;
+	}
+}
+aiTonePreviewAttributionMargin: margins(16px, 10px, 16px, 8px);
+
+aiTonePreviewExampleCardBg: boxBg;
+aiTonePreviewExampleCardRadius: 22px;
+aiTonePreviewExampleCardPadding: margins(14px, 12px, 16px, 12px);
+aiTonePreviewExampleCardSectionSkip: 24px;
+aiTonePreviewExampleCardTitleSkip: 6px;
+aiTonePreviewExampleCardMargin: margins(16px, 6px, 16px, 0px);
+aiTonePreviewBottomSkip: 6px;
+
+aiTonePreviewAnotherExampleButton: RoundButton(defaultLightButton) {
+	width: -12px;
+	height: 26px;
+	radius: 8px;
+	textTop: 4px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px semibold);
+	}
+}
+aiTonePreviewAnotherExampleIcon: IconEmoji {
+	icon: icon {{ "chat/refresh-18x18", lightButtonFg }};
+	padding: margins(0px, 1px, 4px, 0px);
+}
+aiComposeToneRemovedToastIcon: icon {{ "menu/delete", toastFg }};
+
 aiComposeCardBg: boxBg;
 aiComposeCardRadius: 22px;
 aiComposeCardPadding: margins(12px, 16px, 16px, 16px);
-aiComposeCardDivider: shadowFg;
 aiComposeCardSectionSkip: 12px;
 aiComposeCardControlSkip: 8px;
 aiComposeCardTitle: FlatLabel(defaultSubsectionTitle) {
@@ -1258,6 +1375,8 @@ aiComposeCardTitle: FlatLabel(defaultSubsectionTitle) {
 	maxHeight: 22px;
 }
 aiComposeEmojifyCheckbox: Checkbox(defaultBoxCheckbox) {
+	textFg: windowSubTextFg;
+	textFgActive: windowSubTextFg;
 	width: 0px;
 }
 
@@ -1279,6 +1398,17 @@ aiComposeCopyButton: IconButton(aiComposeExpandButton) {
 	icon: aiComposeCopyIcon;
 	iconOver: aiComposeCopyIcon;
 }
+
+aiComposeAuthorLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 0px;
+	maxHeight: 20px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+		linkUnderline: kLinkUnderlineActive;
+	}
+}
+aiComposeAuthorLabelTop: 8px;
 
 aiComposeBoxButton: RoundButton(defaultActiveButton) {
 	height: 42px;
@@ -1305,3 +1435,4 @@ aiComposeBoxInfoButton: IconButton(boxTitleClose) {
 	iconOver: icon {{ "menu/info", boxTitleCloseFgOver }};
 	ripple: defaultRippleAnimation;
 }
+aiComposeShadowOpacity: 0.3;

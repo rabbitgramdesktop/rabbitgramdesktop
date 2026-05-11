@@ -47,6 +47,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_group_call_bar.h"
 #include "data/data_media_types.h"
 #include "data/data_document.h"
+#include "data/data_channel.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_file_origin.h"
@@ -80,6 +81,15 @@ constexpr auto kRotateAmplitude = 3.;
 constexpr auto kScaleSegments = 2;
 constexpr auto kScaleAmplitude = 0.03;
 constexpr auto kRollDuration = crl::time(400);
+constexpr auto kExpiringVoteRestrictionDuration = 10 * 60 * crl::time(1000);
+constexpr auto kVoteRestrictionToastDuration = 5 * crl::time(1000);
+
+[[nodiscard]] bool IsExpiringVoteRestriction(
+		PollData::VoteRestriction restriction) {
+	using Restriction = PollData::VoteRestriction;
+	return (restriction == Restriction::SubscribersOnly)
+		|| (restriction == Restriction::SubscribersJoinedTooRecently);
+}
 
 [[nodiscard]] int PollAnswerMediaSize() {
 	return st::historyPollRadio.diameter * 2;
@@ -1543,6 +1553,7 @@ struct Poll::Options : public Poll::Part {
 	void saveStateInAnimation() const;
 	void startAnswersAnimation() const;
 	void toggleRipple(Answer &answer, bool pressed);
+	void clearSelected();
 	void toggleMultiOption(const QByteArray &option);
 	void sendMultiOptions();
 	void showResults();
@@ -1900,6 +1911,67 @@ bool Poll::showVotes() const {
 	return _voted || (_flags & PollData::Flag::Closed);
 }
 
+PollData::VoteRestriction Poll::knownVoteRestriction() const {
+	const auto fromServer = _poll->voteRestriction();
+	if (fromServer != PollData::VoteRestriction::None) {
+		if (IsExpiringVoteRestriction(fromServer)) {
+			const auto updated = _poll->voteRestrictionUpdated();
+			if (updated > 0
+				&& (updated + kExpiringVoteRestrictionDuration <= crl::now())) {
+				return PollData::VoteRestriction::None;
+			}
+		}
+		return fromServer;
+	}
+	if (_poll->subscribersOnly()) {
+		const auto channel = _parent->data()->history()->peer->asChannel();
+		if (channel && !channel->amIn()) {
+			return PollData::VoteRestriction::SubscribersOnly;
+		}
+	}
+	if (!_poll->countries.empty()) {
+		const auto userIso2 = _poll->session().appConfig().phoneCountryIso2();
+		if (!userIso2.isEmpty()) {
+			const auto inList = ranges::any_of(
+				_poll->countries,
+				[&](const QString &iso2) {
+					return !iso2.compare(userIso2, Qt::CaseInsensitive);
+				});
+			if (!inList) {
+				return PollData::VoteRestriction::Countries;
+			}
+		}
+	}
+	return PollData::VoteRestriction::None;
+}
+
+bool Poll::voteRestricted() const {
+	return (knownVoteRestriction() != PollData::VoteRestriction::None)
+		&& !showVotes()
+		&& !_voted
+		&& _parent->data()->isRegular();
+}
+
+void Poll::showVoteRestrictionToast() const {
+	const auto restriction = knownVoteRestriction();
+	if (restriction == PollData::VoteRestriction::None) {
+		return;
+	}
+	const auto peer = _parent->data()->history()->peer;
+	auto text = PollVoteRestrictionText(restriction, peer, _poll);
+	if (text.text.isEmpty()) {
+		return;
+	}
+	if (const auto window = peer->session().tryResolveWindow(peer)) {
+		window->showToast({
+			.text = std::move(text),
+			.iconLottie = u"ban"_q,
+			.iconLottieSize = st::pollToastIconSize,
+			.duration = kVoteRestrictionToastDuration,
+		});
+	}
+}
+
 bool Poll::isAuthorNotVoted() const {
 	return _parent->data()->out()
 		&& !_voted
@@ -1907,7 +1979,10 @@ bool Poll::isAuthorNotVoted() const {
 }
 
 bool Poll::canVote() const {
-	return !showVotes() && !_voted && _parent->data()->isRegular();
+	return !showVotes()
+		&& !_voted
+		&& _parent->data()->isRegular()
+		&& (knownVoteRestriction() == PollData::VoteRestriction::None);
 }
 
 bool Poll::canSendVotes() const {
@@ -1915,6 +1990,9 @@ bool Poll::canSendVotes() const {
 }
 
 bool Poll::showVotersCount() const {
+	if (voteRestricted()) {
+		return true;
+	}
 	if (_voted && !showVotes()) {
 		return !(_flags & PollData::Flag::PublicVotes);
 	}
@@ -2708,6 +2786,8 @@ ClickHandlerPtr Poll::Options::createAnswerClickHandler(
 			}
 			if (_owner->canVote()) {
 				_owner->_optionsPart->toggleMultiOption(option);
+			} else if (_owner->voteRestricted()) {
+				_owner->showVoteRestrictionToast();
 			} else if (_owner->showVotes()) {
 				_owner->_optionsPart->showAnswerVotesTooltip(option);
 			}
@@ -2724,6 +2804,8 @@ ClickHandlerPtr Poll::Options::createAnswerClickHandler(
 				_owner->history()->session().api().polls().sendVotes(
 					_owner->_parent->data()->fullId(),
 					{ option });
+			} else if (_owner->voteRestricted()) {
+				_owner->showVoteRestrictionToast();
 			} else if (_owner->showVotes()) {
 				_owner->_optionsPart->showAnswerVotesTooltip(option);
 			}
@@ -2755,6 +2837,26 @@ void Poll::Options::toggleMultiOption(const QByteArray &option) {
 		} else {
 			_hasSelected = true;
 		}
+		_owner->repaint();
+	}
+}
+
+void Poll::Options::clearSelected() {
+	auto changed = false;
+	for (auto &answer : _answers) {
+		if (answer.selected) {
+			answer.selected = false;
+			changed = true;
+		}
+		if (answer.selectedAnimation.animating()) {
+			answer.selectedAnimation.stop();
+		}
+	}
+	if (_hasSelected) {
+		_hasSelected = false;
+		changed = true;
+	}
+	if (changed) {
 		_owner->repaint();
 	}
 }
@@ -2803,9 +2905,7 @@ void Poll::updateVotes() {
 	if (_voted != voted) {
 		_voted = voted;
 		if (_voted) {
-			for (auto &answer : _optionsPart->_answers) {
-				answer.selected = false;
-			}
+			_optionsPart->clearSelected();
 			if (_optionsPart->_votedFromHere
 				&& (_flags & PollData::Flag::HideResultsUntilClose)
 				&& !(_flags & PollData::Flag::Closed)) {
@@ -2820,8 +2920,11 @@ void Poll::updateVotes() {
 			}
 		} else {
 			_optionsPart->_votedFromHere = false;
-			_optionsPart->_hasSelected = false;
+			_optionsPart->clearSelected();
 		}
+	}
+	if (voteRestricted()) {
+		_optionsPart->clearSelected();
 	}
 	_optionsPart->updateAnswerVotes();
 	_footerPart->updateTotalVotes();

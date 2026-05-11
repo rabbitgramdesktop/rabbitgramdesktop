@@ -81,6 +81,9 @@ starIconEmojiLarge: IconEmoji {
 starIconEmojiInline: IconEmoji(starIconEmojiSmall) {
 	padding: margins(0px, 3px, 0px, 0px);
 }
+starIconEmojiMiniFont: IconEmoji(starIconEmojiSmall) {
+	padding: margins(0px, 5px, 0px, 0px);
+}
 buttonStarIconEmoji: IconEmoji(starIconEmoji) {
 	padding: margins(4px, 2px, 4px, 0px);
 }

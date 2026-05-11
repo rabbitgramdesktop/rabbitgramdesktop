@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QTextEdit>
 #include <QtGui/QAction>
@@ -109,6 +110,7 @@ void SendKeySequence(
 	const auto focused = QApplication::focusWidget();
 	if (qobject_cast<QLineEdit*>(focused)
 		|| qobject_cast<QTextEdit*>(focused)
+		|| qobject_cast<QLabel*>(focused)
 		|| dynamic_cast<HistoryInner*>(focused)) {
 		QApplication::postEvent(
 			focused,
@@ -245,6 +247,14 @@ void Manager::recomputeState() {
 					focused->parentWidget())) {
 				markdownState = inputField->markdownEnabledState();
 			}
+		}
+	} else if (const auto label = qobject_cast<QLabel*>(focused)) {
+		const auto flags = label->textInteractionFlags();
+		const auto selectable = flags
+			& (Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+		if (selectable) {
+			canCopy = label->hasSelectedText();
+			canSelectAll = !label->text().isEmpty();
 		}
 	} else if (const auto list = dynamic_cast<HistoryInner*>(focused)) {
 		canCopy = list->canCopySelected();
