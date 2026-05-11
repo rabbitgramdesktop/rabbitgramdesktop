@@ -9,14 +9,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "windows_utils.h"
 
-#include "core/application.h"
-#include "core/core_settings.h"
 #include "storage/localstorage.h"
-#include "window/themes/window_theme.h"
-#include "window/themes/window_themes_embedded.h"
 
 #include <ShlObj_core.h>
-#include <dwmapi.h>
 
 void reloadAppIconFromTaskBar()
 {
@@ -38,10 +33,10 @@ void reloadAppIconFromTaskBar()
                                       nullptr,
                                       CLSCTX_INPROC_SERVER,
                                       IID_IShellLink,
-                                      (void**)&pShellLink);
+                                      reinterpret_cast<void**>(&pShellLink));
         if (SUCCEEDED(hr))
         {
-            hr = pShellLink->QueryInterface(IID_IPersistFile, (void**)&pPersistFile);
+            hr = pShellLink->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&pPersistFile));
             if (SUCCEEDED(hr))
             {
                 WCHAR wszShortcutPath[MAX_PATH];

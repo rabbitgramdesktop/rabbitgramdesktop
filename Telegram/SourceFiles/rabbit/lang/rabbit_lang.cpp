@@ -57,7 +57,7 @@ namespace RabbitLang::Lang
                 LOG(("RabbitLang::Lang Info: file %1 could not be read.").arg(filename));
                 return;
             }
-            auto error = QJsonParseError{0, QJsonParseError::NoError};
+            auto error = QJsonParseError{.offset = 0, .error = QJsonParseError::NoError};
             const auto document = QJsonDocument::fromJson(
                 base::parse::stripComments(file.readAll()),
                 &error);
@@ -94,7 +94,7 @@ namespace RabbitLang::Lang
 
             for (auto i = keyList.constBegin(), e = keyList.constEnd(); i != e; ++i)
             {
-                const auto key = *i;
+                const auto& key = *i;
                 if (key.startsWith("dummy_")) continue;
 
                 const auto value = langKeys.constFind(key);
@@ -110,7 +110,7 @@ namespace RabbitLang::Lang
 
                     for (auto pli = pluralList.constBegin(), ple = pluralList.constEnd(); pli != ple; ++pli)
                     {
-                        const auto plural = *pli;
+                        const auto& plural = *pli;
                         const auto pluralValue = keyPlurals.constFind(plural);
 
                         if (!pluralValue->isString())
@@ -193,7 +193,7 @@ namespace RabbitLang::Lang
         LangChanges.fire({});
     }
 
-    QString Translate(const QString& key, Var var1, Var var2, Var var3, Var var4)
+    QString Translate(const QString& key, const Var& var1, const Var& var2, const Var& var3, const Var& var4)
     {
         auto phrase = (CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty())
                           ? CurrentValues.value(key)
@@ -204,8 +204,8 @@ namespace RabbitLang::Lang
             if (!v.key.isEmpty())
             {
                 auto skipNext = false;
-                const auto key = qsl("{%1}").arg(v.key);
-                const auto neededLength = phrase.length() - key.length();
+                const auto chars = qsl("{%1}").arg(v.key);
+                const auto neededLength = phrase.length() - chars.length();
                 for (auto i = 0; i <= neededLength; i++)
                 {
                     if (skipNext)
@@ -215,9 +215,9 @@ namespace RabbitLang::Lang
                     }
 
                     if (phrase.at(i) == QChar('\\')) skipNext = true;
-                    else if (phrase.at(i) == QChar('{') && phrase.mid(i, key.length()) == key)
+                    else if (phrase.at(i) == QChar('{') && phrase.mid(i, chars.length()) == chars)
                     {
-                        phrase.replace(i, key.length(), v.value);
+                        phrase.replace(i, chars.length(), v.value);
                         break;
                     }
                 }
@@ -227,18 +227,19 @@ namespace RabbitLang::Lang
         return phrase;
     }
 
-    QString Translate(const QString& key, float64 value, Var var1, Var var2, Var var3, Var var4)
+    QString Translate(const QString& key, float64 value, const Var& var1, const Var& var2, const Var& var3, const Var& var4)
     {
         const auto shift = ::Lang::PluralShift(value);
         return Translate(key + kPostfixes.at(shift), var1, var2, var3);
     }
 
-    TextWithEntities TranslateWithEntities(const QString& key, EntVar var1, EntVar var2, EntVar var3, EntVar var4)
+    TextWithEntities TranslateWithEntities(const QString& key, const EntVar& var1, const EntVar& var2, const EntVar& var3, const EntVar& var4)
     {
         TextWithEntities phrase = {
-            (CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty())
+            .text = CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty()
                 ? CurrentValues.value(key)
-                : (DefaultValues.contains(key) ? DefaultValues.value(key) : key)
+                : DefaultValues.contains(key) ? DefaultValues.value(key) : key,
+            .entities = EntitiesInText()
         };
 
         for (const auto& v : {var1, var2, var3, var4})
@@ -246,8 +247,8 @@ namespace RabbitLang::Lang
             if (!v.key.isEmpty())
             {
                 auto skipNext = false;
-                const auto key = qsl("{%1}").arg(v.key);
-                const auto neededLength = phrase.text.length() - key.length();
+                const auto chars = qsl("{%1}").arg(v.key);
+                const auto neededLength = phrase.text.length() - chars.length();
                 for (auto i = 0; i <= neededLength; i++)
                 {
                     if (skipNext)
@@ -257,10 +258,10 @@ namespace RabbitLang::Lang
                     }
 
                     if (phrase.text.at(i) == QChar('\\')) skipNext = true;
-                    else if (phrase.text.at(i) == QChar('{') && phrase.text.mid(i, key.length()) == key)
+                    else if (phrase.text.at(i) == QChar('{') && phrase.text.mid(i, chars.length()) == chars)
                     {
-                        phrase.text.replace(i, key.length(), v.value.text);
-                        const auto endOld = i + key.length();
+                        phrase.text.replace(i, chars.length(), v.value.text);
+                        const auto endOld = i + chars.length();
                         const auto endNew = i + v.value.text.length();
 
                         // Shift existing entities
@@ -288,7 +289,7 @@ namespace RabbitLang::Lang
                         }
 
                         // Add new entities
-                        for (auto entity : v.value.entities)
+                        for (auto& entity : v.value.entities)
                         {
                             phrase.entities.append(EntityInText(
                                 entity.type(),
@@ -305,11 +306,11 @@ namespace RabbitLang::Lang
         return phrase;
     }
 
-    TextWithEntities TranslateWithEntities(const QString& key, float64 value, EntVar var1, EntVar var2, EntVar var3,
-                                           EntVar var4)
+    TextWithEntities TranslateWithEntities(const QString& key, float64 value, const EntVar& var1, const EntVar& var2, const EntVar& var3,
+                                           const EntVar& var4)
     {
         const auto shift = ::Lang::PluralShift(value);
-        return TranslateWithEntities(key + kPostfixes.at(shift), var1, var2, var3, var4);
+        return TranslateWithEntities(key + kPostfixes.at(shift), var1, var2, var3);
     }
 
     rpl::producer<> Events()

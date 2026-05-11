@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_inner_widget.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/settings/quick_action.h"
 
 #include "api/api_polls.h"
 #include "chat_helpers/stickers_emoji_pack.h"

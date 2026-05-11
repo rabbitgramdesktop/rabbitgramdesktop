@@ -5,8 +5,6 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
-#include <ui/boxes/single_choice_box.h>
-
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings/quick_action_ui.h"
 #include "rabbit/lang/rabbit_lang.h"
@@ -23,22 +21,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/vertical_list.h"
-#include "boxes/connection_box.h"
 #include "ui/boxes/confirm_box.h"
-#include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
-#include "lang/lang_instance.h"
 #include "core/application.h"
-#include "storage/localstorage.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
-#include "apiwrap.h"
-#include "api/api_blocked_peers.h"
 #include "rabbit/settings_menu/boxes/quick_action_box.h"
 #include "ui/widgets/continuous_sliders.h"
 
@@ -57,8 +47,8 @@ namespace Settings
         QString id,
         rpl::producer<QString> title,
         const style::icon *icon,
-        Fn<bool()> getter,
-        Fn<void(bool)> setter,
+        const Fn<bool()>& getter,
+        const Fn<void(bool)>& setter,
         QStringList keywords = {})
     {
         const auto st = icon
@@ -236,6 +226,7 @@ namespace Settings
                 .margin = st::defaultSubsectionTitlePadding,
             };
         });
+        
         builder.add(nullptr, [] {
             return SearchEntry{
                 .id = u"rabbit/chats/sticker_shape_picker"_q,

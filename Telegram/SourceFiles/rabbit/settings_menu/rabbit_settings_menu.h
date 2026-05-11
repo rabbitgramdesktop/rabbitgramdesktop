@@ -15,7 +15,6 @@ class BoxContent;
 namespace Window
 {
     class Controller;
-
     class SessionController;
 } // namespace Window
 
