@@ -609,6 +609,14 @@ stickerPanRemoveSet: IconButton(hashtagClose) {
 	iconPosition: point(-1px, -1px);
 	rippleAreaPosition: point(0px, 0px);
 }
+whoReadClose: IconButton(stickerPanRemoveSet) {
+	width: 20px;
+	height: 20px;
+	icon: smallCloseIconOver;
+	rippleAreaSize: 20px;
+}
+whoReadCloseVisibleRadius: 7px;
+whoReadCloseBlurPadding: 5px;
 stickerIconMove: 400;
 stickerPreviewDuration: 150;
 stickerPreviewMin: 0.1;

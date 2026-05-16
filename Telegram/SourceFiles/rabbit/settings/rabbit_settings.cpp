@@ -10,13 +10,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/version.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
-#include "window/window_controller.h"
 #include "core/application.h"
-#include "data/data_peer_id.h"
 #include "base/parse_helper.h"
 #include "base/timer.h"
-#include "data/data_chat_filters.h"
-#include "platform/platform_file_utilities.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -45,23 +41,23 @@ namespace RabbitSettings::JsonSettings
                 const QString& key,
                 uint64 accountId = 0,
                 bool isTestAccount = false);
-            [[nodiscard]] QVariantMap getAllWithPending(const QString& key);
+            [[nodiscard]] QVariantMap getAllWithPending(const QString& key) const;
             [[nodiscard]] rpl::producer<QString> events(
                 const QString& key,
                 uint64 accountId = 0,
-                bool isTestAccount = false);
+                bool isTestAccount = false) const;
             [[nodiscard]] rpl::producer<QString> eventsWithPending(
                 const QString& key,
                 uint64 accountId = 0,
-                bool isTestAccount = false);
+                bool isTestAccount = false) const;
             void set(
                 const QString& key,
-                QVariant value,
+                const QVariant& value,
                 uint64 accountId = 0,
                 bool isTestAccount = false);
             void setAfterRestart(
                 const QString& key,
-                QVariant value,
+                const QVariant& value,
                 uint64 accountId = 0,
                 bool isTestAccount = false);
             void reset(
@@ -75,9 +71,9 @@ namespace RabbitSettings::JsonSettings
             void writeTimeout();
 
         private:
-            [[nodiscard]] QVariant getDefault(const QString& key);
+            [[nodiscard]] static QVariant getDefault(const QString& key);
 
-            void writeDefaultFile();
+            static void writeDefaultFile();
             void writeCurrentSettings();
             bool readCustomFile();
             void writing();
@@ -156,7 +152,7 @@ namespace RabbitSettings::JsonSettings
 
         CheckHandler ScalesLimit()
         {
-            return [=](QVariant value) -> QVariant
+            return [=](const QVariant& value) -> QVariant
             {
                 auto newArrayValue = QJsonArray();
                 if (value.canConvert<QJsonArray>())
@@ -590,7 +586,7 @@ namespace RabbitSettings::JsonSettings
         _settingsHashMap.reserve(DefinitionMap.size());
         _defaultSettingsHashMap.reserve(DefinitionMap.size());
 
-        const auto addDefaultValue = [&](const QString& option, QVariant value)
+        const auto addDefaultValue = [&](const QString& option, const QVariant& value)
         {
             _settingsHashMap.insert(option, value);
         };
@@ -662,7 +658,7 @@ namespace RabbitSettings::JsonSettings
         return result;
     }
 
-    QVariantMap Manager::getAllWithPending(const QString& key)
+    QVariantMap Manager::getAllWithPending(const QString& key) const
     {
         auto resultMap = QVariantMap();
 
@@ -707,8 +703,7 @@ namespace RabbitSettings::JsonSettings
             return QVariant();
         }
         const auto defaultValue = &defIterator->second.defaultValue;
-        const auto settingType = defIterator->second.type;
-        switch (settingType)
+        switch (defIterator->second.type)
         {
         case QStringSetting:
             return QVariant(defaultValue->isValid()
@@ -731,26 +726,26 @@ namespace RabbitSettings::JsonSettings
         return QVariant();
     }
 
-    rpl::producer<QString> Manager::events(const QString& key, uint64 accountId, bool isTestAccount)
+    rpl::producer<QString> Manager::events(const QString& key, uint64 accountId, bool isTestAccount) const
     {
         const auto mapKey = MakeMapKey(key, accountId, isTestAccount);
         return _eventStream.events() | rpl::filter(rpl::mappers::_1 == mapKey);
     }
 
-    rpl::producer<QString> Manager::eventsWithPending(const QString& key, uint64 accountId, bool isTestAccount)
+    rpl::producer<QString> Manager::eventsWithPending(const QString& key, uint64 accountId, bool isTestAccount) const
     {
         const auto mapKey = MakeMapKey(key, accountId, isTestAccount);
         return _pendingEventStream.events() | rpl::filter(rpl::mappers::_1 == mapKey);
     }
 
-    void Manager::set(const QString& key, QVariant value, uint64 accountId, bool isTestAccount)
+    void Manager::set(const QString& key, const QVariant& value, uint64 accountId, bool isTestAccount)
     {
         const auto mapKey = MakeMapKey(key, accountId, isTestAccount);
         _settingsHashMap.insert(mapKey, value);
         _eventStream.fire_copy(mapKey);
     }
 
-    void Manager::setAfterRestart(const QString& key, QVariant value, uint64 accountId, bool isTestAccount)
+    void Manager::setAfterRestart(const QString& key, const QVariant& value, uint64 accountId, bool isTestAccount)
     {
         const auto mapKey = MakeMapKey(key, accountId, isTestAccount);
         if (!_settingsHashMap.contains(mapKey)
@@ -814,11 +809,11 @@ namespace RabbitSettings::JsonSettings
             const QString& key,
             const Definition& def,
             const QJsonValue& val,
-            Fn<void(const QString&,
+            const Fn<void(const QString&,
                     const Definition&,
                     const QJsonValue&,
                     uint64,
-                    bool)> callback)
+                    bool)>& callback)
         {
             if (val.isUndefined()) return;
             if (def.scope == Account && val.isObject())
@@ -990,14 +985,14 @@ namespace RabbitSettings::JsonSettings
         return (Data) ? Data->eventsWithPending(key, accountId, isTestAccount) : rpl::single(QString());
     }
 
-    void Set(const QString& key, QVariant value, uint64 accountId, bool isTestAccount)
+    void Set(const QString& key, const QVariant& value, uint64 accountId, bool isTestAccount)
     {
         if (!Data) return;
         Data->set(key, value, accountId, isTestAccount);
         Write();
     }
 
-    void SetAfterRestart(const QString& key, QVariant value, uint64 accountId, bool isTestAccount)
+    void SetAfterRestart(const QString& key, const QVariant& value, uint64 accountId, bool isTestAccount)
     {
         if (!Data) return;
         Data->setAfterRestart(key, value, accountId, isTestAccount);

@@ -24,7 +24,7 @@ namespace RabbitAssets
 
     void loadAppIco();
 
-    QImage loadPreview(QString name);
+    QImage loadPreview(const QString &name);
 
     QString currentAppLogoName();
     QImage currentAppLogo();

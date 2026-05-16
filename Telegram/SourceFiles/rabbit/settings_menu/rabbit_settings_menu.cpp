@@ -5,8 +5,6 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
-#include <ui/boxes/single_choice_box.h>
-
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
@@ -17,7 +15,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "core/application.h"
 #include "core/file_utilities.h"
-#include "lang_auto.h"
 #include "mainwindow.h"
 #include "settings/settings_common.h"
 #include "settings/settings_builder.h"
@@ -26,32 +23,19 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/vertical_list.h"
-#include "boxes/connection_box.h"
-#include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
-#include "lang/lang_instance.h"
-#include "core/application.h"
 #include "storage/localstorage.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
-#include "ui/toast/toast.h"
-#include "styles/style_settings.h"
-#include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "apiwrap.h"
-#include "api/api_blocked_peers.h"
 #include "api/api_common.h"
 #include "data/data_user.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_media_prepare.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "window/window_peer_menu.h"
-#include "ui/widgets/continuous_sliders.h"
 #include "ui/basic_click_handlers.h"
-#include "styles/style_chat.h"
 #include "styles/style_boxes.h"
 
 namespace Settings

@@ -136,6 +136,8 @@ pollBoxFilledPollCorrectIcon: icon{{ "poll/filled/filled_poll_correct", activeBu
 pollBoxFilledPollRevoteIcon: icon{{ "poll/filled/filled_poll_revote", activeButtonFg }};
 pollBoxFilledPollShuffleIcon: icon{{ "poll/filled/filled_poll_shuffle", activeButtonFg }};
 pollBoxFilledPollMultipleIcon: icon{{ "poll/filled/filled_poll_multiple", activeButtonFg }};
+pollBoxFilledPollSubscribersIcon: icon{{ "poll/filled/filled_poll_subscribers-20x20", activeButtonFg }};
+pollBoxFilledPollCountryIcon: icon{{ "poll/filled/filled_poll_country-20x20", activeButtonFg }};
 
 pollAttachTextSkip: 28px;
 pollAttachProgressMargin: 4px;

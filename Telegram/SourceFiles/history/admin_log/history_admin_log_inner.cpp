@@ -83,6 +83,7 @@ namespace {
 // If we require to support more admins we'll have to rewrite this anyway.
 constexpr auto kMaxChannelAdmins = 200;
 constexpr auto kScrollDateHideTimeout = 1000;
+constexpr auto kScrollDateHideOnDayCrossingTimeout = crl::time(3000);
 constexpr auto kEventsFirstPage = 20;
 constexpr auto kEventsPerPage = 50;
 constexpr auto kClearUserpicsAfter = 50;
@@ -376,9 +377,10 @@ void InnerWidget::visibleTopBottomUpdated(
 	updateVisibleTopItem();
 	checkPreloadMore();
 	if (scrolledUp) {
+		_scrollDateAfterDayCrossing = false;
 		_scrollDateCheck.call();
 	} else {
-		scrollDateHideByTimer();
+		scrollDateCheckDownward();
 	}
 	_controller->floatPlayerAreaUpdated();
 	session().data().itemVisibilitiesUpdated();
@@ -422,8 +424,33 @@ void InnerWidget::scrollDateCheck() {
 	}
 }
 
+void InnerWidget::scrollDateCheckDownward() {
+	const auto previousDay = _scrollDateLastItem
+		? _scrollDateLastItem->dateTime().date()
+		: QDate();
+	const auto currentDay = _visibleTopItem
+		? _visibleTopItem->dateTime().date()
+		: QDate();
+	const auto crossedDay = previousDay.isValid()
+		&& currentDay.isValid()
+		&& (previousDay != currentDay);
+	_scrollDateLastItem = _visibleTopItem;
+	_scrollDateLastItemTop = _visibleTopFromItem;
+	if (crossedDay) {
+		if (!_scrollDateShown) {
+			toggleScrollDateShown();
+		}
+		_scrollDateAfterDayCrossing = true;
+		_scrollDateHideTimer.callOnce(
+			kScrollDateHideOnDayCrossingTimeout);
+	} else if (!_scrollDateAfterDayCrossing) {
+		scrollDateHideByTimer();
+	}
+}
+
 void InnerWidget::scrollDateHideByTimer() {
 	_scrollDateHideTimer.cancel();
+	_scrollDateAfterDayCrossing = false;
 	scrollDateHide();
 }
 

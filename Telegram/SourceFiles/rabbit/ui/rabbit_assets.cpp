@@ -45,7 +45,7 @@ namespace RabbitAssets
         }
     }
 
-    QImage loadPreview(QString name)
+    QImage loadPreview(const QString &name)
     {
         return QImage(qsl(":/gui/art/rabbit/%1/app_preview.png").arg(name));
     }

@@ -9,11 +9,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <rpl/producer.h>
 
-#include <map>
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
-
-#include "rabbit/settings/quick_action.h"
 
 namespace RabbitSettings
 {
@@ -53,12 +50,12 @@ namespace RabbitSettings
             bool isTestAccount = false);
         void Set(
             const QString& key,
-            QVariant value,
+            const QVariant& value,
             uint64 accountId = 0,
             bool isTestAccount = false);
         void SetAfterRestart(
             const QString& key,
-            QVariant value,
+            const QVariant& value,
             uint64 accountId = 0,
             bool isTestAccount = false);
         void Reset(
@@ -175,7 +172,7 @@ namespace RabbitSettings
     inline void setShowPeerIdDc(bool value) { JsonSettings::Set("show_peer_id_dc", value); }
     inline void setConnectionBarLost(bool value) { JsonSettings::Set("connection_bar_lost", value); }
     inline void setConnectionBarProxy(bool value) { JsonSettings::Set("connection_bar_proxy", value); }
-    inline void setAppIcon(QString value) { JsonSettings::Set("app_icon", value); }
+    inline void setAppIcon(const QString& value) { JsonSettings::Set("app_icon", value); }
     inline void setUserpicRoundness(int value) { JsonSettings::Set("userpic_roundness", value); }
     inline void setGeneralRoundness(bool value) { JsonSettings::Set("general_roundness", value); }
     inline void setSidebarMyProfile(bool value) { JsonSettings::Set("sidebar_my_profile", value); }

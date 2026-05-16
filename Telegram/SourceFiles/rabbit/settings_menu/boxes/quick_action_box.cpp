@@ -23,7 +23,7 @@ namespace {
 void BuildQuickActionBox(
     not_null<Ui::GenericBox*> box,
     const QString &titleKey,
-    Fn<void(RabbitSettings::QuickAction)> setter) {
+    const Fn<void(RabbitSettings::QuickAction)>& setter) {
     box->setTitle(rktr(titleKey));
 
     auto layout = box->verticalLayout();

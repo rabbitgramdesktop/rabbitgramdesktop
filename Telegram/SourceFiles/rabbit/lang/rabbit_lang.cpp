@@ -57,7 +57,7 @@ namespace RabbitLang::Lang
                 LOG(("RabbitLang::Lang Info: file %1 could not be read.").arg(filename));
                 return;
             }
-            auto error = QJsonParseError{0, QJsonParseError::NoError};
+            auto error = QJsonParseError{.offset = 0, .error = QJsonParseError::NoError};
             const auto document = QJsonDocument::fromJson(
                 base::parse::stripComments(file.readAll()),
                 &error);
@@ -204,8 +204,8 @@ namespace RabbitLang::Lang
             if (!v.key.isEmpty())
             {
                 auto skipNext = false;
-                const auto key = qsl("{%1}").arg(v.key);
-                const auto neededLength = phrase.length() - key.length();
+                const auto chars = qsl("{%1}").arg(v.key);
+                const auto neededLength = phrase.length() - chars.length();
                 for (auto i = 0; i <= neededLength; i++)
                 {
                     if (skipNext)
@@ -215,9 +215,9 @@ namespace RabbitLang::Lang
                     }
 
                     if (phrase.at(i) == QChar('\\')) skipNext = true;
-                    else if (phrase.at(i) == QChar('{') && phrase.mid(i, key.length()) == key)
+                    else if (phrase.at(i) == QChar('{') && phrase.mid(i, chars.length()) == chars)
                     {
-                        phrase.replace(i, key.length(), v.value);
+                        phrase.replace(i, chars.length(), v.value);
                         break;
                     }
                 }
@@ -236,9 +236,9 @@ namespace RabbitLang::Lang
     TextWithEntities TranslateWithEntities(const QString& key, EntVar var1, EntVar var2, EntVar var3, EntVar var4)
     {
         TextWithEntities phrase = {
-            (CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty())
-                ? CurrentValues.value(key)
-                : (DefaultValues.contains(key) ? DefaultValues.value(key) : key)
+            .text = CurrentValues.contains(key) && !CurrentValues.value(key).isEmpty()
+                        ? CurrentValues.value(key)
+                        : DefaultValues.contains(key) ? DefaultValues.value(key) : key
         };
 
         for (const auto& v : {var1, var2, var3, var4})
@@ -246,8 +246,8 @@ namespace RabbitLang::Lang
             if (!v.key.isEmpty())
             {
                 auto skipNext = false;
-                const auto key = qsl("{%1}").arg(v.key);
-                const auto neededLength = phrase.text.length() - key.length();
+                const auto chars = qsl("{%1}").arg(v.key);
+                const auto neededLength = phrase.text.length() - chars.length();
                 for (auto i = 0; i <= neededLength; i++)
                 {
                     if (skipNext)
@@ -257,10 +257,10 @@ namespace RabbitLang::Lang
                     }
 
                     if (phrase.text.at(i) == QChar('\\')) skipNext = true;
-                    else if (phrase.text.at(i) == QChar('{') && phrase.text.mid(i, key.length()) == key)
+                    else if (phrase.text.at(i) == QChar('{') && phrase.text.mid(i, chars.length()) == chars)
                     {
-                        phrase.text.replace(i, key.length(), v.value.text);
-                        const auto endOld = i + key.length();
+                        phrase.text.replace(i, chars.length(), v.value.text);
+                        const auto endOld = i + chars.length();
                         const auto endNew = i + v.value.text.length();
 
                         // Shift existing entities

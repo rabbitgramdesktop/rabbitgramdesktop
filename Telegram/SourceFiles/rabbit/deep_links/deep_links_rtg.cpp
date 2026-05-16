@@ -34,7 +34,7 @@ struct RtgSectionMapping {
 Result HandleRtgSettingsWithSuffix(
 		const Context &ctx,
 		const QString &pathPrefix,
-		Settings::Type sectionId) {
+		const Settings::Type& sectionId) {
 	if (!ctx.controller) {
 		return Result::NeedsAuth;
 	}

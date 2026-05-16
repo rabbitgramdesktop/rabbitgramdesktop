@@ -46,5 +46,11 @@ public:
 protected:
 	void paintEvent(QPaintEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
+};
 
+class QuickActionsPreview : public Ui::RpWidget {
+public:
+	QuickActionsPreview(QWidget *parent);
+protected:
+	void paintEvent(QPaintEvent *e) override;
 };

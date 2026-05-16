@@ -36,14 +36,14 @@ const QVector icon_variants {
     RabbitAssets::TWITCH_ICON,
 };
 
-const auto kColumnsCount = 4;
+constexpr auto kColumnsCount = 4;
 
-[[nodiscard]] int rowsCount() {
-	const auto count = static_cast<int>(icon_variants.size());
+[[nodiscard]] static int rowsCount() {
+	const auto count = icon_variants.size();
 	return (count + kColumnsCount - 1) / kColumnsCount;
 }
 
-void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
+static void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
 {
     xOffset += st::cpPadding;
 
@@ -61,7 +61,7 @@ void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float s
     );
     p.restore();
 
-    auto rect = QRect(
+    const auto rect = QRect(
         xOffset + st::cpImagePadding,
         yOffset + st::cpImagePadding,
         st::cpIconSize,
@@ -70,7 +70,7 @@ void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float s
     p.drawImage(rect, icon);
 }
 
-void applyIcon()
+static void applyIcon()
 {
 #ifdef Q_OS_WIN
     RabbitAssets::loadAppIco();

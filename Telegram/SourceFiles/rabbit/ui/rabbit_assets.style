@@ -41,3 +41,11 @@ stickerShapeVariantCardWidth: 102px;
 stickerShapeVariantCardHeight: 70px;
 stickerShapePadding: 10px;
 stickerShapePenWidth: 2px;
+
+quickActionPreviewWidth: 348px;
+quickActionPreviewHeight: 148px;
+quickActionBoxWidth: 149px;
+quickActionBoxHeight: 62px;
+
+quickActionBoxFill: windowBgOver;
+quickActionBoxStroke: historyPeerArchiveUserpicBg;

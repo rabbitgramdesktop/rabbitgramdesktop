@@ -8,23 +8,21 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "previews.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/settings/quick_action.h"
+#include <rabbit/settings/quick_action_ui.h>
 #include "styles/style_rabbit_assets.h"
 #include "styles/style_chat.h"
 #include "ui/painter.h"
 #include "ui/chat/chat_style.h"
-#include "ui/chat/chat_style_radius.h"
 #include "ui/chat/message_bubble.h"
 
+#include <rpl/producer.h>
 #include <array>
 
 namespace {
 
 [[nodiscard]] int StickerShapeRadius(int shape) {
-	switch (shape) {
-	case 1: return st::bubbleRadiusSmall;
-	case 2: return st::bubbleRadiusLarge;
-	}
-	return 0;
+	return shape == 1 ? st::bubbleRadiusSmall : st::bubbleRadiusLarge;
 }
 
 } // namespace
@@ -87,9 +85,9 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 	PainterHighQualityEnabler hq(p);
 
 	const auto stickerSize = RabbitSettings::stickerSize();
-	const auto stickerRect = QSize(stickerSize, int(stickerSize * 0.7));
+	const auto stickerRect = QSize(stickerSize, static_cast<int>(stickerSize * 0.7));
 	const auto stickerShape = RabbitSettings::stickerShape();
-	const auto stickerRadius = qreal(StickerShapeRadius(stickerShape));
+	const auto stickerRadius = static_cast<qreal>(StickerShapeRadius(stickerShape));
 
 	p.setPen(Qt::NoPen);
 	p.setBrush(st::rndPreviewFill);
@@ -109,14 +107,14 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 		timeRadius);
 
 	struct BubbleEntry {
-		double widthFraction;
 		bool outgoing;
+		double widthFraction;
 	};
-	const auto bubbles = std::array<BubbleEntry, 4>{ {
-		{ 0.85, true },
-		{ 0.6, false },
-		{ 0.5, true },
-		{ 0.7, false },
+	constexpr auto bubbles = std::array<BubbleEntry, 4>{ {
+		{ .outgoing = true, .widthFraction = 0.85 },
+		{ .outgoing = false, .widthFraction = 0.6 },
+		{ .outgoing = true, .widthFraction = 0.5 },
+		{ .outgoing = false, .widthFraction = 0.7 },
 	} };
 
 	const auto bubbleHeight = st::stickerSpacefillerHeight;
@@ -125,12 +123,12 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 	auto topOffset = stickerRect.height() + st::stickerPreviewMargin;
 
 	for (const auto &entry : bubbles) {
-		const auto bubbleWidth = int(outerWidth * 0.5 * entry.widthFraction);
+		const auto bubbleWidth = static_cast<int>(outerWidth * 0.5 * entry.widthFraction);
 		const auto bubbleLeft = entry.outgoing
-			? (outerWidth - bubbleWidth - tailWidth)
+			? outerWidth - bubbleWidth - tailWidth
 			: tailWidth;
 
-		auto rounding = Ui::BubbleRounding();
+		Ui::BubbleRounding rounding;
 		rounding.topLeft = Ui::BubbleCornerRounding::Large;
 		rounding.topRight = Ui::BubbleCornerRounding::Large;
 		if (entry.outgoing) {
@@ -144,6 +142,7 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 		Ui::PaintBubble(p, Ui::SimpleBubble{
 			.st = _chatStyle.get(),
 			.geometry = QRect(bubbleLeft, topOffset, bubbleWidth, bubbleHeight),
+			.patternViewport = QRect(),
 			.outerWidth = outerWidth,
 			.outbg = entry.outgoing,
 			.rounding = rounding,
@@ -210,9 +209,75 @@ void StickerShapePicker::mousePressEvent(QMouseEvent *e) {
 	if (x < 0) {
 		return;
 	}
-	const auto index = std::min(int(x / cellWidth), 2);
+	const auto index = std::min(static_cast<int>(x / cellWidth), 2);
 	if (index != RabbitSettings::stickerShape()) {
 		RabbitSettings::setStickerShape(index);
 		update();
+	}
+}
+
+QuickActionsPreview::QuickActionsPreview(QWidget *parent) : RpWidget(parent) {
+	setMinimumSize(st::quickActionPreviewWidth, st::quickActionPreviewHeight);
+
+	RabbitSettings::JsonSettings::Events(
+		"incoming_quick_action"
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		"outgoing_quick_action"
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+}
+
+void QuickActionsPreview::paintEvent(QPaintEvent *e) {
+	Painter p(this);
+	PainterHighQualityEnabler hq(p);
+	
+	const auto radius = st::quickActionBoxHeight / 4;
+	const auto incomingBox = QRect(
+		QPoint(1, 1),
+		QSize(st::quickActionBoxWidth, st::quickActionBoxHeight));
+	const auto outgoingBox = QRect(
+		QPoint(
+			st::quickActionPreviewWidth - st::quickActionBoxWidth - 1,
+			st::quickActionPreviewHeight - st::quickActionBoxHeight - 1),
+		QSize(st::quickActionBoxWidth, st::quickActionBoxHeight));
+
+	p.setPen(QPen(st::quickActionBoxStroke, 1.));
+	p.setBrush(st::windowBgOver);
+	p.drawRoundedRect(
+		incomingBox,
+		radius, 
+		radius);
+	
+	p.drawRoundedRect(
+		outgoingBox,
+		radius, 
+		radius);
+
+	auto incoming_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::incomingQuickAction());
+	auto outgoing_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::outgoingQuickAction());
+	auto incoming_icon = RabbitSettings::QuickActionIcon(incoming_action);
+	auto outgoing_icon = RabbitSettings::QuickActionIcon(outgoing_action);
+
+	if (incoming_icon) {
+		const auto icon = Settings::Icon(std::move(incoming_icon));
+		const auto iconLeft = incomingBox.x()
+			+ (incomingBox.width() - icon.width()) / 2;
+		const auto iconTop = incomingBox.y()
+			+ (incomingBox.height() - icon.height()) / 2;
+		icon.paint(p, iconLeft, iconTop);
+	}
+
+	if (outgoing_icon) {
+		const auto icon = Settings::Icon(std::move(outgoing_icon));
+		const auto iconLeft = outgoingBox.x()
+			+ (outgoingBox.width() - icon.width()) / 2;
+		const auto iconTop = outgoingBox.y()
+			+ (outgoingBox.height() - icon.height()) / 2;
+		icon.paint(p, iconLeft, iconTop);
 	}
 }
