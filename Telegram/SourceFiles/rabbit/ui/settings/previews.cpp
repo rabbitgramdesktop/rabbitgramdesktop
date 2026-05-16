@@ -8,12 +8,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "previews.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/settings/quick_action.h"
+#include <rabbit/settings/quick_action_ui.h>
 #include "styles/style_rabbit_assets.h"
 #include "styles/style_chat.h"
 #include "ui/painter.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
 
+#include <rpl/producer.h>
 #include <array>
 
 namespace {
@@ -215,6 +218,18 @@ void StickerShapePicker::mousePressEvent(QMouseEvent *e) {
 
 QuickActionsPreview::QuickActionsPreview(QWidget *parent) : RpWidget(parent) {
 	setMinimumSize(st::quickActionPreviewWidth, st::quickActionPreviewHeight);
+
+	RabbitSettings::JsonSettings::Events(
+		"incoming_quick_action"
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		"outgoing_quick_action"
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
 }
 
 void QuickActionsPreview::paintEvent(QPaintEvent *e) {
@@ -222,24 +237,47 @@ void QuickActionsPreview::paintEvent(QPaintEvent *e) {
 	PainterHighQualityEnabler hq(p);
 	
 	const auto radius = st::quickActionBoxHeight / 4;
+	const auto incomingBox = QRect(
+		QPoint(1, 1),
+		QSize(st::quickActionBoxWidth, st::quickActionBoxHeight));
+	const auto outgoingBox = QRect(
+		QPoint(
+			st::quickActionPreviewWidth - st::quickActionBoxWidth - 1,
+			st::quickActionPreviewHeight - st::quickActionBoxHeight - 1),
+		QSize(st::quickActionBoxWidth, st::quickActionBoxHeight));
 
 	p.setPen(QPen(st::quickActionBoxStroke, 1.));
 	p.setBrush(st::windowBgOver);
 	p.drawRoundedRect(
-		1, 
-		1, 
-		st::quickActionBoxWidth, 
-		st::quickActionBoxHeight, 
+		incomingBox,
 		radius, 
 		radius);
 	
 	p.drawRoundedRect(
-		st::quickActionPreviewWidth - st::quickActionBoxWidth - 1, 
-		st::quickActionPreviewHeight - st::quickActionBoxHeight - 1, 
-		st::quickActionBoxWidth, 
-		st::quickActionBoxHeight, 
+		outgoingBox,
 		radius, 
 		radius);
-	
-	// TODO: implement drawing current icons
+
+	auto incoming_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::incomingQuickAction());
+	auto outgoing_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::outgoingQuickAction());
+	auto incoming_icon = RabbitSettings::QuickActionIcon(incoming_action);
+	auto outgoing_icon = RabbitSettings::QuickActionIcon(outgoing_action);
+
+	if (incoming_icon) {
+		const auto icon = Settings::Icon(std::move(incoming_icon));
+		const auto iconLeft = incomingBox.x()
+			+ (incomingBox.width() - icon.width()) / 2;
+		const auto iconTop = incomingBox.y()
+			+ (incomingBox.height() - icon.height()) / 2;
+		icon.paint(p, iconLeft, iconTop);
+	}
+
+	if (outgoing_icon) {
+		const auto icon = Settings::Icon(std::move(outgoing_icon));
+		const auto iconLeft = outgoingBox.x()
+			+ (outgoingBox.width() - icon.width()) / 2;
+		const auto iconTop = outgoingBox.y()
+			+ (outgoingBox.height() - icon.height()) / 2;
+		icon.paint(p, iconLeft, iconTop);
+	}
 }
