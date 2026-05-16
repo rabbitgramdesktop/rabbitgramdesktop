@@ -258,23 +258,6 @@ namespace Settings
         });
 
         if (const auto button = builder.addButton({
-            .id = u"rabbit/chats/quick_actions/outgoing"_q,
-            .title = rktr("rtg_outgoing_quick_actions"),
-            .st = &st::settingsButtonNoIcon,
-            .label = RabbitSettings::QuickActionString(outgoingAction),
-            .onClick = controller
-                ? [=] { controller->show(Box(OutgoingQuickActionBox)); }
-                : Fn<void()>(),
-            .keywords = { u"outgoing"_q, u"actions"_q },
-        })) {
-            if (controller) {
-                RtgMenu::AttachSettingsContextMenu(
-                    button,
-                    u"rabbit/chats/quick_actions/outgoing"_q,
-                    controller);
-            }
-        }
-        if (const auto button = builder.addButton({
             .id = u"rabbit/chats/quick_actions/incoming"_q,
             .title = rktr("rtg_incoming_quick_actions"),
             .st = &st::settingsButtonNoIcon,
@@ -288,6 +271,23 @@ namespace Settings
                 RtgMenu::AttachSettingsContextMenu(
                     button,
                     u"rabbit/chats/quick_actions/incoming"_q,
+                    controller);
+            }
+        }
+        if (const auto button = builder.addButton({
+            .id = u"rabbit/chats/quick_actions/outgoing"_q,
+            .title = rktr("rtg_outgoing_quick_actions"),
+            .st = &st::settingsButtonNoIcon,
+            .label = RabbitSettings::QuickActionString(outgoingAction),
+            .onClick = controller
+                           ? [=] { controller->show(Box(OutgoingQuickActionBox)); }
+                           : Fn<void()>(),
+            .keywords = { u"outgoing"_q, u"actions"_q },
+        })) {
+            if (controller) {
+                RtgMenu::AttachSettingsContextMenu(
+                    button,
+                    u"rabbit/chats/quick_actions/outgoing"_q,
                     controller);
             }
         }
