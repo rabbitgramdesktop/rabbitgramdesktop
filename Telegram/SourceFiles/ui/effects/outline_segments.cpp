@@ -217,7 +217,7 @@ void PaintOutlineSegmentsRoundedRect(
 	const auto length = left / float64(count);
 	const auto spin = separator * (1. - fromFullProgress);
 
-	auto start = (full / 4.) + (separator / 2.) + (3. * spin);
+	auto start = (shape.topHalf / 2.) + (separator / 2.) + (3. * spin);
 	auto pen = QPen(
 		segments.back().brush,
 		segments.back().width,
