@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "settings.h"
 
+#include "core/version.h"
 #include "ui/emoji_config.h"
 
 Qt::LayoutDirection gLangDir = Qt::LeftToRight;

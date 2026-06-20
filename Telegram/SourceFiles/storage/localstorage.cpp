@@ -21,6 +21,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/file_location.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/version.h"
 #include "media/audio/media_audio.h"
 #include "mtproto/mtproto_config.h"
 #include "mtproto/mtproto_dc_options.h"

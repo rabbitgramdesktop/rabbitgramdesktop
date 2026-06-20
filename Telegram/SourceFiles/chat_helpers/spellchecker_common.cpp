@@ -25,6 +25,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "spellcheck/spellcheck_value.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/version.h"
 
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>

@@ -60,6 +60,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mainwindow.h"
 #include "main/main_session.h"
 #include "window/notifications_manager.h"
+#include "window/window_session_controller.h"
 #include "calls/calls_instance.h"
 #include "spellcheck/spellcheck_types.h"
 #include "storage/localstorage.h"
@@ -529,7 +530,7 @@ not_null<HistoryItem*> History::createItem(
 	owner().fillMessagePeers(peer->id, message);
 	if (const auto result = owner().message(peer, id)) {
 		if (detachExistingItem) {
-			result->removeMainView();
+			result->removeMainView(Data::ViewRemovalReason::Detached);
 		}
 		if (result->needsUpdateForVideoQualities(message)) {
 			owner().updateEditedMessage(message);
@@ -668,6 +669,9 @@ void History::destroyMessagesByDates(TimeId minDate, TimeId maxDate) {
 			toDestroy.push_back(message.get());
 		}
 	}
+	if (!toDestroy.empty()) {
+		owner().notifyItemsAboutToBeDestroyed(toDestroy);
+	}
 	for (const auto &item : toDestroy) {
 		item->destroy();
 	}
@@ -680,6 +684,9 @@ void History::destroyMessagesByTopic(MsgId topicRootId) {
 		if (message->topicRootId() == topicRootId) {
 			toDestroy.push_back(message.get());
 		}
+	}
+	if (!toDestroy.empty()) {
+		owner().notifyItemsAboutToBeDestroyed(toDestroy);
 	}
 	for (const auto &item : toDestroy) {
 		item->destroy();
@@ -694,6 +701,9 @@ void History::destroyMessagesBySublist(not_null<PeerData*> sublistPeer) {
 		if (message->sublistPeerId() == peerId) {
 			toDestroy.push_back(message.get());
 		}
+	}
+	if (!toDestroy.empty()) {
+		owner().notifyItemsAboutToBeDestroyed(toDestroy);
 	}
 	for (const auto &item : toDestroy) {
 		item->destroy();
@@ -1518,6 +1528,15 @@ void History::applyServiceChanges(
 			user->setNoForwardsFlags(
 				enabled && item->out(),
 				enabled && !item->out());
+		}
+	}, [&](const MTPDmessageActionPaidMessagesPrice &data) {
+		if (const auto channel = peer->asBroadcast()) {
+			for (const auto &controller : session().windows()) {
+				if (controller->activeChatCurrent().peer() == peer.get()) {
+					channel->updateFullForced();
+					break;
+				}
+			}
 		}
 	}, [](const auto &) {
 	});
@@ -4182,11 +4201,15 @@ void History::clear(ClearType type, bool markEmpty) {
 		_loadedAtTop = _loadedAtBottom = markEmpty;
 	} else {
 		// Leave the 'sending' messages in local messages.
-		auto local = base::flat_set<not_null<HistoryItem*>>();
+		auto local = std::vector<not_null<HistoryItem*>>();
+		local.reserve(_clientSideMessages.size());
 		for (const auto &item : _clientSideMessages) {
 			if (!item->isSending()) {
-				local.emplace(item);
+				local.push_back(item);
 			}
+		}
+		if (!local.empty()) {
+			owner().notifyItemsAboutToBeDestroyed(local);
 		}
 		for (const auto &item : local) {
 			item->destroy();
@@ -4245,6 +4268,9 @@ void History::clearUpTill(MsgId availableMinId) {
 		} else if (itemId < availableMinId) {
 			remove.push_back(item.get());
 		}
+	}
+	if (!remove.empty()) {
+		owner().notifyItemsAboutToBeDestroyed(remove);
 	}
 	for (const auto &item : remove) {
 		item->destroy();
@@ -4392,9 +4418,12 @@ int HistoryBlock::resizeGetHeight(int newWidth, ResizeRequest request) {
 	return _height;
 }
 
-void HistoryBlock::remove(not_null<Element*> view) {
+void HistoryBlock::remove(
+		not_null<Element*> view,
+		Data::ViewRemovalReason reason) {
 	Expects(view->block() == this);
 
+	_history->owner().notifyViewAboutToBeRemoved(view, reason);
 	_history->mainViewRemoved(this, view);
 
 	const auto blockIndex = indexInHistory();

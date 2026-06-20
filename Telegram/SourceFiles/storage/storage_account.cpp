@@ -28,6 +28,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/file_location.h"
+#include "core/version.h"
 #include "data/components/recent_inline_bots.h"
 #include "data/components/recent_peers.h"
 #include "settings/settings_recent_searches.h"

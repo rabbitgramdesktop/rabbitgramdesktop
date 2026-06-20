@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/platform/base_platform_system_media_controls.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/version.h"
 #include "data/data_document_media.h"
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
@@ -267,9 +268,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 
 	_controls->commandRequests(
 	) | rpl::on_next([=](Command command) {
-		const auto type = mediaPlayer->current(AudioMsgId::Type::Song)
-			? AudioMsgId::Type::Song
-			: AudioMsgId::Type::Voice;
+		const auto type = mediaPlayer->getActiveType();
 		switch (command) {
 		case Command::PlayPause: mediaPlayer->playPause(type); break;
 		case Command::Play: mediaPlayer->play(type); break;
@@ -315,9 +314,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		) | rpl::filter([](Media::Player::Instance::Seeking seeking) {
 			return (seeking == Media::Player::Instance::Seeking::Finish);
 		}) | rpl::map([=] {
-			const auto type = mediaPlayer->current(AudioMsgId::Type::Song)
-				? AudioMsgId::Type::Song
-				: AudioMsgId::Type::Voice;
+			const auto type = mediaPlayer->getActiveType();
 			return mediaPlayer->getState(type).position;
 		}) | rpl::distinct_until_changed(
 		) | rpl::on_next([=](int position) {
@@ -327,17 +324,13 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 
 		_controls->seekRequests(
 		) | rpl::on_next([=](float64 progress) {
-			const auto type = mediaPlayer->current(AudioMsgId::Type::Song)
-				? AudioMsgId::Type::Song
-				: AudioMsgId::Type::Voice;
+			const auto type = mediaPlayer->getActiveType();
 			mediaPlayer->finishSeeking(type, progress);
 		}, _lifetime);
 
 		_controls->updatePositionRequests(
 		) | rpl::on_next([=] {
-			const auto type = mediaPlayer->current(AudioMsgId::Type::Song)
-				? AudioMsgId::Type::Song
-				: AudioMsgId::Type::Voice;
+			const auto type = mediaPlayer->getActiveType();
 			_controls->setPosition(mediaPlayer->getState(type).position);
 		}, _lifetime);
 	}

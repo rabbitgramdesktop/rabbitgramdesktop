@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/launcher.h"
 #include "core/proxy_rotation_manager.h"
 #include "core/ui_integration.h"
+#include "core/version.h"
 #include "chat_helpers/emoji_keywords.h"
 #include "chat_helpers/stickers_emoji_image_loader.h"
 #include "base/platform/base_platform_global_shortcuts.h"
@@ -1414,7 +1415,9 @@ Window::Controller *Application::ensureSeparateWindowFor(
 		return window;
 	};
 	if (const auto existing = separateWindowFor(id)) {
-		if (id.thread && id.type == Window::SeparateType::Chat) {
+		if (id.thread
+			&& id.type == Window::SeparateType::Chat
+			&& !passcodeLocked()) {
 			existing->sessionController()->showThread(
 				id.thread,
 				showAtMsgId,
@@ -1428,6 +1431,9 @@ Window::Controller *Application::ensureSeparateWindowFor(
 		std::make_unique<Window::Controller>(id, showAtMsgId)
 	).first->second.get();
 	processCreatedWindow(result);
+	if (passcodeLocked()) {
+		result->setupPasscodeLock();
+	}
 	result->firstShow();
 	result->finishFirstShow();
 	return activate(result);

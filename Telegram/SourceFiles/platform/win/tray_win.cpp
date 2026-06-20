@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/invoke_queued.h"
 #include "base/qt_signal_producer.h"
 #include "core/application.h"
+#include "core/version.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "storage/localstorage.h"
@@ -281,7 +282,7 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 		using namespace rpl::mappers;
 		_callbackFromTrayLifetime = _menu->shownValue(
 		) | rpl::filter(!_1) | rpl::take(1) | rpl::on_next([=] {
-			callback();
+			crl::on_main([=] { callback(); });
 		});
 	});
 

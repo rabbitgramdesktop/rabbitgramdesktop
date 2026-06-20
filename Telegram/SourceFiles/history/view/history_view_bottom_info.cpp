@@ -71,6 +71,20 @@ namespace {
 	return map.back().text;
 }
 
+[[nodiscard]] QString FormatEditedDate(QDateTime sent, QDateTime edited) {
+	const auto today = QDateTime::currentDateTime().date();
+	const auto time = QLocale().toString(edited.time(), QLocale::ShortFormat);
+	if (sent.date() == today && edited.date() == today) {
+		return tr::lng_edited_at(tr::now, lt_time, time);
+	}
+	return tr::lng_edited_on(
+		tr::now,
+		lt_date,
+		langDayOfMonthShort(edited.date()),
+		lt_time,
+		time);
+}
+
 } // namespace
 
 struct BottomInfo::Effect {
@@ -304,6 +318,18 @@ void BottomInfo::paint(
 			firstLineBottom + st::historyEditedTop,
 			outerWidth);
 	}
+
+	if (_data.flags & Data::Flag::Silent) {
+		const auto &icon = inverted
+			? st->historySilentInvertedIcon()
+			: stm->historySilentIcon;
+		right -= st::historySilentWidth;
+		icon.paint(
+			p,
+			right,
+			firstLineBottom + st::historySilentTop,
+			outerWidth);
+	}
 	if (_data.flags & Data::Flag::Pinned) {
 		const auto &icon = inverted
 			? st->historyPinInvertedIcon()
@@ -462,18 +488,26 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto edited = [&] {
-		if (_data.flags & Data::Flag::EstimateDate) {
-			return tr::lng_approximate(tr::now) + ' ';
-		}
-		if (_data.scheduleRepeatPeriod) {
-			return SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ';
-		}
-		return QString();
-	}();
+	const auto editedPrimary = (_data.flags & Data::Flag::EditedPrimary)
+        && !(_data.flags & Data::Flag::ForwardedDate);
+
+    const auto edited = [&] {
+        if (editedPrimary) {
+            return QString();
+        }
+        if (_data.flags & Data::Flag::EstimateDate) {
+            return tr::lng_approximate(tr::now) + ' ';
+        }
+        if (_data.scheduleRepeatPeriod) {
+            return SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ';
+        }
+        return QString();
+    }();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
-	const auto date = edited + ((_data.flags & Data::Flag::ForwardedDate)
+	const auto date = editedPrimary
+		? FormatEditedDate(_data.date, _data.editedDate)
+		: edited + ((_data.flags & Data::Flag::ForwardedDate)
 		? Ui::FormatDateTimeSavedFrom(_data.date)
 		: QLocale().toString(
 			_data.date.time(), 
@@ -584,6 +618,9 @@ QSize BottomInfo::countOptimalSize() {
 	if (_data.flags & Data::Flag::Pinned) {
 		width += st::historyPinWidth;
 	}
+	if (_data.flags & Data::Flag::Silent) {
+		width += st::historySilentWidth;
+	}
 	_effectMaxWidth = countEffectMaxWidth();
 	width += _effectMaxWidth;
 	const auto dateHeight = (_data.flags & Data::Flag::Sponsored)
@@ -660,8 +697,12 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 			}
 		}
 	}
-	if (message->displayedEditDate()) {
+	if (const auto editedDate = message->displayedEditDate()) {
 		result.flags |= Flag::Edited;
+		if (item->history()->session().messagePrimaryEditedDate()) {
+			result.flags |= Flag::EditedPrimary;
+			result.editedDate = base::unixtime::parse(editedDate);
+		}
 	}
 	if (const auto views = item->Get<HistoryMessageViews>()) {
 		if (views->views.count >= 0) {
@@ -702,6 +743,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->isScheduled()) {
 		result.scheduleRepeatPeriod = item->scheduleRepeatPeriod();
+		if (item->isSilent()) {
+			result.flags |= Flag::Silent;
+		}
 	}
 	if (!forwarded) {
 		return result;
