@@ -1606,7 +1606,7 @@ TextState Poll::Header::textState(
 				result = _attachedMediaAttach->textState(
 					point - QPoint(sideSkip, tshift),
 					request);
-				result.symbol = 0;
+				SetTextStatePosition(&result, 0, false);
 				return result;
 			}
 		} else if (_attachedMedia
@@ -1679,7 +1679,7 @@ TextState Poll::Header::textState(
 						textWidth,
 						outerWidth,
 						request.forText()));
-				result.symbol += symbolAdd;
+				AddTextStateOffset(&result, symbolAdd);
 				return result;
 			}
 			if (_solutionAttach) {
@@ -1715,7 +1715,7 @@ TextState Poll::Header::textState(
 						result = _solutionAttach->textState(
 							point - QPoint(mediaLeft, mediaTop),
 							request);
-						result.symbol = 0;
+						SetTextStatePosition(&result, 0, false);
 					}
 				}
 			}
@@ -1735,7 +1735,7 @@ TextState Poll::Header::textState(
 				point - QPoint(left, tshift),
 				innerWidth,
 				request.forText()));
-		result.symbol += symbolAdd;
+		AddTextStateOffset(&result, symbolAdd);
 		return result;
 	}
 	if (point.y() >= tshift + questionH) {
@@ -4323,12 +4323,12 @@ TextState Poll::textState(QPoint point, StateRequest request) const {
 				request);
 			if (partResult.link) {
 				partResult.itemId = result.itemId;
-				partResult.symbol += symbolAdd;
+				AddTextStateOffset(&partResult, symbolAdd);
 				return partResult;
 			}
 			if (point.y() >= tshift && point.y() < tshift + h) {
 				partResult.itemId = result.itemId;
-				partResult.symbol += symbolAdd;
+				AddTextStateOffset(&partResult, symbolAdd);
 				return partResult;
 			}
 		}

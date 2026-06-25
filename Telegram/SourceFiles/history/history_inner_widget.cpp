@@ -266,6 +266,13 @@ public:
 			_widget->elementShowTooltip(text, hiddenCallback);
 		}
 	}
+	void elementShowHiddenSenderTooltip(
+			FullMsgId itemId,
+			const TextWithEntities &text) override {
+		if (_widget) {
+			_widget->elementShowHiddenSenderTooltip(itemId, text);
+		}
+	}
 	bool elementAnimationsPaused() override {
 		return _widget ? _widget->elementAnimationsPaused() : false;
 	}
@@ -641,7 +648,6 @@ void HistoryInner::setupSwipeReplyAndBack() {
 	if (!_peer) {
 		return;
 	}
-	const auto peer = _peer;
 
 	auto update = [=, history = _history](
 			Ui::Controls::SwipeContextData data) {
@@ -727,8 +733,7 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				return Ui::Controls::SwipeHandlerFinishData();
 			}
 		}
-		if (inSelectionMode().inSelectionMode
-			|| (peer->isChannel() && !peer->isMegagroup())) {
+		if (inSelectionMode().inSelectionMode) {
 			return result;
 		}
 		enumerateItems<EnumItemsDirection::BottomToTop>([&](
@@ -4062,41 +4067,26 @@ TextForMimeData HistoryInner::getSelectedText() const {
 		return _selectedText;
 	}
 
+	const auto richContext = (selected.size() > 1);
 	struct Part {
-		QString name;
-		QString time;
-		TextForMimeData unwrapped;
+		not_null<HistoryItem*> item;
+		const Data::Group *group = nullptr;
 	};
 
 	auto groups = base::flat_set<not_null<const Data::Group*>>();
-	auto fullSize = 0;
 	auto texts = base::flat_map<Data::MessagePosition, Part>();
 
-	const auto wrapItem = [&](
-			not_null<HistoryItem*> item,
-			TextForMimeData &&unwrapped) {
-		const auto i = texts.emplace(item->position(), Part{
-			.name = item->author()->name(),
-			.time = QString("[%1] ").arg(
-				QLocale().toString(
-					ItemDateTime(item), 
-					RabbitSettings::showSeconds()
-						? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-						: QLocale::system().timeFormat(QLocale::ShortFormat))),
-			.unwrapped = std::move(unwrapped),
-		}).first;
-		fullSize += i->second.time.size()
-			+ i->second.name.size()
-			+ 2
-			+ i->second.unwrapped.expanded.size();
-	};
 	const auto addItem = [&](not_null<HistoryItem*> item) {
-		wrapItem(item, HistoryItemText(item));
+		texts.emplace(item->position(), Part{ .item = item });
 	};
 	const auto addGroup = [&](not_null<const Data::Group*> group) {
 		Expects(!group->items.empty());
 
-		wrapItem(group->items.back(), HistoryGroupText(group));
+		const auto item = group->items.back();
+		texts.emplace(item->position(), Part{
+			.item = item,
+			.group = group.get(),
+		});
 	};
 
 	for (const auto &item : selected) {
@@ -4114,15 +4104,33 @@ TextForMimeData HistoryInner::getSelectedText() const {
 			addItem(item);
 		}
 	}
-	if (texts.size() == 1) {
-		return texts.front().second.unwrapped;
+	if (!richContext && texts.size() == 1) {
+		const auto &part = texts.front().second;
+		if (part.group) {
+			return HistoryGroupText(not_null<const Data::Group*>{ part.group });
+		}
+		return HistoryItemText(part.item);
 	}
 	auto result = TextForMimeData();
 	const auto sep = u"\n"_q;
-	result.reserve(fullSize + (texts.size() - 1) * sep.size());
 	for (auto i = texts.begin(), e = texts.end(); i != e;) {
-		result.append(i->second.time).append(i->second.name).append(u": "_q);
-		result.append(std::move(i->second.unwrapped));
+		const auto &part = i->second;
+		auto body = TextForMimeData();
+		if (part.group) {
+			const auto group = not_null<const Data::Group*>{ part.group };
+			body = richContext
+				? HistoryGroupTextForSelectedCopy(group)
+				: HistoryGroupText(group);
+		} else {
+			body = richContext
+				? HistoryItemTextForSelectedCopy(part.item)
+				: HistoryItemText(part.item);
+		}
+		auto wrapped = HistorySelectedItemWrappedText(
+			part.item,
+			std::move(body),
+			richContext);
+		result.append(std::move(wrapped));
 		if (++i != e) {
 			result.append(sep);
 		}
@@ -4999,6 +5007,26 @@ void HistoryInner::elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) {
 	_widget->showInfoTooltip(text, std::move(hiddenCallback));
+}
+
+void HistoryInner::elementShowHiddenSenderTooltip(
+		FullMsgId itemId,
+		const TextWithEntities &text) {
+	auto area = QRect();
+	if (const auto item = _controller->session().data().message(itemId)) {
+		if (const auto view = viewByItem(item)) {
+			const auto tooltip
+				= view->Get<HistoryView::HiddenSenderTooltip>();
+			const auto top = itemTop(view);
+			if (tooltip && !tooltip->linkRect.isEmpty() && top >= 0) {
+				const auto local = tooltip->linkRect;
+				area = QRect(
+					mapToGlobal(QPoint(local.x(), top + local.y())),
+					local.size());
+			}
+		}
+	}
+	_widget->showHiddenSenderTooltip(area, text);
 }
 
 bool HistoryInner::elementAnimationsPaused() {

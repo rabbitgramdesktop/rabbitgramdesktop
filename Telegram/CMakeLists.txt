@@ -319,6 +319,10 @@ PRIVATE
     boxes/peer_list_box.h
     boxes/peer_list_controllers.cpp
     boxes/peer_list_controllers.h
+    boxes/peer_list_section_headers.cpp
+    boxes/peer_list_section_headers.h
+    boxes/peer_list_section_index.cpp
+    boxes/peer_list_section_index.h
     boxes/peer_list_widgets.cpp
     boxes/peer_list_widgets.h
     boxes/peer_lists_box.cpp
@@ -1090,6 +1094,8 @@ PRIVATE
     history/history_unread_things.h
     history/history_view_highlight_manager.cpp
     history/history_view_highlight_manager.h
+    history/history_view_pull_to_next_channel.cpp
+    history/history_view_pull_to_next_channel.h
     history/history_view_swipe_back_session.cpp
     history/history_view_swipe_back_session.h
     history/history_widget.cpp
@@ -1435,6 +1441,8 @@ PRIVATE
     media/view/media_view_overlay_renderer.h
     media/view/media_view_overlay_widget.cpp
     media/view/media_view_overlay_widget.h
+    media/view/media_view_recognition_selection.cpp
+    media/view/media_view_recognition_selection.h
     media/view/media_view_pip.cpp
     media/view/media_view_pip.h
     media/view/media_view_pip_opengl.cpp
@@ -1622,6 +1630,8 @@ PRIVATE
     platform/win/windows_dlls.h
     platform/win/windows_autostart_task.cpp
     platform/win/windows_autostart_task.h
+    platform/win/windows_taskbar_buttons.cpp
+    platform/win/windows_taskbar_buttons.h
     platform/win/windows_toast_activator.cpp
     platform/win/windows_toast_activator.h
     platform/platform_file_utilities.h

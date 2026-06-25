@@ -833,6 +833,12 @@ void InnerWidget::elementShowTooltip(
 	Fn<void()> hiddenCallback) {
 }
 
+void InnerWidget::elementShowHiddenSenderTooltip(
+		FullMsgId itemId,
+		const TextWithEntities &text) {
+	_controller->showToast(TextWithEntities(text));
+}
+
 bool InnerWidget::elementAnimationsPaused() {
 	return _controller->isGifPausedAtLeastFor(Window::GifPauseReason::Any);
 }
