@@ -93,9 +93,9 @@ def bundle_portable(root: Path, version: VersionInfo) -> None:
 
     shutil.copy2(exe_src, portable_dir / "rabbitGram.exe")
 
-    modules_src = release_dir / "modules"
-    if modules_src.exists():
-        shutil.copytree(modules_src, portable_dir / "modules")
+    updater_src = release_dir / "Updater.exe"
+    if updater_src.exists():
+        shutil.copy2(updater_src, portable_dir / "Updater.exe")
 
     output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -130,10 +130,6 @@ def bundle_update(root: Path, version: VersionInfo) -> None:
         "-path", "rabbitGram.exe",
         "-path", "Updater.exe",
     ]
-
-    d3d = release_dir / "modules" / "x64" / "d3d" / "d3dcompiler_47.dll"
-    if d3d.exists():
-        cmd.extend(["-path", "modules\\x64\\d3d\\d3dcompiler_47.dll"])
 
     cmd.extend(["-target", "win64"])
 

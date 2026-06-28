@@ -74,9 +74,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#ReleasePath}\rabbitGram.exe"; DestDir: "{app}"; Flags: ignoreversion
-#if MyBuildTarget != "winarm"
-Source: "{#ReleasePath}\{#ModulesFolder}\d3d\d3dcompiler_47.dll"; DestDir: "{app}\{#ModulesFolder}\d3d"; Flags: ignoreversion
-#endif
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
