@@ -582,7 +582,11 @@ void StickerSetBox::prepare() {
 	_inner->setInstalled(
 	) | rpl::on_next([=](uint64 setId) {
 		if (_inner->setType() == Data::StickersType::Masks) {
-			showToast(tr::lng_masks_installed(tr::now));
+			showToast({
+				.text = { tr::lng_masks_installed(tr::now) },
+				.iconLottie = u"toast/contact_check"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		} else if (_inner->setType() == Data::StickersType::Emoji) {
 			auto &stickers = _session->data().stickers();
 			stickers.notifyEmojiSetInstalled(setId);
@@ -771,9 +775,13 @@ void StickerSetBox::updateButtons() {
 		const auto type = _inner->setType();
 		const auto share = [=] {
 			copyStickersLink();
-			showToast(type == Data::StickersType::Emoji
+			showToast({
+				.text = { type == Data::StickersType::Emoji
 					? tr::lng_stickers_copied_emoji(tr::now)
-					: tr::lng_stickers_copied(tr::now));
+					: tr::lng_stickers_copied(tr::now) },
+				.iconLottie = u"toast/voip_invite"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		};
 		const auto fillSetCreatorMenu = [&] {
 			using Filler = Fn<void(not_null<Ui::PopupMenu*>)>;

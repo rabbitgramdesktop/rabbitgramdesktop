@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/cached_round_corners.h"
 #include "boxes/share_box.h"
 #include "boxes/sticker_set_box.h"
+#include "boxes/stickers_box.h"
 #include "lang/lang_keys.h"
 #include "layout/layout_position.h"
 #include "data/data_emoji_statuses.h"
@@ -2339,9 +2340,9 @@ void EmojiListWidget::paint(
 		&& !_searchRequestTimer.isActive()) {
 		paintEmptySearchResults(p);
 	}
-	const auto badgeText = tr::lng_stickers_creator_badge(tr::now);
+	const auto creatorBadgeText = tr::lng_stickers_creator_badge(tr::now);
+	const auto groupBadgeText = tr::lng_emoji_group_badge(tr::now);
 	const auto &badgeFont = st::stickersHeaderBadgeFont;
-	const auto badgeWidth = badgeFont->width(badgeText);
 	enumerateSections([&](const SectionInfo &info) {
 		if (clip.top() >= info.rowsBottom) {
 			return true;
@@ -2370,9 +2371,22 @@ void EmojiListWidget::paint(
 				: (info.section >= _staticCount)
 				? _custom[info.section - _staticCount].set.get()
 				: nullptr;
-			const auto amCreator = titleSet
+			const auto megagroupEmoji = !_searchMode
+				&& (info.section >= _staticCount)
+				&& (_custom[info.section - _staticCount].id
+					== Data::Stickers::MegagroupSetId);
+			const auto amCreator = !megagroupEmoji
+				&& titleSet
 				&& (titleSet->flags & Data::StickersSetFlag::AmCreator);
-			if (amCreator) {
+			const auto badgeText = megagroupEmoji
+				? groupBadgeText
+				: amCreator
+				? creatorBadgeText
+				: QString();
+			const auto badgeWidth = badgeText.isEmpty()
+				? 0
+				: badgeFont->width(badgeText);
+			if (!badgeText.isEmpty()) {
 				widthForTitle -= badgeWidth
 					+ st::stickersFeaturedUnreadSkip
 					+ st::stickersHeaderBadgeFontSkip;
@@ -2394,7 +2408,7 @@ void EmojiListWidget::paint(
 			p.setFont(st::emojiPanHeaderFont);
 			p.setPen(st().headerFg);
 			p.drawText(titleLeft, textBaseline, titleText);
-			if (amCreator) {
+			if (!badgeText.isEmpty()) {
 				const auto badgeLeft = titleLeft
 					+ titleWidth
 					+ st::stickersFeaturedUnreadSkip;
@@ -2925,7 +2939,11 @@ void EmojiListWidget::displaySet(not_null<DocumentData*> document) {
 
 void EmojiListWidget::displaySet(uint64 setId) {
 	if (setId == Data::Stickers::MegagroupSetId) {
-		if (_megagroupSet->mgInfo->emojiSet.id) {
+		if (_megagroupSet->canEditEmoji()) {
+			showBoxPreventHide(
+				Box<StickersBox>(_show, _megagroupSet, true));
+			return;
+		} else if (_megagroupSet->mgInfo->emojiSet.id) {
 			setId = _megagroupSet->mgInfo->emojiSet.id;
 		} else {
 			return;

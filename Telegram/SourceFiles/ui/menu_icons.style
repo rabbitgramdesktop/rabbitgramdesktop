@@ -69,6 +69,8 @@ menuIconArticle: icon {{ "/menu/article_rich-24x24", menuIconColor }};
 menuIconQrCode: icon {{ "menu/qr_code", menuIconColor }};
 menuIconExpand: icon {{ "menu/expand", menuIconColor }};
 menuIconCollapse: icon {{ "menu/collapse", menuIconColor }};
+menuIconZoomIn: icon {{ "/menu/zoom_in-24x24", menuIconColor }};
+menuIconZoomOut: icon {{ "/menu/zoom_out-24x24", menuIconColor }};
 menuIconToMainMenu: icon {{ "menu/move_to_menu", menuIconColor }};
 menuIconFromMainMenu: icon {{ "menu/move_from_menu", menuIconColor }};
 menuIconAddAccount: icon {{ "menu/add_account", menuIconColor }};

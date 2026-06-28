@@ -269,6 +269,7 @@ private:
 	Ui::RpWidget *_actionMore = nullptr;
 
 	base::unique_qptr<Ui::HorizontalFitContainer> _actions;
+	base::unique_qptr<Ui::RpWidget> _actionsShadow;
 
 	std::unique_ptr<Lottie::MultiPlayer> _lottiePlayer;
 	bool _lottieSingleLoop = false;

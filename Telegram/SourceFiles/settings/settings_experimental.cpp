@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/search_field_controller.h"
 #include "ui/text/text_entity.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/padding_wrap.h"
@@ -50,6 +51,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/notifications_manager.h"
 #include "info/info_flexible_scroll.h"
 #include "chat_helpers/stickers_list_widget.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 #include "styles/style_settings.h"
 #include "styles/style_layers.h"
@@ -156,7 +158,11 @@ void AddOption(
 			st::popupMenuWithIcons);
 		(*menu)->addAction(u"Copy deep link"_q, [=] {
 			TextUtilities::SetClipboardText({ link });
-			window->showToast(u"Deep link copied to clipboard."_q);
+			window->showToast({
+				.text = { u"Deep link copied to clipboard."_q },
+				.iconLottie = u"toast/voip_invite"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		}, &st::menuIconCopy);
 		(*menu)->popup(QCursor::pos());
 		e->accept();
@@ -303,6 +309,7 @@ void SetupExperimental(
 	addToggle(Ui::kOptionHideAiButton);
 	addToggle(HistoryView::kOptionUnlimitedMessageWidth);
 	addToggle(HistoryView::Controls::kOptionMacCmdReplyImmediately);
+	addToggle(Ui::kOptionQScroller);
 }
 
 } // namespace
@@ -327,7 +334,11 @@ void Experimental::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		[=] {
 			TextUtilities::SetClipboardText(
 				{ EncodeOptionsToText(base::options::serialize()) });
-			window->showToast(u"Experimental settings code copied to clipboard."_q);
+			window->showToast({
+				.text = { u"Experimental settings code copied to clipboard."_q },
+				.iconLottie = u"toast/copy"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		},
 		&st::menuIconCopy);
 	if (!DecodeOptionsFromText(QGuiApplication::clipboard()->text()).ok) {

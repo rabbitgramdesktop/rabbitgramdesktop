@@ -744,6 +744,38 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 	};
 	const auto guard = gsl::finally([&] {
 		addMore();
+
+		_actionsShadow = base::make_unique_q<Ui::RpWidget>(this);
+		const auto shadowRaw = _actionsShadow.get();
+		shadowRaw->setAttribute(Qt::WA_TransparentForMouseEvents);
+		const auto shadow = shadowRaw->lifetime().make_state<Ui::BoxShadow>(
+			st::infoProfileTopBarActionButtonShadow);
+		const auto shadowShown = shadowRaw->lifetime().make_state<bool>(
+			false);
+		const auto extend = Ui::BoxShadow::ExtendFor(
+			st::infoProfileTopBarActionButtonShadow);
+		shadowRaw->paintRequest() | rpl::on_next([=] {
+			if (!*shadowShown) {
+				return;
+			}
+			const auto full = st::infoProfileTopBarActionButtonSize;
+			const auto progress = std::clamp(
+				float64(_actions->height()) / full,
+				0.,
+				1.);
+			if (progress <= 0.) {
+				return;
+			}
+			auto p = QPainter(shadowRaw);
+			const auto opacity = shadow->opacity() * progress;
+			for (const auto &button : buttons) {
+				const auto buttonRect = button->geometry().translated(
+					extend.left(),
+					extend.top());
+				shadow->paint(p, buttonRect, st::boxRadius, opacity);
+			}
+		}, shadowRaw->lifetime());
+
 		style::PaletteChanged(
 		) | rpl::on_next([=] {
 			const auto current = _edgeColor.current();
@@ -756,6 +788,8 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 			for (const auto &button : buttons) {
 				button->setStyle(st);
 			}
+			*shadowShown = st.shadowColor.has_value();
+			shadowRaw->update();
 		}, _actions->lifetime());
 		const auto padding = st::infoProfileTopBarActionButtonsPadding;
 		sizeValue() | rpl::on_next([=](const QSize &size) {
@@ -774,8 +808,14 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 				size.width() - rect::m::sum::h(padding),
 				resultHeight);
 		}, _actions->lifetime());
+		_actions->geometryValue() | rpl::on_next([=](QRect geometry) {
+			shadowRaw->setGeometry(geometry.marginsAdded(extend));
+			shadowRaw->update();
+		}, shadowRaw->lifetime());
+		shadowRaw->show();
 		_actions->show();
 		_actions->raise();
+		shadowRaw->stackUnder(_actions.get());
 	});
 	if (user) {
 		const auto message = Ui::CreateChild<TopBarActionButton>(
@@ -2905,7 +2945,9 @@ TopBarActionButtonStyle TopBar::mapActionStyle(
 				st::boxBg->c,
 				1. - st::infoProfileTopBarActionButtonBgOpacity),
 			.fgColor = std::nullopt,
-			.shadowColor = std::make_optional(st::windowShadowFgFallback->c),
+			.shadowColor = Window::Theme::IsNightMode()
+				? std::nullopt
+				: std::make_optional(st::windowShadowFgFallback->c),
 		};
 	}
 }

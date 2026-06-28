@@ -5204,8 +5204,13 @@ void OverlayWidget::initThemePreview() {
 					_themeShare->setClickedCallback([=] {
 						QGuiApplication::clipboard()->setText(
 							session->createInternalLinkFull("addtheme/" + slug));
-						uiShow()->showToast(
-							tr::lng_background_link_copied(tr::now));
+						uiShow()->showToast({
+							.text = {
+								tr::lng_background_link_copied(tr::now),
+							},
+							.iconLottie = u"toast/voip_invite"_q,
+							.iconLottieSize = st::toastLottieIconSize,
+						});
 					});
 				} else {
 					_themeShare.destroy();

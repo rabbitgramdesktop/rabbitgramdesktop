@@ -1861,6 +1861,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_media_type_polls" = "Polls";
 "lng_polls_search_none" = "No polls found";
 "lng_media_type_rounds" = "Video messages";
+"lng_media_zoom_in" = "Zoom In";
+"lng_media_zoom_out" = "Zoom Out";
 "lng_media_saved_music_your" = "Your playlist";
 "lng_media_saved_music_title" = "Playlist";
 "lng_profile_common_groups_section" = "Groups in common";
@@ -4580,6 +4582,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_emoji_remove_group_set" = "Remove group emoji set?";
 "lng_emoji_group_from_your" = "Choose from your emoji";
 "lng_emoji_group_from_featured" = "Choose from trending emoji";
+"lng_emoji_group_badge" = "Group Emoji";
 "lng_masks_archive_pack" = "Archive Masks";
 "lng_masks_has_been_archived" = "Mask pack has been archived.";
 "lng_masks_installed" = "Mask pack has been installed.";

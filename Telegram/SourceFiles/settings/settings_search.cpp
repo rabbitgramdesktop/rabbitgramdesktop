@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_recent_searches.h"
 #include "ui/painter.h"
 #include "ui/text/text_entity.h"
+#include "ui/toast/toast.h"
 #include "ui/search_field_controller.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
@@ -31,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -488,8 +490,13 @@ not_null<Ui::SettingsButton*> Search::createEntryButton(
 					[=] {
 						TextUtilities::SetClipboardText(
 							TextForMimeData::Simple(copyLink));
-						controller()->showToast(
-							tr::lng_channel_public_link_copied(tr::now));
+						controller()->showToast({
+							.text = {
+								tr::lng_channel_public_link_copied(tr::now),
+							},
+							.iconLottie = u"toast/voip_invite"_q,
+							.iconLottieSize = st::toastLottieIconSize,
+						});
 					},
 					&st::menuIconLink);
 			}

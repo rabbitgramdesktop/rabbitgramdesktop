@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_theme.h"
 #include "ui/layers/show.h"
 #include "ui/text/text_extended_data.h"
+#include "ui/toast/toast.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/color_contrast.h"
@@ -27,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "styles/palette.h"
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_iv.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -951,7 +953,11 @@ QVariant MarkdownDocumentWidget::viewerToastClickHandlerContext() const {
 void MarkdownDocumentWidget::showToast(const QString &text) const {
 	const auto context = clickHandlerContext().value<ClickHandlerContext>();
 	if (context.show) {
-		context.show->showToast(text);
+		context.show->showToast({
+			.text = { text },
+			.iconLottie = u"toast/copy"_q,
+			.iconLottieSize = st::toastLottieIconSize,
+		});
 	}
 }
 

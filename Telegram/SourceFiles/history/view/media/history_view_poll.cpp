@@ -1438,6 +1438,7 @@ struct Poll::Header : public Poll::Part {
 	std::unique_ptr<Media> _attachedMediaAttach;
 	mutable QImage _attachedMediaCache;
 	mutable Ui::BubbleRounding _attachedMediaCacheRounding;
+	mutable bool _attachedMediaCacheBlurred = false;
 	std::vector<RecentVoter> _recentVoters;
 	QImage _recentVotersImage;
 	mutable ClickHandlerPtr _showSolutionLink;
@@ -2779,11 +2780,8 @@ void Poll::Header::validateTopMediaCache(QSize size) const {
 	}
 	const auto ratio = style::DevicePixelRatio();
 	const auto rounding = topMediaRounding();
-	if ((_attachedMediaCache.size() == (size * ratio))
-		&& (_attachedMediaCacheRounding == rounding)) {
-		return;
-	}
 	auto source = QImage();
+	auto blurred = false;
 	if (_attachedMedia->photoMedia) {
 		if (const auto image
 			= _attachedMedia->photoMedia->image(Data::PhotoSize::Large)) {
@@ -2792,9 +2790,11 @@ void Poll::Header::validateTopMediaCache(QSize size) const {
 			= _attachedMedia->photoMedia->image(
 				Data::PhotoSize::Thumbnail)) {
 			source = image->original();
+			blurred = true;
 		} else if (const auto image
 			= _attachedMedia->photoMedia->thumbnailInline()) {
 			source = image->original();
+			blurred = true;
 		}
 	}
 	if (source.isNull()) {
@@ -2802,6 +2802,11 @@ void Poll::Header::validateTopMediaCache(QSize size) const {
 			std::max(size.width(), size.height()) * ratio);
 	}
 	if (source.isNull()) {
+		return;
+	}
+	if ((_attachedMediaCache.size() == (size * ratio))
+		&& (_attachedMediaCacheRounding == rounding)
+		&& (_attachedMediaCacheBlurred == blurred)) {
 		return;
 	}
 	const auto sw = source.width();
@@ -2817,16 +2822,20 @@ void Poll::Header::validateTopMediaCache(QSize size) const {
 			cropW,
 			cropH);
 	}
+	const auto options = blurred
+		? Images::Option::Blur
+		: Images::Option();
 	auto prepared = Images::Prepare(
 		source,
 		size * ratio,
-		{ .outer = size });
+		{ .options = options, .outer = size });
 	prepared = Images::Round(
 		std::move(prepared),
 		MediaRoundingMask(rounding));
 	prepared.setDevicePixelRatio(ratio);
 	_attachedMediaCache = std::move(prepared);
 	_attachedMediaCacheRounding = rounding;
+	_attachedMediaCacheBlurred = blurred;
 }
 
 int Poll::Header::countDescriptionHeight(int innerWidth) const {

@@ -151,6 +151,9 @@ public:
 	virtual void saveChanges(FnMut<void()> done);
 	[[nodiscard]] virtual SendMenu::Details sendMenuDetails() const;
 	virtual bool processChosenSticker(ChatHelpers::FileChosen &&chosen);
+	virtual bool processZoomKey(not_null<QKeyEvent*> e) {
+		return false;
+	}
 
 	[[nodiscard]] int scrollBottomSkip() const;
 	[[nodiscard]] rpl::producer<int> scrollBottomSkipValue() const;
