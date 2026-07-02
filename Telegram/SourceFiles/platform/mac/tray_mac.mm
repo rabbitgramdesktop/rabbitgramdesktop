@@ -441,6 +441,32 @@ void Tray::addAction(
 	}, _actionsLifetime);
 }
 
+void Tray::addSubmenu(
+		rpl::producer<QString> text,
+		std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> &&items) {
+	if (!_menu) {
+		return;
+	}
+
+	auto submenu = new QMenu(_menu.get());
+	for (auto &item : items) {
+		const auto action = submenu->addAction(QString(), std::move(item.second));
+		std::move(
+			item.first
+		) | rpl::on_next([=](const QString &text) {
+			action->setText(text);
+		}, _actionsLifetime);
+	}
+
+	const auto action = _menu->addMenu(submenu);
+	std::move(
+		text
+	) | rpl::on_next([=](const QString &text) {
+		action->setText(text);
+		submenu->setTitle(text);
+	}, _actionsLifetime);
+}
+
 void Tray::addSeparator() {
 	if (_menu) {
 		_menu->addSeparator();

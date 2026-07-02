@@ -207,12 +207,8 @@ public:
 	void setSoundNotify(bool value) {
 		_soundNotify = value;
 	}
-	[[nodiscard]] bool desktopNotify() const {
-		return _desktopNotify;
-	}
-	void setDesktopNotify(bool value) {
-		_desktopNotify = value;
-	}
+	[[nodiscard]] bool desktopNotify() const;
+	void setDesktopNotify(bool value);
 	[[nodiscard]] bool flashBounceNotify() const {
 		return _flashBounceNotify;
 	}

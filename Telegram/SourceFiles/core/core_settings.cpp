@@ -7,6 +7,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "core/core_settings.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+#include "base/unixtime.h"
+
 #include "base/platform/base_platform_info.h"
 #include "calls/group/calls_group_common.h"
 #include "history/view/history_view_quick_action.h"
@@ -1862,6 +1865,17 @@ Dialogs::Ui::QuickDialogAction Settings::quickDialogAction() const {
 
 void Settings::setQuickDialogAction(Dialogs::Ui::QuickDialogAction action) {
 	_quickDialogAction = action;
+}
+
+bool Settings::desktopNotify() const {
+	return _desktopNotify && !(RabbitSettings::quietModeDeadline() > base::unixtime::now());
+}
+
+void Settings::setDesktopNotify(bool value) {
+	_desktopNotify = value;
+	if (value) {
+		RabbitSettings::setQuietModeDeadline(0);
+	}
 }
 
 } // namespace Core

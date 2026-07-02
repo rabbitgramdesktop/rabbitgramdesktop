@@ -67,5 +67,12 @@
     "rtg_show_peer_id_dc": "Показывать ID и DC",
     "rtg_precise_time": "Показывать точное время",
     "rtg_update": "Обновить rabbitGram",
+    "rtg_quiet_mode_for": "...на",
+    "rtg_quiet_mode_30m": "30 мин",
+    "rtg_quiet_mode_1h": "1 ч",
+    "rtg_quiet_mode_3h": "3 ч",
+    "rtg_quiet_mode_8h": "8 ч",
+    "rtg_quiet_mode_24h": "24 ч",
+    "rtg_general_quiet_mode": "Тихий режим",
     "last_string": null
 }

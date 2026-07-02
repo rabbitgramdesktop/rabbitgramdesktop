@@ -10,6 +10,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "platform/platform_tray.h"
 
 #include "base/unique_qptr.h"
+#include <vector>
+#include <utility>
 
 class QMenu;
 class QIcon;
@@ -52,6 +54,9 @@ public:
 		Fn<void()> &&callback,
 		std::shared_ptr<Ui::DynamicImage> icon,
 		int size);
+	void addSubmenu(
+		rpl::producer<QString> text,
+		std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> &&items);
 	void addSeparator();
 
 	void showTrayMessage() const;

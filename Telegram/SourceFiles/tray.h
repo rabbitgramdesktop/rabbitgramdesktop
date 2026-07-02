@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #pragma once
 
 #include "platform/platform_tray.h"
+#include "base/timer.h"
 
 namespace Core {
 
@@ -31,6 +32,7 @@ private:
 
 	Platform::Tray _tray;
 
+	base::Timer _quietModeTimer;
 	bool _activeForTrayIconAction = false;
 	crl::time _lastTrayClickTime = 0;
 

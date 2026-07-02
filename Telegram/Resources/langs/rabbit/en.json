@@ -67,5 +67,12 @@
     "rtg_show_peer_id_dc": "Show peer ID and DC",
     "rtg_precise_time": "Precise time",
     "rtg_update": "Update rabbitGram",
+    "rtg_quiet_mode_for": "...for",
+    "rtg_quiet_mode_30m": "30min",
+    "rtg_quiet_mode_1h": "1hr",
+    "rtg_quiet_mode_3h": "3hr",
+    "rtg_quiet_mode_8h": "8hr",
+    "rtg_quiet_mode_24h": "24hr",
+    "rtg_general_quiet_mode": "Quiet mode",
     "last_string": null
 }

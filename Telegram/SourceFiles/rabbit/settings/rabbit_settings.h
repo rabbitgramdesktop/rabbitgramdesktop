@@ -165,6 +165,8 @@ namespace RabbitSettings
     inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
     inline bool preciseTime() { return JsonSettings::GetBool("precise_time"); }
     inline bool showOnlineIndicator() { return JsonSettings::GetBool("show_online_indicator"); }
+    inline int quietModeDeadline() { return JsonSettings::GetInt("quiet_mode_deadline"); }
+    inline bool quietModeEnabled() { return JsonSettings::GetBool("quiet_mode_enabled"); }
 
     inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
     inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
@@ -196,4 +198,11 @@ namespace RabbitSettings
     inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
     inline void setPreciseTime(bool value) { JsonSettings::Set("precise_time", value); }
     inline void setShowOnlineIndicator(bool value) { JsonSettings::Set("show_online_indicator", value); }
+    inline void setQuietModeDeadline(int value) { JsonSettings::Set("quiet_mode_deadline", value); }
+    inline void setQuietModeEnabled(bool value) {
+        JsonSettings::Set("quiet_mode_enabled", value);
+        if (!value) {
+            setQuietModeDeadline(0);
+        }
+    }
 } // namespace RabbitSettings

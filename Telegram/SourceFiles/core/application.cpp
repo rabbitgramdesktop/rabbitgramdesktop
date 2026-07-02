@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/application.h"
 
 #include "rabbit/lang/rabbit_lang.h"
+#include "rabbit/settings/rabbit_settings.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
@@ -1119,7 +1120,7 @@ int Application::unreadBadge() const {
 }
 
 bool Application::unreadBadgeMuted() const {
-	return _domain->unreadBadgeMuted();
+	return _domain->unreadBadgeMuted() || (RabbitSettings::quietModeDeadline() > base::unixtime::now());
 }
 
 rpl::producer<> Application::unreadBadgeChanges() const {

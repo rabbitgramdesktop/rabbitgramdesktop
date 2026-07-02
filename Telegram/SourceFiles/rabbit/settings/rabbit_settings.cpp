@@ -409,6 +409,18 @@ namespace RabbitSettings::JsonSettings
                     .type = BoolSetting,
                     .defaultValue = false,
                 }
+            },
+            {
+                "quiet_mode_deadline", {
+                    .type = IntSetting,
+                    .defaultValue = 0,
+                }
+            },
+            {
+                "quiet_mode_enabled", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
             }
         };
 

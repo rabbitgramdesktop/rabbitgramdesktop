@@ -122,6 +122,14 @@ namespace Settings
                 u"rtg_general_auto_hide_notifications"_q,
                 u"auto_hide_notifications"_q,
                 { u"notifications"_q, u"auto"_q });
+            AddToggle(
+                builder,
+                u"rabbit/general/quiet_mode"_q,
+                rktr("rtg_general_quiet_mode"),
+                nullptr,
+                [] { return RabbitSettings::quietModeEnabled(); },
+                [](bool value) { RabbitSettings::setQuietModeEnabled(value); },
+                { u"quiet"_q, u"notifications"_q });
             AddJsonToggle(
                 builder,
                 u"rabbit/general/userpic_in_top_bar"_q,

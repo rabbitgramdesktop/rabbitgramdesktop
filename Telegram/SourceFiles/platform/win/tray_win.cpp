@@ -277,6 +277,40 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 	}, _actionsLifetime);
 }
 
+void Tray::addSubmenu(
+		rpl::producer<QString> text,
+		std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> &&items) {
+	if (!_menu) {
+		return;
+	}
+
+	auto submenu = std::make_unique<Ui::PopupMenu>(nullptr);
+	submenu->deleteOnHide(false);
+
+	for (auto &item : items) {
+		auto itemCallback = crl::guard(submenu.get(), [=, callback = std::move(item.second)] {
+			using namespace rpl::mappers;
+			_callbackFromTrayLifetime = _menu->shownValue(
+			) | rpl::filter(!_1) | rpl::take(1) | rpl::on_next([=] {
+				crl::on_main([=] { callback(); });
+			});
+		});
+		const auto action = submenu->addAction(QString(), std::move(itemCallback));
+		std::move(
+			item.first
+		) | rpl::on_next([=](const QString &text) {
+			action->setText(text);
+		}, _actionsLifetime);
+	}
+
+	const auto action = _menu->addAction(QString(), std::move(submenu));
+	std::move(
+		text
+	) | rpl::on_next([=](const QString &text) {
+		action->setText(text);
+	}, _actionsLifetime);
+}
+
 void Tray::showTrayMessage() const {
 	if (!cSeenTrayTooltip() && _icon) {
 		_icon->showMessage(

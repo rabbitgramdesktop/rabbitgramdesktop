@@ -9,6 +9,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "tray_accounts_menu.h"
 
 #include "rabbit/lang/rabbit_lang.h"
+#include "rabbit/settings/rabbit_settings.h"
+#include "window/notifications_manager.h"
+#include "base/unixtime.h"
 
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -20,10 +23,44 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace Core {
 
-Tray::Tray() {
+Tray::Tray()
+	: _quietModeTimer([=] { rebuildMenu(); }) {
 }
 
 void Tray::create() {
+	const auto deadline = RabbitSettings::quietModeDeadline();
+	const auto now = base::unixtime::now();
+	if (deadline > now) {
+		_quietModeTimer.callOnce((deadline - now) * 1000);
+	}
+
+	RabbitSettings::JsonSettings::Events(
+		"quiet_mode_deadline"
+	) | rpl::on_next([=] {
+		const auto deadline = RabbitSettings::quietModeDeadline();
+		const auto now = base::unixtime::now();
+		if (deadline > now) {
+			_quietModeTimer.callOnce((deadline - now) * 1000);
+		} else {
+			_quietModeTimer.cancel();
+		}
+		rebuildMenu();
+		updateIconCounters();
+	}, _tray.lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		"quiet_mode_enabled"
+	) | rpl::on_next([=] {
+		rebuildMenu();
+	}, _tray.lifetime());
+
+	Core::App().notifications().settingsChanged(
+	) | rpl::on_next([=](Window::Notifications::ChangeType type) {
+		if (type == Window::Notifications::ChangeType::DesktopEnabled) {
+			rebuildMenu();
+		}
+	}, _tray.lifetime());
+
 	rebuildMenu();
 	using WorkMode = Settings::WorkMode;
 	if (Core::App().settings().workMode() != WorkMode::WindowOnly) {
@@ -100,6 +137,27 @@ void Tray::rebuildMenu() {
 		_tray.addAction(
 			std::move(notificationsText),
 			[=] { toggleSoundNotifications(); });
+
+		if (Core::App().settings().desktopNotify() && RabbitSettings::quietModeEnabled()) {
+			std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> quietOptions;
+			const auto addOption = [&](const QString &labelKey, int seconds) {
+				quietOptions.push_back({
+					rktr(labelKey),
+					[=] {
+						const auto deadline = base::unixtime::now() + seconds;
+						RabbitSettings::setQuietModeDeadline(deadline);
+						Core::App().notifications().updateAll();
+					}
+				});
+			};
+			addOption("rtg_quiet_mode_30m", 30 * 60);
+			addOption("rtg_quiet_mode_1h", 60 * 60);
+			addOption("rtg_quiet_mode_3h", 3 * 60 * 60);
+			addOption("rtg_quiet_mode_8h", 8 * 60 * 60);
+			addOption("rtg_quiet_mode_24h", 24 * 60 * 60);
+
+			_tray.addSubmenu(rktr("rtg_quiet_mode_for"), std::move(quietOptions));
+		}
 	}
 
 	_tray.addAction(rktr("rtg_close"), [] { Core::Quit(); });

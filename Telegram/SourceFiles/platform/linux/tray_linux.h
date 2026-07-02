@@ -10,6 +10,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "platform/platform_tray.h"
 
 #include "base/unique_qptr.h"
+#include <vector>
+#include <utility>
 
 namespace base::Platform::DBus {
 class ServiceWatcher;
@@ -48,6 +50,9 @@ public:
 	void destroyMenu();
 
 	void addAction(rpl::producer<QString> text, Fn<void()> &&callback);
+	void addSubmenu(
+		rpl::producer<QString> text,
+		std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> &&items);
 
 	void showTrayMessage() const;
 	[[nodiscard]] bool hasTrayMessageSupport() const;

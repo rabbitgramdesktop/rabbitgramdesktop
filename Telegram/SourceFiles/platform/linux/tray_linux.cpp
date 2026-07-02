@@ -376,6 +376,51 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 	}
 }
 
+void Tray::addSubmenu(
+		rpl::producer<QString> text,
+		std::vector<std::pair<rpl::producer<QString>, Fn<void()>>> &&items) {
+	if (_menuCustom) {
+		auto submenu = std::make_unique<Ui::PopupMenu>(nullptr);
+		submenu->deleteOnHide(false);
+
+		for (auto &item : items) {
+			const auto action = submenu->addAction(QString(), item.second);
+			rpl::duplicate(
+				item.first
+			) | rpl::on_next([=](const QString &text) {
+				action->setText(text);
+			}, _actionsLifetime);
+		}
+
+		const auto action = _menuCustom->addAction(QString(), std::move(submenu));
+		rpl::duplicate(
+			text
+		) | rpl::on_next([=](const QString &text) {
+			action->setText(text);
+		}, _actionsLifetime);
+	}
+
+	if (_menu) {
+		auto submenu = new QMenu(_menu.get());
+		for (auto &item : items) {
+			const auto action = submenu->addAction(QString(), std::move(item.second));
+			rpl::duplicate(
+				item.first
+			) | rpl::on_next([=](const QString &text) {
+				action->setText(text);
+			}, _actionsLifetime);
+		}
+
+		const auto action = _menu->addMenu(submenu);
+		std::move(
+			text
+		) | rpl::on_next([=](const QString &text) {
+			action->setText(text);
+			submenu->setTitle(text);
+		}, _actionsLifetime);
+	}
+}
+
 void Tray::showTrayMessage() const {
 }
 
