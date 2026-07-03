@@ -70,10 +70,14 @@ ChatPreview::ChatPreview(QWidget *parent) : RpWidget(parent) {
 
 void ChatPreview::ensureChatStyle() {
 	const auto version = style::PaletteVersion();
-	if (_chatStyle && _paletteVersion == version) {
+	const auto roundness = RabbitSettings::messageRoundness();
+	if (_chatStyle
+		&& _paletteVersion == version
+		&& _messageRoundness == roundness) {
 		return;
 	}
 	_paletteVersion = version;
+	_messageRoundness = roundness;
 	_chatStyle = std::make_unique<Ui::ChatStyle>(
 		style::main_palette::get());
 }

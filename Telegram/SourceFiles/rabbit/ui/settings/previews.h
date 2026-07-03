@@ -36,6 +36,7 @@ private:
 
 	std::unique_ptr<Ui::ChatStyle> _chatStyle;
 	int _paletteVersion = 0;
+	int _messageRoundness = -1;
 
 };
 

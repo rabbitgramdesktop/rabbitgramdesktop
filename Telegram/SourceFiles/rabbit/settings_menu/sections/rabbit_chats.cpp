@@ -103,8 +103,8 @@ namespace Settings
             };
             const auto updateStickerSize = [=](int value) {
                 updateStickerSizeLabel(value);
-                chatPreview->repaint();
                 RabbitSettings::setStickerSize(value);
+                chatPreview->repaint();
             };
             stickerSizeSlider->resize(st::settingsAudioVolumeSlider.seekSize);
             stickerSizeSlider->setPseudoDiscrete(
@@ -130,8 +130,8 @@ namespace Settings
                 RabbitSettings::messageRoundness());
             const auto updateMessageRoundness = [=](int value) {
                 updateMessageRoundnessLabel(value);
-                chatPreview->repaint();
                 RabbitSettings::setMessageRoundness(value);
+                chatPreview->repaint();
             };
             const auto showRestartRequired = [=](int value) {
                 if (value == *previousMessageRoundness) {
