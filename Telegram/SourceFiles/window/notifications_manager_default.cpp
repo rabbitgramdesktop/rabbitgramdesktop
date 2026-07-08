@@ -25,6 +25,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/painter.h"
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
+#include "ui/cached_round_corners.h"
 #include "data/data_premium_limits.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
@@ -505,7 +506,8 @@ Widget::Widget(
 		| Qt::NoDropShadowWindowHint
 		| Qt::Tool);
 	setAttribute(Qt::WA_MacAlwaysShowToolWindow);
-	setAttribute(Qt::WA_OpaquePaintEvent);
+	setAttribute(Qt::WA_NoSystemBackground);
+	setAttribute(Qt::WA_TranslucentBackground);
 
 	Ui::Platform::InitOnTopPanel(this);
 
@@ -630,10 +632,10 @@ Background::Background(QWidget *parent) : RpWidget(parent) {
 void Background::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
-	p.fillRect(rect(), st::notificationBg);
-	p.fillRect(0, 0, st::notifyBorderWidth, height(), st::notifyBorder);
-	p.fillRect(width() - st::notifyBorderWidth, 0, st::notifyBorderWidth, height(), st::notifyBorder);
-	p.fillRect(st::notifyBorderWidth, height() - st::notifyBorderWidth, width() - 2 * st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorder);
+	auto corners = Ui::CornersPixmaps();
+	corners.p[2] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[2];
+	corners.p[3] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[3];
+	Ui::FillRoundRect(p, rect(), st::notificationBg, corners);
 }
 
 Notification::Notification(
@@ -744,7 +746,22 @@ void Notification::prepareActionsCache() {
 	{
 		Painter p(&actionsCacheImg);
 		st::notifyFadeRight.fill(p, style::rtlrect(0, 0, fadeWidth, actionsCacheHeight, actionsCacheWidth));
-		p.fillRect(style::rtlrect(fadeWidth, 0, actionsCacheWidth - fadeWidth, actionsCacheHeight, actionsCacheWidth), st::notificationBg);
+		auto corners = Ui::CornersPixmaps();
+		if (style::RightToLeft()) {
+			corners.p[2] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[2];
+		} else {
+			corners.p[3] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[3];
+		}
+		Ui::FillRoundRect(
+			p,
+			style::rtlrect(
+				fadeWidth,
+				0,
+				actionsCacheWidth - fadeWidth,
+				actionsCacheHeight,
+				actionsCacheWidth),
+			st::notificationBg,
+			corners);
 		p.drawPixmapRight(replyRight, _reply->y() - actionsTop, actionsCacheWidth, replyCache);
 	}
 	_buttonsCache = Ui::PixmapFromImage(std::move(actionsCacheImg));
@@ -893,14 +910,18 @@ void Notification::updateNotifyDisplay() {
 		size() * style::DevicePixelRatio(),
 		QImage::Format_ARGB32_Premultiplied);
 	img.setDevicePixelRatio(style::DevicePixelRatio());
-	img.fill(st::notificationBg->c);
+	img.fill(Qt::transparent);
 
 	{
 		Painter p(&img);
-		p.fillRect(0, 0, w - st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(w - st::notifyBorderWidth, 0, st::notifyBorderWidth, h - st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(st::notifyBorderWidth, h - st::notifyBorderWidth, w - st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorder);
-		p.fillRect(0, st::notifyBorderWidth, st::notifyBorderWidth, h - st::notifyBorderWidth, st::notifyBorder);
+		auto corners = Ui::CornersPixmaps();
+		if (h > st::notifyMinHeight) {
+			corners.p[0] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[0];
+			corners.p[1] = Ui::CachedCornerPixmaps(Ui::BoxCorners).p[1];
+		} else {
+			corners = Ui::CachedCornerPixmaps(Ui::BoxCorners);
+		}
+		Ui::FillRoundRect(p, QRect(0, 0, w, h), st::notificationBg, corners);
 
 		if (!options.hideNameAndPhoto) {
 			if (_fromScheduled && _history->peer->isSelf()) {
@@ -1322,11 +1343,11 @@ void HideAllButton::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	p.setClipRect(e->rect());
 
-	p.fillRect(rect(), _mouseOver ? st::lightButtonBgOver : st::lightButtonBg);
-	p.fillRect(0, 0, width(), st::notifyBorderWidth, st::notifyBorder);
-	p.fillRect(0, height() - st::notifyBorderWidth, width(), st::notifyBorderWidth, st::notifyBorder);
-	p.fillRect(0, st::notifyBorderWidth, st::notifyBorderWidth, height() - 2 * st::notifyBorderWidth, st::notifyBorder);
-	p.fillRect(width() - st::notifyBorderWidth, st::notifyBorderWidth, st::notifyBorderWidth, height() - 2 * st::notifyBorderWidth, st::notifyBorder);
+	Ui::FillRoundRect(
+		p,
+		rect(),
+		_mouseOver ? st::lightButtonBgOver : st::lightButtonBg,
+		Ui::BoxCorners);
 
 	p.setFont(st::defaultLinkButton.font);
 	p.setPen(_mouseOver ? st::lightButtonFgOver : st::lightButtonFg);
