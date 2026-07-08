@@ -107,7 +107,6 @@ public:
 	void networkSettings();
 	void processContinue();
 
-	void checkingFinished();
 	void sendingError(QNetworkReply::NetworkError e);
 	void sendingFinished();
 	void sendingProgress(qint64 uploaded, qint64 total);
@@ -127,7 +126,6 @@ private:
 	void excludeReportUsername();
 
 	QString getReportField(const QLatin1String &name, const QLatin1String &prefix);
-	void addReportFieldPart(const QLatin1String &name, const QLatin1String &prefix, QHttpMultiPart *multipart);
 
 	QByteArray _dumpraw;
 
@@ -159,7 +157,6 @@ private:
 	PreLaunchLabel _updating;
 
 	QNetworkAccessManager _sendManager;
-	QNetworkReply *_checkReply = nullptr;
 	QNetworkReply *_sendReply = nullptr;
 
 	enum UpdatingState {

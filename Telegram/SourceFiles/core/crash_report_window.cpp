@@ -7,6 +7,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "core/crash_report_window.h"
 
+#if __has_include("../../../../DesktopPrivate/crash_report_bot_credentials.h")
+#include "../../../../DesktopPrivate/crash_report_bot_credentials.h"
+#endif
+
 #include "core/crash_reports.h"
 #include "core/application.h"
 #include "core/sandbox.h"
@@ -31,6 +35,23 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace {
 
 constexpr auto kDefaultProxyPort = 80;
+
+#ifndef CRASH_REPORT_BOT_TOKEN
+#define CRASH_REPORT_BOT_TOKEN ""
+#endif
+
+#ifndef CRASH_REPORT_CHAT_ID
+#define CRASH_REPORT_CHAT_ID ""
+#endif
+
+constexpr auto kCrashBotToken = CRASH_REPORT_BOT_TOKEN;
+constexpr auto kCrashChatId = CRASH_REPORT_CHAT_ID;
+
+bool HasConfiguredBot() {
+	const auto botToken = QString::fromUtf8(kCrashBotToken);
+	const auto chatId = QString::fromUtf8(kCrashChatId);
+	return !botToken.isEmpty() && botToken != u"YOUR_BOT_TOKEN_HERE"_q && !chatId.isEmpty() && chatId != u"YOUR_CHAT_ID_HERE"_q;
+}
 
 } // namespace
 
@@ -317,8 +338,7 @@ LastCrashedWindow::LastCrashedWindow(
 , _launch(std::move(launch)) {
 	excludeReportUsername();
 
-	if (!cInstallBetaVersion() && !cAlphaVersion()) {
-		// Currently accept crash reports only from testers.
+	if (!HasConfiguredBot()) {
 		_sendingState = SendingNoReport;
 	} else if (Core::OpenGLLastCheckFailed()) {
 		// Nothing we can do right now with graphics driver crashes in GL.
@@ -375,7 +395,7 @@ LastCrashedWindow::LastCrashedWindow(
 	if (_sendingState != SendingNoReport) {
 		QString version = getReportField(qstr("version"), qstr("Version:"));
 		QString current = cAlphaVersion() ? u"-%1"_q.arg(cAlphaVersion()) : QString::number(AppVersion);
-		if (version != current) { // currently don't accept crash reports from not current app version
+		if (version != current && !HasConfiguredBot()) { // currently don't accept crash reports from not current app version
 			_sendingState = SendingNoReport;
 		}
 	}
@@ -554,46 +574,100 @@ QString LastCrashedWindow::getReportField(const QLatin1String &name, const QLati
 	return QString();
 }
 
-void LastCrashedWindow::addReportFieldPart(const QLatin1String &name, const QLatin1String &prefix, QHttpMultiPart *multipart) {
-	QString data = getReportField(name, prefix);
-	if (!data.isEmpty()) {
-		QHttpPart reportPart;
-		reportPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"%1\""_q.arg(name)));
-		reportPart.setBody(data.toUtf8());
-		multipart->append(reportPart);
-	}
-}
-
 void LastCrashedWindow::sendReport() {
-	if (_checkReply) {
-		_checkReply->deleteLater();
-		_checkReply = nullptr;
-	}
 	if (_sendReply) {
 		_sendReply->deleteLater();
 		_sendReply = nullptr;
 	}
 
-	QString apiid = getReportField(qstr("apiid"), qstr("ApiId:")), version = getReportField(qstr("version"), qstr("Version:"));
-	_checkReply = _sendManager.get(QNetworkRequest(u"https://tdesktop.com/crash.php?act=query_report&apiid=%1&version=%2&dmp=%3&platform=%4"_q.arg(
-		apiid,
-		version,
-		QString::number(minidumpFileName().isEmpty() ? 0 : 1),
-		CrashReports::PlatformString())));
+	if (HasConfiguredBot()) {
+		zlib::FileToWrite crashZip;
+		zip_fileinfo zfi = { { 0, 0, 0, 0, 0, 0 }, 0, 0, 0 };
 
-	connect(
-		_checkReply,
-		&QNetworkReply::errorOccurred,
-		[=](QNetworkReply::NetworkError code) { sendingError(code); });
-	connect(
-		_checkReply,
-		&QNetworkReply::finished,
-		[=] { checkingFinished(); });
+		crashZip.openNewFile(
+			"report.telegramcrash",
+			&zfi,
+			nullptr,
+			0,
+			nullptr,
+			0,
+			nullptr,
+			Z_DEFLATED,
+			Z_DEFAULT_COMPRESSION);
+		QByteArray reportData = getCrashReportRaw();
+		crashZip.writeInFile(reportData.constData(), reportData.size());
+		crashZip.closeFile();
 
-	_pleaseSendReport.setText(u"Sending crash report..."_q);
-	_sendingState = SendingProgress;
-	_reportShown = false;
-	updateControls();
+		QString dmpName = minidumpFileName();
+		if (!dmpName.isEmpty()) {
+			QFile file(_minidumpFull);
+			if (file.open(QIODevice::ReadOnly)) {
+				QByteArray minidump = file.readAll();
+				file.close();
+
+				QByteArray dmpNameUtf = dmpName.toUtf8();
+				crashZip.openNewFile(
+					dmpNameUtf.constData(),
+					&zfi,
+					nullptr,
+					0,
+					nullptr,
+					0,
+					nullptr,
+					Z_DEFLATED,
+					Z_DEFAULT_COMPRESSION);
+				crashZip.writeInFile(minidump.constData(), minidump.size());
+				crashZip.closeFile();
+			}
+		}
+
+		crashZip.close();
+
+		auto multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+		QHttpPart chatIdPart;
+		chatIdPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"chat_id\""_q));
+		chatIdPart.setBody(QByteArray(kCrashChatId));
+		multipart->append(chatIdPart);
+
+		QString version = getReportField(qstr("version"), qstr("Version:"));
+		QString caption = u"rabbitGram Desktop Crash Report\nVersion: %1\nPlatform: %2"_q.arg(
+			version,
+			CrashReports::PlatformString()
+		);
+		QHttpPart captionPart;
+		captionPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"caption\""_q));
+		captionPart.setBody(caption.toUtf8());
+		multipart->append(captionPart);
+
+		QHttpPart docPart;
+		docPart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant(u"application/zip"_q));
+		docPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"document\"; filename=\"crash_report.zip\""_q));
+		docPart.setBody(crashZip.result());
+		multipart->append(docPart);
+
+		QString url = u"https://api.telegram.org/bot%1/sendDocument"_q.arg(kCrashBotToken);
+		_sendReply = _sendManager.post(QNetworkRequest(url), multipart);
+		multipart->setParent(_sendReply);
+
+		connect(
+			_sendReply,
+			&QNetworkReply::errorOccurred,
+			[=](QNetworkReply::NetworkError code) { sendingError(code); });
+		connect(
+			_sendReply,
+			&QNetworkReply::finished,
+			[=] { sendingFinished(); });
+		connect(
+			_sendReply,
+			&QNetworkReply::uploadProgress,
+			[=](qint64 sent, qint64 total) { sendingProgress(sent, total); });
+
+		_pleaseSendReport.setText(u"Sending crash report..."_q);
+		_sendingState = SendingProgress;
+		_reportShown = false;
+		updateControls();
+	}
 }
 
 QString LastCrashedWindow::minidumpFileName() {
@@ -603,94 +677,6 @@ QString LastCrashedWindow::minidumpFileName() {
 		return dmpFile.fileName();
 	}
 	return QString();
-}
-
-void LastCrashedWindow::checkingFinished() {
-	if (!_checkReply || _sendReply) return;
-
-	QByteArray result = _checkReply->readAll().trimmed();
-	_checkReply->deleteLater();
-	_checkReply = nullptr;
-
-	LOG(("Crash report check for sending done, result: %1").arg(QString::fromUtf8(result)));
-
-	if (result == "Old") {
-		_pleaseSendReport.setText(u"This report is about some old version of rabbitGram Desktop."_q);
-		_sendingState = SendingTooOld;
-		updateControls();
-		return;
-	} else if (result == "Unofficial") {
-		_pleaseSendReport.setText(u"You use some custom version of rabbitGram Desktop."_q);
-		_sendingState = SendingUnofficial;
-		updateControls();
-		return;
-	} else if (result != "Report") {
-		_pleaseSendReport.setText(u"Thank you for your report!"_q);
-		_sendingState = SendingDone;
-		updateControls();
-
-		CrashReports::Restart();
-		return;
-	}
-
-	auto multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
-
-	addReportFieldPart(qstr("platform"), qstr("Platform:"), multipart);
-	addReportFieldPart(qstr("version"), qstr("Version:"), multipart);
-
-	QHttpPart reportPart;
-	reportPart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/octet-stream"));
-	reportPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"report\"; filename=\"report.telegramcrash\""));
-	reportPart.setBody(getCrashReportRaw());
-	multipart->append(reportPart);
-
-	QString dmpName = minidumpFileName();
-	if (!dmpName.isEmpty()) {
-		QFile file(_minidumpFull);
-		if (file.open(QIODevice::ReadOnly)) {
-			QByteArray minidump = file.readAll();
-			file.close();
-
-			QString zipName = QString(dmpName).replace(qstr(".dmp"), qstr(".zip"));
-
-			zlib::FileToWrite minidumpZip;
-
-			zip_fileinfo zfi = { { 0, 0, 0, 0, 0, 0 }, 0, 0, 0 };
-			QByteArray dmpNameUtf = dmpName.toUtf8();
-			minidumpZip.openNewFile(dmpNameUtf.constData(), &zfi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
-			minidumpZip.writeInFile(minidump.constData(), minidump.size());
-			minidumpZip.closeFile();
-			minidumpZip.close();
-
-			if (minidumpZip.error() == ZIP_OK) {
-				QHttpPart dumpPart;
-				dumpPart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/octet-stream"));
-				dumpPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"dump\"; filename=\"%1\""_q.arg(zipName)));
-				dumpPart.setBody(minidumpZip.result());
-				multipart->append(dumpPart);
-
-				_minidump.setText(u"+ %1 (%2 KB)"_q.arg(zipName).arg(minidumpZip.result().size() / 1024));
-			}
-		}
-	}
-
-	_sendReply = _sendManager.post(QNetworkRequest(u"https://tdesktop.com/crash.php?act=report"_q), multipart);
-	multipart->setParent(_sendReply);
-
-	connect(
-		_sendReply,
-		&QNetworkReply::errorOccurred,
-		[=](QNetworkReply::NetworkError code) { sendingError(code); });
-	connect(
-		_sendReply,
-		&QNetworkReply::finished,
-		[=] { sendingFinished(); });
-	connect(
-		_sendReply,
-		&QNetworkReply::uploadProgress,
-		[=](qint64 sent, qint64 total) { sendingProgress(sent, total); });
-
-	updateControls();
 }
 
 void LastCrashedWindow::updateControls() {
@@ -1037,10 +1023,6 @@ void LastCrashedWindow::sendingError(QNetworkReply::NetworkError e) {
 
 	_pleaseSendReport.setText(u"Sending crash report failed :("_q);
 	_sendingState = SendingFail;
-	if (_checkReply) {
-		_checkReply->deleteLater();
-		_checkReply = nullptr;
-	}
 	if (_sendReply) {
 		_sendReply->deleteLater();
 		_sendReply = nullptr;
