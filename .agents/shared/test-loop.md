@@ -157,7 +157,9 @@ writing any overlay:
      `git show <IMPL_SHA>^:<path>`). Render those references to PNG and compare the tight crop
      against both. **If the rendered target matches the OLD art — or you cannot tell them apart —
      that is a FAIL, not a pass.** (This is the check that catches a change that never took effect,
-     e.g. an asset that wasn't rebuilt into the binary.)
+     e.g. an asset that wasn't rebuilt into the binary.) For a task the wrapper marked
+     `Visual: layout`, matching-the-art is necessary but NOT sufficient — also verify the numeric
+     design contract in `<TASK_DIR>/visual.md` (sizes, spacings, alignment); see "Visual contract".
    - **Behavior** → drive the specific action and observe the concrete state/log/screenshot the
      change should produce, and confirm the pre-change behavior no longer happens.
 3. **Cover every surface the task names.** If the Observable result lists a settings row, a balance
@@ -165,6 +167,53 @@ writing any overlay:
    a reason). Do not stop at one or two.
 4. **Write the checks into `<TASK_DIR>/test.md` BEFORE running** (format under "Test report"), so the
    design is explicit and Actual/Result can be filled in per check afterward.
+
+## Visual contract (layout tasks)
+
+When the wrapper marks a task `Visual: layout`, "looks right" is not a vibe — it is a small
+computation, and the test MEASURES it. The wrapper's design-spec phase writes the contract to
+`<TASK_DIR>/visual.md`; impl builds to it; this loop verifies it. (Tasks marked `Visual: appearance`
+or unmarked use the ordinary visual/asset check above — this section does not apply.)
+
+A mockup (usually mobile) gives RELATIONSHIPS, never pixels. The contract re-expresses those
+relationships in desktop units by anchoring every quantity to a font metric or an existing tdesktop
+`.style` token — so it auto-adjusts to desktop and reuses real components. The strongest anchor is an
+existing widget: "the count badge IS the dialogs-list unread badge" pins font + height + padding to
+`st::dialogsUnread*` and is self-correcting — far better than "a blue circle ~24px".
+
+Write it as an ORDERED DERIVATION: each step resolves one quantity the next consumes, so impl and
+test are both mechanical. Example — a glyph-on-rounded-square icon + title + count, in a bubble:
+
+    Anchor:  T = st::<title>.font->height ;  Badge := the dialogs unread-badge metrics
+    1. glyphH = 1.4·T              ±2px   — white glyph box height                    (from T)
+    2. square = glyphH ÷ (2/3)    ±2px   — accent rounded-square side ; iconR = square·0.28
+    3. margin m (equal on square's top/left/bottom) ; bubbleH = square + 2·m   ±1px
+       bubbleR = bubbleH/2 ; iconR : bubbleR must read as in-sync (icon proportionally smaller)
+    4. titleY = (bubbleH − T)/2    ±1px   — title vertically centered in the bubble
+    5. badge = Badge (font+height+padding) ; vertically centered ; margins top=right=bottom equal ±1px
+
+Then the RELATIONSHIP checks that catch what existence-checks miss — each falsifiable: `square ≤
+bubbleH` (no overflow/overlap), the square's three margins equal, the two corner radii in sync, the
+badge identical to a real chat-row unread badge. Note every mobile→desktop adjustment and which token
+replaced each mobile measurement.
+
+How TEST verifies it (numbers over eyes):
+- **Measure, don't admire.** Have the overlay LOG the computed geometry — `font->height` and the
+  `QRect` of each piece (glyph, square, bubble, title, badge) — and assert each derivation line
+  arithmetically within tolerance. Live-widget geometry is the primary oracle; it deterministically
+  catches "icon taller than the bubble", "square overflows", "badge oversized / cramped". Where a
+  rect can't be logged, measure it from a tight crop by colour (accent square, badge, bubble outline
+  are separable).
+- **Same-scale side-by-side.** Build one composite — the mockup's bubble crop and the rendered crop
+  scaled to EQUAL element height, side by side — and judge composition on THAT, never on a
+  full-window screenshot (a 30px bubble in a 600px window is what rubber-stamps bad proportions).
+- **Adversarial designer pass.** One final judgement framed to REJECT: "You are a product designer
+  rejecting this PR — list every way these two differ in proportion, spacing, or alignment." Approve
+  only if it finds nothing disqualifying. (The approval-framed "does it look OK?" is what passed the
+  broken build.)
+- **Existence ≠ sufficiency.** "Icon + title + count are all present" is a precondition, not a pass.
+  A `Visual: layout` check APPROVES only when the measured geometry satisfies the contract; any line
+  out of tolerance is an IMPL_BUG (report measured-vs-target) and loops like any other.
 
 ## Overlay mechanics
 
@@ -200,6 +249,41 @@ highest level that still exercises the change (often a direct data-layer call li
   app never hangs holding a lock on the exe — independent of the runner's own timeout.
 - End every path (success or assertion failure) by logging `TEST_COMPLETE` then `Core::Quit()`.
 
+### Finding widgets in an overlay (CRITICAL — avoids a guaranteed crash)
+
+Telegram's custom widgets (`Ui::InputField`, `Ui::FlatLabel`, `Ui::RpWidget`, boxes, buttons, …)
+do **NOT** declare `Q_OBJECT` — they have no own meta-object. So `QObject::findChildren<T*>()` does
+**not** filter by type for them: with no distinct meta-object it matches the nearest moc'd base
+(`QWidget`), i.e. it returns **every** child widget blindly cast to `T*`. The moment you use one as
+`T` (e.g. call `InputField::setFocused()` / `rawTextEdit()` on what is really a `VerticalLayout`) you
+get a raw SIGSEGV — the debugger shows `this` with the *wrong* dynamic type. A clean rebuild does NOT
+fix it; it is a real bug in the overlay, not a stale build.
+
+- **Never** `findChildren<Ui::SomeCustomWidget*>()`. Instead enumerate `findChildren<QWidget*>()`
+  (`QWidget` *is* `Q_OBJECT`, so that call is sound and returns all descendants) and
+  `dynamic_cast<Ui::SomeCustomWidget*>()` each, keeping the non-null results — C++ RTTI identifies the
+  real type regardless of `Q_OBJECT`. A reusable helper:
+  ```cpp
+  template <typename T>
+  [[nodiscard]] std::vector<T*> FindWidgets(QWidget *root) {
+      auto out = std::vector<T*>();
+      for (const auto w : root->findChildren<QWidget*>()) {
+          if (const auto t = dynamic_cast<T*>(w)) out.push_back(t);
+      }
+      return out;
+  }
+  ```
+- Only genuine Qt `Q_OBJECT` types (`QWidget`, `QLabel`, `QLineEdit`, …) are safe to pass directly to
+  `findChildren<T*>()`.
+
+### Log to an ABSOLUTE path (the launcher chdir's)
+
+The Windows launcher changes the working directory to the exe folder before the app runs, so a
+**relative** overlay log path (`<TASK_DIR>/test_log.txt`) silently fails to write (`QFile` won't
+create missing parents) — the run looks "clean" but produces no evidence. Resolve `<TASK_DIR>` to an
+absolute path up front (e.g. `QDir::current().absoluteFilePath(...)` computed at inject time, or an
+absolute path baked into the overlay) so flushes actually land; likewise for screenshots.
+
 ### Git mechanics for the overlay (no stash)
 
 - After building, save the overlay as a patch: `git diff > <TASK_DIR>/test-overlay.patch`.
@@ -223,12 +307,82 @@ highest level that still exercises the change (often a direct data-layer call li
   it and the binary keeps the OLD asset. Before building such a task force regeneration — touch the
   referencing `.style` (or clean the codegen output) — so the change actually ships. A render that
   shows no difference from before is the symptom of skipping this.
-- Run: run the SETUP steps (Test account) -> launch `EXE` in the background -> poll `test_log.txt`
-  every ~5s -> on each `SCREENSHOT:` read the image and judge it -> detect `TEST_COMPLETE` (success)
-  or process death (crash) or no new output for the watchdog cap (hang) -> path-scoped kill of any
-  straggler (Test account → "Serialize app runs") -> optional CLEANUP -> save the overlay
-  (`git diff > <TASK_DIR>/test-overlay.patch`) -> THEN `git reset --hard <IMPL_SHA>` (back to
-  impl-only — the patch must be saved before this reset).
+- Run: run the SETUP steps (Test account) -> launch `EXE` **with `-testagent`** in the background,
+  redirecting BOTH stdout and stderr to `<TASK_DIR>/app_stderr.txt` (see "Crashes & assertions"
+  below — this flag is what stops a crash from hanging on a modal dialog, and the redirect is what
+  captures the assertion text) -> **start a hard wall-clock deadline (~90s) from launch** -> poll
+  `test_log.txt` every ~5s -> on each `SCREENSHOT:` read the image and judge it -> detect
+  `TEST_COMPLETE` (success) or process death (crash) or no new output for the watchdog cap, or the
+  hard deadline elapsing (hang) -> path-scoped kill of any straggler (Test account → "Serialize app
+  runs") -> optional CLEANUP -> save the overlay (`git diff > <TASK_DIR>/test-overlay.patch`) ->
+  THEN `git reset --hard <IMPL_SHA>` (back to impl-only — the patch must be saved before this reset).
+
+    On Windows, launch and capture both streams like:
+
+        $exe = (Resolve-Path "$EXE").Path
+        Start-Process -FilePath $exe -ArgumentList '-testagent' `
+          -RedirectStandardError "$TASK_DIR/app_stderr.txt" `
+          -RedirectStandardOutput "$TASK_DIR/app_stdout.txt" -PassThru
+
+### Crashes & assertions (always launch the test binary with `-testagent`)
+
+A Debug build normally turns a failed `std::vector` bounds check, a bad iterator, an `assert()`, a
+pure-virtual call, or `abort()` into a modal **Abort / Retry / Ignore** dialog. That dialog blocks
+the process forever — the agent sees no `TEST_COMPLETE`, no process death, just a hang until the
+watchdog cap, and learns nothing about the cause. **`-testagent` removes those dialogs.** With it
+set, the binary:
+
+- suppresses every CRT / STL / WER / `abort()` message box (no button to press, never hangs);
+- converts any such assertion into a real crash that the crash reporter records, so the process
+  **terminates immediately** instead of waiting;
+- writes the assertion text (expression + file:line) to **stderr** — captured in
+  `<TASK_DIR>/app_stderr.txt`, tagged `[testagent]`;
+- also turns on debug logging (`-testagent` implies `-debug`).
+
+**Do NOT key the crash decision on exit code.** Breakpad handles the crash and the process usually
+exits **0** — exactly as tdesktop's own crash detection assumes. The reliable crash signals are: the
+process is gone WITHOUT a `TEST_COMPLETE` marker, AND a fresh non-empty
+`<workdir>/tdata/working` exists. So **always pass `-testagent`**, and on a crash gather diagnostics
+in this order before deciding the verdict:
+
+1. **`<TASK_DIR>/app_stderr.txt`** — the `[testagent] assert: …` line gives the failed expression and
+   `file:line` (e.g. `vector(1931) : … vector subscript out of range`). Usually enough to localize.
+2. **`<workdir>/tdata/working`** — the crash report the reporter wrote: the `Assertion:` /
+   `CrtAssert:` annotations, the failed `file:line`, and `Caught signal …` / minidump id. Plain text;
+   read it directly. `<workdir>` is the launch `-workdir` (in portable test runs,
+   `out/Debug/TelegramForcePortable/`).
+3. **`<workdir>/tdata/dumps/*.dmp`** — the minidump (full stack, needs symbols to read; note its path
+   in `test.md`, don't try to symbolize inline).
+
+A crash is an **IMPL_BUG** (the implementation tripped an assertion / dereferenced out of range), not
+a TEST_FLAW, unless the overlay itself is what reached out of bounds — quote the `[testagent]` line
+and the `tdata/working` excerpt in `test.md` as evidence, and feed the expression + file:line to the
+impl-fix agent as the Root cause / Fix hint. Only a crash with NO usable diagnostic after one retry
+is UNRECOVERABLE.
+
+### Hangs & freezes (two layers, because they have two causes)
+
+A run that never reaches `TEST_COMPLETE` and never dies is a hang. Two independent guards catch it:
+
+- **Frozen main thread (in-app).** `-testagent` force-enables the built-in **DeadlockDetector** — a
+  ping thread that, if the main/event loop stops responding (a genuine deadlock or an infinite loop
+  on the UI thread), raises `Unexpected("Deadlock found!")` from a side thread. That crashes through
+  the same reporter, so the **frozen main-thread stack is captured in the minidump** and the process
+  exits on its own (key on the `tdata/working` report, not the exit code) — same diagnostics path as
+  a crash above. No agent action needed beyond reading `tdata/working` / the dump. Detection is
+  within ~30–90s of the stall.
+- **Everything else (external hard cap).** The DeadlockDetector does NOT fire when the event loop is
+  still alive but the test simply never finishes — e.g. a buggy overlay that loops forever, waits on
+  a condition that never comes, or just never calls `Core::Quit()`. For that the **runner enforces a
+  hard wall-clock deadline (~90s) from launch** and, when it elapses, does the path-scoped kill
+  regardless of output. No legitimate auto-test runs anywhere near a minute, so this cap is pure
+  backstop — but it is what guarantees the agent can never wedge forever.
+
+Classify by which guard tripped: a DeadlockDetector crash with a real main-thread stack in app code
+is an **IMPL_BUG**; the external cap firing is almost always a **TEST_FLAW** (the overlay didn't
+drive to `TEST_COMPLETE`/quit) — re-author the overlay — unless the captured stack/log shows the
+implementation itself wedged, in which case it is an IMPL_BUG. Two external-cap kills in a row with
+the same signature → BLOCKED (early-escalation rule).
 
 ### Leave no test binary behind
 
@@ -259,7 +413,11 @@ correct.
   convey the intended look, they are NOT pixel targets, so never fail a check merely for not matching
   a mockup pixel-for-pixel. The falsifiable signal is the on-screen crop against the OLD vs
   intended-NEW render (does it match the new and differ from the old?); the mockup informs what
-  "correct" means. Read the images and decide like a designer reviewing the build.
+  "correct" means. Read the images and decide like a designer reviewing the build. This bans
+  pixel-diffing against the MOCKUP — not measuring your OWN render: for a `Visual: layout` task you DO
+  assert the rendered widget's measured geometry against the desktop-unit contract in `visual.md`
+  ("Visual contract"). That is numeric and falsifiable, and it is exactly the check that catches the
+  wrong proportions/spacings an eye waves through.
 - **No-difference = IMPL_BUG.** If a check detects no difference from the pre-change state (the glyph
   matches the OLD art; the string still shows the old word), the change did not take effect — return
   IMPL_BUG; do not approve.

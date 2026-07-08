@@ -34,6 +34,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "dialogs/dialogs_entry.h"
 #include "dialogs/dialogs_widget.h"
 #include "dialogs/ui/dialogs_layout.h"
+#include "ffmpeg/ffmpeg_utility.h"
 #include "history/history_item_components.h"
 #include "history/view/controls/compose_controls_common.h"
 #include "history/view/history_view_message.h"
@@ -302,7 +303,7 @@ void SetupExperimental(
 		addToggle(kOptionFastButtonsMode);
 	}
 	addToggle(Window::kOptionDisableTouchbar);
-	addToggle(Info::kAlternativeScrollProcessing);
+	addToggle(Info::kClassicProfileScroll);
 	addToggle(kModerateCommonGroups);
 	addToggle(kForceComposeSearchOneColumn);
 	addToggle(ChatHelpers::kOptionUnlimitedRecentStickers);
@@ -310,6 +311,7 @@ void SetupExperimental(
 	addToggle(HistoryView::kOptionUnlimitedMessageWidth);
 	addToggle(HistoryView::Controls::kOptionMacCmdReplyImmediately);
 	addToggle(Ui::kOptionQScroller);
+	addToggle(FFmpeg::kOptionFFmpegMultiThread);
 }
 
 } // namespace

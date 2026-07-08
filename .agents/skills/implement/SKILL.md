@@ -42,10 +42,23 @@ BUILD         = cmake --build ./out --config Debug --target Telegram
 EXE           = ./out/Debug/Telegram.exe   (or ./out/Debug/Telegram on WSL/Linux — verify the tree)
 TEST_ACCOUNT  = ./out/Debug/test_TelegramForcePortable   (user-prepared golden; launch gate aborts if absent)
 MAX_ATTEMPTS  = 4
+SUBAGENT_MODEL = highest-quality available non-fast model (currently gpt-5.5)
+SUBAGENT_REASONING = xhigh
 ```
 
 `EXE` is also the process-cleanup scope. Any autonomous kill step must match the full executable
 path for THIS checkout's built binary only; never blanket-kill all `Telegram.exe` processes.
+
+The test binary is **always launched with `-testagent`** (see test-loop.md "Crashes & assertions"):
+it suppresses the Debug Abort/Retry/Ignore dialogs that would hang the run, turns any CRT/STL
+assertion (and a frozen main thread) into an immediate crash with a written `tdata/working` report,
+and writes the assertion text to a captured stderr file so a crash is diagnosable instead of a silent
+hang. Key crash detection on the report file, not the exit code.
+
+For every subagent spawned by this skill — planner, task-runner, per-phase implementation/review
+agents, test-author agents, and impl-fix agents — request `SUBAGENT_MODEL` and
+`SUBAGENT_REASONING` when the host supports model overrides. If model names change, choose the
+smartest/frontier model available, never a mini, fast, spark, or cost-optimized variant.
 
 Tasks run **sequentially** in this one checkout (the build cache stays warm; app runs must serialize
 against the account anyway). To parallelize, run the skill in a different checkout/slot (e.g.
@@ -117,7 +130,8 @@ first unfinished task.
 
 ## Phase B: Planning & testability split (delegate)
 
-Spawn one planner subagent (`fork_context: false`) with this prompt shape:
+Spawn one planner subagent (`fork_context: false`, request `SUBAGENT_MODEL` and
+`SUBAGENT_REASONING` when supported) with this prompt shape:
 
 ```
 You are a planning/splitting agent for a large C++ codebase (Telegram Desktop).
@@ -209,8 +223,9 @@ is visible.
 For each task whose `Status` is not `approved`/`blocked`, in order:
 
 1. Set `Status: in-progress` and mark the corresponding progress item in progress. Spawn ONE
-   **task-runner** worker (`fork_context: false`, request `model: gpt-5.4`,
-   `reasoning_effort: xhigh` when supported) with the prompt below. Apply task-think's wait ladder
+   **task-runner** worker (`fork_context: false`, request `SUBAGENT_MODEL` and
+   `SUBAGENT_REASONING` when supported; currently `model: gpt-5.5` and
+   `reasoning_effort: xhigh`) with the prompt below. Apply task-think's wait ladder
    (5-min waits while in progress, 1-2 min near completion; inspect the task's progress/result
    artifacts on timeout; one follow-up then one fresh retry before escalating).
 2. Read only its compact reply block. Detail is in `.ai/`.
@@ -218,8 +233,22 @@ For each task whose `Status` is not `approved`/`blocked`, in order:
 4. Append any `DISCOVERED` tasks as new lettered `### <letter>:` blocks (`Status: todo`) after the
    remaining ones, and add them to the progress list. The main thread is the only writer of
    `implementing.md`.
-5. On BLOCKED, stop and report — do not start the next task. Under Goal run mode, surfacing the
-   blocker is the correct stop; the loop should not spin on a blocked task.
+5. On BLOCKED, **do NOT stop the loop — prioritize continuing development.** This often runs
+   unattended for hours, so NEVER pause to ask the user whether to go on; record the blocker and
+   move to the next task as long as further progress is possible:
+   - **Test-blocked** — the runner committed a building impl and only its in-app verification could
+     not complete (a harness limit, or the attempt cap hit on a test flaw, not a real bug). The code
+     is on disk, so CONTINUE; capture EXACTLY what was left unverified for the loud final report.
+   - **Impl-blocked but checkout clean** — no green impl for this task, but HEAD is left at a prior
+     committed, buildable commit. CONTINUE — later tasks may be independent; record the missing
+     behavior.
+   - **Hard stop ONLY when continuing is truly impossible** — a broken / uncommitted / non-buildable
+     checkout, or a global environment failure (file lock needing the user to close `Telegram.exe`,
+     the test-account gate). Only then stop and report.
+   Before spawning the next task, confirm the working tree is clean and at a buildable commit
+   (`git status` + the runner's summary); if a blocked runner left it dirty or broken, reset to the
+   last known-good commit first, else hard-stop. Every blocked/unverified task MUST be surfaced
+   LOUDLY in Completion — continuing is never the same as silently passing.
 
 ### task-runner prompt
 
@@ -227,6 +256,10 @@ For each task whose `Status` is not `approved`/`blocked`, in order:
 You are a task-runner for ONE task in an autonomous implement-and-test workflow on Telegram
 Desktop (C++ / Qt). You own this task end to end and isolate its context from the orchestrator.
 You MUST use subagents (spawn_agent/wait_agent) for each phase, keeping the parent thread lean.
+When spawning any subagent for context, plan, assess, implementation, review, test-author, or
+impl-fix work, request the highest-quality available non-fast model and highest reasoning effort
+(`model: gpt-5.5`, `reasoning_effort: xhigh` when available). Never choose mini, fast, spark, or
+cost-optimized model variants.
 
 PROJECT: <project>   TASK: <letter> — <title>
 TASK DESCRIPTION:
@@ -277,23 +310,39 @@ YOUR context, not the orchestrator's), writing prompt/progress/result logs per t
 Skip TEST only for docs/config-only tasks (say so). On Windows, after approval run task-think
 Phase 7 (CRLF / no-BOM) on the task's touched source/config files.
 
+If you must return `STATUS: BLOCKED`, FIRST leave the checkout clean and buildable for the next
+task: `git reset --hard` to your last green IMPL_SHA if you have one, else the prior task's HEAD
+(never leave uncommitted or non-building changes). State the blocker TYPE in the summary:
+`BLOCKED(test)` = impl committed & building, only verification incomplete (give the exact unverified
+behavior + SHA); `BLOCKED(impl)` = no green impl (say whether HEAD is left clean/buildable). Reserve
+a true unrecoverable stop for a broken checkout you cannot reset to a buildable commit.
+
 Reply with only the compact summary block from test-loop.md
 (TASK/STATUS/VERDICT/ATTEMPTS/TOUCHED/DISCOVERED/NOTES).
 ```
 
 ## Completion
 
-When the loop ends (all tasks approved/blocked, or a blocked task stopped it):
-1. Summarize per task: approved vs blocked, attempts, files touched, key test evidence.
-2. List any discovered tasks that were added.
-3. Note the project name for `implement <project> <follow-up>`.
-4. Show total elapsed time (`Xh Ym Zs`, omit zero components).
-5. Remind that test overlays are saved as `.ai/<project>/<letter>/test-overlay.patch` and the
+When the loop ends (every task is `approved` or `blocked`):
+1. **FIRST — LOUDLY AND IN BOLD — list everything that did NOT fully succeed.** Every `blocked`
+   task and every task whose tests could not fully verify it gets its own bold line stating EXACTLY
+   what failed or what is still UNVERIFIED and the manual follow-up needed, e.g.
+   **"⚠️ <letter> — impl committed (<sha>) & review-approved, but <behavior> is UNVERIFIED
+   (<why, e.g. test-harness limit>); verify manually"**. Make this block impossible to miss. If
+   everything passed AND verified, say that explicitly instead.
+2. Summarize per task: approved vs blocked, attempts, files touched, key test evidence.
+3. List any discovered tasks that were added.
+4. Note the project name for `implement <project> <follow-up>`.
+5. Show total elapsed time (`Xh Ym Zs`, omit zero components).
+6. Remind that test overlays are saved as `.ai/<project>/<letter>/test-overlay.patch` and the
    checkout is left at each task's implementation commit (overlays reset away).
 
 ## Error handling
 
-- Follow task-think's retry ladder for stuck phases; a task-runner returning BLOCKED stops the loop.
+- Follow task-think's retry ladder for stuck phases. A task-runner returning BLOCKED does NOT stop
+  the loop by default — record it and continue while the checkout stays clean and buildable (Phase C
+  step 5); stop only when continuing is impossible (broken/non-buildable checkout, or a global
+  environment failure). Report every blocker LOUDLY in Completion.
 - If `implementing.md` or any artifact is malformed, re-spawn that step with tighter instructions.
 - For file-lock build errors, run the autonomous path-scoped kill from test-loop.md and retry once.
   Kill only the resolved `EXE` for this checkout; `taskkill /IM Telegram.exe /F` and other

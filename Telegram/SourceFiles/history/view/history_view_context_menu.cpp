@@ -45,6 +45,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/controls/delete_message_context_action.h"
 #include "ui/controls/who_reacted_context_action.h"
+#include "ui/delayed_activation.h"
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/boxes/edit_factcheck_box.h"
@@ -291,13 +292,14 @@ void AddDocumentActions(
 			[=] { ShowStickerPackInfo(document, list); },
 			&st::menuIconStickers);
 	}
-	if (document->sticker() && !document->sticker()->set) {
+	const auto sending = item && item->isSending();
+	if (!sending && document->sticker() && !document->sticker()->set) {
 		Api::AddAddToOwnedSetAction(
 			Ui::Menu::CreateAddActionCallback(menu),
 			controller->uiShow(),
 			document);
 	}
-	if (document->sticker()) {
+	if (!sending && document->sticker()) {
 		const auto isFaved = document->owner().stickers().isFaved(document);
 		menu->addAction(
 			(isFaved
@@ -750,6 +752,9 @@ bool AddEditMessageAction(
 		const auto item = owner->message(itemId);
 		if (!item) {
 			return;
+		}
+		if (item->richPage()) {
+			Ui::PreventDelayedActivation();
 		}
 		list->editMessageRequestNotify(item->fullId());
 	}, &st::menuIconEdit);

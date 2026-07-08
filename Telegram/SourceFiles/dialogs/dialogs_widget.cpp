@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "dialogs/ui/dialogs_stories_content.h"
 #include "dialogs/ui/dialogs_stories_list.h"
 #include "dialogs/ui/dialogs_suggestions.h"
+#include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
 #include "dialogs/dialogs_inner_widget.h"
 #include "dialogs/dialogs_search_from_controllers.h"
 #include "dialogs/dialogs_top_bar_suggestion.h"
@@ -114,6 +115,20 @@ base::options::toggle OptionForumHideChatsList({
 	.name = "Hide chat list in forums",
 	.description = "Don't keep a narrow column of chat list.",
 });
+
+// An invisible, larger hit-area stacked under the main menu toggle so a mouse
+// click near the toggle still opens the menu. It duplicates the toggle's action
+// and carries no label, so it reports no accessible role - that keeps the screen
+// reader's FocusManager from turning it into a second, unnamed Tab stop, while
+// mouse clicks keep working.
+class MenuUnderButton final : public Ui::AbstractButton {
+public:
+	using Ui::AbstractButton::AbstractButton;
+
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::NoRole;
+	}
+};
 
 [[nodiscard]] bool RedirectTextToSearch(const QString &text) {
 	for (const auto &ch : text) {
@@ -354,7 +369,7 @@ Widget::Widget(
 	.toggle = object_ptr<Ui::IconButton>(
 		_searchControls,
 		st::dialogsMenuToggle),
-	.under = object_ptr<Ui::AbstractButton>(_searchControls),
+	.under = object_ptr<MenuUnderButton>(_searchControls),
 })
 , _searchForNarrowLayout(_searchControls, st::dialogsSearchForNarrowFilters)
 , _search(_searchControls, st::dialogsFilter, tr::lng_dlg_filter())
@@ -1134,38 +1149,16 @@ void Widget::setupTopBarSuggestions() {
 		}) | rpl::flatten_latest() | rpl::on_next([=](
 				Ui::SlideWrap<Ui::RpWidget> *raw) {
 			if (raw) {
-				_topBarSuggestionPlaceholder.reset(_innerList->insert(
-					0,
-					object_ptr<Ui::RpWidget>(_innerList)));
-				_topBarSuggestionPlaceholder->paintOn([
-					ph = _topBarSuggestionPlaceholder.get()
-				](QPainter &p) {
-					p.fillRect(ph->rect(), st::dialogsBg);
-				});
 				_topBarSuggestion.reset(raw);
-				_topBarSuggestion->setParent(_scroll);
-				_topBarSuggestion->raise();
-				_topBarSuggestion->heightValue(
-				) | rpl::on_next([=](int h) {
-					if (_topBarSuggestionPlaceholder) {
-						_topBarSuggestionPlaceholder->resize(
-							_topBarSuggestionPlaceholder->width(),
-							h);
-					}
-					_scroll->setBarTopInset(h);
-					_topBarSuggestionHeightChanged.fire_copy(h);
-				}, _topBarSuggestion->entity()->lifetime());
-				const auto pinToScroll = [=] {
-					if (_topBarSuggestion) {
-						_topBarSuggestion->resizeToWidth(_scroll->width());
-						_topBarSuggestion->moveToLeft(0, 0);
-					}
-				};
-				_scroll->sizeValue(
-				) | rpl::to_empty | rpl::on_next(
-					pinToScroll,
-					_topBarSuggestion->entity()->lifetime());
-				pinToScroll();
+				MountTopBarSuggestion({
+					.scroll = _scroll,
+					.innerList = _innerList,
+					.wrap = _topBarSuggestion.get(),
+					.placeholder = &_topBarSuggestionPlaceholder,
+					.heightChanged = [=](int h) {
+						_topBarSuggestionHeightChanged.fire_copy(h);
+					},
+				});
 			} else {
 				_topBarSuggestionPlaceholder = nullptr;
 				_topBarSuggestion = nullptr;
@@ -2225,6 +2218,10 @@ void Widget::setInnerFocus(bool unfocusSearch) {
 			|| _searchHasFocus
 			|| _searchSuggestionsLocked)) {
 		_search->setFocus();
+	} else if (Ui::ScreenReaderModeActive()) {
+		// Focus the chat list itself, so the screen reader announces the list
+		// and its selected chat, instead of the unnamed dialogs container.
+		_inner->setFocus();
 	} else {
 		setFocus();
 	}

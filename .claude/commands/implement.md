@@ -35,6 +35,12 @@ TEST_ACCOUNT  = ./out/Debug/test_TelegramForcePortable   # user-prepared golden;
 MAX_ATTEMPTS  = 4
 ```
 
+The test binary is **always launched with `-testagent`** (see test-loop.md "Crashes & assertions"):
+it suppresses the Debug Abort/Retry/Ignore dialogs that would hang the run, turns any CRT/STL
+assertion (and a frozen main thread) into an immediate crash with a written `tdata/working` report,
+and writes the assertion text to a captured stderr file so a crash is diagnosable instead of a silent
+hang. Key crash detection on the report file, not the exit code.
+
 Tasks run **sequentially** in this one checkout (the build cache stays warm; app runs must
 serialize against the account anyway). To parallelize, launch `/implement` in a different
 checkout/slot (e.g. `C:\Telegram\tdesktop`, `D:\Telegram\tdesktop`, `D:\Telegram\twin`) — each run
@@ -157,6 +163,7 @@ Write `.ai/<project>/implementing.md` in EXACTLY this format:
 Status: todo
 <2-4 line self-contained description: what to implement and the observable, testable result. Enough
 that a fresh agent can act on it.>
+Visual: layout | appearance       (UI tasks only — see "Visual classification" below; omit otherwise)
 Images: images/<file> — <caption>      (this line only if the task uses an image)
 
 ### b: <imperative title>
@@ -170,6 +177,19 @@ that changes UI / visual / asset behavior MUST cite the specific mockups/resourc
 do not leave such a task without its images, and do not leave a provided image referenced by no task
 (if one genuinely applies to none, note why). These per-task references are the oracle the test
 phase verifies against — be specific and per-task, not one shared dump on the first task.
+
+**Visual classification (required for UI tasks).** For every task that changes how something LOOKS,
+add a `Visual:` line — it routes the task-runner's flow:
+- `Visual: layout` — must reproduce the mockup's COMPOSITION: element sizes, proportions,
+  spacing/margins, alignment, or a component's geometry (e.g. "a glyph on a rounded square inside a
+  bubble with a count badge"). Triggers a dedicated design-spec phase (which derives a numeric design
+  contract) and a geometry-MEASURING test oracle. Such a task MUST cite its mockup(s) via `Images:`.
+- `Visual: appearance` — must match COLORS / wording / which-style / glyph identity, but NOT
+  proportions or geometry (e.g. "make Decline red", "use the box-button palette"). Lighter check; no
+  contract.
+- omit the line — the task changes no appearance.
+When torn between the two, choose `layout` (the safe default for anything built from multiple
+sized/positioned pieces). The human can override by editing the `Visual:` line in `implementing.md`.
 
 Use letters a, b, c... as task ids. Do not plan internals or implement. When done, reply with ONLY a
 compact confirmation — `ready — <N> tasks` (extend: `ready — appended <letters>`); do NOT echo the
@@ -206,8 +226,25 @@ For each task in `implementing.md` whose `Status` is not `approved`/`blocked`, i
 5. If `DISCOVERED` lists new tasks, append them to `implementing.md` as new lettered `### <letter>:`
    blocks (`Status: todo`) **after** the current remaining tasks, and add them to TodoWrite. (You
    are the only writer of `implementing.md`, so there are no write races.)
-6. If `STATUS: BLOCKED`, stop the loop and report to the user — do not start the next task. (Under
-   `/goal`, surfacing the blocker is the correct stop; the loop should not spin on a blocked task.)
+6. If `STATUS: BLOCKED`, **do NOT stop the loop — prioritize continuing development.** This often
+   runs unattended for hours, so NEVER pause to ask the user whether to go on; record the blocker
+   and move to the next task as long as further progress is possible. Distinguish:
+   - **Test-blocked** — the runner committed a building impl and only its in-app verification could
+     not complete (a test-harness limitation, or the attempt cap hit on a test flaw rather than a
+     real bug). The committed code is on disk, so CONTINUE. Capture EXACTLY what was left unverified
+     for the loud final report.
+   - **Impl-blocked but checkout clean** — no green impl for THIS task, but the runner left HEAD at
+     a prior committed, buildable commit. CONTINUE — later tasks may be independent of this one;
+     record that this task's behavior is missing.
+   - **Hard stop ONLY when continuing is truly impossible** — the checkout is left broken /
+     uncommitted / non-buildable (a later task-runner could not even start from a clean base), or a
+     global environment failure blocks all work (file-lock build error needing the user to close
+     `Telegram.exe`; the test-account gate). Only then stop and report.
+   Before spawning the next task, confirm the working tree is clean and at a buildable commit
+   (`git status` + the runner's summary). If a blocked runner left it dirty or broken, reset to the
+   last known-good commit first; if you cannot recover a clean buildable base, that is the hard-stop
+   case above. Every blocked/unverified task MUST be surfaced LOUDLY in the Completion report —
+   continuing is never the same as silently passing.
 
 ### task-runner prompt
 
@@ -235,16 +272,27 @@ stays in YOUR context, not the orchestrator's):
 
 1. CONTEXT  — run task.md's Phase 1 (new) or Phase 1F (follow-up) prompt for this task; produces
    `<TASK_DIR>/context.md` (and `about.md` for the project).
-2. PLAN     — task.md Phase 2 -> `<TASK_DIR>/plan.md`.
+1b. DESIGN-SPEC — only if the task is `Visual: layout`. Spawn a design-spec subagent that READS the
+   task's mockup image(s) closely (crop/zoom) AND the existing desktop widgets/tokens it should borrow
+   from (e.g. how the dialogs-list unread badge is built), then writes `<TASK_DIR>/visual.md`: the
+   design contract as an ORDERED DERIVATION per `.agents/shared/test-loop.md` ("Visual contract") —
+   every quantity anchored to a font metric or an existing tdesktop `.style` token, NEVER a mobile
+   pixel, each with a tolerance. This contract is the spec IMPLEMENT builds to and the oracle TEST
+   measures against. Skip entirely for non-visual and `Visual: appearance` tasks.
+2. PLAN     — task.md Phase 2 -> `<TASK_DIR>/plan.md`. For a `Visual: layout` task the plan's `.style`
+   metrics come straight from `<TASK_DIR>/visual.md`.
 3. ASSESS   — task.md Phase 3 (refine plan, size phases).
-4. IMPLEMENT— task.md Phase 4, one subagent per plan phase. Implementation agents do NOT commit
-   yet; you commit after build passes.
+4. IMPLEMENT— task.md Phase 4, one subagent per plan phase. For a `Visual: layout` task, give each
+   impl subagent `<TASK_DIR>/visual.md` and require its `.style` metrics to satisfy that contract
+   exactly (no eyeballed sizes). Implementation agents do NOT commit yet; you commit after build
+   passes.
 5. BUILD    — task.md Phase 5 (build with BUILD, fix errors). On file-lock errors, run the
    path-scoped kill of THIS checkout's binary (see test-loop.md "Serialize app runs") and retry
    once, else stop.
 6. REVIEW   — task.md Phase 6 but a SINGLE pass (not 3): one review agent, then one fix agent if
    NEEDS_CHANGES, then rebuild. (Tests catch behavior; review catches dead code / duplication /
-   placement / style.)
+   placement / style.) For a `Visual: layout` task, also hand the review agent `<TASK_DIR>/visual.md`
+   so it flags any `.style` metric that violates the contract.
 7. COMMIT   — `git add -A && git commit` with a concise plain-language subject (≤ ~50-60 chars,
    matching recent `git log` style; usually the whole message — add a short plain body only if the
    subject can't carry it). NO `Autotask:`/attempt trailer and NO `Co-Authored-By:`/attribution line
@@ -257,7 +305,11 @@ stays in YOUR context, not the orchestrator's):
    `git show <IMPL_SHA>` + touched files. It designs a falsifiable oracle per change and writes the
    plan into `<TASK_DIR>/test.md` BEFORE running (for visual/asset changes the oracle compares the
    tight crop against old vs intended-new art — judged VISUALLY, never by hash/byte; mobile mockups
-   are not pixel targets), covers every surface the task names, and never reuses another task's
+   are not pixel targets; and for a `Visual: layout` task ALSO feed `<TASK_DIR>/visual.md` and make
+   the oracle that numeric design contract — measured sizes/spacings/alignment must satisfy each
+   derivation line within tolerance, on a same-scale side-by-side plus an adversarial designer pass,
+   "all elements present" is NOT a pass — see test-loop.md "Visual contract"), covers every surface
+   the task names, and never reuses another task's
    navigate+screenshot. You drive RUN/ASSESS yourself, ADVERSARIALLY (no pass-by-inference; missing
    evidence = TEST_FLAW; no-difference-from-before = IMPL_BUG), and keep the human-readable
    `<TASK_DIR>/test.md` report. Spawn an impl-fix subagent on IMPL_BUG (it commits the next attempt →
@@ -267,23 +319,41 @@ stays in YOUR context, not the orchestrator's):
 
 Skip TEST only if the task changed no runnable behavior (docs/config only) — say so explicitly.
 
+If you must return `STATUS: BLOCKED`, FIRST leave the checkout clean and buildable for the next
+task: `git reset --hard` to your last green IMPL_SHA if you have one, else to the prior task's HEAD
+(never leave uncommitted or non-building changes behind). In the summary state the blocker TYPE so
+the orchestrator can continue: `BLOCKED(test)` = impl committed & building, only verification
+incomplete (give the exact unverified behavior + the commit SHA); `BLOCKED(impl)` = no green impl
+for this task (say whether HEAD is left clean/buildable at a prior commit). Reserve a true
+unrecoverable stop for a broken checkout you cannot reset to a buildable commit.
+
 When done, write nothing new to chat except the compact summary block from test-loop.md
 ("TASK/STATUS/VERDICT/ATTEMPTS/TOUCHED/DISCOVERED/NOTES"). All reasoning lives in `.ai/`.
 ```
 
 ## Completion
 
-When the loop ends (all tasks approved/blocked, or a blocked task stopped it):
-1. Summarize per task: approved vs blocked, attempts, files touched, key test evidence.
-2. List any discovered tasks that were added.
-3. Note the project name for `/implement <project> <follow-up>`.
-4. Show total elapsed time (`Xh Ym Zs`, omit zero components).
-5. Remind that test overlays are saved as `.ai/<project>/<letter>/test-overlay.patch` and the
+When the loop ends (every task is `approved` or `blocked`):
+1. **FIRST — LOUDLY AND IN BOLD — list everything that did NOT fully succeed.** Every `blocked`
+   task and every task whose tests could not fully verify it gets its own bold line stating EXACTLY
+   what failed or what is still UNVERIFIED and the manual follow-up needed, e.g.
+   **"⚠️ <letter> — impl committed (<sha>) & review-approved, but <behavior> is UNVERIFIED
+   (<why, e.g. test-harness limit>); verify manually"**. Make this block impossible to miss. If
+   everything passed AND verified, say that explicitly instead.
+2. Summarize per task: approved vs blocked, attempts, files touched, key test evidence.
+3. List any discovered tasks that were added.
+4. Note the project name for `/implement <project> <follow-up>`.
+5. Show total elapsed time (`Xh Ym Zs`, omit zero components).
+6. Remind that test overlays are saved as `.ai/<project>/<letter>/test-overlay.patch` and the
    checkout is left at each task's implementation commit (overlays reset away).
 
 ## Error handling
 
-- A `task-runner` returning BLOCKED stops the loop; report its reason and the `test.md` path.
+- A `task-runner` returning BLOCKED does NOT stop the loop by default — record the blocker and
+  continue to the next task as long as the checkout stays clean and buildable (see Phase C step 6).
+  Stop the loop ONLY when continuing is impossible: a broken/non-buildable checkout, or a global
+  environment failure (unresolved file lock, missing test account). Whatever the outcome, report
+  every blocker's reason and `test.md` path LOUDLY in the Completion summary.
 - If `implementing.md` or any artifact is malformed, re-spawn that step with tighter instructions.
 - Never proceed past a file-lock build error — ask the user to close `Telegram.exe`.
 - The launch gate (Phase A) guarantees the test account exists before any work begins; if it is

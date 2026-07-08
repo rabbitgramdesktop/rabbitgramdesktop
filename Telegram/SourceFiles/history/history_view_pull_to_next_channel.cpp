@@ -20,30 +20,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_main_list.h"
 #include "dialogs/dialogs_row.h"
 #include "history/history.h"
+#include "history/history_inner_widget.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "storage/storage_shared_media.h"
 #include "support/support_preload.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/continuous_scroll.h"
+#include "ui/widgets/elastic_scroll.h"
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
 #include "ui/ui_utility.h"
 #include "ui/userpic_view.h"
 #include "window/window_session_controller.h"
+#include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 
 namespace HistoryView {
 namespace {
 
-constexpr auto kPullResistance = 0.9;
 constexpr auto kDirectionLock = 8.;
 constexpr auto kResetReachedOn = 0.95;
 constexpr auto kReleaseShowDuration = crl::time(250);
 constexpr auto kReleaseHideDuration = crl::time(220);
 constexpr auto kPanelDuration = crl::time(320);
 constexpr auto kRetractDuration = crl::time(250);
+constexpr auto kExpandDuration = crl::time(250);
 constexpr auto kBounceDuration = crl::time(400);
 
 [[nodiscard]] History *FindNextUnreadChannel(
@@ -263,9 +266,9 @@ void PullToNextChannel::Indicator::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	p.setRenderHint(QPainter::Antialiasing);
 
-	const auto threshold = float64(st::historyPullNextThreshold);
-	const auto progress = (threshold > 0.)
-		? std::clamp(offset / threshold, 0., 1.)
+	const auto card = float64(st::historyPullNextExpand);
+	const auto progress = (card > 0.)
+		? std::clamp(offset / card, 0., 1.)
 		: 0.;
 	const auto release = _releaseProgress.value(_ready ? 1. : 0.);
 	const auto alpha = std::clamp(progress, 0., 1.);
@@ -280,7 +283,7 @@ void PullToNextChannel::Indicator::paintEvent(QPaintEvent *e) {
 
 	const auto widthRadius = std::clamp(
 		circleRadius * (offset - st::historyPullNextSkip)
-			/ (threshold - st::historyPullNextSkip),
+			/ (card - st::historyPullNextSkip),
 		0.,
 		circleRadius);
 	const auto widthRadius2 = std::max(
@@ -339,7 +342,8 @@ void PullToNextChannel::Indicator::paintEvent(QPaintEvent *e) {
 		: tr::lng_pull_no_unread_channels(tr::now);
 	if (release > 0. && !name.isEmpty()) {
 		const auto nameFont = st::historyPullNextNameFont;
-		const auto avail = width() - 4 * st::historyPullNextSkip;
+		const auto centerWidth = width() - st::historyScroll.width;
+		const auto avail = centerWidth - 4 * st::historyPullNextSkip;
 		const auto elName = nameFont->elided(name, avail);
 		const auto nameW = float64(nameFont->width(elName));
 		const auto y = h
@@ -347,7 +351,7 @@ void PullToNextChannel::Indicator::paintEvent(QPaintEvent *e) {
 				- st::historyPullNextRise * release)
 			+ bounceOffset;
 		const auto pill = QRectF(
-			(width() - nameW) / 2. - st::historyPullNextSkip,
+			(centerWidth - nameW) / 2. - st::historyPullNextSkip,
 			y - st::historyPullNextPadding,
 			nameW + 2 * st::historyPullNextSkip,
 			nameFont->height + st::historyPullNextSkip);
@@ -361,7 +365,7 @@ void PullToNextChannel::Indicator::paintEvent(QPaintEvent *e) {
 		p.setPen(fg);
 		p.setFont(nameFont);
 		p.drawText(
-			QRectF((width() - nameW) / 2., y, nameW, nameFont->height),
+			QRectF((centerWidth - nameW) / 2., y, nameW, nameFont->height),
 			elName,
 			QTextOption(Qt::AlignCenter));
 	}
@@ -571,7 +575,7 @@ PullToNextChannel::PullToNextChannel(
 
 PullToNextChannel::~PullToNextChannel() = default;
 
-void PullToNextChannel::attachToContent(not_null<Ui::RpWidget*> inner) {
+void PullToNextChannel::attachToContent(not_null<HistoryInner*> inner) {
 	reset();
 	_inner = inner.get();
 	_filter = base::unique_qptr<QObject>(base::install_event_filter(
@@ -612,7 +616,7 @@ bool PullToNextChannel::processWheel(not_null<QWheelEvent*> e) {
 		reset();
 		return false;
 	} else if (phase == Qt::ScrollEnd || phase == Qt::ScrollMomentum) {
-		return release() || _retract.animating();
+		return release() || _retract.animating() || _swallowMomentum;
 	} else if (!_engaged
 		&& (_gaveUp
 			|| !_history
@@ -633,8 +637,13 @@ bool PullToNextChannel::applyDelta(float64 deltaX, float64 deltaY) {
 		if (sideways > kDirectionLock && sideways >= down) {
 			_gaveUp = true;
 			return false;
-		} else if (down <= kDirectionLock || down <= sideways || !active()) {
+		} else if (down < -kDirectionLock) {
+			_gaveUp = true;
 			return false;
+		} else if (!active()) {
+			return false;
+		} else if (down <= kDirectionLock || down <= sideways) {
+			return true;
 		}
 		_engaged = true;
 		_retract.stop();
@@ -652,19 +661,20 @@ bool PullToNextChannel::applyDelta(float64 deltaX, float64 deltaY) {
 		_accumulated = std::max(0., _accumulated - deltaY);
 	}
 	const auto threshold = float64(st::historyPullNextThreshold);
-	_offset = std::min(threshold, _accumulated * kPullResistance);
-	if (_offset <= 0.) {
-		reset();
-		return true;
-	}
+	_offset = std::max(0., std::min(
+		float64(st::historyPullNextMaxHeight),
+		float64(Ui::OverscrollFromAccumulated(
+			int(base::SafeRound(_accumulated))))));
 	const auto ratio = threshold ? (_offset / threshold) : 0.;
 	if (_next && !_reached && ratio >= 1.) {
 		_reached = true;
 		base::Platform::Haptic();
+		startExpand(true);
 	} else if (_reached && ratio < kResetReachedOn) {
 		_reached = false;
+		startExpand(false);
 	}
-	push(_offset, _reached, true, _next);
+	push(_offset, _reached, _offset > 0., _next);
 	return true;
 }
 
@@ -673,15 +683,16 @@ bool PullToNextChannel::release() {
 		return false;
 	}
 	const auto next = _next;
-	const auto from = _offset;
-	const auto ready = (from >= float64(st::historyPullNextThreshold))
+	const auto fromAccumulated = _accumulated;
+	const auto ready = (_offset >= float64(st::historyPullNextThreshold))
 		&& next
 		&& next->unreadCount() > 0;
+	_swallowMomentum = true;
 	clearState();
 	if (ready) {
 		crl::on_main(_parent.get(), [=] { jumpWhenReady(next, 0); });
 	} else {
-		startRetract(from, next);
+		startRetract(fromAccumulated, next);
 	}
 	return true;
 }
@@ -691,33 +702,57 @@ void PullToNextChannel::push(
 		bool ready,
 		bool visible,
 		History *next) {
-	applyShift(int(base::SafeRound(offset)));
-	_indicator->setData(offset, ready, next);
-	_hint->setData(visible, ready, next);
+	_pushOffset = offset;
+	_pushVisible = visible;
+	_pushNext = next;
+	render(ready);
+}
+
+void PullToNextChannel::render(bool ready) {
+	const auto full = float64(st::historyPullNextExpand);
+	const auto expand = _expand.value(ready ? 1. : 0.);
+	const auto effective = _pushOffset + (full - _pushOffset) * expand;
+	applyShift(int(base::SafeRound(effective)));
+	_indicator->setData(effective, ready, _pushNext);
+	_hint->setData(_pushVisible, ready, _pushNext);
+}
+
+void PullToNextChannel::startExpand(bool ready) {
+	_expand.start(
+		[=] { render(_reached); },
+		ready ? 0. : 1.,
+		ready ? 1. : 0.,
+		kExpandDuration,
+		anim::easeOutQuint);
 }
 
 void PullToNextChannel::applyShift(int shift) {
-	if (_inner) {
-		_inner->move(_inner->x(), -_scroll->scrollTop() - shift);
+	if (_inner && _inner->pullBottomInset() != shift) {
+		_inner->setPullBottomInset(shift);
+		_scroll->scrollToY(_scroll->scrollTopMax());
+		_inner->update();
 	}
 }
 
-void PullToNextChannel::startRetract(float64 from, History *next) {
-	if (from <= 0.) {
+void PullToNextChannel::startRetract(float64 fromAccumulated, History *next) {
+	if (fromAccumulated <= 0.) {
 		push(0., false, false, nullptr);
 		return;
 	}
 	_retract.start([=] {
-		const auto offset = _retract.value(0.);
+		const auto progress = _retract.value(0.);
 		if (_retract.animating()) {
+			const auto offset = float64(Ui::OverscrollFromAccumulated(
+				int(base::SafeRound(fromAccumulated * progress))));
 			push(offset, false, true, next);
 		} else {
 			push(0., false, false, nullptr);
 		}
-	}, from, 0., kRetractDuration, anim::easeOutCubic);
+	}, 1., 0., kRetractDuration, anim::sineInOut);
 }
 
 void PullToNextChannel::clearState() {
+	_expand.stop();
 	_accumulated = 0.;
 	_offset = 0.;
 	_swipeX = 0.;
@@ -730,6 +765,7 @@ void PullToNextChannel::clearState() {
 
 void PullToNextChannel::reset() {
 	_retract.stop();
+	_swallowMomentum = false;
 	clearState();
 	applyShift(0);
 	_indicator->hideNow();

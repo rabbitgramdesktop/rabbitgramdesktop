@@ -586,6 +586,12 @@ void Message::requestRichPageRelayout(QRect articleRect) {
 	if (const auto rich = const_cast<Message*>(this)->richpage()) {
 		rich->article.invalidateLayout();
 	}
+	// The article layout was just invalidated, but textHeightFor() caches by
+	// _textWidth and would short-circuit when re-queried at the same (constant)
+	// max width, leaving the bubble sized from a stale, now-zeroed
+	// lastLayoutWidth(). Drop the text-size cache too so the article is really
+	// laid out again, the same way blockquoteExpandChanged() does for quotes.
+	invalidateTextSizeCache();
 	setPendingResize();
 	history()->owner().requestViewResize(this);
 }
@@ -695,6 +701,7 @@ void Message::activateRichPagePreparedLink(
 }
 
 QRect Message::richPageRect(QRect trect) const {
+	trect.setTop(trect.top() + st::mediaInBubbleSkip);
 	return trect.marginsAdded(
 		{ st::msgPadding.left(), 0, st::msgPadding.right(), 0 });
 }
@@ -4431,6 +4438,7 @@ bool Message::getStateText(
 			local,
 			request.flags | Ui::Text::StateRequest::Flag::LookupSymbol);
 		if (horizontalScrollHit.overScrollbar) {
+			rich->handlerCodeHeaderSegmentIndex = -1;
 			rich->handlerPreparedLink = std::nullopt;
 			rich->handlerMediaActivation = {};
 			rich->handlerPlaceholderId = {};
@@ -4446,6 +4454,7 @@ bool Message::getStateText(
 			return true;
 		}
 		if (!hit.valid()) {
+			rich->handlerCodeHeaderSegmentIndex = -1;
 			clearHorizontalScrollHandler();
 			return horizontalScrollHit.scrollable;
 		}
@@ -4458,16 +4467,21 @@ bool Message::getStateText(
 			offset,
 			hit.direct);
 		if (hit.codeHeaderCopy) {
-			const auto text = rich->article.textForContext(hit);
+			const auto reuse = rich->handler
+				&& (rich->handlerCodeHeaderSegmentIndex == hit.segmentIndex);
 			clearHorizontalScrollHandler();
 			rich->handlerPreparedLink = std::nullopt;
 			rich->handlerMediaActivation = {};
 			rich->handlerPlaceholderId = {};
 			rich->handlerPlaceholderPoint = {};
-			rich->handler = std::make_shared<RichPageActionClickHandler>(
-				[text](ClickContext context) {
-					CopyRichPageCodeBlockText(text, std::move(context));
-				});
+			if (!reuse) {
+				const auto text = rich->article.textForContext(hit);
+				rich->handlerCodeHeaderSegmentIndex = hit.segmentIndex;
+				rich->handler = std::make_shared<RichPageActionClickHandler>(
+					[text](ClickContext context) {
+						CopyRichPageCodeBlockText(text, std::move(context));
+					});
+			}
 			outResult->link = rich->handler;
 		} else if (hit.preparedLink
 			|| hit.mediaActivation.kind != MediaActivationKind::None) {
@@ -4479,6 +4493,7 @@ bool Message::getStateText(
 				&& SameMediaActivation(
 					rich->handlerMediaActivation,
 					activation);
+			rich->handlerCodeHeaderSegmentIndex = -1;
 			clearHorizontalScrollHandler();
 			rich->handlerPlaceholderId = hit.mediaActivation.placeholderId;
 			rich->handlerPlaceholderPoint = hit.placeholderLocalPoint;
@@ -4505,6 +4520,7 @@ bool Message::getStateText(
 			}
 			outResult->link = rich->handler;
 		} else {
+			rich->handlerCodeHeaderSegmentIndex = -1;
 			clearHorizontalScrollHandler();
 			outResult->link = hit.state.link;
 		}
@@ -6598,7 +6614,12 @@ bool Message::textAppearCheckLine(not_null<TextAppearing*> appearing) {
 					|| (appearing->shownHeight < finalLineHeight))));
 	if (!use) {
 		if (data()->isRegular()) {
-			RemoveComponents(TextAppearing::Bit());
+			// We are inside these animations' tick, can't destroy them now.
+			crl::on_main(this, [=] {
+				if (Has<TextAppearing>() && !Get<TextAppearing>()->use) {
+					RemoveComponents(TextAppearing::Bit());
+				}
+			});
 			return false;
 		} else if (recount && lines) {
 			appearing->shownLine = lines - 1;

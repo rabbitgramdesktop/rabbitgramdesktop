@@ -72,6 +72,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/show_or_premium_box.h"
 #include "ui/color_contrast.h"
 #include "ui/controls/stars_rating.h"
+#include "ui/controls/swipe_handler.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/upload_progress_overlay.h"
@@ -435,6 +436,7 @@ TopBar::TopBar(
 
 	setupUniqueBadgeTooltip();
 	setupButtons(controller, descriptor.source);
+	setupSwipeBack(controller);
 	setupUserpicButton(controller);
 	if (_hasActions) {
 		_peer->session().changes().peerFlagsValue(
@@ -1528,6 +1530,59 @@ TopBar::~TopBar() {
 
 rpl::producer<> TopBar::backRequest() const {
 	return _backClicks.events();
+}
+
+void TopBar::setupSwipeBack(
+		not_null<Window::SessionController*> controller) {
+	auto update = [=](Ui::Controls::SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!_swipeBackData.callback) {
+				const auto container = static_cast<Ui::RpWidget*>(
+					parentWidget());
+				_swipeBackData = Ui::Controls::SetupSwipeBack(
+					container ? container : static_cast<Ui::RpWidget*>(this),
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::historyForwardChooseBg->c,
+							st::historyForwardChooseFg->c,
+						};
+					});
+			}
+			_swipeBackData.callback(data);
+			return;
+		} else if (_swipeBackData.lifetime) {
+			_swipeBackData = {};
+		}
+	};
+
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		if (data.direction != Qt::RightToLeft) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
+		auto dismiss = Fn<void()>();
+		if (_back && _back->toggled()) {
+			dismiss = [=] { _backClicks.fire({}); };
+		} else if (_close) {
+			dismiss = (_wrap.current() == Wrap::Side)
+				? Fn<void()>([=] {
+					controller->closeThirdSection();
+				})
+				: Fn<void()>([=] {
+					controller->hideLayer();
+					controller->hideSpecialLayer();
+				});
+		}
+		return dismiss
+			? Ui::Controls::DefaultSwipeBackHandlerFinishData(
+				std::move(dismiss))
+			: Ui::Controls::SwipeHandlerFinishData();
+	};
+
+	Ui::Controls::SetupSwipeHandler({
+		.widget = this,
+		.update = std::move(update),
+		.init = std::move(init),
+	});
 }
 
 void TopBar::setOnlineCount(rpl::producer<int> &&count) {

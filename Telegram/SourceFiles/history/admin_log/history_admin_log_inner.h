@@ -96,6 +96,14 @@ public:
 	void saveState(not_null<SectionMemento*> memento);
 	void restoreState(not_null<SectionMemento*> memento);
 
+	// Whether the top / bottom edge has no more events to page in.
+	[[nodiscard]] bool loadedAtTop() const {
+		return _upLoaded;
+	}
+	[[nodiscard]] bool loadedAtBottom() const {
+		return _downLoaded;
+	}
+
 	// Empty "flags" means all events.
 	void applyFilter(FilterValue &&value);
 	void applySearch(const QString &query);

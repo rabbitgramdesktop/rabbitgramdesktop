@@ -372,9 +372,12 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 "lng_edit_media_album_error" = "This file cannot be saved as a part of an album.";
 "lng_edit_media_invalid_file" = "Sorry, no way to use this file.";
-/*
 "lng_iv_editor_media_invalid_file" = "Sorry, only photos, video, and audio files are supported here.";
-*/
+"lng_iv_editor_discard_draft_sure" = "Are you sure you want to discard this message? This action cannot be undone.";
+"lng_iv_editor_saving_draft" = "Saving the draft...";
+"lng_iv_editor_save_draft_failed" = "Could not save the draft.";
+"lng_iv_editor_save_draft_failed_error" = "Could not save the draft.\n\nError: {error}";
+"lng_iv_editor_close_now" = "Close now";
 "lng_edit_photo_editor_hint" = "Left-click on the photo to edit.";
 "lng_edit_caption_attach" = "Sorry, you can't attach new media while editing a message.";
 "lng_edit_caption_voice" = "Sorry, you can't edit messages when you have an unsent voice message.";
@@ -3099,6 +3102,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_premium_summary_about_no_forwards" = "Restrict forwarding, copying, and saving content from your private chats.";
 "lng_premium_summary_subtitle_ai_compose" = "AI Tools";
 "lng_premium_summary_about_ai_compose" = "Transform your messages and entire chats in your preferred style and language.";
+"lng_premium_summary_subtitle_rich_formatting" = "Rich Formatting";
+"lng_premium_summary_about_rich_formatting" = "Add headers, tables, lists, AI and inline media to messages.";
 "lng_premium_summary_bottom_subtitle" = "About Telegram Premium";
 "lng_premium_summary_bottom_about" = "While the free version of Telegram already gives its users more than any other messaging application, **Telegram Premium** pushes its capabilities even further.\n\n**Telegram Premium** is a paid option, because most Premium Features require additional expenses from Telegram to third parties such as data center providers and server manufacturers. Contributions from **Telegram Premium** users allow us to cover such costs and also help Telegram stay free for everyone.";
 "lng_premium_summary_button" = "Subscribe for {cost} per month";
@@ -4649,6 +4654,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_in_dlg_sticker" = "Sticker";
 "lng_in_dlg_sticker_emoji" = "{emoji} Sticker";
 "lng_in_dlg_poll" = "Poll";
+"lng_in_dlg_table" = "Table";
 "lng_in_dlg_story" = "Story";
 "lng_in_dlg_todo_list" = "Checklist";
 "lng_in_dlg_story_expired" = "Expired story";
@@ -5886,6 +5892,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_menu_formatting_blockquote" = "Quote";
 "lng_menu_formatting_monospace" = "Monospace";
 "lng_menu_formatting_spoiler" = "Spoiler";
+"lng_menu_formatting_subscript" = "Subscript";
+"lng_menu_formatting_superscript" = "Superscript";
+"lng_menu_formatting_marked" = "Marked";
+"lng_menu_formatting_plain_text" = "Plain text";
 "lng_menu_formatting_date" = "Date";
 "lng_menu_formatting_link_create" = "Create link";
 "lng_menu_formatting_link_edit" = "Edit link";
@@ -5895,6 +5905,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_formatting_link_edit_title" = "Edit link";
 "lng_formatting_link_text" = "Text";
 "lng_formatting_link_url" = "URL";
+"lng_formatting_math_create_title" = "Insert formula";
+"lng_formatting_math_edit_title" = "Edit formula";
+"lng_formatting_math_source" = "Formula";
+"lng_formatting_math_source_placeholder" = "Formula source";
+"lng_formatting_math_separate_line" = "Separate Line Formula";
+"lng_formatting_math_source_label" = "LaTeX";
+"lng_formatting_math_result_label" = "Result";
 "lng_formatting_link_create" = "Create";
 "lng_formatting_code_title" = "Code Language";
 "lng_formatting_code_language" = "Language for syntax highlighting.";
@@ -7201,9 +7218,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_polls_stop_warning" = "If you stop this poll now, nobody will be able to vote in it anymore. This action cannot be undone.";
 "lng_polls_stop_sure" = "Stop";
 "lng_article_menu_item" = "Article";
-/*
 "lng_article_editor_title" = "Article";
 "lng_article_insert_heading" = "Heading";
+"lng_article_insert_text" = "Text";
 "lng_article_insert_heading1" = "Heading 1";
 "lng_article_insert_heading2" = "Heading 2";
 "lng_article_insert_heading3" = "Heading 3";
@@ -7218,24 +7235,50 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_article_insert_ordered_list" = "Ordered List";
 "lng_article_insert_bullet_list" = "Bullet List";
 "lng_article_insert_task_list" = "Task List";
+"lng_article_list_change" = "Change List";
+"lng_article_list_insert" = "Insert List";
+"lng_article_tooltip_text_style" = "Text Style";
+"lng_article_tooltip_list_style" = "List Style";
+"lng_article_tooltip_table_insert" = "Insert Table";
+"lng_article_tooltip_table_style" = "Table Style";
+"lng_article_tooltip_link" = "Insert Link";
+"lng_article_tooltip_media" = "Insert Media";
+"lng_article_tooltip_formula" = "Insert Formula";
+"lng_article_tooltip_emoji" = "Emoji Panel";
+"lng_article_list_item_change" = "Change List Item";
+"lng_article_list_numbers" = "Numbers";
+"lng_article_list_lowercase_letters" = "Lowercase Letters";
+"lng_article_list_uppercase_letters" = "Uppercase Letters";
+"lng_article_list_lowercase_roman" = "Lowercase Roman";
+"lng_article_list_uppercase_roman" = "Uppercase Roman";
+"lng_article_list_reversed" = "Reversed";
 "lng_article_insert_pullquote" = "Pullquote";
 "lng_article_insert_media" = "Attach Media";
+"lng_article_media_ungroup" = "Ungroup";
+"lng_article_media_collage" = "Collage";
+"lng_article_media_slideshow" = "Slideshow";
 "lng_article_insert_details" = "Details";
 "lng_article_insert_table" = "Table";
-"lng_article_insert_map" = "Map";
 "lng_article_limit_length" = "The article is too long.";
 "lng_article_limit_depth" = "The article is nested too deeply.";
 "lng_article_limit_blocks" = "The article has too many blocks.";
 "lng_article_limit_columns" = "The article table has too many columns.";
 "lng_article_limit_media" = "The article has too many media files.";
+"lng_article_submit_empty" = "The article can't be empty.";
 "lng_article_premium_required" = "Subscribe to {link} to be able to send rich articles.";
 "lng_article_premium_required_link" = "Telegram Premium";
+"lng_article_premium_choice_title" = "Remove Formatting";
+"lng_article_premium_choice_about" = "This message uses rich formatting, which requires {link}.";
+"lng_article_premium_choice_about_link" = "Telegram Premium";
+"lng_article_premium_choice_plain" = "Send Without Formatting";
 "lng_article_table_change" = "Change Table";
 "lng_article_table_add_row" = "Add Row";
 "lng_article_table_add_column" = "Add Column";
 "lng_article_table_header" = "Header";
+"lng_article_table_align_left" = "Align Left";
 "lng_article_table_align_center" = "Align Center";
 "lng_article_table_align_right" = "Align Right";
+"lng_article_table_align_top" = "Align Top";
 "lng_article_table_align_middle" = "Align Middle";
 "lng_article_table_align_bottom" = "Align Bottom";
 "lng_article_table_split_cell" = "Split Cell";
@@ -7245,9 +7288,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 "lng_article_table_delete_column" = "Delete Column";
 "lng_article_table_delete_columns" = "Delete Columns";
 "lng_article_table_delete_table" = "Delete Table";
-"lng_article_table_bordered" = "Bordered Table";
+"lng_article_table_borderless" = "Borderless";
 "lng_article_table_striped" = "Striped Table";
-*/
 "lng_polls_menu_item" = "Poll";
 "lng_polls_create" = "Create poll";
 "lng_polls_create_title" = "New poll";

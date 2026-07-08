@@ -645,6 +645,12 @@ void EmojiListWidget::setupSearch() {
 	}, session, type);
 }
 
+void EmojiListWidget::setSearchRightReserved(int value) {
+	if (_search) {
+		_search->setRightReserved(value);
+	}
+}
+
 rpl::producer<std::vector<QString>> EmojiListWidget::searchQueries() const {
 	return _searchQueries.events();
 }

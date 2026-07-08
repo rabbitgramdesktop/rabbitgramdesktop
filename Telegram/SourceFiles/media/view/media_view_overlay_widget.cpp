@@ -1418,6 +1418,7 @@ bool OverlayWidget::opaqueContentShown() const {
 }
 
 void OverlayWidget::clearStreaming(bool savePosition) {
+	finishSystemMediaControls();
 	if (_streamed && _document && savePosition) {
 		Media::Player::SaveLastPlaybackPosition(
 			_document,
@@ -4302,13 +4303,11 @@ void OverlayWidget::hide() {
 	clearBeforeHide();
 	applyHideWindowWorkaround();
 	_window->hide();
-#ifdef Q_OS_LINUX
 	if (Platform::IsWayland()) {
 		if (const auto handle = _window->windowHandle()) {
 			handle->destroy();
 		}
 	}
-#endif // Q_OS_LINUX
 }
 
 void OverlayWidget::setCursor(style::cursor cursor) {
@@ -5828,6 +5827,7 @@ void OverlayWidget::playbackPauseMusic() {
 void OverlayWidget::updatePlaybackState() {
 	Expects(_streamed != nullptr);
 
+	refreshSystemMediaControls();
 	if (!_streamed->controls && !_stories) {
 		return;
 	}
@@ -5844,6 +5844,134 @@ void OverlayWidget::updatePlaybackState() {
 			_stories->updatePlayback(state);
 		}
 	}
+}
+
+void OverlayWidget::setSystemMediaControls(
+		SystemMediaControlsVideoSink *sink) {
+	_smtcSink = sink;
+}
+
+void OverlayWidget::refreshSystemMediaControls() {
+	if (!_smtcSink) {
+		return;
+	}
+	const auto self = static_cast<SystemMediaControlsVideoDelegate*>(this);
+	if (!_streamed || !_streamed->withSound) {
+		_smtcSink->videoFinish(self);
+		return;
+	}
+	const auto &player = _streamed->instance.player();
+	const auto state = player.prepareLegacyState();
+	if (state.position == kTimeUnknown || state.length == kTimeUnknown) {
+		return;
+	}
+	const auto channel = _from && _from->isBroadcast();
+	const auto filename = _document ? _document->filename() : QString();
+	auto title = channel ? _fromName : filename;
+	if (title.isEmpty()) {
+		title = _fromName;
+	}
+	auto video = SystemMediaControlsVideoSink::VideoState{
+		.title = title,
+		.artist = channel ? filename : _fromName,
+		.position = std::max(state.position, int64(0)),
+		.duration = std::max(state.length, int64(0)),
+		.playing = (!player.paused() && !player.finished()),
+		.nextAvailable = _rightNavVisible,
+		.previousAvailable = _leftNavVisible,
+	};
+	if (_smtcDocument != _document) {
+		_smtcDocument = _document;
+		_smtcThumbnailSet = false;
+		_smtcSink->videoStart(self, video);
+	} else {
+		_smtcSink->videoUpdate(video);
+	}
+	if (!_smtcThumbnailSet) {
+		const auto cover = systemMediaControlsThumbnail();
+		if (!cover.isNull()) {
+			_smtcSink->videoSetThumbnail(cover);
+			_smtcThumbnailSet = true;
+		}
+	}
+}
+
+QImage OverlayWidget::systemMediaControlsThumbnail() const {
+	const auto original = [](Image *image) {
+		return image ? image->original() : QImage();
+	};
+	auto result = QImage();
+	if (_videoCover && _videoCoverMedia) {
+		result = original(_videoCoverMedia->image(Data::PhotoSize::Large));
+		if (result.isNull()) {
+			result = original(
+				_videoCoverMedia->image(Data::PhotoSize::Small));
+		}
+	} else if (_documentMedia) {
+		result = original(_documentMedia->goodThumbnail());
+		if (result.isNull()) {
+			result = original(_documentMedia->thumbnail());
+		}
+	}
+	if (result.isNull() && _streamed) {
+		result = currentVideoFrameImage();
+	}
+	return result;
+}
+
+void OverlayWidget::finishSystemMediaControls() {
+	if (_smtcSink) {
+		_smtcSink->videoFinish(
+			static_cast<SystemMediaControlsVideoDelegate*>(this));
+	}
+	_smtcDocument = nullptr;
+}
+
+void OverlayWidget::smtcPlay() {
+	if (!_streamed) {
+		return;
+	}
+	const auto &player = _streamed->instance.player();
+	if (player.paused() || player.finished() || !player.active()) {
+		playbackPauseResume();
+	}
+}
+
+void OverlayWidget::smtcPause() {
+	if (!_streamed) {
+		return;
+	}
+	const auto &player = _streamed->instance.player();
+	if (!player.paused() && !player.finished() && player.active()) {
+		playbackPauseResume();
+	}
+}
+
+void OverlayWidget::smtcPlayPause() {
+	if (_streamed) {
+		playbackPauseResume();
+	}
+}
+
+void OverlayWidget::smtcStop() {
+	close();
+}
+
+void OverlayWidget::smtcNext() {
+	moveToNext(1);
+}
+
+void OverlayWidget::smtcPrevious() {
+	moveToNext(-1);
+}
+
+void OverlayWidget::smtcSeek(crl::time position) {
+	if (!_streamed) {
+		return;
+	}
+	_streamingStartPaused = _streamed->instance.player().paused();
+	restartAtSeekPosition(position);
+	activateControls();
 }
 
 void OverlayWidget::validatePhotoImage(Image *image, bool blurred) {

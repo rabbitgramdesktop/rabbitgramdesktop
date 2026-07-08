@@ -103,6 +103,7 @@ struct TabbedSelectorDescriptor {
 	Fn<QColor()> customTextColor;
 	ComposeFeatures features;
 	uint64 excludeStickerSetId = 0;
+	int searchRightReserved = 0;
 };
 
 enum class TabbedSearchType {
@@ -160,6 +161,7 @@ public:
 	void setCurrentPeer(PeerData *peer);
 	void provideRecentEmoji(
 		const std::vector<EmojiStatusId> &customRecentList);
+	void setSearchRightReserved(int value);
 
 	void hideFinished();
 	void showStarted();

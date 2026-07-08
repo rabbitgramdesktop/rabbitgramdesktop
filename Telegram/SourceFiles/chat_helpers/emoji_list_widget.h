@@ -150,6 +150,8 @@ public:
 
 	void provideRecent(const std::vector<EmojiStatusId> &customRecentList);
 
+	void setSearchRightReserved(int value);
+
 	void prepareExpanding();
 	void paintExpanding(
 		Painter &p,

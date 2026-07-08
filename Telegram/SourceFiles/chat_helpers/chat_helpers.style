@@ -1176,7 +1176,8 @@ historyToDownBadgeSize: 22px;
 historyToDownShownAfter: 480px;
 historyToDownDuration: 150;
 
-historyPullNextThreshold: 110px;
+historyPullNextThreshold: 48px;
+historyPullNextExpand: 110px;
 historyPullNextMaxHeight: 150px;
 historyPullNextAvatar: 56px;
 historyPullNextSkip: 8px;
@@ -1264,6 +1265,7 @@ historyComposeField: InputField(defaultInputField) {
 	duration: 100;
 }
 historyComposeFieldMaxHeight: 224px;
+historyRichMessagePreviewHeight: 72px;
 historyComposeFieldFadeHeight: 6px;
 historySendRight: 2px;
 historySendPadding: 9px;
@@ -1534,6 +1536,10 @@ historyAiComposeButtonPosition: point(-8px, -4px);
 historySendAsFileButton: IconButton(historyAiComposeButton) {
 	icon: icon {{ "chat/text_to_file-18x18", historyComposeIconFg }};
 	iconOver: icon {{ "chat/text_to_file-18x18", historyComposeIconFgOver }};
+}
+historyExpandComposeButton: IconButton(historyAiComposeButton) {
+	icon: icon {{ "menu/expand", historyComposeIconFg }};
+	iconOver: icon {{ "menu/expand", historyComposeIconFgOver }};
 }
 historyAiComposeTooltipSkip: 8px;
 importantTooltipHide: IconButton(defaultIconButton) {

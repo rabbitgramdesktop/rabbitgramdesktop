@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 
 class History;
+class HistoryInner;
 class QEvent;
 class QWheelEvent;
 
@@ -33,7 +34,7 @@ public:
 		not_null<Window::SessionController*> controller);
 	~PullToNextChannel();
 
-	void attachToContent(not_null<Ui::RpWidget*> inner);
+	void attachToContent(not_null<HistoryInner*> inner);
 
 	void setHistory(History *history);
 
@@ -49,8 +50,10 @@ private:
 	[[nodiscard]] bool applyDelta(float64 deltaX, float64 deltaY);
 	[[nodiscard]] bool release();
 	void push(float64 offset, bool ready, bool visible, History *next);
+	void render(bool ready);
+	void startExpand(bool ready);
 	void applyShift(int shift);
-	void startRetract(float64 from, History *next);
+	void startRetract(float64 fromAccumulated, History *next);
 	void clearState();
 	void reset();
 	void jumpWhenReady(not_null<History*> next, crl::time waited);
@@ -62,12 +65,17 @@ private:
 	const base::unique_qptr<Indicator> _indicator;
 	const base::unique_qptr<HintOverlay> _hint;
 
-	QPointer<Ui::RpWidget> _inner;
+	QPointer<HistoryInner> _inner;
 	History *_history = nullptr;
 	History *_next = nullptr;
 
 	base::unique_qptr<QObject> _filter;
 	Ui::Animations::Simple _retract;
+	Ui::Animations::Simple _expand;
+
+	float64 _pushOffset = 0.;
+	bool _pushVisible = false;
+	History *_pushNext = nullptr;
 
 	float64 _accumulated = 0.;
 	float64 _offset = 0.;
@@ -76,6 +84,7 @@ private:
 	bool _engaged = false;
 	bool _reached = false;
 	bool _gaveUp = false;
+	bool _swallowMomentum = false;
 
 };
 
