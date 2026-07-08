@@ -11,6 +11,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "storage/localstorage.h"
 
+#include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <ShlObj_core.h>
 
 void reloadAppIconFromTaskBar()
@@ -39,14 +41,12 @@ void reloadAppIconFromTaskBar()
             hr = pShellLink->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&pPersistFile));
             if (SUCCEEDED(hr))
             {
-                WCHAR wszShortcutPath[MAX_PATH];
-                shortcut.toWCharArray(wszShortcutPath);
-                wszShortcutPath[shortcut.length()] = '\0';
-
-                if (SUCCEEDED(pPersistFile->Load(wszShortcutPath, STGM_READWRITE)))
+                const auto nativeShortcut = QDir::toNativeSeparators(shortcut).toStdWString();
+                if (SUCCEEDED(pPersistFile->Load(nativeShortcut.c_str(), STGM_READWRITE)))
                 {
-                    pShellLink->SetIconLocation(rabbitgramIconPath.toStdWString().c_str(), 0);
-                    pPersistFile->Save(wszShortcutPath, TRUE);
+                    const auto nativeIconPath = QDir::toNativeSeparators(rabbitgramIconPath).toStdWString();
+                    pShellLink->SetIconLocation(nativeIconPath.c_str(), 0);
+                    pPersistFile->Save(nativeShortcut.c_str(), TRUE);
                 }
 
                 pPersistFile->Release();
