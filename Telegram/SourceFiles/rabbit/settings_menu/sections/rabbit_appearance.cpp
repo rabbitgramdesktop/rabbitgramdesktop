@@ -108,7 +108,7 @@ namespace Settings
             builder.add([](const WidgetContext &ctx) {
                 return SectionBuilder::WidgetToAdd{
                     .widget = object_ptr<IconPicker>(ctx.container),
-                    .margin = st::settingsCheckboxPadding,
+                    .margin = { 0, st::settingsCheckboxPadding.top(), 0, st::settingsCheckboxPadding.bottom() },
                 };
             }, [] {
                 return SearchEntry{

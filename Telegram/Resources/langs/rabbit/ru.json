@@ -74,5 +74,15 @@
     "rtg_quiet_mode_8h": "8 ч",
     "rtg_quiet_mode_24h": "24 ч",
     "rtg_general_quiet_mode": "Тихий режим",
+    "rtg_settings_app_icon_default": "Базовая",
+    "rtg_settings_app_icon_angel": "Ангел",
+    "rtg_settings_app_icon_blackout": "Блэкаут",
+    "rtg_settings_app_icon_color": "Цветная",
+    "rtg_settings_app_icon_impostor": "amogus",
+    "rtg_settings_app_icon_matrix": "Матрица",
+    "rtg_settings_app_icon_moon": "Луна",
+    "rtg_settings_app_icon_old": "Старая",
+    "rtg_settings_app_icon_seasonal": "Сакура",
+    "rtg_settings_app_icon_twitch": "Twitch",
     "last_string": null
 }

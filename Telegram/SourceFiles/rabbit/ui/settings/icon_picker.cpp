@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "icon_picker.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/lang/rabbit_lang.h"
 
 #include "tray.h"
 #include "core/application.h"
@@ -45,24 +46,24 @@ constexpr auto kColumnsCount = 4;
 
 static void drawIcon(QPainter& p, const QImage& icon, int xOffset, int yOffset, float strokeOpacity)
 {
-    xOffset += st::cpPadding;
-
-    p.save();
-    p.setPen(QPen(st::boxDividerBg, 0));
-    p.setBrush(QBrush(st::boxDividerBg));
-    p.setOpacity(strokeOpacity);
-    p.drawRoundedRect(
-        xOffset + st::cpSelectedPadding,
-        yOffset + st::cpSelectedPadding,
-        st::cpIconSize + st::cpSelectedPadding * 2,
-        st::cpIconSize + st::cpSelectedPadding * 2,
-        st::cpSelectedRounding,
-        st::cpSelectedRounding
-    );
-    p.restore();
+    if (strokeOpacity > 0.0f)
+    {
+        p.save();
+        QPen pen(st::windowBgActive, 2);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        p.setOpacity(strokeOpacity);
+        p.drawEllipse(
+            xOffset,
+            yOffset + st::cpSelectedPadding,
+            st::cpIconSize + st::cpSelectedPadding * 2,
+            st::cpIconSize + st::cpSelectedPadding * 2
+        );
+        p.restore();
+    }
 
     const auto rect = QRect(
-        xOffset + st::cpImagePadding,
+        xOffset + st::cpSelectedPadding,
         yOffset + st::cpImagePadding,
         st::cpIconSize,
         st::cpIconSize
@@ -87,8 +88,12 @@ IconPicker::IconPicker(QWidget* parent)
     : RpWidget(parent)
 {
 	const auto rows = rowsCount();
-	const auto cellHeight = st::cpIconSize + st::cpSelectedPadding * 2;
-	const auto totalHeight = cellHeight + (rows - 1) * (st::cpIconSize + st::cpSpacingY);
+	const auto textFont = st::normalFont;
+	const auto textHeight = textFont->height;
+	const auto textSpacing = 4;
+	const auto rowGap = 16;
+	const auto rowHeight = st::cpIconSize + st::cpSelectedPadding * 3 + textSpacing + textHeight + rowGap;
+	const auto totalHeight = (rows - 1) * rowHeight + st::cpIconSize + st::cpSelectedPadding * 3 + textSpacing + textHeight;
 	setMinimumSize(st::boxWidth, totalHeight);
 }
 
@@ -99,11 +104,23 @@ void IconPicker::paintEvent(QPaintEvent* e)
 
     const auto rows = rowsCount();
     const auto iconsCount = static_cast<int>(icon_variants.size());
-    auto offset = st::boxWidth / 2 - (st::cpIconSize + st::cpSpacingX) * 2;
+    const auto totalWidth = width();
+
+    const auto textFont = st::normalFont;
+    const auto textHeight = textFont->height;
+    const auto textSpacing = 4;
+    const auto rowGap = 16;
+    const auto rowHeight = st::cpIconSize + st::cpSelectedPadding * 3 + textSpacing + textHeight + rowGap;
+
+    const auto cellWidth = st::cpIconSize + st::cpSelectedPadding * 2;
+    const auto padding = st::cpPadding + st::cpSelectedPadding;
+    const auto spacingX = (totalWidth - padding * 2 - cellWidth) / (kColumnsCount - 1);
 
     for (int row = 0; row < rows; row++)
     {
         const auto columns = std::min(kColumnsCount, iconsCount - row * kColumnsCount);
+        const auto yOffset = row * rowHeight;
+
         for (int i = 0; i < columns; i++)
         {
             const auto idx = i + row * kColumnsCount;
@@ -127,12 +144,30 @@ void IconPicker::paintEvent(QPaintEvent* e)
                 opacity = wasSelected.isEmpty() ? 1.0f : animation.value(1.0f);
             }
 
+            const auto xOffset = padding + i * spacingX;
+
             drawIcon(
                 p,
                 icon,
-                (st::cpIconSize + st::cpSpacingX) * i + offset,
-                row * (st::cpIconSize + st::cpSpacingY),
+                xOffset,
+                yOffset,
                 opacity
+            );
+
+            const auto nameKey = u"rtg_settings_app_icon_"_q + iconName;
+            const auto nameText = RabbitLang::Lang::Translate(nameKey);
+
+            p.setFont(textFont);
+            p.setPen(st::windowFg);
+
+            const auto textWidth = spacingX;
+            const auto textX = xOffset - (spacingX - cellWidth) / 2;
+            const auto textY = yOffset + st::cpSelectedPadding * 3 + st::cpIconSize + textSpacing;
+
+            p.drawText(
+                QRect(textX, textY, textWidth, textHeight),
+                Qt::AlignCenter,
+                nameText
             );
         }
     }
@@ -143,29 +178,42 @@ void IconPicker::mousePressEvent(QMouseEvent* e)
     auto appIcon = RabbitSettings::appIcon();
     auto changed = false;
 
-    auto x = e->pos().x();
+    const auto x = e->pos().x();
     const auto rows = rowsCount();
     const auto iconsCount = static_cast<int>(icon_variants.size());
+    const auto totalWidth = width();
+
+    const auto textFont = st::normalFont;
+    const auto textHeight = textFont->height;
+    const auto textSpacing = 4;
+    const auto rowGap = 16;
+    const auto rowHeight = st::cpIconSize + st::cpSelectedPadding * 3 + textSpacing + textHeight + rowGap;
+
+    const auto cellWidth = st::cpIconSize + st::cpSelectedPadding * 2;
+    const auto padding = st::cpPadding + st::cpSelectedPadding;
+    const auto spacingX = (totalWidth - padding * 2 - cellWidth) / (kColumnsCount - 1);
+
     for (int row = 0; row < rows; row++)
     {
         const auto columns = std::min(kColumnsCount, iconsCount - row * kColumnsCount);
+        const auto yOffset = row * rowHeight;
+
         for (int i = 0; i < columns; i++)
         {
             const auto idx = i + row * kColumnsCount;
-            const auto xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
-            const auto yOffset = row * (st::cpIconSize + st::cpSpacingY);
+            const auto xOffset = padding + i * spacingX;
 
-            if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
-                && e->pos().y() <= yOffset + st::cpIconSize)
+            if (x >= xOffset + st::cpSelectedPadding
+                && x <= xOffset + st::cpSelectedPadding + st::cpIconSize
+                && e->pos().y() >= yOffset + st::cpImagePadding
+                && e->pos().y() <= yOffset + st::cpImagePadding + st::cpIconSize)
             {
                 const auto& iconName = icon_variants[idx];
-                if (iconName.isEmpty())
-                {
+                if (iconName.isEmpty()) {
                     break;
                 }
 
-                if (appIcon != iconName)
-                {
+                if (appIcon != iconName) {
                     wasSelected = appIcon;
                     animation.start(
                         [=]
@@ -189,7 +237,6 @@ void IconPicker::mousePressEvent(QMouseEvent* e)
     if (changed)
     {
         applyIcon();
-
         repaint();
     }
 }
