@@ -1209,7 +1209,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	return u"https://telegramdesktop.github.io/tdesktop/changelog/"_q;
+	return u"tg://resolve?domain=rabbitGramUpdates"_q;
 }
 
 bool Application::openCustomUrl(
