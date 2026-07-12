@@ -1954,7 +1954,6 @@ void Filler::fillProfileActions() {
 	addManageTopic();
 	addToggleTopicClosed();
 	addViewDiscussion();
-	addGoToFirstMessage();
 	addDirectMessages();
 	addExportChat();
 	addToggleNoForwards();
