@@ -94,6 +94,13 @@ void CreatePaletteCorners() {
 
 } // namespace
 
+void ClearCachedCornerMasks() {
+	using Radius = CachedCornerRadius;
+	for (auto i = int(Radius::ThumbSmall); i < int(Radius::kCount); ++i) {
+		CachedMasks[i] = {};
+	}
+}
+
 void StartCachedCorners() {
 	Corners.resize(RoundCornersCount);
 	CreateMaskCorners();

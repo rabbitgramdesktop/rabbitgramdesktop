@@ -76,6 +76,7 @@ enum class CachedCornerRadius {
 [[nodiscard]] const std::array<QImage, 4> &CachedCornersMasks(
 	CachedCornerRadius radius);
 
+void ClearCachedCornerMasks();
 void StartCachedCorners();
 void FinishCachedCorners();
 

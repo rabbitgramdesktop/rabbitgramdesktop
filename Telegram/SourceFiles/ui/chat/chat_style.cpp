@@ -671,6 +671,24 @@ void ChatStyle::applyAdjustedServiceBg(QColor serviceBg) {
 	msgServiceBg().set(uchar(r), uchar(g), uchar(b), uchar(a));
 }
 
+void ChatStyle::clearCornerCaches() const {
+	for (auto &style : _messageStyles) {
+		style.msgBgCornersSmall = {};
+		style.msgBgCornersLarge = {};
+	}
+	for (auto &style : _imageStyles) {
+		style.msgServiceBgCornersSmall = {};
+		style.msgServiceBgCornersLarge = {};
+		style.msgShadowCornersSmall = {};
+		style.msgShadowCornersLarge = {};
+	}
+	_msgBotKbOverBgAddCornersSmall = {};
+	_msgBotKbOverBgAddCornersLarge = {};
+	for (auto &corners : _msgSelectOverlayCorners) {
+		corners = {};
+	}
+}
+
 std::span<Text::SpecialColor> ChatStyle::highlightColors() const {
 	if (_highlightColors.empty()) {
 		_highlightColors = SyntaxHighlightColors(this);

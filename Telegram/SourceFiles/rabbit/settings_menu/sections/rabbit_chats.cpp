@@ -31,6 +31,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_menu_icons.h"
 #include "rabbit/settings_menu/boxes/quick_action_box.h"
 #include "ui/widgets/continuous_sliders.h"
+#include "ui/chat/chat_style.h"
+#include "ui/cached_round_corners.h"
 
 namespace Settings
 {
@@ -126,24 +128,12 @@ namespace Settings
                     "rtg_chats_message_rounding",
                     { "radius", radius }));
             };
-            const auto previousMessageRoundness = wrap->lifetime().make_state<int>(
-                RabbitSettings::messageRoundness());
             const auto updateMessageRoundness = [=](int value) {
                 updateMessageRoundnessLabel(value);
                 RabbitSettings::setMessageRoundness(value);
+                Ui::ClearCachedCornerMasks();
+                ctx.controller->chatStyle()->clearCornerCaches();
                 chatPreview->repaint();
-            };
-            const auto showRestartRequired = [=](int value) {
-                if (value == *previousMessageRoundness) {
-                    return;
-                }
-                *previousMessageRoundness = value;
-                ctx.controller->show(Ui::MakeConfirmBox({
-                    .text = tr::lng_settings_need_restart(),
-                    .confirmed = [] { Core::Restart(); },
-                    .confirmText = tr::lng_settings_restart_now(),
-                    .cancelText = tr::lng_settings_restart_later(),
-                }));
             };
             messageRoundnessSlider->resize(
                 st::settingsAudioVolumeSlider.seekSize);
@@ -151,8 +141,7 @@ namespace Settings
                 51,
                 [](int val) { return val; },
                 RabbitSettings::messageRoundness(),
-                updateMessageRoundness,
-                showRestartRequired);
+                updateMessageRoundness);
             updateMessageRoundnessLabel(RabbitSettings::messageRoundness());
 
             return SectionBuilder::WidgetToAdd{ .widget = std::move(wrap) };

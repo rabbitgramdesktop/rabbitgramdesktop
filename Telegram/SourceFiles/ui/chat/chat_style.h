@@ -339,6 +339,7 @@ public:
 	void apply(not_null<ChatTheme*> theme);
 	void applyCustomPalette(const style::palette *palette);
 	void applyAdjustedServiceBg(QColor serviceBg);
+	void clearCornerCaches() const;
 
 	[[nodiscard]] bool dark() const {
 		return _dark;
