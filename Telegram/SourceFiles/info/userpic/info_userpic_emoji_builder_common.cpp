@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "info/userpic/info_userpic_emoji_builder_common.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "ui/image/image_prepare.h"
 #include "ui/userpic_view.h" // ForumUserpicRadiusMultiplier.
 
@@ -24,7 +26,12 @@ namespace UserpicBuilder {
 	}
 	const auto processModifier = [&](QImage &&i) {
 		if (circle) {
-			return Images::Circle(std::move(i));
+			const auto radius = std::min(i.height(), i.width())
+				* RabbitSettings::userpicRoundness()
+				/ 100.;
+			return Images::Round(
+				std::move(i),
+				Images::CornersMask(radius / style::DevicePixelRatio()));
 		} else if (roundForumRect) {
 			const auto radius = std::min(i.height(), i.width())
 				* Ui::ForumUserpicRadiusMultiplier();

@@ -76,11 +76,11 @@ PaintRoundImageCallback ForceRoundUserpicCallback(not_null<PeerData*> peer) {
 			*cache = QImage(cacheSize, QImage::Format_ARGB32_Premultiplied);
 			cache->setDevicePixelRatio(ratio);
 		}
+		cache->fill(Qt::transparent);
 		auto q = Painter(cache.get());
 		peer->paintUserpicLeft(q, userpic, 0, 0, outerWidth, size);
 		q.end();
 
-		*cache = Images::Circle(std::move(*cache));
 		p.drawImage(x, y, *cache);
 	};
 }

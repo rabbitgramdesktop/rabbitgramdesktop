@@ -1986,22 +1986,7 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		_cachedUserpic.setDevicePixelRatio(style::DevicePixelRatio());
 	}
 
-	{
-		auto radius = RabbitSettings::userpicRoundness() / 100.0;
-		if (_peer->isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
-		
-		auto path = QPainterPath();
-		path.addRoundedRect(
-			geometry,
-			geometry.width() * radius,
-			geometry.width() * radius);
-
-		p.save();
-		auto hq = PainterHighQualityEnabler(p);
-		p.setClipPath(path);
-		p.drawImage(geometry, _cachedUserpic);
-		p.restore();
-	}
+	p.drawImage(geometry, _cachedUserpic);
 	
 	if (_uploadOverlay && _uploadOverlay->shown()) {
 		_uploadOverlay->paint(p, geometry, {

@@ -357,7 +357,6 @@ void EmptyUserpic::paintRounded(
 		int size,
 		int radius) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		auto radius = size * RabbitSettings::userpicRoundness() / 100;
 		p.drawRoundedRect(x, y, size, size, 
 			radius, radius);
 	});

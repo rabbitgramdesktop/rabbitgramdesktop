@@ -480,18 +480,7 @@ void PeerData::paintUserpic(
 		size * ratio,
 		context.shape);
 
-	auto radius = size * RabbitSettings::userpicRoundness() / 100.;
-	if (isForum() && !RabbitSettings::generalRoundness()) radius *= Ui::ForumUserpicRadiusMultiplier();
-
-	p.save();
-	auto hq = PainterHighQualityEnabler(p);
-	QPainterPath clipPath;
-	clipPath.addRoundedRect(
-		QRect(context.position, QSize(size, size)),
-		radius, radius);
-	p.setClipPath(clipPath);
 	p.drawImage(QRect(context.position, QSize(size, size)), view.cached);
-	p.restore();
 }
 
 void PeerData::loadUserpic() {

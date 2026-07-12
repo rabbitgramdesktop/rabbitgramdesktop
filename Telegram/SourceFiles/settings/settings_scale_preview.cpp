@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "settings/settings_scale_preview.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "base/platform/base_platform_info.h"
 #include "base/event_filter.h"
 #include "data/data_user.h"
@@ -745,10 +747,13 @@ void Preview::validateUserpicCache() {
 		|| _userpic.isEmpty()) {
 		return;
 	}
-	_userpicImage = Images::Circle(_userpicOriginal.scaled(
-		_userpic.size() * _ratio,
-		Qt::IgnoreAspectRatio,
-		Qt::SmoothTransformation));
+	const auto radius = _userpic.width() * RabbitSettings::userpicRoundness() / 100.;
+	_userpicImage = Images::Round(
+		_userpicOriginal.scaled(
+			_userpic.size() * _ratio,
+			Qt::IgnoreAspectRatio,
+			Qt::SmoothTransformation),
+		Images::CornersMask(int(radius)));
 	_userpicImage.setDevicePixelRatio(_ratio);
 }
 

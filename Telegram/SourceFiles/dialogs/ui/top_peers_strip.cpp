@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "dialogs/ui/top_peers_strip.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "base/event_filter.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
@@ -830,7 +832,10 @@ void TopPeersStrip::paintUserpic(
 		q.setCompositionMode(QPainter::CompositionMode_Source);
 		const auto onlineSize = st::dialogsOnlineBadgeSize;
 		const auto stroke = st::dialogsOnlineBadgeStroke;
-		const auto skip = st::dialogsOnlineBadgeSkip;
+		const auto roundnessRatio = RabbitSettings::userpicRoundness() / 100.;
+		const auto skip = QPointF(
+			st::dialogsOnlineBadgeSkip.x() * roundnessRatio,
+			st::dialogsOnlineBadgeSkip.y() * roundnessRatio);
 		const auto shrink = (onlineSize / 2) * (1. - online);
 
 		auto pen = QPen(Qt::transparent);

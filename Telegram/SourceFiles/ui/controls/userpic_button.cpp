@@ -1109,12 +1109,13 @@ void UserpicButton::showCustom(QImage &&image) {
 			size * style::DevicePixelRatio(),
 			Qt::IgnoreAspectRatio,
 			Qt::SmoothTransformation);
-		_userpic = Ui::PixmapFromImage(useForumShape()
-			? Images::Round(
-				std::move(small),
-				Images::CornersMask(_st.photoSize
-					* Ui::ForumUserpicRadiusMultiplier()))
-			: Images::Circle(std::move(small)));
+		auto imgRadius = _st.photoSize * RabbitSettings::userpicRoundness() / 100.;
+		if (useForumShape() && !RabbitSettings::generalRoundness()) {
+			imgRadius *= Ui::ForumUserpicRadiusMultiplier();
+		}
+		_userpic = Ui::PixmapFromImage(Images::Round(
+			std::move(small),
+			Images::CornersMask(int(imgRadius))));
 	} else {
 		_userpic = CreateSquarePixmap(_st.photoSize, [&](Painter &p) {
 			fillShape(p, CreateDefaultGradientBrush(_st.photoSize));
