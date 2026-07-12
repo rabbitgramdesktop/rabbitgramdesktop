@@ -22,7 +22,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 namespace {
 
 [[nodiscard]] int StickerShapeRadius(int shape) {
-	return shape == 1 ? st::bubbleRadiusSmall : st::bubbleRadiusLarge;
+	switch (shape) {
+	case 1: return st::bubbleRadiusSmall;
+	case 2: return st::bubbleRadiusLarge;
+	default: return 0;
+	}
 }
 
 } // namespace
@@ -66,6 +70,12 @@ void RoundnessPreview::paintEvent(QPaintEvent *e) {
 
 ChatPreview::ChatPreview(QWidget *parent) : RpWidget(parent) {
 	setMinimumHeight(st::stickerPreviewSize);
+
+	RabbitSettings::JsonSettings::Events(
+		"sticker_shape"
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
 }
 
 void ChatPreview::ensureChatStyle() {
