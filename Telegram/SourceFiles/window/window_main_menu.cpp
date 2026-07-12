@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_main_menu.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/settings_menu/sections/rabbit_appearance.h"
 
 #include "apiwrap.h"
 #include "base/event_filter.h"
@@ -78,6 +79,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
+#include <QtGui/QContextMenuEvent>
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -546,6 +548,13 @@ void MainMenu::setupArchive() {
 		_contextMenu->popup(QCursor::pos());
 	}, button->lifetime());
 
+	base::install_event_filter(button, [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu) {
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	});
+
 	const auto now = folder();
 	auto folderValue = now
 		? (rpl::single(now) | rpl::type_erased)
@@ -881,6 +890,17 @@ void MainMenu::paintEvent(QPaintEvent *e) {
 	if (cover.intersects(clip)) {
 		drawName(p);
 	}
+}
+
+void MainMenu::contextMenuEvent(QContextMenuEvent *e) {
+	_contextMenu = base::make_unique_q<Ui::PopupMenu>(
+		this,
+		st::popupMenuWithIcons);
+	_contextMenu->addAction(tr::lng_theme_edit(tr::now), [=] {
+		_controller->setHighlightControlId(u"rabbit/appearance/sidebar"_q);
+		_controller->showSettings(Settings::RabbitAppearance::Id());
+	}, &st::menuIconEdit);
+	_contextMenu->popup(e->globalPos());
 }
 
 void MainMenu::drawName(Painter &p) {

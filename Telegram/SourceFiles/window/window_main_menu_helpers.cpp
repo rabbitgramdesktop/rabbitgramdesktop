@@ -8,6 +8,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_main_menu_helpers.h"
 
 #include "apiwrap.h"
+#include "base/event_filter.h"
+#include <QtGui/QContextMenuEvent>
 #include "base/platform/base_platform_info.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -269,6 +271,13 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 			[=] { controller->uiShow()->showBox(Box(myChannelsBox)); },
 			chats ? &st::menuIconGroups : &st::menuIconChannel);
 		(*menu)->popup(QCursor::pos());
+	});
+
+	base::install_event_filter(button, [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu) {
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
 	});
 
 	return button;
