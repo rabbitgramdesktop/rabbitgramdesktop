@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/editor/iv_editor_widget.h"
 
+#include "base/event_filter.h"
 #include "base/qthelp_url.h"
 #include "base/qt/qt_common_adapters.h"
 #include "base/random.h"
@@ -21,10 +22,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor.h"
 #include "editor/photo_editor_common.h"
 #include "iv/editor/iv_editor_text_entities.h"
+#include "iv/editor/iv_editor_window.h"
 #include "iv/markdown/iv_markdown_article_paint.h"
 #include "iv/markdown/iv_markdown_microtex.h"
 #include "iv/markdown/iv_markdown_prepare_links.h"
 #include "iv/markdown/iv_markdown_prepare_native_richtext.h"
+#include "iv/iv_search_bar.h"
+#include "iv/iv_search_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "main/session/session_show.h"
@@ -36,7 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/click_handler.h"
-#include "ui/effects/radial_animation.h"
 #include "ui/image/image.h"
 #include "ui/image/image_location.h"
 #include "ui/layers/generic_box.h"
@@ -83,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QTextCursor>
 #include <QtGui/QTextDocument>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QTextEdit>
 #include <QShortcut>
@@ -231,6 +235,18 @@ struct CommittedFieldSelectionRestore {
 	int anchorOffset = 0;
 	int cursorOffset = 0;
 };
+
+void RemoveBlockLevelEntities(TextWithEntities *text) {
+	auto &list = text->entities;
+	for (auto i = list.begin(); i != list.end();) {
+		const auto type = i->type();
+		if (type == EntityType::Blockquote || type == EntityType::Pre) {
+			i = list.erase(i);
+		} else {
+			++i;
+		}
+	}
+}
 
 constexpr auto kMaxRichTextNodeLength = 16000;
 constexpr auto kMaxCommittedFieldLength = 256 * 1024;
@@ -2703,6 +2719,29 @@ Widget::Widget(
 	refreshPreparedContent();
 	_history.push_back(captureHistoryEntry());
 	_historyIndex = 0;
+
+	base::install_event_filter(this, qApp, [=](not_null<QEvent*> e) {
+		if (e->type() != QEvent::ShortcutOverride) {
+			return base::EventFilterResult::Continue;
+		}
+		const auto top = window();
+		if (!top || !top->isActiveWindow()) {
+			return base::EventFilterResult::Continue;
+		}
+		const auto event = static_cast<QKeyEvent*>(e.get());
+		if (event->isAccepted()) {
+			return base::EventFilterResult::Continue;
+		} else if ((event->modifiers() & Qt::ControlModifier)
+			&& (event->key() == Qt::Key_F)
+			&& !searchBlockedByLayer()) {
+			event->accept();
+			toggleSearch();
+			return base::EventFilterResult::Cancel;
+		} else if (handleUndoRedoShortcutOverride(event)) {
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	});
 }
 
 Widget::~Widget() {
@@ -2865,10 +2904,121 @@ void Widget::acceptInlineField() {
 	hideInlineFieldAndRefresh();
 }
 
+void Widget::toggleSearch() {
+	if (_search && _search->shown()) {
+		_search->hide();
+		return;
+	}
+	hideInlineFieldAndRefresh();
+	clearStructuralSelection();
+	if (!_search) {
+		createSearchController();
+	}
+	_search->toggle();
+}
+
+bool Widget::closeSearch() {
+	if (!_search || !_search->shown()) {
+		return false;
+	}
+	_search->hide();
+	return true;
+}
+
+void Widget::createSearchController() {
+	auto host = SearchHost{
+		.ready = [=] { return _article != nullptr; },
+		.sources = [=] { return _article->searchSources(); },
+		.applyMatches = [=](
+				std::vector<Markdown::MarkdownArticleSearchMatch> matches,
+				int current) {
+			_article->setSearchMatches(std::move(matches), current);
+			update();
+		},
+		.scrollToSegment = [=](int segmentIndex) {
+			scrollToSearchSegment(segmentIndex);
+		},
+		.expandDetails = [](const QString &) { return false; },
+		.focusContent = [=] { setFocus(); },
+		.fieldFocused = [=] { hideInlineFieldAndRefresh(); },
+	};
+	_search = std::make_unique<SearchController>(
+		_outer,
+		widthValue() | rpl::map([=](int outerWidth) {
+			return searchBarColumn(outerWidth).width;
+		}),
+		std::move(host),
+		SearchBarMode::EditorPill);
+	_searchSlideHeight = _search->barHeightValue();
+	_searchSlideHeight.changes() | rpl::on_next([=] {
+		resizeToWidth(width());
+		update();
+	}, lifetime());
+	widthValue() | rpl::on_next([=] {
+		updateSearchBarGeometry();
+	}, lifetime());
+	_search->raiseBar();
+}
+
+void Widget::scrollToSearchSegment(int segmentIndex) {
+	const auto scroll = selectionScrollArea();
+	if (!scroll || !_article) {
+		return;
+	}
+	const auto rect = _article->segmentRect(
+		segmentIndex
+	).translated(articleTopLeft());
+	if (rect.isEmpty()) {
+		return;
+	}
+	const auto topMargin = _topContentPadding
+		+ st::ivEditorToolbarPadding.top()
+		+ st::ivEditorToolbarButtonSize
+		+ 2 * st::ivEditorPillPadding;
+	const auto current = scroll->scrollTop();
+	const auto height = scroll->height();
+	const auto from = rect.y() - topMargin;
+	const auto till = rect.y() + rect.height() + _bottomContentPadding;
+	auto target = current;
+	if (from < current) {
+		target = from;
+	} else if (till > current + height) {
+		target = std::min(till - height, from);
+	}
+	scroll->scrollToY(target);
+}
+
+void Widget::updateSearchBarGeometry() {
+	if (!_search) {
+		return;
+	}
+	_search->moveBar(searchBarColumn(width()).left, searchBarTop());
+}
+
+Widget::ArticleColumn Widget::searchBarColumn(int outerWidth) const {
+	const auto column = articleColumnForWidth(outerWidth);
+	return (column.width >= _contentMaxWidth)
+		? column
+		: ArticleColumn{ 0, outerWidth };
+}
+
+int Widget::searchBarTop() const {
+	return st::ivEditorToolbarPadding.top()
+		+ st::ivEditorToolbarButtonSize
+		+ 2 * st::ivEditorPillPadding;
+}
+
 void Widget::refreshPreparedContent() {
 	setDocument(_state->prepared());
 	relayoutCurrentContent();
 	update();
+	if (_search) {
+		if (articleRelayoutDeferralActive()) {
+			_searchRefreshDeferred = true;
+		} else {
+			_search->refresh();
+		}
+	}
 }
 
 void Widget::refreshPreparedLeafAtActiveSource() {
@@ -2883,21 +3033,35 @@ void Widget::refreshPreparedLeafAtSource(
 		const Markdown::PreparedEditLeafSource &source) {
 	_article->updatePreparedLeaf(source, _state->prepared());
 	relayoutCurrentContent();
+	if (_search) {
+		if (articleRelayoutDeferralActive()) {
+			_searchRefreshDeferred = true;
+		} else {
+			_search->refresh();
+		}
+	}
 }
 
 void Widget::applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation) {
 	if (!mutation) {
 		return;
 	}
-	auto live = captureHistoryEntry();
-	for (auto &entry : _history) {
-		if (!mutation(entry.snapshot.richPage)) {
-			return;
+	auto savedActiveIndexes = std::vector<std::pair<State::BlockPath, int>>();
+	if (_article) {
+		for (const auto &geo : _article->mediaBlockGeometries()) {
+			if (!geo.grouped) {
+				continue;
+			}
+			if (const auto path = _state->convertBlockPath(geo.block)) {
+				savedActiveIndexes.emplace_back(*path, geo.activeItemIndex);
+			}
 		}
 	}
-	if (!mutation(live.snapshot.richPage)) {
-		return;
+	auto live = captureHistoryEntry();
+	for (auto &entry : _history) {
+		mutation(entry.snapshot.richPage);
 	}
+	mutation(live.snapshot.richPage);
 	const auto wasPreservingExternalFieldRestore
 		= PreservingExternalFieldRestore;
 	PreservingExternalFieldRestore = this;
@@ -2905,6 +3069,9 @@ void Widget::applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation) {
 		PreservingExternalFieldRestore = wasPreservingExternalFieldRestore;
 	});
 	restoreHistoryEntry(live);
+	for (const auto &[path, activeIndex] : savedActiveIndexes) {
+		restoreGroupedActiveIndexForPath(path, activeIndex);
+	}
 	_fieldUndoAvailable = !_field->isHidden()
 		? _field->isUndoAvailable()
 		: false;
@@ -2964,11 +3131,13 @@ void Widget::flushArticleRelayoutDeferral() {
 	const auto relayout = _articleRelayoutDeferred || clearHeightOverride;
 	const auto geometry = _inlineFieldGeometryDeferred;
 	const auto heightOverride = _inlineFieldHeightOverrideDeferred;
+	const auto searchRefresh = _searchRefreshDeferred;
 	_articleEditableHeightOverrideClearDeferred = false;
 	_articleRelayoutDeferred = false;
 	_inlineFieldGeometryDeferred = false;
 	_inlineFieldHeightOverrideDeferred = false;
-	if (!relayout && !geometry && !heightOverride) {
+	_searchRefreshDeferred = false;
+	if (!relayout && !geometry && !heightOverride && !searchRefresh) {
 		return;
 	}
 	if (clearHeightOverride && _article) {
@@ -2983,6 +3152,9 @@ void Widget::flushArticleRelayoutDeferral() {
 	}
 	if (heightOverride) {
 		updateInlineFieldHeightOverride();
+	}
+	if (searchRefresh && _search) {
+		_search->refresh();
 	}
 	syncArticleVisibleTopBottom();
 }
@@ -3202,6 +3374,9 @@ void Widget::requestMedia(
 void Widget::replacePreparedBlock(
 		State::ReplaceTarget target,
 		RichPage::Block block) {
+	const auto savedActiveIndex = (target.itemIndex >= 0)
+		? groupedActiveIndexForPath(target.path)
+		: -1;
 	recordMutationTransaction([&] {
 		auto committed = ApplyResult::Unchanged;
 		if (!_field->isHidden()) {
@@ -3226,6 +3401,7 @@ void Widget::replacePreparedBlock(
 		clearTextSelection();
 		clearStructuralSelection();
 		refreshPreparedContent();
+		restoreGroupedActiveIndexForPath(target.path, savedActiveIndex);
 		const auto ordinal = _state->activeTextOrdinal();
 		if (ordinal >= 0 && ordinal < _state->textNodeCount()) {
 			activateTextOrdinal(ordinal, 0);
@@ -3570,6 +3746,272 @@ void Widget::pasteStructuredClipboardData(const ClipboardData &data) {
 	});
 }
 
+bool Widget::hasFieldTextSpanSelection() const {
+	return !_settingField
+		&& !_field->isHidden()
+		&& (_activeSegmentIndex >= 0)
+		&& (_state->activeFieldMode() != State::FieldMode::Raw)
+		&& _field->textCursor().hasSelection();
+}
+
+bool Widget::hasActiveSelection() const {
+	return hasStructuralSelection()
+		|| !_selection.empty()
+		|| hasFieldTextSpanSelection();
+}
+
+TextWithEntities Widget::textSpanForCurrentSelection() {
+	if (hasStructuralSelection()) {
+		return {};
+	}
+	if (hasFieldTextSpanSelection()) {
+		if (const auto context = activeTextInsertContext()) {
+			return context->selected;
+		}
+		return {};
+	}
+	const auto selection = _selection;
+	const auto sameSegmentSelection = !selection.empty()
+		&& _article
+		&& (selection.from.segment == selection.to.segment)
+		&& _article->segmentIsText(selection.from.segment);
+	const auto ordinal = sameSegmentSelection
+		? editableOrdinalForSegment(selection.from.segment)
+		: -1;
+	if (ordinal < 0) {
+		return {};
+	}
+	const auto selectionFrom = selection.from.offset;
+	const auto selectionTo = selection.to.offset;
+	clearTextSelection();
+	if (!commitAndActivateTextOrdinal(
+			ordinal,
+			selectionFrom,
+			selectionTo)) {
+		return {};
+	}
+	if (const auto context = activeTextInsertContext()) {
+		return context->selected;
+	}
+	return {};
+}
+
+std::shared_ptr<const RichPage> Widget::richPageForCurrentSelection() const {
+	if (hasStructuralSelection()) {
+		const auto kind = _structuralSelection.kind;
+		if (kind == PreparedEditSelectionKind::TableRows
+			|| kind == PreparedEditSelectionKind::TableCells) {
+			return _state->richPageForTableSelection(_structuralSelection);
+		}
+		const auto data = _state->structuredClipboardDataForSelection(
+			_structuralSelection);
+		if (!data) {
+			return nullptr;
+		}
+		auto page = std::make_shared<RichPage>();
+		if (const auto blocks = std::get_if<ClipboardBlockData>(&*data)) {
+			page->blocks = blocks->blocks;
+		} else if (const auto items
+				= std::get_if<ClipboardListItemsData>(&*data)) {
+			auto list = RichPage::Block();
+			list.kind = RichPage::BlockKind::List;
+			list.listKind = items->listKind;
+			list.orderedList = items->orderedList;
+			list.listItems = items->items;
+			page->blocks.push_back(std::move(list));
+		}
+		if (page->blocks.empty()) {
+			return nullptr;
+		}
+		return page;
+	}
+	return nullptr;
+}
+
+void Widget::replaceCurrentSelectionWithRichPage(
+		std::shared_ptr<const RichPage> page) {
+	if (!page || page->blocks.empty()) {
+		return;
+	}
+	if (hasStructuralSelection()) {
+		const auto kind = _structuralSelection.kind;
+		if (kind == PreparedEditSelectionKind::TableRows
+			|| kind == PreparedEditSelectionKind::TableCells) {
+			auto blocks = page->blocks;
+			recordMutationTransaction([&] {
+				auto committed = ApplyResult::Unchanged;
+				if (!_field->isHidden()) {
+					committed = commitInlineField();
+					if (committed == ApplyResult::Failed) {
+						return MutationTransactionResult{
+							.committed = committed,
+							.failed = true,
+						};
+					}
+				}
+				using InPlace = State::TableInPlaceApplyResult;
+				const auto inPlace
+					= _state->replaceTableSelectionCellsInPlace(
+						_structuralSelection,
+						*page);
+				if (inPlace == InPlace::Failed
+					|| inPlace == InPlace::Unchanged) {
+					if (inPlace == InPlace::Failed) {
+						showLastLimitToast();
+					}
+					return MutationTransactionResult{
+						.committed = committed,
+						.changed = (committed == ApplyResult::Changed),
+					};
+				}
+				if (inPlace == InPlace::StructureMismatch
+					&& !_state->insertPreparedBlocksAfterTableSelection(
+						_structuralSelection,
+						std::move(blocks))) {
+					showLastLimitToast();
+					return MutationTransactionResult{
+						.committed = committed,
+						.changed = (committed == ApplyResult::Changed),
+					};
+				}
+				_pendingOrdinal = -1;
+				_pendingCursorOffset = 0;
+				hideInlineField();
+				clearInlineFieldEditSession();
+				clearTextSelection();
+				clearStructuralSelection();
+				refreshPreparedContent();
+				const auto ordinal = _state->activeTextOrdinal();
+				if (ordinal >= 0 && ordinal < _state->textNodeCount()) {
+					activateTextOrdinal(ordinal, 0);
+				}
+				return MutationTransactionResult{
+					.committed = committed,
+					.changed = true,
+				};
+			});
+			return;
+		}
+		if (kind == PreparedEditSelectionKind::ListItems
+			&& page->blocks.size() == 1
+			&& page->blocks.front().kind == RichPage::BlockKind::List) {
+			const auto &list = page->blocks.front();
+			auto data = ClipboardListItemsData();
+			data.listKind = list.listKind;
+			data.orderedList = list.orderedList;
+			data.items = list.listItems;
+			data.taskList = !data.items.empty()
+				&& (data.items.front().taskState
+					!= RichPage::TaskState::None);
+			if (!data.items.empty()) {
+				pasteStructuredClipboardData(ClipboardData(std::move(data)));
+				return;
+			}
+		}
+	}
+	auto data = ClipboardBlockData();
+	data.blocks = page->blocks;
+	pasteStructuredClipboardData(ClipboardData(std::move(data)));
+}
+
+void Widget::replaceCurrentSelectionWithText(TextWithEntities text) {
+	RemoveBlockLevelEntities(&text);
+	if (text.text.isEmpty()) {
+		return;
+	}
+	auto context = activeTextInsertContext();
+	if (!context || context->selected.text.isEmpty()) {
+		return;
+	}
+	recordMutationTransaction([&] {
+		const auto restoreLeaf = _fieldLeaf;
+		const auto restoreStyleKey = _activeFieldStyleKey;
+		const auto restoreMode = _fieldMode;
+		const auto restoreSelection
+			= captureHistoryViewState().leafSelection;
+		_pendingOrdinal = -1;
+		_pendingCursorOffset = 0;
+		hideInlineField();
+		clearInlineFieldEditSession(true);
+		auto restore = true;
+		const auto restoreInlineField = gsl::finally([&] {
+			if (!restore) {
+				return;
+			}
+			if (restoreLeaf && restoreStyleKey) {
+				if (auto revived = reviveRetainedLeafField(
+						_historyIndex,
+						*restoreLeaf,
+						restoreMode,
+						*restoreStyleKey)) {
+					_field = std::move(revived);
+					_activeFieldStyleKey = restoreStyleKey;
+					_fieldMode = restoreMode;
+					_fieldLeaf = *restoreLeaf;
+					refreshInlineFieldPlaceholder();
+					_fieldUndoAvailable = _field->isUndoAvailable();
+					_fieldRedoAvailable = _field->isRedoAvailable();
+					clearFieldUndoRedoNoopState();
+				}
+			}
+			if (!_fieldLeaf && restoreSelection) {
+				const auto ordinal = _state->textOrdinalForLeafPath(
+					restoreSelection->leaf);
+				if (ordinal >= 0) {
+					activateTextOrdinal(
+						ordinal,
+						restoreSelection->anchorOffset,
+						restoreSelection->cursorOffset);
+					return;
+				}
+			}
+			_field->show();
+			syncInlineFieldGeometry();
+			updateInlineFieldHeightOverride();
+			syncArticleVisibleTopBottom();
+			revealActiveInlineField();
+			_field->raise();
+			_field->setFocusFast();
+			notifyToolbarStateChanged();
+		});
+		const auto applied = _state->replaceActiveTextSelectionWithText(
+			std::move(text),
+			*context);
+		if (applied.result != ApplyResult::Changed) {
+			showLastLimitToast();
+			return MutationTransactionResult{
+				.committed = ApplyResult::Unchanged,
+			};
+		}
+		restore = false;
+		refreshPreparedContent();
+		auto restored = false;
+		if (applied.destinationLeaf) {
+			const auto ordinal = _state->textOrdinalForLeafPath(
+				*applied.destinationLeaf);
+			if (ordinal >= 0) {
+				activateTextOrdinal(
+					ordinal,
+					applied.selectionFrom,
+					applied.selectionTo);
+				restored = true;
+			}
+		}
+		if (!restored) {
+			const auto ordinal = _state->activeTextOrdinal();
+			if (ordinal >= 0 && ordinal < _state->textNodeCount()) {
+				activateTextOrdinal(ordinal, 0);
+			} else {
+				activateInitialNode();
+			}
+		}
+		return MutationTransactionResult{
+			.committed = ApplyResult::Unchanged,
+			.changed = true,
+		};
+	});
+}
+
 bool Widget::handleClipboardKey(QKeyEvent *e) {
 	if (e == QKeySequence::Copy) {
 		if (_selection.empty() && !hasStructuralSelection()) {
@@ -3616,9 +4058,47 @@ bool Widget::handleClipboardKey(QKeyEvent *e) {
 	return false;
 }
 
+bool Widget::handleHardcodedBlockShortcut(QKeyEvent *e) {
+	const auto type = e->type();
+	if (type != QEvent::ShortcutOverride && type != QEvent::KeyPress) {
+		return false;
+	}
+	const auto perform = (type == QEvent::KeyPress);
+	if (MatchesKeySequence(e, kEditorHeading1Sequence)) {
+		if (perform) {
+			insertBlock({
+				.type = State::InsertBlockType::Heading,
+				.headingLevel = 1,
+			});
+		}
+	} else if (MatchesKeySequence(e, kEditorHeading2Sequence)) {
+		if (perform) {
+			insertBlock({
+				.type = State::InsertBlockType::Heading,
+				.headingLevel = 2,
+			});
+		}
+	} else if (MatchesKeySequence(e, kEditorTableSequence)) {
+		if (perform) {
+			insertBlock({ .type = State::InsertBlockType::Table });
+		}
+	} else if (MatchesKeySequence(e, kEditorBodyTextSequence)) {
+		if (perform) {
+			applyToolbarFormatAction(ToolbarFormatAction::PlainText);
+		}
+	} else {
+		return false;
+	}
+	e->accept();
+	return true;
+}
+
 bool Widget::handleFieldBlockInsertShortcut(QKeyEvent *e) {
 	if (_fieldMode != State::FieldMode::Rich || _field->isHidden()) {
 		return false;
+	}
+	if (handleHardcodedBlockShortcut(e)) {
+		return true;
 	}
 	const auto type = e->type();
 	if (type != QEvent::ShortcutOverride && type != QEvent::KeyPress) {
@@ -3646,6 +4126,9 @@ bool Widget::handleFieldBlockInsertShortcut(QKeyEvent *e) {
 bool Widget::handleStructuralBlockInsertShortcut(QKeyEvent *e) {
 	if (!hasStructuralSelection()) {
 		return false;
+	}
+	if (handleHardcodedBlockShortcut(e)) {
+		return true;
 	}
 	const auto type = e->type();
 	if (type != QEvent::ShortcutOverride && type != QEvent::KeyPress) {
@@ -3841,6 +4324,35 @@ bool Widget::handleUndoRedoShortcut(QKeyEvent *e) {
 	return true;
 }
 
+bool Widget::handleUndoRedoShortcutOverride(QKeyEvent *e) {
+	auto redo = std::optional<bool>();
+	if (e == QKeySequence::Undo) {
+		redo = false;
+	} else if (e == QKeySequence::Redo) {
+		redo = true;
+	}
+	if (!redo || searchBlockedByLayer()) {
+		return false;
+	}
+	const auto focused = QApplication::focusWidget();
+	if (qobject_cast<QTextEdit*>(focused)
+		|| qobject_cast<QLineEdit*>(focused)) {
+		return false;
+	} else if (hasFocus()) {
+		e->accept();
+		return false;
+	}
+	const auto redoValue = *redo;
+	if (!canPerformUndoRedo(redoValue)) {
+		return false;
+	}
+	e->accept();
+	crl::on_main(this, [=] {
+		performToolbarUndoRedo(redoValue);
+	});
+	return true;
+}
+
 bool Widget::handleSelectAllShortcut(QKeyEvent *e) {
 	if (e != QKeySequence::SelectAll) {
 		return false;
@@ -3851,6 +4363,12 @@ bool Widget::handleSelectAllShortcut(QKeyEvent *e) {
 			_field->isHidden())) {
 		return false;
 	}
+	selectWholeDocument();
+	e->accept();
+	return true;
+}
+
+void Widget::selectWholeDocument() {
 	if (!_field->isHidden()) {
 		const auto committed = recordMutationTransaction([&] {
 			const auto committed = commitInlineField();
@@ -3863,8 +4381,7 @@ bool Widget::handleSelectAllShortcut(QKeyEvent *e) {
 			return committed;
 		});
 		if (committed == ApplyResult::Failed) {
-			e->accept();
-			return true;
+			return;
 		}
 		refreshAfterInlineFieldCommit(committed);
 	}
@@ -3880,8 +4397,6 @@ bool Widget::handleSelectAllShortcut(QKeyEvent *e) {
 		: PreparedEditSelection());
 	setFocus();
 	update();
-	e->accept();
-	return true;
 }
 
 bool Widget::performFieldUndoRedo(bool redo) {
@@ -4396,6 +4911,8 @@ void Widget::editMathFromToolbar() {
 	}
 	if (const auto request = activeMathEditRequest()) {
 		showMathEditBox(*request);
+	} else {
+		showMathEditBox(newDisplayMathRequest());
 	}
 }
 
@@ -4408,6 +4925,7 @@ void Widget::setTopContentPadding(int value) {
 		return;
 	}
 	_topContentPadding = value;
+	updateSearchBarGeometry();
 	resizeToWidth(width());
 	update();
 }
@@ -4427,6 +4945,10 @@ void Widget::setContentMaxWidth(int value) {
 	}
 	_contentMaxWidth = value;
 	update();
+}
+
+rpl::producer<int> Widget::searchSlideHeightValue() const {
+	return _searchSlideHeight.value();
 }
 
 int Widget::resizeGetHeight(int newWidth) {
@@ -4565,7 +5087,11 @@ void Widget::contextMenuEvent(QContextMenuEvent *e) {
 		articlePoint,
 		Ui::Text::StateRequest::Flag::LookupSymbol);
 	const auto editHit = _article->editHitTest(articlePoint);
-	if (showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+	if (showMediaMenuFromHit(
+			editHit,
+			hit,
+			e->globalPos(),
+			MediaClickKind::ContextMenu)) {
 		e->accept();
 		return;
 	}
@@ -4611,7 +5137,10 @@ bool Widget::focusNextPrevChild(bool next) {
 }
 
 void Widget::keyPressEvent(QKeyEvent *e) {
-	if (handleUndoRedoShortcut(e)) {
+	if (e->key() == Qt::Key_Escape && closeSearch()) {
+		e->accept();
+		return;
+	} else if (handleUndoRedoShortcut(e)) {
 		return;
 	} else if (handleSelectAllShortcut(e)) {
 		return;
@@ -4773,6 +5302,32 @@ void Widget::addFieldBlockFormatActions(not_null<QMenu*> menu) {
 void Widget::handleFieldContextMenuRequest(
 		Ui::InputField::ContextMenuRequest request) {
 	addFieldBlockFormatActions(request.menu);
+	if (!SingleRootPlainTextFieldSelectAllPassthrough(
+			_state->richPage(),
+			_state->activeLeafPath(),
+			_field->isHidden())) {
+		const auto selectAllShortcut = QKeySequence(
+			QKeySequence::SelectAll).toString(QKeySequence::NativeText);
+		const auto shortcutText = [](const QString &text) {
+			const auto tab = text.indexOf(QChar('\t'));
+			return (tab >= 0) ? text.mid(tab + 1) : QString();
+		};
+		for (const auto action : request.menu->actions()) {
+			if (!action->isSeparator()
+				&& !selectAllShortcut.isEmpty()
+				&& shortcutText(action->text()) == selectAllShortcut) {
+				QObject::disconnect(
+					action,
+					&QAction::triggered,
+					nullptr,
+					nullptr);
+				connect(action, &QAction::triggered, this, [this] {
+					selectWholeDocument();
+				});
+				break;
+			}
+		}
+	}
 	const auto activeLeaf = _state->activePreparedLeafSource();
 	const auto listSource = activeLeaf
 		? ListItemSourceFromLeaf(*activeLeaf)
@@ -5461,7 +6016,7 @@ void Widget::fillTableChangeMenu(
 				return _state->setTableStriped(range, !info.striped);
 			});
 		},
-		nullptr,
+		&st::ivEditorTableStripedIcon,
 		info.striped);
 }
 
@@ -5773,7 +6328,8 @@ void Widget::showStructuralPhotoVideoMenu(QPoint globalPos) {
 bool Widget::showMediaMenuFromHit(
 		const PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
-		QPoint globalPos) {
+		QPoint globalPos,
+		MediaClickKind clickKind) {
 	if (clickHitsStructuralPhotoVideoSelection(hit)) {
 		showStructuralPhotoVideoMenu(globalPos);
 		return true;
@@ -5789,10 +6345,20 @@ bool Widget::showMediaMenuFromHit(
 			== Markdown::MediaActivationKind::None) {
 			return false;
 		}
-		showGroupedMediaMenu(
-			*path,
-			articleHit.mediaActivation.itemIndex,
-			globalPos);
+		const auto itemIndex = articleHit.mediaActivation.itemIndex;
+		if (clickKind == MediaClickKind::Left) {
+			const auto block = BlockFromPath(_state->richPage(), *path);
+			const auto photoItem = block
+				&& (itemIndex >= 0)
+				&& (itemIndex < int(block->mediaItems.size()))
+				&& (block->mediaItems[itemIndex].kind
+					== RichPage::BlockKind::Photo);
+			if (photoItem) {
+				editGroupedItemPhoto(*path, itemIndex);
+				return true;
+			}
+		}
+		showGroupedMediaMenu(*path, itemIndex, globalPos);
 		return true;
 	}
 	return false;
@@ -5904,18 +6470,35 @@ void Widget::editPhotoBlock(State::BlockPath path) {
 	if (!target) {
 		return;
 	}
+	openPhotoEditor(block->photoId, block->spoiler, std::move(*target));
+}
+
+void Widget::openPhotoEditor(
+		uint64 photoId,
+		bool spoiler,
+		State::ReplaceTarget target) {
 	if (!_requestPhotoEditSource) {
 		return;
 	}
-	auto source = _requestPhotoEditSource(block->photoId);
-	if (source.isNull()) {
-		return;
-	}
-	const auto spoiler = block->spoiler;
+	const auto weak = base::make_weak(this);
+	_requestPhotoEditSource(photoId, [=, target = std::move(target)](
+			QImage source) {
+		const auto strong = weak.get();
+		if (!strong || source.isNull()) {
+			return;
+		}
+		strong->showPhotoEditor(std::move(source), spoiler, target);
+	});
+}
+
+void Widget::showPhotoEditor(
+		QImage source,
+		bool spoiler,
+		State::ReplaceTarget target) {
 	const auto previewWidth = st::sendMediaPreviewSize;
 	const auto sourceShared = std::make_shared<QImage>(std::move(source));
 	const auto replaceTarget = std::make_shared<State::ReplaceTarget>(
-		std::move(*target));
+		std::move(target));
 	auto fileImage = std::make_shared<Image>(QImage(*sourceShared));
 	auto editor = base::make_unique_q<::Editor::PhotoEditor>(
 		_outer,
@@ -5956,6 +6539,26 @@ void Widget::editPhotoBlock(State::BlockPath path) {
 			*replaceTarget);
 	});
 	_show->showLayer(std::move(layer), Ui::LayerOption::KeepOther);
+}
+
+void Widget::editGroupedItemPhoto(State::BlockPath path, int itemIndex) {
+	const auto block = BlockFromPath(_state->richPage(), path);
+	if (!block
+		|| block->kind != RichPage::BlockKind::GroupedMedia
+		|| itemIndex < 0
+		|| itemIndex >= int(block->mediaItems.size())) {
+		return;
+	}
+	const auto &item = block->mediaItems[itemIndex];
+	if (item.kind != RichPage::BlockKind::Photo
+		|| mediaUploadStateForGroupedItem(path, itemIndex).uploading) {
+		return;
+	}
+	auto target = _state->replaceTargetForGroupedItem(path, itemIndex);
+	if (!target) {
+		return;
+	}
+	openPhotoEditor(item.photoId, item.spoiler, std::move(*target));
 }
 
 MediaUploadState Widget::mediaUploadStateForBlock(
@@ -6000,7 +6603,6 @@ Widget::MediaControlLayout Widget::mediaControlLayout(
 }
 
 void Widget::paintMediaControls(Painter &p, QPoint topLeft) {
-	auto activeRadials = std::vector<uint64>();
 	for (const auto &geo : _article->mediaBlockGeometries()) {
 		if (geo.visibleMediaRect.isEmpty()) {
 			continue;
@@ -6013,35 +6615,6 @@ void Widget::paintMediaControls(Painter &p, QPoint topLeft) {
 		if (!block) {
 			continue;
 		}
-		const auto paintRadial = [&](
-				uint64 mediaId,
-				QRect radialRect,
-				float64 progress) {
-			activeRadials.push_back(mediaId);
-			auto i = _mediaUploadRadials.find(mediaId);
-			if (i == _mediaUploadRadials.end()) {
-				i = _mediaUploadRadials.emplace(
-					mediaId,
-					std::make_unique<Ui::RadialAnimation>(
-						[=] { update(); })).first;
-			}
-			const auto radialPtr = i->second.get();
-			if (!radialPtr->animating()) {
-				radialPtr->start(progress);
-			} else {
-				radialPtr->update(progress, false, crl::now());
-			}
-			const auto radial = radialRect.translated(topLeft);
-			auto hq = PainterHighQualityEnabler(p);
-			p.setPen(Qt::NoPen);
-			p.setBrush(st::roundedBg);
-			p.drawEllipse(radial);
-			radialPtr->draw(
-				p,
-				QRectF(radial),
-				st::ivEditorMediaUploadRadialWidth,
-				st::roundedFg);
-		};
 		const auto paintCircleIcon = [&](QRect circle, const style::icon &icon) {
 			const auto target = circle.translated(topLeft);
 			auto hq = PainterHighQualityEnabler(p);
@@ -6061,15 +6634,7 @@ void Widget::paintMediaControls(Painter &p, QPoint topLeft) {
 				}
 				const auto itemIndex = (active >= 0) ? active : i;
 				const auto layout = mediaControlLayout(itemRect);
-				const auto uploadState = mediaUploadStateForGroupedItem(
-					*path,
-					itemIndex);
-				if (uploadState.uploading) {
-					paintRadial(
-						MediaIdForGroupedItem(block->mediaItems[itemIndex]),
-						layout.radial,
-						uploadState.progress);
-				} else {
+				if (!mediaUploadStateForGroupedItem(*path, itemIndex).uploading) {
 					paintCircleIcon(
 						layout.threeDots,
 						st::sendBoxAlbumButtonMediaMore);
@@ -6088,31 +6653,9 @@ void Widget::paintMediaControls(Painter &p, QPoint topLeft) {
 			continue;
 		}
 		const auto layout = mediaControlLayout(geo.visibleMediaRect);
-		const auto uploadState = mediaUploadStateForBlock(*path);
-		if (uploadState.uploading) {
-			paintRadial(
-				MediaIdForBlock(*block),
-				layout.radial,
-				uploadState.progress);
-		} else {
+		if (!mediaUploadStateForBlock(*path).uploading) {
 			paintCircleIcon(layout.threeDots, st::sendBoxAlbumButtonMediaMore);
 			paintCircleIcon(layout.plus, st::ivEditorMediaAddIcon);
-		}
-	}
-	for (auto i = _mediaUploadRadials.begin()
-		; i != _mediaUploadRadials.end()
-		;) {
-		auto active = false;
-		for (const auto id : activeRadials) {
-			if (id == i->first) {
-				active = true;
-				break;
-			}
-		}
-		if (active) {
-			++i;
-		} else {
-			i = _mediaUploadRadials.erase(i);
 		}
 	}
 }
@@ -6845,7 +7388,11 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 				e->accept();
 				return;
 			}
-			if (showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+			if (showMediaMenuFromHit(
+					editHit,
+					hit,
+					e->globalPos(),
+					MediaClickKind::Left)) {
 				e->accept();
 				return;
 			}
@@ -6971,7 +7518,11 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 	} else if (activateGroupedMediaLinkFromHit(editHit, hit, e->button())) {
 		e->accept();
 		return;
-	} else if (!showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+	} else if (!showMediaMenuFromHit(
+			editHit,
+			hit,
+			e->globalPos(),
+			MediaClickKind::Left)) {
 		focusOrActivateInitial();
 	}
 	e->accept();
@@ -7254,13 +7805,26 @@ void Widget::setupInlineField() {
 			},
 		});
 		if (_show) {
+			const auto weak = QPointer<Widget>(this);
 			_field->setEditLinkCallback(DefaultEditLinkCallback(
 				_show,
 				_field.get(),
 				nullptr,
-				ValidateInstantViewEditorLink));
+				ValidateInstantViewEditorLink,
+				[=](bool active) {
+					if (weak) {
+						weak->setInlineFieldExternalInteractionActive(active);
+						weak->notifyToolbarStateChanged();
+					}
+				},
+				[=] {
+					if (weak && !weak->_field->isHidden()) {
+						weak->_field->setFocusFast();
+						weak->notifyToolbarStateChanged();
+					}
+				}));
 		}
-		Ui::Emoji::SuggestionsController::Init(
+		_fieldSuggestions = Ui::Emoji::SuggestionsController::Init(
 			_outer,
 			_field.get(),
 			_session,
@@ -7281,6 +7845,7 @@ void Widget::setupInlineField() {
 					: false);
 		});
 	} else {
+		_fieldSuggestions = nullptr;
 		_field->setInstantViewEditorTagsEnabled(false);
 		_field->setInstantReplacesEnabled(
 			rpl::single(false),
@@ -7963,6 +8528,13 @@ Widget::visibleFullHeadingFieldTextSpan() const {
 	}
 	const auto full = ConvertEditorTagsToRichText(
 		_field->getTextWithAppliedMarkdown());
+	if (full.text.isEmpty()) {
+		return TextNodeSpan{
+			.leaf = *leaf,
+			.from = 0,
+			.till = 0,
+		};
+	}
 	const auto cursor = _field->textCursor();
 	if (!cursor.hasSelection()) {
 		return std::nullopt;
@@ -8030,6 +8602,14 @@ std::optional<Widget::MathEditRequest> Widget::activeMathEditRequest() const {
 		request.editingExisting = true;
 	}
 	return request;
+}
+
+Widget::MathEditRequest Widget::newDisplayMathRequest() const {
+	return MathEditRequest{
+		.allowSeparateLine = true,
+		.separateLine = true,
+		.insertNewDisplayBlock = true,
+	};
 }
 
 bool Widget::handleIvClipboardMime(
@@ -8100,6 +8680,13 @@ ApplyResult Widget::applyMathEditResult(
 	}
 	if (_settingField) {
 		return ApplyResult::Unchanged;
+	}
+	if (request.insertNewDisplayBlock) {
+		auto block = RichPage::Block();
+		block.kind = RichPage::BlockKind::Math;
+		block.formula = source;
+		insertPreparedBlock(std::move(block));
+		return ApplyResult::Changed;
 	}
 	if (request.displayMathOrdinal >= 0) {
 		if (!_state->setActiveTextByOrdinal(request.displayMathOrdinal)) {
@@ -8893,6 +9480,13 @@ bool Widget::handleFieldKey(QKeyEvent *e) {
 						}
 					}
 				}
+				if (!handled && down) {
+					if (const auto ordinal
+						= _state->firstTableCellOrdinalFromActiveTitle()) {
+						refreshPreparedContentAndActivate(*ordinal, 0);
+						handled = true;
+					}
+				}
 				if (!handled) {
 					handled = down
 						? moveVerticalDownBoundary()
@@ -8937,6 +9531,9 @@ bool Widget::handleFieldKey(QKeyEvent *e) {
 		&& key == Qt::Key_Right) {
 		handled = moveBoundary(true, true);
 	} else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+		if (_fieldSuggestions && _fieldSuggestions->shown()) {
+			return false;
+		}
 		recordMutationTransaction([&] {
 			const auto committed = commitInlineField();
 			// At the very start of the very first text node of a block that
@@ -9051,9 +9648,7 @@ bool Widget::moveBoundary(bool forward, bool allowTrailing) {
 			};
 		}
 		if (target) {
-			if (committed == ApplyResult::Changed) {
-				refreshAfterInlineFieldCommit(committed);
-			}
+			refreshPreparedContent();
 			if (forward) {
 				activateTextOrdinal(*target, 0);
 			} else {
@@ -9140,9 +9735,7 @@ bool Widget::moveBoundaryAfterCommit(
 		? _state->nextEditableOrdinal()
 		: _state->previousEditableOrdinal();
 	if (target) {
-		if (committed == ApplyResult::Changed) {
-			refreshAfterInlineFieldCommit(committed);
-		}
+		refreshPreparedContent();
 		if (forward) {
 			activateTextOrdinal(*target, 0);
 		} else {
@@ -9767,6 +10360,7 @@ void Widget::retainActiveLeafField(
 		.styleKey = _activeFieldStyleKey,
 	};
 	retained.field = std::move(_field);
+	retained.suggestions = _fieldSuggestions;
 	_field = std::move(replacement);
 	_activeFieldStyleKey = std::nullopt;
 	_fieldMode = State::FieldMode::Rich;
@@ -9799,6 +10393,7 @@ base::unique_qptr<Ui::InputField> Widget::reviveRetainedLeafField(
 			&& _retainedLeafFields[i].styleKey
 			&& (*_retainedLeafFields[i].styleKey == styleKey)) {
 			auto result = std::move(_retainedLeafFields[i].field);
+			_fieldSuggestions = _retainedLeafFields[i].suggestions;
 			_retainedLeafFields.erase(_retainedLeafFields.begin() + i);
 			return result;
 		}
@@ -10661,6 +11256,11 @@ Ui::ElasticScroll *Widget::selectionScrollArea() const {
 	return nullptr;
 }
 
+bool Widget::searchBlockedByLayer() const {
+	const auto editorWindow = dynamic_cast<Window*>(window());
+	return editorWindow && editorWindow->isLayerShown();
+}
+
 bool Widget::articleSelectionAutoScrollActive() const {
 	return _articleSelectionDrag.active
 		&& _articleSelectionDrag.dragStarted
@@ -11417,7 +12017,7 @@ style::margins Widget::effectiveBodyPadding() const {
 	const auto base = EditorBodyPadding();
 	return style::margins(
 		base.left(),
-		base.top() + _topContentPadding,
+		base.top() + _topContentPadding + _searchSlideHeight.current(),
 		base.right(),
 		base.bottom() + _bottomContentPadding);
 }

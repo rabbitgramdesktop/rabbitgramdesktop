@@ -285,7 +285,11 @@ struct RichPageLinkUrl {
 	not_null<Main::Session*> session,
 	const MTPDwebPage &webpage);
 [[nodiscard]] std::optional<TextWithEntities> SerializeAsSimple(
-	const RichPage &page);
+	const RichPage &page,
+	not_null<Main::Session*> session);
+[[nodiscard]] bool CanSerializeAsSimple(
+	const RichPage &page,
+	not_null<Main::Session*> session);
 [[nodiscard]] bool RichPageUsesPremiumFormatting(const RichPage &page);
 [[nodiscard]] bool RichPageIsFlattenSafe(const RichPage &page);
 [[nodiscard]] RichPage SplitTextIntoRichPage(TextWithEntities text);

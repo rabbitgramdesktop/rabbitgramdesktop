@@ -23,6 +23,7 @@ ivMenuToggle: IconButton(defaultIconButton) {
 	ripple: defaultRippleAnimationBgOver;
 }
 ivMenuPosition: point(-2px, 40px);
+ivZoomDropdownPosition: point(-2px, 0px);
 ivBackIcon: icon {{ "box_button_back", menuIconColor }};
 ivBack: IconButton(ivMenuToggle) {
 	width: 60px;
@@ -73,6 +74,11 @@ ivSubtitleHeight: 48px;
 ivSubtitleTop: 12px;
 ivSubtitleLeft: 22px;
 ivSubtitleSkip: 0px;
+ivSearchBarHeight: ivSubtitleHeight;
+ivSearchBarCounterSkip: 10px;
+ivSearchCounterLabel: FlatLabel(defaultSettingsRightLabel) {
+	textFg: windowFg;
+}
 ivWrongLayoutBarHeight: 32px;
 ivWrongLayoutLink: LinkButton(defaultLinkButton) {
 	color: windowSubTextFg;
@@ -92,16 +98,18 @@ ivEditorBottomControlsPadding: margins(9px, 10px, 9px, 10px);
 ivEditorPillPadding: 2px;
 ivEditorPillButtonSkip: 6px;
 ivEditorBottomCircleSize: 40px;
-ivEditorSendLockBadgePosition: point(0px, 0px);
+ivEditorSendLockBadgeShift: point(-5px, -5px);
 ivComposeSendLockBadgePosition: point(1px, 2px);
 ivEditorSendLockBadgePadding: 3px;
+ivEditorSendLockBadgeStroke: 2px;
 ivEditorPremiumChoiceAboutSkip: 10px;
 ivEditorPremiumChoiceBox: Box(defaultBox) {
 	buttonHeight: 0px;
 }
 ivEditorSendLockIcon: icon{{ "chat/mini_lock", windowFgActive }};
 ivEditorToolbarPremiumStarSize: 11px;
-ivEditorToolbarPremiumStarSkip: point(5px, 5px);
+ivEditorToolbarPremiumStarSkip: point(5px, 7px);
+ivEditorToolbarPremiumStarOutline: 2px;
 ivEditorStyleMenuPremiumStarSize: 16px;
 ivEditorPillShadow: BoxShadow {
 	blurRadius: 3px;
@@ -140,6 +148,21 @@ ivEditorToolbarButton: IconButton(defaultIconButton) {
 	rippleAreaSize: ivEditorToolbarButtonSize;
 	ripple: defaultRippleAnimationBgOver;
 }
+ivEditorSearchMultiSelect: MultiSelect(searchInChatMultiSelect) {
+	bg: transparent;
+	padding: margins(8px, 4px, 8px, 4px);
+}
+ivEditorSearchPrevious: IconButton(ivEditorToolbarButton) {
+	icon: icon {{ "calendar_down-flip_vertical", boxTitleFg }};
+}
+ivEditorSearchNext: IconButton(ivEditorSearchPrevious) {
+	icon: icon {{ "calendar_down", boxTitleFg }};
+}
+ivEditorSearchCancel: CrossButton(defaultMultiSelectSearchCancel) {
+	width: ivEditorToolbarButtonSize;
+	height: ivEditorToolbarButtonSize;
+	crossPosition: point(0px, 0px);
+}
 ivEditorBottomDiscardButton: IconButton(ivEditorToolbarButton) {
 	icon: ivEditorBottomDiscardIcon;
 	iconOver: ivEditorBottomDiscardIcon;
@@ -148,6 +171,9 @@ ivEditorBottomCancelButton: IconButton(ivEditorToolbarButton) {
 	icon: ivEditorBottomCancelIcon;
 	iconOver: ivEditorBottomCancelIcon;
 }
+ivEditorBottomAiIcon: icon {{ "chat/ai_letters-24x24", menuIconColor }};
+ivEditorBottomAiStar1: icon {{ "chat/ai_star1-24x24", menuIconColor }};
+ivEditorBottomAiStar2: icon {{ "chat/ai_star2-24x24", menuIconColor }};
 ivEditorBottomSend: SendButton(historySend) {
 	sendIconPosition: point(8px, 8px);
 	sendIconFillPadding: 8px;
@@ -158,6 +184,12 @@ ivEditorBottomSend: SendButton(historySend) {
 		iconOver: icon {{ "menu/rich/send-24x24", windowFgActive }};
 		rippleAreaSize: ivEditorBottomCircleSize;
 		rippleAreaPosition: point(0px, 0px);
+	}
+	stars: RoundButton(defaultActiveButton) {
+		height: ivEditorBottomCircleSize;
+		padding: margins(6px, 0px, 10px, 0px);
+		textTop: 11px;
+		width: -8px;
 	}
 	sendIconFg: windowFgActive;
 }
@@ -213,11 +245,11 @@ ivEditorToolbarAttachIcon: icon {{ "menu/rich/attach-24x24", menuIconColor }};
 ivEditorToolbarDetailsIcon: icon {{ "menu/rich/details-24x24", menuIconColor }};
 ivEditorToolbarTableIcon: icon {{ "menu/rich/table-24x24", menuIconColor }};
 ivEditorToolbarLocationIcon: icon {{ "menu/rich/location-24x24", menuIconColor }};
+ivEditorToolbarAudioIcon: icon {{ "menu/rich/audio-24x24", menuIconColor }};
 ivEditorMediaCornerSize: 27px;
 ivEditorMediaCornerSkip: 6px;
 ivEditorMediaAddIcon: icon {{ "menu/rich/media_add-20x20", windowFgActive }};
 ivEditorMediaUploadRadialSize: 44px;
-ivEditorMediaUploadRadialWidth: 4px;
 ivEditorMediaToCollageIcon: icon {{ "menu/rich/to_collage-20x20", windowFgActive }};
 ivEditorMediaToSlideshowIcon: icon {{ "menu/rich/to_slideshow-20x20", windowFgActive }};
 ivEditorTableAddRowAboveIcon: icon {{ "menu/rich/table_add_row_above-24x24", menuIconColor }};
@@ -227,6 +259,7 @@ ivEditorTableAddColumnRightIcon: icon {{ "menu/rich/table_add_column_right-24x24
 ivEditorTableHeaderIcon: icon {{ "menu/rich/table_highlight-24x24", menuIconColor }};
 ivEditorTableHeaderOffIcon: icon {{ "menu/rich/table_highlight_off-24x24", menuIconColor }};
 ivEditorTableBorderlessIcon: icon {{ "menu/rich/table_borderless-24x24", menuIconColor }};
+ivEditorTableStripedIcon: icon {{ "menu/rich/table_striped-24x24", menuIconColor }};
 ivEditorTableAlignLeftIcon: icon {{ "menu/rich/align_left-24x24", menuIconColor }};
 ivEditorTableAlignCenterIcon: icon {{ "menu/rich/align_center-24x24", menuIconColor }};
 ivEditorTableAlignRightIcon: icon {{ "menu/rich/align_right-24x24", menuIconColor }};
@@ -465,6 +498,10 @@ MarkdownGroupedMedia {
 	navPreviousIconOver: icon;
 	navNextIcon: icon;
 	navNextIconOver: icon;
+	dotSize: pixels;
+	dotSkip: pixels;
+	dotsBottomSkip: pixels;
+	dotsBgOpacity: double;
 }
 MarkdownFailure {
 	label: FlatLabel;
@@ -802,6 +839,10 @@ defaultMarkdownGroupedMedia: MarkdownGroupedMedia {
 	navPreviousIconOver: ivBackIcon;
 	navNextIcon: ivForwardIcon;
 	navNextIconOver: ivForwardIcon;
+	dotSize: 6px;
+	dotSkip: 14px;
+	dotsBottomSkip: 12px;
+	dotsBgOpacity: 0.34;
 }
 defaultMarkdownFailureLabel: FlatLabel(defaultFlatLabel) {
 	minWidth: 280px;
@@ -1099,6 +1140,7 @@ messageMarkdownGroupedMedia: MarkdownGroupedMedia(defaultMarkdownGroupedMedia) {
 	navPreviousIconOver: messageMarkdownNavPreviousIconSelected;
 	navNextIcon: messageMarkdownNavNextIcon;
 	navNextIconOver: messageMarkdownNavNextIconSelected;
+	dotsBottomSkip: 8px;
 }
 messageMarkdownFailureLabel: FlatLabel(defaultMarkdownFailureLabel) {
 	textFg: msgInDateFg;
@@ -1343,4 +1385,11 @@ messageMarkdownOutSelected: Markdown(messageMarkdown) {
 	failure: MarkdownFailure(messageMarkdownFailure) {
 		label: messageMarkdownFailureLabelOutSelected;
 	}
+}
+aiComposeCardMarkdown: Markdown(messageMarkdown) {
+	textPadding: margins(12px, 8px, 12px, 8px);
+}
+translateBoxMarkdown: Markdown(messageMarkdown) {
+	textPadding: boxRowPadding;
+	rule: defaultMarkdownRule;
 }

@@ -809,6 +809,7 @@ struct MarkdownArticleContent {
 	std::vector<PreparedFootnote> footnotes;
 	std::vector<PreparedFormulaSlot> formulas;
 	std::shared_ptr<MediaRuntime> mediaRuntime;
+	std::shared_ptr<const Iv::RichPage> richPage;
 	bool editMode = false;
 	PrepareFailureStatus failure;
 	PrepareDebugStats debug;
@@ -854,6 +855,7 @@ struct NativeInstantViewPrepareResult {
 [[nodiscard]] MarkdownPrepareDimensions CaptureMarkdownPrepareDimensions();
 [[nodiscard]] MarkdownPrepareDimensions CaptureMarkdownPrepareDimensions(
 	const style::Markdown &st);
+[[nodiscard]] QString HeadingLevelLabel(int level);
 [[nodiscard]] QString SerializeInlineTextObjectEntity(
 	const InlineTextObjectEntity &object);
 [[nodiscard]] QString InlineFormulaCopySource(const QString &source);

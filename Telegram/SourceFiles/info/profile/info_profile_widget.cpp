@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history.h"
 #include "info/profile/info_profile_inner_widget.h"
 #include "info/profile/info_profile_members.h"
+#include "info/profile/tabs/info_profile_tabs_host.h"
 #include "info/settings/info_settings_widget.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/ui_utility.h"
@@ -107,6 +108,7 @@ Widget::Widget(
 	controller->setSearchEnabledByContent(false);
 
 	const auto classic = UseClassicProfileScroll();
+	const auto tabs = (_inner->tabsHost() != nullptr);
 	const auto flexible = _pinnedToTop
 		&& _pinnedToTop->minimumHeight()
 		&& _inner->hasFlexibleTopBar();
@@ -115,12 +117,19 @@ Widget::Widget(
 	}
 
 	_inner->scrollToRequests(
-	) | rpl::on_next([this](Ui::ScrollToRequest request) {
+	) | rpl::on_next([this, tabs](Ui::ScrollToRequest request) {
 		if (request.ymin < 0) {
 			scrollTopRestore(
 				qMin(scrollTopSave(), request.ymax));
-		} else {
+		} else if (!tabs) {
 			scrollTo(request);
+		} else {
+			// Inner coordinates miss the flexible cover top padding.
+			const auto reserve = innerTopReserve();
+			scrollTo({
+				request.ymin + reserve,
+				(request.ymax < 0) ? -1 : (request.ymax + reserve),
+			});
 		}
 	}, lifetime());
 
@@ -128,8 +137,12 @@ Widget::Widget(
 		checkBeforeClose([=] { controller->showBackFromStack(); });
 	}, _inner->lifetime());
 
+	setSwipeInterceptor([this](Ui::Controls::SwipeHandlerInitData data) {
+		return swipeTabsFinishData(data);
+	});
+
 	if (!classic && flexible) {
-		setupFlexibleRegularScroll(_inner, _pinnedToTop.get());
+		setupFlexibleRegularScroll(_inner, _pinnedToTop.get(), tabs);
 	} else if (_pinnedToTop) {
 		_inner->widthValue(
 		) | rpl::on_next([=](int w) {
@@ -154,7 +167,8 @@ Widget::Widget(
 			[=](rpl::producer<not_null<QEvent*>> &&events) {
 				ContentWidget::setViewport(std::move(events));
 			},
-			_flexibleScroll);
+			_flexibleScroll,
+			tabs);
 	}
 
 	if (_pinnedToBottom) {
@@ -175,6 +189,89 @@ Widget::Widget(
 			heightValue()
 		) | rpl::on_next(processHeight, _pinnedToBottom->lifetime());
 	}
+
+	setupTabsStripFloat();
+}
+
+void Widget::setupTabsStripFloat() {
+	const auto host = _inner->tabsHost();
+	if (!host || !_pinnedToTop) {
+		return;
+	}
+	_tabsHost = base::make_weak(host);
+	_tabsStrip = base::make_weak(host->stripWidget().get());
+	_inner->tabsDockedValue(
+	) | rpl::distinct_until_changed(
+	) | rpl::on_next([=](bool docked) {
+		const auto host = _tabsHost.get();
+		const auto strip = _tabsStrip.get();
+		if (!host || !strip) {
+			return;
+		}
+		if (docked) {
+			if (!_tabsStripFloat) {
+				_tabsStripFloat = base::make_unique_q<Ui::RpWidget>(this);
+				ContentWidget::setViewport(_tabsStripFloat->events(
+				) | rpl::filter([](not_null<QEvent*> e) {
+					return (e->type() == QEvent::Wheel);
+				}));
+			}
+			strip->setParent(_tabsStripFloat.get());
+			strip->moveToLeft(0, 0);
+			strip->show();
+			_tabsStripFloat->show();
+			_tabsStripFloat->raise();
+			updateTabsStripFloatGeometry();
+		} else if (_tabsStripFloat) {
+			_tabsStripFloat->hide();
+			host->returnStrip();
+		}
+	}, lifetime());
+
+	rpl::combine(
+		widthValue(),
+		host->stripWidget()->heightValue(),
+		host->stripWidget()->naturalWidthValue()
+	) | rpl::on_next([=] {
+		updateTabsStripFloatGeometry();
+	}, lifetime());
+}
+
+void Widget::updateTabsStripFloatGeometry() {
+	const auto strip = _tabsStrip.get();
+	if (!strip
+		|| !_tabsStripFloat
+		|| _tabsStripFloat->isHidden()
+		|| !_pinnedToTop) {
+		return;
+	}
+	const auto stripWidth = std::min(strip->naturalWidth(), width());
+	strip->resizeToWidth(stripWidth);
+	strip->moveToLeft(0, 0);
+	_tabsStripFloat->setGeometry(
+		(width() - stripWidth) / 2,
+		_pinnedToTop->minimumHeight(),
+		stripWidth,
+		strip->height());
+}
+
+auto Widget::swipeTabsFinishData(Ui::Controls::SwipeHandlerInitData data)
+-> Ui::Controls::SwipeHandlerFinishData {
+	const auto host = _inner->tabsHost();
+	if (!host) {
+		return {};
+	}
+	const auto shift = Ui::MapFrom(_inner, host, QPoint());
+	const auto body = host->bodyGeometry().translated(shift);
+	if (!body.contains(data.cursorPosition)) {
+		return {};
+	}
+	const auto toNextTab = (data.direction == Qt::LeftToRight);
+	auto callback = host->prepareSwitch(toNextTab);
+	return callback
+		? Ui::Controls::DefaultSwipeBackHandlerFinishData(
+			std::move(callback))
+		: Ui::Controls::SwipeHandlerFinishData();
 }
 
 void Widget::setInnerFocus() {

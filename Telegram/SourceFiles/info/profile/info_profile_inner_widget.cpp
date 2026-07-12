@@ -10,12 +10,20 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "info/info_controller.h"
 #include "info/info_memento.h"
 #include "info/profile/info_profile_widget.h"
+#include "info/profile/tabs/adapters/info_profile_tab_media.h"
+#include "info/profile/tabs/adapters/info_profile_tab_members.h"
+#include "info/profile/tabs/adapters/info_profile_tab_peer_lists.h"
+#include "info/profile/tabs/adapters/info_profile_tab_polls.h"
+#include "info/profile/tabs/adapters/info_profile_tab_saved.h"
+#include "info/profile/tabs/adapters/info_profile_tab_stories.h"
+#include "info/profile/tabs/info_profile_tabs_host.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_members.h"
 #include "info/profile/info_profile_music_button.h"
+#include "info/profile/info_profile_shared_media_classic.h"
 #include "info/profile/info_profile_top_bar.h"
 #include "info/profile/info_profile_actions.h"
-#include "info/media/info_media_buttons.h"
+#include "info/profile/info_profile_values.h"
 #include "info/saved/info_saved_music_widget.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
@@ -214,10 +222,16 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		_sublist,
 		origin);
 
+	const auto tabs = UseProfileMediaTabs();
 	auto sharedTracker = Ui::MultiSlideTracker();
-	{
-		auto sharedMediaWidget = setupSharedMedia(
+	if (!tabs) {
+		auto sharedMediaWidget = SetupSharedMediaClassic(
 			result.data(),
+			_controller,
+			_peer,
+			_topic,
+			_sublist,
+			_migrated,
 			sharedTracker);
 		const auto raw = sharedMediaWidget.data();
 		_sharedMediaWrap = raw;
@@ -227,7 +241,94 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			.shown = raw->toggledValue(),
 		});
 	}
+
+	const auto addTabsHost = [&] {
+		using namespace rpl::mappers;
+		const auto tabsPeer = _sublist ? _sublist->sublistPeer() : _peer;
+		const auto topicRootId = _topic ? _topic->rootId() : MsgId();
+		const auto monoforumPeerId = _sublist
+			? _sublist->sublistPeer()->id
+			: PeerId();
+		auto tabs = std::vector<MediaTabDescriptor>();
+		const auto addTab = [&](Storage::SharedMediaType type) {
+			tabs.push_back(MakeMediaTabDescriptor(
+				type,
+				SharedMediaCountValue(
+					tabsPeer,
+					topicRootId,
+					monoforumPeerId,
+					_migrated,
+					type) | rpl::map(_1 > 0)));
+		};
+		if ((_peer->isChat() || _peer->isMegagroup())
+			&& !_peer->isMonoforum()
+			&& !_topic
+			&& !_sublist) {
+			tabs.push_back(MakeMembersTabDescriptor(_peer));
+		}
+		if (!_topic) {
+			tabs.push_back(MakeStoriesTabDescriptor(tabsPeer));
+			if (!_sublist) {
+				tabs.push_back(MakeGiftsTabDescriptor(_peer));
+			}
+			tabs.push_back(MakeSavedTabDescriptor(tabsPeer));
+		}
+		addTab(Storage::SharedMediaType::Photo);
+		addTab(Storage::SharedMediaType::Video);
+		addTab(Storage::SharedMediaType::File);
+		addTab(Storage::SharedMediaType::MusicFile);
+		addTab(Storage::SharedMediaType::Link);
+		tabs.push_back(MakePollsTabDescriptor(SharedMediaCountValue(
+			tabsPeer,
+			topicRootId,
+			monoforumPeerId,
+			_migrated,
+			Storage::SharedMediaType::Poll) | rpl::map(_1 > 0)));
+		addTab(Storage::SharedMediaType::RoundVoiceFile);
+		addTab(Storage::SharedMediaType::GIF);
+		if (!_topic && !_sublist) {
+			if (const auto user = _peer->asUser()) {
+				tabs.push_back(MakeCommonGroupsTabDescriptor(user));
+			}
+			if (_peer->asBot() || _peer->asBroadcast()) {
+				tabs.push_back(MakeSimilarPeersTabDescriptor(_peer));
+			}
+		}
+		auto tabsHost = object_ptr<TabsHost>(
+			result.data(),
+			TabsHost::Descriptor{
+				.context = MediaTabContext{
+					.controller = _controller,
+					.peer = _peer,
+					.topic = _topic,
+					.sublist = _sublist,
+					.migrated = _migrated,
+					.onlineCountChanged = [this](int count) {
+						_onlineCount.fire_copy(count);
+					},
+				},
+				.tabs = std::move(tabs),
+			});
+		const auto raw = tabsHost.data();
+		_tabsHost = raw;
+		raw->scrollToRequests(
+		) | rpl::on_next([this, raw](Ui::ScrollToRequest request) {
+			const auto shift = MapFrom(this, raw, QPoint()).y();
+			_scrollToRequests.fire({
+				request.ymin + shift,
+				(request.ymax < 0) ? -1 : (request.ymax + shift),
+			});
+		}, raw->lifetime());
+		stack.addPlainSeparator();
+		stack.add(Section{
+			.widget = std::move(tabsHost),
+			.shown = raw->heightValue() | rpl::map(_1 > 0),
+		});
+	};
 	if (_topic || _sublist) {
+		if (tabs) {
+			addTabsHost();
+		}
 		stack.finalize();
 		return result;
 	}
@@ -250,7 +351,9 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			.shown = rpl::single(true),
 		});
 	}
-	if ((_peer->isChat() || _peer->isMegagroup())
+	if (tabs) {
+		addTabsHost();
+	} else if ((_peer->isChat() || _peer->isMegagroup())
 		&& !_peer->isMonoforum()) {
 		stack.addPlainSeparator();
 		stack.add(makeMembersSection(result.data()));
@@ -293,141 +396,6 @@ Section InnerWidget::makeMembersSection(not_null<QWidget*> parent) {
 	};
 }
 
-object_ptr<Ui::SlideWrap<Ui::RpWidget>> InnerWidget::setupSharedMedia(
-		not_null<RpWidget*> parent,
-		Ui::MultiSlideTracker &sharedTracker) {
-	using namespace rpl::mappers;
-	using MediaType = Media::Type;
-
-	const auto peer = _sublist ? _sublist->sublistPeer() : _peer;
-	auto content = object_ptr<Ui::VerticalLayout>(parent);
-	auto &tracker = sharedTracker;
-	auto addMediaButton = [&](
-			MediaType type,
-			const style::icon &icon) {
-		auto result = Media::AddButton(
-			content,
-			_controller,
-			peer,
-			_topic ? _topic->rootId() : MsgId(),
-			_sublist ? _sublist->sublistPeer()->id : PeerId(),
-			_migrated,
-			type,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-	auto addCommonGroupsButton = [&](
-			not_null<UserData*> user,
-			const style::icon &icon) {
-		auto result = Media::AddCommonGroupsButton(
-			content,
-			_controller,
-			user,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-	const auto addSimilarPeersButton = [&](
-			not_null<PeerData*> peer,
-			const style::icon &icon) {
-		auto result = Media::AddSimilarPeersButton(
-			content,
-			_controller,
-			peer,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-	auto addStoriesButton = [&](
-			not_null<PeerData*> peer,
-			const style::icon &icon) {
-		if (peer->isChat()) {
-			return;
-		}
-		auto result = Media::AddStoriesButton(
-			content,
-			_controller,
-			peer,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-	auto addSavedSublistButton = [&](
-			not_null<PeerData*> peer,
-			const style::icon &icon) {
-		auto result = Media::AddSavedSublistButton(
-			content,
-			_controller,
-			peer,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-	auto addPeerGiftsButton = [&](
-			not_null<PeerData*> peer,
-			const style::icon &icon) {
-		auto result = Media::AddPeerGiftsButton(
-			content,
-			_controller,
-			peer,
-			tracker);
-		object_ptr<Profile::FloatingIcon>(
-			result,
-			icon,
-			st::infoSharedMediaButtonIconPosition);
-	};
-
-	if (!_topic) {
-		addStoriesButton(peer, st::infoIconMediaStories);
-		addPeerGiftsButton(peer, st::infoIconMediaGifts);
-		addSavedSublistButton(peer, st::infoIconMediaSaved);
-	}
-	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
-	addMediaButton(MediaType::Video, st::infoIconMediaVideo);
-	addMediaButton(MediaType::File, st::infoIconMediaFile);
-	addMediaButton(MediaType::MusicFile, st::infoIconMediaAudio);
-	addMediaButton(MediaType::Link, st::infoIconMediaLink);
-	addMediaButton(MediaType::Poll, st::infoIconMediaPoll);
-	addMediaButton(MediaType::RoundVoiceFile, st::infoIconMediaVoice);
-	addMediaButton(MediaType::GIF, st::infoIconMediaGif);
-	if (const auto bot = peer->asBot()) {
-		addCommonGroupsButton(bot, st::infoIconMediaGroup);
-		addSimilarPeersButton(bot, st::infoIconMediaBot);
-	} else if (const auto channel = peer->asBroadcast()) {
-		addSimilarPeersButton(channel, st::infoIconMediaChannel);
-	} else if (const auto user = peer->asUser()) {
-		addCommonGroupsButton(user, st::infoIconMediaGroup);
-	}
-
-	auto result = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-		parent,
-		object_ptr<Ui::VerticalLayout>(parent)
-	);
-
-	result->setDuration(
-		st::infoSlideDuration
-	)->toggleOn(
-		tracker.atLeastOneShownValue()
-	);
-
-	auto layout = result->entity();
-
-	layout->add(std::move(content));
-
-	return result;
-}
-
 int InnerWidget::countDesiredHeight() const {
 	return _content->height() + (_members
 		? (_members->desiredHeight() - _members->height())
@@ -438,11 +406,19 @@ void InnerWidget::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
 	setChildVisibleTopBottom(_content, visibleTop, visibleBottom);
+	if (_tabsHost) {
+		const auto top = MapFrom(this, _tabsHost, QPoint()).y();
+		_tabsHost->setVisibleRegion(visibleTop - top, visibleBottom - top);
+		_tabsDocked = (visibleTop >= top);
+	}
 }
 
 void InnerWidget::saveState(not_null<Memento*> memento) {
 	if (_members) {
 		memento->setMembersState(_members->saveState());
+	}
+	if (_tabsHost) {
+		memento->setActiveTab(_tabsHost->activeId());
 	}
 }
 
@@ -452,6 +428,11 @@ void InnerWidget::restoreState(not_null<Memento*> memento) {
 	}
 	if (_sharedMediaWrap) {
 		_sharedMediaWrap->finishAnimating();
+	}
+	if (_tabsHost) {
+		if (const auto active = memento->activeTab(); !active.isEmpty()) {
+			_tabsHost->restoreActiveTab(active);
+		}
 	}
 }
 
@@ -500,6 +481,11 @@ base::weak_qptr<Ui::RpWidget> InnerWidget::createPinnedToTop(
 	content->backRequest(
 	) | rpl::start_to_stream(_backClicks, content->lifetime());
 	content->setOnlineCount(_onlineCount.events());
+	if (_tabsHost) {
+		content->bindActiveTab(
+			_tabsHost->activeTabBindings(),
+			_tabsDocked.value());
+	}
 	_topBarColor = content->edgeColor();
 	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }

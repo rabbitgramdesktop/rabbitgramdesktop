@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
+#include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
@@ -24,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "ui/text/text.h"
 #include "ui/text/text_utilities.h"
 
 #include <algorithm>
@@ -155,12 +157,19 @@ enum class OrderedMarkerType {
 	return QString::number(value);
 }
 
+[[nodiscard]] QString OrderedRawMarkerText(const QString &raw) {
+	if (raw.isEmpty() || raw.endsWith('.') || raw.endsWith(')')) {
+		return raw;
+	}
+	return raw + u"."_q;
+}
+
 [[nodiscard]] QString OrderedMarkerText(
 		const OrderedListData &list,
 		const OrderedListItemData &item,
 		int fallbackValue) {
 	if (item.hasRawText()) {
-		return item.rawText();
+		return OrderedRawMarkerText(item.rawText());
 	}
 	const auto type = item.type.has_value() ? item.type : list.type;
 	const auto value = item.value.value_or(fallbackValue);
@@ -1050,6 +1059,14 @@ void RememberWebPageMedia(
 			context,
 			anchorId,
 			anchorIds);
+	}, [&](const MTPDtextDiff &data) {
+		AssertIsDebug();
+		return AppendRichText(
+			data.vtext(),
+			result,
+			context,
+			anchorId,
+			anchorIds);
 	});
 }
 
@@ -1692,8 +1709,7 @@ void AppendSummaryBlocks(
 		const auto type = entity.type();
 		if (type == EntityType::Subscript
 			|| type == EntityType::Superscript
-			|| type == EntityType::Marked
-			|| type == EntityType::CustomEmoji) {
+			|| type == EntityType::Marked) {
 			return false;
 		}
 	}
@@ -1737,33 +1753,143 @@ void AppendSimpleBlock(
 	result->append(std::move(block));
 }
 
+// Computes the length text.text would have after TextUtilities::Trim(),
+// without copying or mutating anything. Must mirror Trim() exactly: right
+// trim by IsTrimmed(), then left trim stopping at the first monospace
+// entity offset (leading whitespace inside inline code is preserved).
+[[nodiscard]] int TrimmedLength(const TextWithEntities &text) {
+	const auto begin = text.text.constData();
+	auto end = begin + text.text.size();
+	while (end != begin && Ui::Text::IsTrimmed(*(end - 1))) {
+		--end;
+	}
+	if (end == begin) {
+		return 0;
+	}
+	const auto firstMonospaceOffset = EntityInText::FirstMonospaceOffset(
+		text.entities,
+		int(end - begin));
+	auto start = begin;
+	while ((start - begin) != firstMonospaceOffset
+		&& Ui::Text::IsTrimmed(*start)) {
+		++start;
+	}
+	return int(end - start);
+}
+
+// Sinks for SerializeAsSimpleTo(): SimpleTextBuilder builds the actual
+// serialized text, SimpleTextCounter only computes the length that text
+// would have, skipping the string building entirely, so that the check
+// is cheap enough to run on every content change.
+struct SimpleTextBuilder {
+	TextWithEntities result;
+
+	void append(
+			const TextWithEntities &text,
+			EntityType wrap = EntityType::Invalid,
+			const QString &wrapData = QString()) {
+		AppendSimpleBlock(&result, TextWithEntities(text), wrap, wrapData);
+	}
+	void appendQuote(SimpleTextBuilder &&body) {
+		AppendSimpleBlock(
+			&result,
+			std::move(body.result),
+			EntityType::Blockquote);
+	}
+	[[nodiscard]] int length() const {
+		return int(result.text.size());
+	}
+};
+
+struct SimpleTextCounter {
+	int result = 0;
+
+	void append(
+			const TextWithEntities &text,
+			EntityType = EntityType::Invalid,
+			const QString & = QString()) {
+		appendLength(TrimmedLength(text));
+	}
+	void appendQuote(SimpleTextCounter &&body) {
+		appendLength(body.result);
+	}
+	void appendLength(int length) {
+		if (length > 0) {
+			// The 1 is for the '\n' AppendSimpleBlock() would insert.
+			result += (result > 0 ? 1 : 0) + length;
+		}
+	}
+	[[nodiscard]] int length() const {
+		return result;
+	}
+};
+
+template <typename Accumulator>
 [[nodiscard]] bool CollectSimpleQuote(
 		const Block &quote,
-		TextWithEntities *body) {
+		Accumulator &body) {
 	if (quote.pullquote
+		|| !quote.author.trimmed().isEmpty()
 		|| !quote.caption.text.text.trimmed().isEmpty()) {
 		return false;
 	}
-	auto joined = TextWithEntities();
 	if (!quote.text.text.empty()) {
 		if (!SimpleTextEntitiesAllowed(quote.text.text)) {
 			return false;
 		}
-		AppendSimpleBlock(&joined, TextWithEntities(quote.text.text));
+		body.append(quote.text.text);
 	}
 	for (const auto &child : quote.blocks) {
 		if (child.kind != BlockKind::Paragraph
 			|| !SimpleTextEntitiesAllowed(child.text.text)) {
 			return false;
 		}
-		AppendSimpleBlock(&joined, TextWithEntities(child.text.text));
+		body.append(child.text.text);
 	}
-	TextUtilities::Trim(joined);
-	if (joined.empty()) {
-		return true;
-	}
-	*body = std::move(joined);
 	return true;
+}
+
+// Single source of truth for what can be sent as a simple message, shared
+// by SerializeAsSimple() and CanSerializeAsSimple(), so that the two can't
+// drift apart: returns false when the page can't be sent as one (blocks or
+// entities a normal message can't carry, empty or over-limit text).
+template <typename Accumulator>
+[[nodiscard]] bool SerializeAsSimpleTo(
+		const RichPage &page,
+		not_null<Main::Session*> session,
+		Accumulator &to) {
+	for (const auto &block : page.blocks) {
+		switch (block.kind) {
+		case BlockKind::Paragraph:
+			if (!SimpleTextEntitiesAllowed(block.text.text)) {
+				return false;
+			}
+			to.append(block.text.text);
+			break;
+		case BlockKind::Code:
+			if (!block.text.text.entities.isEmpty()) {
+				return false;
+			}
+			to.append(block.text.text, EntityType::Pre, block.language);
+			break;
+		case BlockKind::Quote: {
+			auto body = Accumulator();
+			if (!CollectSimpleQuote(block, body)) {
+				return false;
+			}
+			to.appendQuote(std::move(body));
+			break;
+		}
+		default:
+			return false;
+		}
+	}
+	if (!to.length()) {
+		return false;
+	}
+	const auto lengthLimit = ::Data::PremiumLimits(session)
+		.messageLengthCurrent();
+	return to.length() <= lengthLimit;
 }
 
 [[nodiscard]] bool RichBlockIsPlain(const Block &block) {
@@ -2189,46 +2315,22 @@ TextWithEntities FlattenRichPageToSimpleText(const RichPage &page) {
 	return result;
 }
 
-std::optional<TextWithEntities> SerializeAsSimple(const RichPage &page) {
-	auto result = TextWithEntities();
-	for (const auto &block : page.blocks) {
-		switch (block.kind) {
-		case BlockKind::Paragraph:
-			if (!SimpleTextEntitiesAllowed(block.text.text)) {
-				return std::nullopt;
-			}
-			AppendSimpleBlock(&result, TextWithEntities(block.text.text));
-			break;
-		case BlockKind::Code:
-			if (!SimpleTextEntitiesAllowed(block.text.text)) {
-				return std::nullopt;
-			}
-			AppendSimpleBlock(
-				&result,
-				TextWithEntities(block.text.text),
-				EntityType::Pre,
-				block.language);
-			break;
-		case BlockKind::Quote: {
-			auto body = TextWithEntities();
-			if (!CollectSimpleQuote(block, &body)) {
-				return std::nullopt;
-			}
-			AppendSimpleBlock(
-				&result,
-				std::move(body),
-				EntityType::Blockquote);
-			break;
-		}
-		default:
-			return std::nullopt;
-		}
-	}
-	TextUtilities::Trim(result);
-	if (result.empty()) {
+std::optional<TextWithEntities> SerializeAsSimple(
+		const RichPage &page,
+		not_null<Main::Session*> session) {
+	auto to = SimpleTextBuilder();
+	if (!SerializeAsSimpleTo(page, session, to)) {
 		return std::nullopt;
 	}
-	return result;
+	TextUtilities::Trim(to.result);
+	return std::move(to.result);
+}
+
+bool CanSerializeAsSimple(
+		const RichPage &page,
+		not_null<Main::Session*> session) {
+	auto to = SimpleTextCounter();
+	return SerializeAsSimpleTo(page, session, to);
 }
 
 bool RichPageUsesPremiumFormatting(const RichPage &page) {

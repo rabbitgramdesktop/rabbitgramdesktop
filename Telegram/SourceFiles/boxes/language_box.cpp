@@ -1605,6 +1605,7 @@ void LanguageBox::setupTop(not_null<Ui::VerticalLayout*> container) {
 			Ui::AddDividerText(
 				platformTranslateWrap->entity(),
 				tr::lng_translate_settings_use_platform_mac_about());
+			Ui::AddSkip(platformTranslateWrap->entity());
 		}
 	}
 
