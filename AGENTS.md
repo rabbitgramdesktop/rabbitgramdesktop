@@ -1,25 +1,27 @@
-# Agent Guide for Telegram Desktop
+# Agent Guide for rabbitGram Desktop
 
-This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
+This guide defines repository-wide instructions for coding agents working with the rabbitGram Desktop codebase.
+
+The project's name should be written as rabbitGram (with a capital "G"), though rabbitgramdesktop may be used in specific technical or repository contexts.
 
 ## Working from Codex on Windows + WSL
 
-This checkout may be opened in Codex Desktop through the Windows UNC path `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop`, while the real Linux path is `/home/{user}/Telegram/tdesktop`. Treat it as a WSL/Linux checkout first, not as a native Windows checkout.
+This checkout may be opened in Codex Desktop through the Windows UNC path `\\wsl.localhost\{distro}\home\{user}\source\rabbitgramdesktop`, while the real Linux path is `/home/{user}/source/rabbitgramdesktop`. Treat it as a WSL/Linux checkout first, not as a native Windows checkout.
 
 - Prefer running repository-aware commands through WSL:
 
 ```powershell
-wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- <command>
+wsl.exe -d {distro} --cd /home/{user}/source/rabbitgramdesktop -- <command>
 ```
 
 - PowerShell can read and write files through the UNC path, but native Windows tools may see different ownership, path, executable, or line-ending behavior than Linux tools.
 - Git from PowerShell over `\\wsl.localhost\...` can fail with `detected dubious ownership`. Use WSL Git instead. Do not change global Git `safe.directory` settings unless the user explicitly asks for that.
-- Keep path styles matched to the shell. Use `/home/{user}/Telegram/tdesktop/...` with WSL commands, and quoted `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop\...` paths with native Windows commands. Avoid passing UNC paths to Linux tools or Linux paths to native Windows tools unless the tool explicitly supports them.
-- If a command behaves strangely from the PowerShell UNC working directory, retry the same command through `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- ...` before concluding the repository or command is broken.
-- Recursive searches and repo inspection are usually faster and more faithful through WSL, for example `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- rg ...`.
+- Keep path styles matched to the shell. Use `/home/{user}/source/rabbitgramdesktop/...` with WSL commands, and quoted `\\wsl.localhost\{distro}\home\{user}\source\rabbitgramdesktop\...` paths with native Windows commands. Avoid passing UNC paths to Linux tools or Linux paths to native Windows tools unless the tool explicitly supports them.
+- If a command behaves strangely from the PowerShell UNC working directory, retry the same command through `wsl.exe -d {distro} --cd /home/{user}/source/rabbitgramdesktop -- ...` before concluding the repository or command is broken.
+- Recursive searches and repo inspection are usually faster and more faithful through WSL, for example `wsl.exe -d {distro} --cd /home/{user}/source/rabbitgramdesktop -- rg ...`.
 - Do not assume the WSL host has the build toolchain installed directly. In this setup, WSL may not have `cmake`, while Windows may have `cmake`, and the configured `out/` tree may still target the Linux Docker toolchain. Do not run native Windows `cmake --build out` against a Linux/Docker build tree.
 - For WSL/Linux builds, use the Docker build entry point from the repository root: `Telegram/build/docker/centos_env/build_debug.sh`. The Docker daemon must be reachable from WSL; checking `docker info` is fine, but do not start a build unless the user asked for one.
-- Existing build outputs may be Linux binaries, for example `out/Debug/Telegram` as an ELF executable, not `Telegram.exe`. Verify the build tree before assuming which platform produced it.
+- Existing build outputs may be Linux binaries, for example `out/Debug/rabbitGram` as an ELF executable, not `rabbitGram.exe`. Verify the build tree before assuming which platform produced it.
 - Be careful with text file line endings. In a WSL/Linux checkout, files should remain LF-only unless the file already uses another convention. CRLF finishing applies only to native, non-WSL Windows runs/checkouts. Do not let PowerShell or Windows tools silently rewrite WSL files to CRLF. If a file becomes mixed, normalize it back to the convention appropriate for the current checkout, without adding a UTF-8 BOM.
 - When using the local `task-think` skill from this WSL checkout, keep `.ai/...` artifacts and edited project text files LF-only. Treat the skill's Windows text-normalization phase as not applicable to WSL, except to record that line endings were checked and kept LF/no-BOM. Run CRLF normalization for `task-think` only in a native, non-WSL Windows checkout.
 
@@ -28,11 +30,11 @@ wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- <command>
 The build system expects this directory layout:
 
 ```text
-L:\Telegram\                    # BuildPath
-L:\Telegram\tdesktop\           # Repository (you work here)
-L:\Telegram\Libraries\          # 32-bit dependencies (Linux/macOS)
-L:\Telegram\win64\Libraries\    # 64-bit dependencies (Windows)
-L:\Telegram\ThirdParty\         # Build tools (NuGet, Python, etc.)
+L:\source\                    # BuildPath
+L:\source\rabbitgramdesktop\           # Repository (you work here)
+L:\source\Libraries\          # 32-bit dependencies (Linux/macOS)
+L:\source\win64\Libraries\    # 64-bit dependencies (Windows)
+L:\source\ThirdParty\         # Build tools (NuGet, Python, etc.)
 ```
 
 Dependencies are located relative to the repository: `../Libraries`, `../win64/Libraries`, or `../ThirdParty`.
@@ -47,7 +49,7 @@ Dependencies are located relative to the repository: `../Libraries`, `../win64/L
 cmake --build out --config Debug --target Telegram
 ```
 
-That's it. The `out/` directory is already configured. The executable will be at `out/Debug/Telegram.exe`.
+That's it. The `out/` directory is already configured. The executable will be at `out/Debug/rabbitGram.exe`.
 
 **From WSL, run through the Linux Docker build environment:**
 
@@ -57,7 +59,7 @@ Telegram/build/docker/centos_env/build_debug.sh
 
 **Important:** When running cmake from a shell that doesn't support `cd`, use quoted absolute paths:
 ```bash
-cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
+cmake --build "l:\source\rx64\out" --config Debug --target Telegram
 ```
 
 **Never build Release** - it's extremely heavy and not needed for testing changes.
@@ -89,7 +91,7 @@ cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
 ## Troubleshooting
 
 ### "Libraries not found"
-Ensure the repository is in `L:\Telegram\tdesktop`. The build system requires `../win64/Libraries` to exist.
+Ensure the repository is in `L:\source\rabbitgramdesktop`. The build system requires `../win64/Libraries` to exist.
 
 ### Build fails with "wrong command prompt"
 On Windows, use the correct Visual Studio Native Tools Command Prompt matching your target (x64/x86/ARM64).
@@ -100,11 +102,11 @@ On Windows, use the correct Visual Studio Native Tools Command Prompt matching y
 
 If the build fails with ANY of these errors:
 - `fatal error C1041: cannot open program database`
-- `cannot open output file 'Telegram.exe'`
+- `cannot open output file 'rabbitGram.exe'`
 - `LNK1104: cannot open file`
 - Any "access denied" or "file in use" error
 
-**STOP IMMEDIATELY.** These errors mean files are locked by a running process (Telegram.exe or debugger).
+**STOP IMMEDIATELY.** These errors mean files are locked by a running process (rabbitGram.exe or debugger).
 
 **What to do:**
 1. Do NOT attempt another build - it will fail the same way
@@ -112,7 +114,7 @@ If the build fails with ANY of these errors:
 3. Do NOT try any workarounds or fixes
 4. IMMEDIATELY inform the user:
 
-> "Build failed - files are locked. Please close Telegram.exe (and any debugger) so I can rebuild."
+> "Build failed - files are locked. Please close rabbitGram.exe (and any debugger) so I can rebuild."
 
 **Then WAIT for user confirmation before attempting any build.**
 
@@ -243,7 +245,7 @@ auto text = QStringLiteral("Settings");
 
 **Never use `Q_OS_LINUX` for platform checks in new code:**
 
-Telegram Desktop distinguishes at most three platforms: Windows / macOS / all-other. The "all-other" branch covers Linux, the BSD variants and more — and this is almost always the branch you want. `Q_OS_LINUX` narrows it to Linux alone, silently excluding the non-Linux Unix platforms, which is almost never intended. For the all-other branch use `!defined Q_OS_WIN && !defined Q_OS_MAC` at compile time, or its runtime equivalent `Platform::IsLinux()` — which, despite the name, means exactly `!defined Q_OS_WIN && !defined Q_OS_MAC` ("everything except Windows and macOS"), not Linux specifically:
+rabbitGram Desktop distinguishes at most three platforms: Windows / macOS / all-other. The "all-other" branch covers Linux, the BSD variants and more — and this is almost always the branch you want. `Q_OS_LINUX` narrows it to Linux alone, silently excluding the non-Linux Unix platforms, which is almost never intended. For the all-other branch use `!defined Q_OS_WIN && !defined Q_OS_MAC` at compile time, or its runtime equivalent `Platform::IsLinux()` — which, despite the name, means exactly `!defined Q_OS_WIN && !defined Q_OS_MAC` ("everything except Windows and macOS"), not Linux specifically:
 
 ```cpp
 // BAD - excludes FreeBSD and other non-Linux Unix:
