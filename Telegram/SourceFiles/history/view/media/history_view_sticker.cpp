@@ -392,6 +392,7 @@ void Sticker::paintAnimationFrame(
 			size),
 		prepared);
 	if (!_lastFrameCached.isNull()) {
+		p.restore();
 		return;
 	}
 
