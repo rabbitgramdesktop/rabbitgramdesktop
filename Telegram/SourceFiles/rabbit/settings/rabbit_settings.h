@@ -163,6 +163,10 @@ inline bool preciseTime() { return JsonSettings::GetBool(u"precise_time"_q); }
 inline bool showOnlineIndicator() { return JsonSettings::GetBool(u"show_online_indicator"_q); }
 inline int quietModeDeadline() { return JsonSettings::GetInt(u"quiet_mode_deadline"_q); }
 inline bool quietModeEnabled() { return JsonSettings::GetBool(u"quiet_mode_enabled"_q); }
+inline bool telemetryAppVersion() { return JsonSettings::GetBool(u"telemetry_app_version"_q); }
+inline bool telemetryOs() { return JsonSettings::GetBool(u"telemetry_os"_q); }
+inline bool telemetryFeatures() { return JsonSettings::GetBool(u"telemetry_features"_q); }
+inline bool telemetryCpuArch() { return JsonSettings::GetBool(u"telemetry_cpu_arch"_q); }
 inline bool analytics() { return JsonSettings::GetBool(u"analytics"_q); }
 inline QString telemetryClientId() { return JsonSettings::GetString(u"telemetry_client_id"_q); }
 
@@ -203,6 +207,10 @@ inline void setQuietModeEnabled(bool value) {
 		setQuietModeDeadline(0);
 	}
 }
+inline void setTelemetryAppVersion(bool value) { JsonSettings::Set(u"telemetry_app_version"_q, value); }
+inline void setTelemetryOs(bool value) { JsonSettings::Set(u"telemetry_os"_q, value); }
+inline void setTelemetryFeatures(bool value) { JsonSettings::Set(u"telemetry_features"_q, value); }
+inline void setTelemetryCpuArch(bool value) { JsonSettings::Set(u"telemetry_cpu_arch"_q, value); }
 inline void setAnalytics(bool value) { JsonSettings::Set(u"analytics"_q, value); }
 inline void setTelemetryClientId(const QString &value) { JsonSettings::Set(u"telemetry_client_id"_q, value); }
 

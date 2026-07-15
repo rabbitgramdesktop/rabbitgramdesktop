@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QUuid>
+#include <QtCore/QSysInfo>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
@@ -56,7 +57,7 @@ void sendTelemetry() {
 	auto request = QNetworkRequest(url);
 	request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/json"_q);
 
-#if defined Q_OS_WIN
+#ifdef Q_OS_WIN
 	const auto osName = u"windows"_q;
 #elif defined Q_OS_MAC
 	const auto osName = u"macos"_q;
@@ -65,12 +66,21 @@ void sendTelemetry() {
 #endif
 
 	auto eventParams = QJsonObject();
-	eventParams[u"app_version"_q] = QString::fromUtf8(AppVersionStr);
-	eventParams[u"os"_q] = osName;
+	if (RabbitSettings::telemetryAppVersion()) {
+		eventParams[u"app_version"_q] = QString::fromUtf8(AppVersionStr);
+	}
+	if (RabbitSettings::telemetryOs()) {
+		eventParams[u"os"_q] = osName;
+	}
+	if (RabbitSettings::telemetryCpuArch()) {
+		eventParams[u"cpu_arch"_q] = QSysInfo::currentCpuArchitecture();
+	}
 
-	const auto features = RabbitSettings::JsonSettings::GetFeaturesTelemetryData();
-	for (auto it = features.constBegin(); it != features.constEnd(); ++it) {
-		eventParams.insert(it.key(), it.value());
+	if (RabbitSettings::telemetryFeatures()) {
+		const auto features = RabbitSettings::JsonSettings::GetFeaturesTelemetryData();
+		for (auto it = features.constBegin(); it != features.constEnd(); ++it) {
+			eventParams.insert(it.key(), it.value());
+		}
 	}
 
 	auto eventObj = QJsonObject();

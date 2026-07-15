@@ -85,6 +85,10 @@
     "rtg_settings_app_icon_seasonal": "Сакура",
     "rtg_settings_app_icon_twitch": "Twitch",
     "rtg_settings_other": "Другое",
-    "rtg_other_analytics": "Отправлять анонимную статистику",
+    "rtg_other_analytics": "Аналитика",
+    "rtg_telemetry_app_version": "Версия приложения",
+    "rtg_telemetry_os": "Операционная система",
+    "rtg_telemetry_features": "Включённые функции",
+    "rtg_telemetry_cpu_arch": "Архитектура процессора",
     "last_string": null
 }

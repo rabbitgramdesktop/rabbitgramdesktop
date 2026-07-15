@@ -661,6 +661,7 @@ rightsButton: SettingsButton(defaultSettingsButton) {
 	toggleOver: rightsToggle;
 	toggleSkip: 20px;
 }
+
 rightsButtonToggleWidth: 70px;
 rightsButtonArrowSkip: 5px;
 rightsDividerMargin: margins(0px, 0px, 0px, 20px);

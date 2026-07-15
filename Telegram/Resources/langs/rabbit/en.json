@@ -85,6 +85,10 @@
     "rtg_settings_app_icon_seasonal": "Sakura",
     "rtg_settings_app_icon_twitch": "Twitch",
     "rtg_settings_other": "Other",
-    "rtg_other_analytics": "Send anonymous analytics",
+    "rtg_other_analytics": "Analytics",
+    "rtg_telemetry_app_version": "App version",
+    "rtg_telemetry_os": "Operating system",
+    "rtg_telemetry_features": "Enabled features",
+    "rtg_telemetry_cpu_arch": "CPU architecture",
     "last_string": null
 }

@@ -449,6 +449,30 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"telemetry_app_version"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"telemetry_os"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"telemetry_features"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"telemetry_cpu_arch"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
 		u"analytics"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
