@@ -1728,10 +1728,14 @@ PRIVATE
     rabbit/settings_menu/sections/rabbit_chats.h
     rabbit/settings_menu/sections/rabbit_general.cpp
     rabbit/settings_menu/sections/rabbit_general.h
+    rabbit/settings_menu/sections/rabbit_other.cpp
+    rabbit/settings_menu/sections/rabbit_other.h
     rabbit/settings_menu/rabbit_context_menu.cpp
     rabbit/settings_menu/rabbit_context_menu.h
     rabbit/settings_menu/rabbit_settings_menu.cpp
     rabbit/settings_menu/rabbit_settings_menu.h
+    rabbit/telemetry/rabbit_telemetry.cpp
+    rabbit/telemetry/rabbit_telemetry.h
     rabbit/ui/settings/icon_picker.cpp
     rabbit/ui/settings/icon_picker.h
     rabbit/ui/settings/previews.cpp

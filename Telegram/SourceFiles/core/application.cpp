@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/telemetry/rabbit_telemetry.h"
 
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
@@ -428,6 +429,8 @@ void Application::run() {
 	}
 
 	processCreatedWindow(_lastActivePrimaryWindow);
+
+	rabbitTelemetry::sendTelemetry();
 }
 
 void Application::autoRegisterUrlScheme() {

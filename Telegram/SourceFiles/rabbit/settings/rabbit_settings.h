@@ -167,6 +167,8 @@ namespace RabbitSettings
     inline bool showOnlineIndicator() { return JsonSettings::GetBool("show_online_indicator"); }
     inline int quietModeDeadline() { return JsonSettings::GetInt("quiet_mode_deadline"); }
     inline bool quietModeEnabled() { return JsonSettings::GetBool("quiet_mode_enabled"); }
+    inline bool analytics() { return JsonSettings::GetBool("analytics"); }
+    inline QString telemetryClientId() { return JsonSettings::GetString("telemetry_client_id"); }
 
     inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
     inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
@@ -205,4 +207,6 @@ namespace RabbitSettings
             setQuietModeDeadline(0);
         }
     }
+    inline void setAnalytics(bool value) { JsonSettings::Set("analytics", value); }
+    inline void setTelemetryClientId(const QString &value) { JsonSettings::Set("telemetry_client_id", value); }
 } // namespace RabbitSettings

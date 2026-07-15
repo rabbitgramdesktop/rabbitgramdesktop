@@ -84,5 +84,7 @@
     "rtg_settings_app_icon_old": "Старая",
     "rtg_settings_app_icon_seasonal": "Сакура",
     "rtg_settings_app_icon_twitch": "Twitch",
+    "rtg_settings_other": "Другое",
+    "rtg_other_analytics": "Отправлять анонимную статистику",
     "last_string": null
 }

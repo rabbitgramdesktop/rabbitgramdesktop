@@ -421,6 +421,18 @@ namespace RabbitSettings::JsonSettings
                     .type = BoolSetting,
                     .defaultValue = false,
                 }
+            },
+            {
+                "analytics", {
+                    .type = BoolSetting,
+                    .defaultValue = false,
+                }
+            },
+            {
+                "telemetry_client_id", {
+                    .type = QStringSetting,
+                    .defaultValue = QString(),
+                }
             }
         };
 

@@ -84,5 +84,7 @@
     "rtg_settings_app_icon_old": "Old",
     "rtg_settings_app_icon_seasonal": "Sakura",
     "rtg_settings_app_icon_twitch": "Twitch",
+    "rtg_settings_other": "Other",
+    "rtg_other_analytics": "Send anonymous analytics",
     "last_string": null
 }

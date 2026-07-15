@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings_menu/sections/rabbit_appearance.h"
 #include "rabbit/settings_menu/sections/rabbit_chats.h"
 #include "rabbit/settings_menu/sections/rabbit_general.h"
+#include "rabbit/settings_menu/sections/rabbit_other.h"
 
 #include "core/application.h"
 #include "core/file_utilities.h"
@@ -70,6 +71,12 @@ namespace Settings
                 .targetSection = RabbitChats::Id(),
                 .icon = { &st::menuIconChatBubble },
                 .keywords = { u"chats"_q, u"messages"_q },
+            });
+            builder.addSectionButton({
+                .title = rktr("rtg_settings_other"),
+                .targetSection = RabbitOther::Id(),
+                .icon = { &st::menuIconShowAll },
+                .keywords = { u"other"_q, u"analytics"_q, u"telemetry"_q },
             });
         }
 
