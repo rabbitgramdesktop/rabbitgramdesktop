@@ -18,16 +18,16 @@ namespace RabbitSettings {
 
 inline rpl::producer<QString> QuickActionString(QuickAction action) {
 	switch (action) {
-	case Disable: return rktr("quick_action_disable");
-	case Reaction: return rktr("quick_action_reaction");
-	case Reply: return rktr("quick_action_reply");
-	case Copy: return rktr("quick_action_copy");
-	case Forward: return rktr("quick_action_forward");
-	case Edit: return rktr("quick_action_edit");
-	case Save: return rktr("quick_action_save");
-	case Delete: return rktr("quick_action_delete");
+	case Disable: return rktr(u"quick_action_disable"_q);
+	case Reaction: return rktr(u"quick_action_reaction"_q);
+	case Reply: return rktr(u"quick_action_reply"_q);
+	case Copy: return rktr(u"quick_action_copy"_q);
+	case Forward: return rktr(u"quick_action_forward"_q);
+	case Edit: return rktr(u"quick_action_edit"_q);
+	case Save: return rktr(u"quick_action_save"_q);
+	case Delete: return rktr(u"quick_action_delete"_q);
 	}
-	return rktr("quick_action_disable");
+	return rktr(u"quick_action_disable"_q);
 }
 
 inline Settings::IconDescriptor QuickActionIcon(QuickAction action) {

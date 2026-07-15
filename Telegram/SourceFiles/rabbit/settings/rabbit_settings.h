@@ -12,201 +12,195 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
 
-namespace RabbitSettings
-{
-    const auto DEFAULT_ICON = QString("default");
-    const auto ANGEL_ICON = QString("angel");
-    const auto BLACKOUT_ICON = QString("blackout");
-    const auto COLOR_ICON = QString("color");
-    const auto IMPOSTOR_ICON = QString("impostor");
-    const auto MATRIX_ICON = QString("matrix");
-    const auto MOON_ICON = QString("moon");
-    const auto OLD_ICON = QString("old");
-    const auto SEASONAL_ICON = QString("seasonal");
-    const auto TWITCH_ICON = QString("twitch");
-    
-    namespace JsonSettings
-    {
-        void Start();
-        void Load();
-        void Write();
-        void Finish();
+namespace RabbitSettings {
 
-        [[nodiscard]] QVariant Get(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        [[nodiscard]] QVariant GetWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        [[nodiscard]] rpl::producer<QString> Events(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        [[nodiscard]] rpl::producer<QString> EventsWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        void Set(
-            const QString& key,
-            const QVariant& value,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        void SetAfterRestart(
-            const QString& key,
-            const QVariant& value,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        void Reset(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
-        void ResetAfterRestart(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false);
+inline const auto DEFAULT_ICON = u"default"_q;
+inline const auto ANGEL_ICON = u"angel"_q;
+inline const auto BLACKOUT_ICON = u"blackout"_q;
+inline const auto COLOR_ICON = u"color"_q;
+inline const auto IMPOSTOR_ICON = u"impostor"_q;
+inline const auto MATRIX_ICON = u"matrix"_q;
+inline const auto MOON_ICON = u"moon"_q;
+inline const auto OLD_ICON = u"old"_q;
+inline const auto SEASONAL_ICON = u"seasonal"_q;
+inline const auto TWITCH_ICON = u"twitch"_q;
 
-        [[nodiscard]] QByteArray ExportSettingsJson();
-        bool ImportSettingsFromJson(const QByteArray &json);
+namespace JsonSettings {
 
-        inline bool GetBool(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return Get(key, accountId, isTestAccount).toBool();
-        }
+void Start();
+void Load();
+void Write();
+void Finish();
 
-        inline int GetInt(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return Get(key, accountId, isTestAccount).toInt();
-        }
+[[nodiscard]] QVariant Get(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+[[nodiscard]] QVariant GetWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+[[nodiscard]] rpl::producer<QString> Events(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+[[nodiscard]] rpl::producer<QString> EventsWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+void Set(
+	const QString &key,
+	const QVariant &value,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+void SetAfterRestart(
+	const QString &key,
+	const QVariant &value,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+void Reset(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
+void ResetAfterRestart(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false);
 
-        inline QString GetString(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return Get(key, accountId, isTestAccount).toString();
-        }
+[[nodiscard]] QByteArray ExportSettingsJson();
+bool ImportSettingsFromJson(const QByteArray &json);
 
-        inline QJsonArray GetJsonArray(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return Get(key, accountId, isTestAccount).toJsonArray();
-        }
+[[nodiscard]] inline bool GetBool(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return Get(key, accountId, isTestAccount).toBool();
+}
 
-        inline bool GetBoolWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return GetWithPending(key, accountId, isTestAccount).toBool();
-        }
+[[nodiscard]] inline int GetInt(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return Get(key, accountId, isTestAccount).toInt();
+}
 
-        inline int GetIntWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return GetWithPending(key, accountId, isTestAccount).toInt();
-        }
+[[nodiscard]] inline QString GetString(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return Get(key, accountId, isTestAccount).toString();
+}
 
-        inline QString GetStringWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return GetWithPending(key, accountId, isTestAccount).toString();
-        }
+[[nodiscard]] inline QJsonArray GetJsonArray(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return Get(key, accountId, isTestAccount).toJsonArray();
+}
 
-        inline QJsonArray GetJsonArrayWithPending(
-            const QString& key,
-            uint64 accountId = 0,
-            bool isTestAccount = false)
-        {
-            return GetWithPending(key, accountId, isTestAccount).toJsonArray();
-        }
-    } // namespace JsonSettings
+[[nodiscard]] inline bool GetBoolWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return GetWithPending(key, accountId, isTestAccount).toBool();
+}
 
-    inline bool streamerMode() { return JsonSettings::GetBool("streamer_mode"); }
-    inline bool hideNotificationsAutomatically() { return JsonSettings::GetBool("auto_hide_notifications"); }
-    inline bool showUserpicInTopBar() { return JsonSettings::GetBool("userpic_in_top_bar"); }
-    inline bool showPeerIdDc() { return JsonSettings::GetBool("show_peer_id_dc"); }
-    inline bool connectionBarLost() { return JsonSettings::GetBool("connection_bar_lost"); }
-    inline bool connectionBarProxy() { return JsonSettings::GetBool("connection_bar_proxy"); }
-    inline QString appIcon() { return JsonSettings::GetString("app_icon"); }
-    inline int userpicRoundness() { return JsonSettings::GetInt("userpic_roundness"); }
-    inline bool generalRoundness() { return JsonSettings::GetBool("general_roundness"); }
-    inline bool sidebarMyProfile() { return JsonSettings::GetBool("sidebar_my_profile"); }
-    inline bool sidebarBots() { return JsonSettings::GetBool("sidebar_bots"); }
-    inline bool sidebarCreateGroup() { return JsonSettings::GetBool("sidebar_create_group"); }
-    inline bool sidebarCreateChannel() { return JsonSettings::GetBool("sidebar_create_channel"); }
-    inline bool sidebarContacts() { return JsonSettings::GetBool("sidebar_contacts"); }
-    inline bool sidebarCalls() { return JsonSettings::GetBool("sidebar_calls"); }
-    inline bool sidebarSavedMessages() { return JsonSettings::GetBool("sidebar_saved_messages"); }
-    inline bool sidebarNightMode() { return JsonSettings::GetBool("sidebar_night_mode"); }
-    inline int stickerSize() { return JsonSettings::GetInt("sticker_size"); }
-    inline int messageRoundness() { return JsonSettings::GetInt("message_roundness"); }
-    inline bool showActionsTime() { return JsonSettings::GetBool("show_actions_time"); }
-    inline bool showSeconds() { return JsonSettings::GetBool("show_seconds"); }
-    inline bool commaAfterMention() { return JsonSettings::GetBool("comma_after_mention"); }
-    inline bool hideBubbleTails() { return JsonSettings::GetBool("hide_bubble_tails"); }
-    inline int stickerShape() { return JsonSettings::GetInt("sticker_shape"); }
-    inline int outgoingQuickAction() { return JsonSettings::GetInt("outgoing_quick_action"); }
-    inline int incomingQuickAction() { return JsonSettings::GetInt("incoming_quick_action"); }
-    inline bool moreRecentStickers() { return JsonSettings::GetBool("more_recent_stickers"); }
-    inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool("spoof_webview_as_android"); }
-    inline bool preciseTime() { return JsonSettings::GetBool("precise_time"); }
-    inline bool showOnlineIndicator() { return JsonSettings::GetBool("show_online_indicator"); }
-    inline int quietModeDeadline() { return JsonSettings::GetInt("quiet_mode_deadline"); }
-    inline bool quietModeEnabled() { return JsonSettings::GetBool("quiet_mode_enabled"); }
-    inline bool analytics() { return JsonSettings::GetBool("analytics"); }
-    inline QString telemetryClientId() { return JsonSettings::GetString("telemetry_client_id"); }
+[[nodiscard]] inline int GetIntWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return GetWithPending(key, accountId, isTestAccount).toInt();
+}
 
-    inline void setStreamerMode(bool value) { JsonSettings::Set("streamer_mode", value); }
-    inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set("auto_hide_notifications", value); }
-    inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set("userpic_in_top_bar", value); }
-    inline void setShowPeerIdDc(bool value) { JsonSettings::Set("show_peer_id_dc", value); }
-    inline void setConnectionBarLost(bool value) { JsonSettings::Set("connection_bar_lost", value); }
-    inline void setConnectionBarProxy(bool value) { JsonSettings::Set("connection_bar_proxy", value); }
-    inline void setAppIcon(const QString& value) { JsonSettings::Set("app_icon", value); }
-    inline void setUserpicRoundness(int value) { JsonSettings::Set("userpic_roundness", value); }
-    inline void setGeneralRoundness(bool value) { JsonSettings::Set("general_roundness", value); }
-    inline void setSidebarMyProfile(bool value) { JsonSettings::Set("sidebar_my_profile", value); }
-    inline void setSidebarBots(bool value) { JsonSettings::Set("sidebar_bots", value); }
-    inline void setSidebarCreateGroup(bool value) { JsonSettings::Set("sidebar_create_group", value); }
-    inline void setSidebarCreateChannel(bool value) { JsonSettings::Set("sidebar_create_channel", value); }
-    inline void setSidebarContacts(bool value) { JsonSettings::Set("sidebar_contacts", value); }
-    inline void setSidebarCalls(bool value) { JsonSettings::Set("sidebar_calls", value); }
-    inline void setSidebarSavedMessages(bool value) { JsonSettings::Set("sidebar_saved_messages", value); }
-    inline void setSidebarNightMode(bool value) { JsonSettings::Set("sidebar_night_mode", value); }
-    inline void setStickerSize(int value) { JsonSettings::Set("sticker_size", value); }
-    inline void setMessageRoundness(int value) { JsonSettings::Set("message_roundness", value); }
-    inline void setShowActionsTime(bool value) { JsonSettings::Set("show_actions_time", value); }
-    inline void setShowSeconds(bool value) { JsonSettings::Set("show_seconds", value); }
-    inline void setCommaAfterMention(bool value) { JsonSettings::Set("comma_after_mention", value); }
-    inline void setHideBubbleTails(bool value) { JsonSettings::Set("hide_bubble_tails", value); }
-    inline void setStickerShape(int value) { JsonSettings::Set("sticker_shape", value); }
-    inline void setOutgoingQuickAction(int value) { JsonSettings::Set("outgoing_quick_action", value); }
-    inline void setIncomingQuickAction(int value) { JsonSettings::Set("incoming_quick_action", value); }
-    inline void setMoreRecentStickers(bool value) { JsonSettings::Set("more_recent_stickers", value); }
-    inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set("spoof_webview_as_android", value); }
-    inline void setPreciseTime(bool value) { JsonSettings::Set("precise_time", value); }
-    inline void setShowOnlineIndicator(bool value) { JsonSettings::Set("show_online_indicator", value); }
-    inline void setQuietModeDeadline(int value) { JsonSettings::Set("quiet_mode_deadline", value); }
-    inline void setQuietModeEnabled(bool value) {
-        JsonSettings::Set("quiet_mode_enabled", value);
-        if (!value) {
-            setQuietModeDeadline(0);
-        }
-    }
-    inline void setAnalytics(bool value) { JsonSettings::Set("analytics", value); }
-    inline void setTelemetryClientId(const QString &value) { JsonSettings::Set("telemetry_client_id", value); }
+[[nodiscard]] inline QString GetStringWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return GetWithPending(key, accountId, isTestAccount).toString();
+}
+
+[[nodiscard]] inline QJsonArray GetJsonArrayWithPending(
+	const QString &key,
+	uint64 accountId = 0,
+	bool isTestAccount = false) {
+	return GetWithPending(key, accountId, isTestAccount).toJsonArray();
+}
+
+} // namespace JsonSettings
+
+inline bool streamerMode() { return JsonSettings::GetBool(u"streamer_mode"_q); }
+inline bool hideNotificationsAutomatically() { return JsonSettings::GetBool(u"auto_hide_notifications"_q); }
+inline bool showUserpicInTopBar() { return JsonSettings::GetBool(u"userpic_in_top_bar"_q); }
+inline bool showPeerIdDc() { return JsonSettings::GetBool(u"show_peer_id_dc"_q); }
+inline bool connectionBarLost() { return JsonSettings::GetBool(u"connection_bar_lost"_q); }
+inline bool connectionBarProxy() { return JsonSettings::GetBool(u"connection_bar_proxy"_q); }
+inline QString appIcon() { return JsonSettings::GetString(u"app_icon"_q); }
+inline int userpicRoundness() { return JsonSettings::GetInt(u"userpic_roundness"_q); }
+inline bool generalRoundness() { return JsonSettings::GetBool(u"general_roundness"_q); }
+inline bool sidebarMyProfile() { return JsonSettings::GetBool(u"sidebar_my_profile"_q); }
+inline bool sidebarBots() { return JsonSettings::GetBool(u"sidebar_bots"_q); }
+inline bool sidebarCreateGroup() { return JsonSettings::GetBool(u"sidebar_create_group"_q); }
+inline bool sidebarCreateChannel() { return JsonSettings::GetBool(u"sidebar_create_channel"_q); }
+inline bool sidebarContacts() { return JsonSettings::GetBool(u"sidebar_contacts"_q); }
+inline bool sidebarCalls() { return JsonSettings::GetBool(u"sidebar_calls"_q); }
+inline bool sidebarSavedMessages() { return JsonSettings::GetBool(u"sidebar_saved_messages"_q); }
+inline bool sidebarNightMode() { return JsonSettings::GetBool(u"sidebar_night_mode"_q); }
+inline int stickerSize() { return JsonSettings::GetInt(u"sticker_size"_q); }
+inline int messageRoundness() { return JsonSettings::GetInt(u"message_roundness"_q); }
+inline bool showActionsTime() { return JsonSettings::GetBool(u"show_actions_time"_q); }
+inline bool showSeconds() { return JsonSettings::GetBool(u"show_seconds"_q); }
+inline bool commaAfterMention() { return JsonSettings::GetBool(u"comma_after_mention"_q); }
+inline bool hideBubbleTails() { return JsonSettings::GetBool(u"hide_bubble_tails"_q); }
+inline int stickerShape() { return JsonSettings::GetInt(u"sticker_shape"_q); }
+inline int outgoingQuickAction() { return JsonSettings::GetInt(u"outgoing_quick_action"_q); }
+inline int incomingQuickAction() { return JsonSettings::GetInt(u"incoming_quick_action"_q); }
+inline bool moreRecentStickers() { return JsonSettings::GetBool(u"more_recent_stickers"_q); }
+inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool(u"spoof_webview_as_android"_q); }
+inline bool preciseTime() { return JsonSettings::GetBool(u"precise_time"_q); }
+inline bool showOnlineIndicator() { return JsonSettings::GetBool(u"show_online_indicator"_q); }
+inline int quietModeDeadline() { return JsonSettings::GetInt(u"quiet_mode_deadline"_q); }
+inline bool quietModeEnabled() { return JsonSettings::GetBool(u"quiet_mode_enabled"_q); }
+inline bool analytics() { return JsonSettings::GetBool(u"analytics"_q); }
+inline QString telemetryClientId() { return JsonSettings::GetString(u"telemetry_client_id"_q); }
+
+inline void setStreamerMode(bool value) { JsonSettings::Set(u"streamer_mode"_q, value); }
+inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set(u"auto_hide_notifications"_q, value); }
+inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set(u"userpic_in_top_bar"_q, value); }
+inline void setShowPeerIdDc(bool value) { JsonSettings::Set(u"show_peer_id_dc"_q, value); }
+inline void setConnectionBarLost(bool value) { JsonSettings::Set(u"connection_bar_lost"_q, value); }
+inline void setConnectionBarProxy(bool value) { JsonSettings::Set(u"connection_bar_proxy"_q, value); }
+inline void setAppIcon(const QString &value) { JsonSettings::Set(u"app_icon"_q, value); }
+inline void setUserpicRoundness(int value) { JsonSettings::Set(u"userpic_roundness"_q, value); }
+inline void setGeneralRoundness(bool value) { JsonSettings::Set(u"general_roundness"_q, value); }
+inline void setSidebarMyProfile(bool value) { JsonSettings::Set(u"sidebar_my_profile"_q, value); }
+inline void setSidebarBots(bool value) { JsonSettings::Set(u"sidebar_bots"_q, value); }
+inline void setSidebarCreateGroup(bool value) { JsonSettings::Set(u"sidebar_create_group"_q, value); }
+inline void setSidebarCreateChannel(bool value) { JsonSettings::Set(u"sidebar_create_channel"_q, value); }
+inline void setSidebarContacts(bool value) { JsonSettings::Set(u"sidebar_contacts"_q, value); }
+inline void setSidebarCalls(bool value) { JsonSettings::Set(u"sidebar_calls"_q, value); }
+inline void setSidebarSavedMessages(bool value) { JsonSettings::Set(u"sidebar_saved_messages"_q, value); }
+inline void setSidebarNightMode(bool value) { JsonSettings::Set(u"sidebar_night_mode"_q, value); }
+inline void setStickerSize(int value) { JsonSettings::Set(u"sticker_size"_q, value); }
+inline void setMessageRoundness(int value) { JsonSettings::Set(u"message_roundness"_q, value); }
+inline void setShowActionsTime(bool value) { JsonSettings::Set(u"show_actions_time"_q, value); }
+inline void setShowSeconds(bool value) { JsonSettings::Set(u"show_seconds"_q, value); }
+inline void setCommaAfterMention(bool value) { JsonSettings::Set(u"comma_after_mention"_q, value); }
+inline void setHideBubbleTails(bool value) { JsonSettings::Set(u"hide_bubble_tails"_q, value); }
+inline void setStickerShape(int value) { JsonSettings::Set(u"sticker_shape"_q, value); }
+inline void setOutgoingQuickAction(int value) { JsonSettings::Set(u"outgoing_quick_action"_q, value); }
+inline void setIncomingQuickAction(int value) { JsonSettings::Set(u"incoming_quick_action"_q, value); }
+inline void setMoreRecentStickers(bool value) { JsonSettings::Set(u"more_recent_stickers"_q, value); }
+inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set(u"spoof_webview_as_android"_q, value); }
+inline void setPreciseTime(bool value) { JsonSettings::Set(u"precise_time"_q, value); }
+inline void setShowOnlineIndicator(bool value) { JsonSettings::Set(u"show_online_indicator"_q, value); }
+inline void setQuietModeDeadline(int value) { JsonSettings::Set(u"quiet_mode_deadline"_q, value); }
+inline void setQuietModeEnabled(bool value) {
+	JsonSettings::Set(u"quiet_mode_enabled"_q, value);
+	if (!value) {
+		setQuietModeDeadline(0);
+	}
+}
+inline void setAnalytics(bool value) { JsonSettings::Set(u"analytics"_q, value); }
+inline void setTelemetryClientId(const QString &value) { JsonSettings::Set(u"telemetry_client_id"_q, value); }
+
 } // namespace RabbitSettings
