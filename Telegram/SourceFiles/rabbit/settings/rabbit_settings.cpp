@@ -18,6 +18,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonValue>
 #include <QtCore/QTimer>
+#include <QtCore/QSet>
 
 namespace RabbitSettings::JsonSettings {
 namespace {
@@ -1045,6 +1046,36 @@ bool ImportSettingsFromJson(const QByteArray &json) {
 		}
 	}
 	return true;
+}
+
+QJsonObject GetFeaturesTelemetryData() {
+	auto result = QJsonObject();
+	const auto blacklist = QSet<QString>{
+		u"api_id"_q,
+		u"api_hash"_q,
+		u"telemetry_client_id"_q,
+		u"quiet_mode_deadline"_q,
+	};
+	for (const auto &[key, def] : DefinitionMap) {
+		if (blacklist.contains(key)) {
+			continue;
+		}
+		switch (def.type) {
+		case BoolSetting:
+			result.insert(key, GetBool(key));
+			break;
+		case IntSetting:
+			result.insert(key, GetInt(key));
+			break;
+		case QStringSetting:
+			result.insert(key, GetString(key));
+			break;
+		case QJsonArraySetting:
+			result.insert(key, GetJsonArray(key));
+			break;
+		}
+	}
+	return result;
 }
 
 } // namespace RabbitSettings::JsonSettings

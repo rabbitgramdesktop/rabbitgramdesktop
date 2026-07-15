@@ -68,6 +68,11 @@ void sendTelemetry() {
 	eventParams[u"app_version"_q] = QString::fromUtf8(AppVersionStr);
 	eventParams[u"os"_q] = osName;
 
+	const auto features = RabbitSettings::JsonSettings::GetFeaturesTelemetryData();
+	for (auto it = features.constBegin(); it != features.constEnd(); ++it) {
+		eventParams.insert(it.key(), it.value());
+	}
+
 	auto eventObj = QJsonObject();
 	eventObj[u"name"_q] = u"app_start"_q;
 	eventObj[u"params"_q] = eventParams;

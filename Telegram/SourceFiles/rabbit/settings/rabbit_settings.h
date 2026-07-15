@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonObject>
 
 namespace RabbitSettings {
 
@@ -125,6 +126,8 @@ bool ImportSettingsFromJson(const QByteArray &json);
 	bool isTestAccount = false) {
 	return GetWithPending(key, accountId, isTestAccount).toJsonArray();
 }
+
+[[nodiscard]] QJsonObject GetFeaturesTelemetryData();
 
 } // namespace JsonSettings
 
