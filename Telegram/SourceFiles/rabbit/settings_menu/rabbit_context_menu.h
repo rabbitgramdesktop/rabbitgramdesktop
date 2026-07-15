@@ -16,8 +16,8 @@ class SessionController;
 namespace Settings::RtgMenu {
 
 void AttachSettingsContextMenu(
-	not_null<QWidget*> widget,
+	not_null<QWidget *> widget,
 	const QString &controlId,
-	not_null<Window::SessionController*> controller);
+	not_null<Window::SessionController *> controller);
 
 } // namespace Settings::RtgMenu

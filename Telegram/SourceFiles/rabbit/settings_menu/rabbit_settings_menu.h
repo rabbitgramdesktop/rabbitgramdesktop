@@ -12,24 +12,24 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 class BoxContent;
 
-namespace Window
-{
-    class Controller;
-    class SessionController;
+namespace Window {
+class Controller;
+class SessionController;
 } // namespace Window
 
-namespace Settings
-{
-    class Rabbit : public Section<Rabbit>
-    {
-    public:
-        Rabbit(QWidget* parent, not_null<Window::SessionController*> controller);
+namespace Settings {
 
-        [[nodiscard]] rpl::producer<QString> title() override;
-        void fillTopBarMenu(
-            const Ui::Menu::MenuCallback &addAction) override;
+class Rabbit final : public Section<Rabbit> {
+public:
+	Rabbit(QWidget *parent, not_null<Window::SessionController *> controller);
 
-    private:
-        void setupContent();
-    };
+	[[nodiscard]] rpl::producer<QString> title() override;
+	void fillTopBarMenu(
+		const Ui::Menu::MenuCallback &addAction) override;
+
+private:
+	void setupContent();
+
+};
+
 } // namespace Settings

@@ -7,7 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
-namespace rabbitTelemetry 
-{
-    void sendTelemetry();
-}
+namespace RabbitTelemetry {
+
+void sendTelemetry();
+
+} // namespace RabbitTelemetry

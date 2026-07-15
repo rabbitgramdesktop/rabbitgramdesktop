@@ -430,7 +430,7 @@ void Application::run() {
 
 	processCreatedWindow(_lastActivePrimaryWindow);
 
-	rabbitTelemetry::sendTelemetry();
+	RabbitTelemetry::sendTelemetry();
 }
 
 void Application::autoRegisterUrlScheme() {

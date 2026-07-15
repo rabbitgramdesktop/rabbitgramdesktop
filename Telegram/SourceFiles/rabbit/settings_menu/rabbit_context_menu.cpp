@@ -26,15 +26,15 @@ base::unique_qptr<Ui::PopupMenu> ContextMenu;
 } // namespace
 
 void AttachSettingsContextMenu(
-		not_null<QWidget*> widget,
-		const QString &controlId,
-		not_null<Window::SessionController*> controller) {
+	not_null<QWidget *> widget,
+	const QString &controlId,
+	not_null<Window::SessionController *> controller) {
 	const auto deepLink = Core::DeepLinks::RtgSettingsDeepLink(controlId);
 	if (deepLink.isEmpty()) {
 		return;
 	}
 
-	base::install_event_filter(widget, [=](not_null<QEvent*> e) {
+	base::install_event_filter(widget, [=](not_null<QEvent *> e) {
 		if (e->type() != QEvent::ContextMenu) {
 			return base::EventFilterResult::Continue;
 		}
@@ -50,7 +50,7 @@ void AttachSettingsContextMenu(
 			});
 
 		ContextMenu->addAction(
-			ktr("rtg_share"),
+			ktr(u"rtg_share"_q),
 			[=] {
 				FastShareLink(controller, deepLink);
 			});

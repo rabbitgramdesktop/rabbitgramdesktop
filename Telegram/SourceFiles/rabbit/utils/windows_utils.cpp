@@ -7,56 +7,57 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #ifdef Q_OS_WIN
 
-#include "windows_utils.h"
+#include "rabbit/utils/windows_utils.h"
 
 #include "storage/localstorage.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <ShlObj_core.h>
+#include <gsl/gsl>
 
-void reloadAppIconFromTaskBar()
-{
-    QString appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
-    QString rabbitgramIconPath = appdata + "/rabbitGram.ico";
+void reloadAppIconFromTaskBar() {
+	const auto appdata = QDir::fromNativeSeparators(QString::fromLocal8Bit(qgetenv("APPDATA")));
+	const auto rabbitgramIconPath = appdata + u"/rabbitGram.ico"_q;
 
-    QString shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/rabbitGram Desktop.lnk";
-    if (!QFile::exists(shortcut))
-    {
-        shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/rabbitGram.lnk";
-    }
+	auto shortcut = appdata + u"/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/rabbitGram Desktop.lnk"_q;
+	if (!QFile::exists(shortcut)) {
+		shortcut = appdata + u"/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/rabbitGram.lnk"_q;
+	}
 
-    if (QFile::exists(shortcut))
-    {
-        IShellLink* pShellLink = nullptr;
-        IPersistFile* pPersistFile = nullptr;
+	if (QFile::exists(shortcut)) {
+		IShellLink *pShellLink = nullptr;
+		HRESULT hr = CoCreateInstance(
+			CLSID_ShellLink,
+			nullptr,
+			CLSCTX_INPROC_SERVER,
+			IID_IShellLink,
+			reinterpret_cast<void **>(&pShellLink));
+		if (SUCCEEDED(hr)) {
+			const auto shellLinkGuard = gsl::finally([&] {
+				pShellLink->Release();
+			});
 
-        HRESULT hr = CoCreateInstance(CLSID_ShellLink,
-                                      nullptr,
-                                      CLSCTX_INPROC_SERVER,
-                                      IID_IShellLink,
-                                      reinterpret_cast<void**>(&pShellLink));
-        if (SUCCEEDED(hr))
-        {
-            hr = pShellLink->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&pPersistFile));
-            if (SUCCEEDED(hr))
-            {
-                const auto nativeShortcut = QDir::toNativeSeparators(shortcut).toStdWString();
-                if (SUCCEEDED(pPersistFile->Load(nativeShortcut.c_str(), STGM_READWRITE)))
-                {
-                    const auto nativeIconPath = QDir::toNativeSeparators(rabbitgramIconPath).toStdWString();
-                    pShellLink->SetIconLocation(nativeIconPath.c_str(), 0);
-                    pPersistFile->Save(nativeShortcut.c_str(), TRUE);
-                }
+			IPersistFile *pPersistFile = nullptr;
+			hr = pShellLink->QueryInterface(
+				IID_IPersistFile,
+				reinterpret_cast<void **>(&pPersistFile));
+			if (SUCCEEDED(hr)) {
+				const auto persistFileGuard = gsl::finally([&] {
+					pPersistFile->Release();
+				});
 
-                pPersistFile->Release();
-            }
+				const auto nativeShortcut = QDir::toNativeSeparators(shortcut).toStdWString();
+				if (SUCCEEDED(pPersistFile->Load(nativeShortcut.c_str(), STGM_READWRITE))) {
+					const auto nativeIconPath = QDir::toNativeSeparators(rabbitgramIconPath).toStdWString();
+					pShellLink->SetIconLocation(nativeIconPath.c_str(), 0);
+					pPersistFile->Save(nativeShortcut.c_str(), TRUE);
+				}
+			}
+		}
 
-            pShellLink->Release();
-        }
-
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
-    }
+		SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+	}
 }
 
 #endif

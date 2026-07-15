@@ -10,15 +10,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 
-class IconPicker : public Ui::RpWidget
-{
+class IconPicker final : public Ui::RpWidget {
 public:
-    IconPicker(QWidget* parent);
+	IconPicker(QWidget *parent);
 
 protected:
-    void paintEvent(QPaintEvent* e) override;
-    void mousePressEvent(QMouseEvent* e) override;
+	void paintEvent(QPaintEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
 
-    Ui::Animations::Simple animation;
-    QString wasSelected;
+private:
+	Ui::Animations::Simple _animation;
+	QString _wasSelected;
+
 };

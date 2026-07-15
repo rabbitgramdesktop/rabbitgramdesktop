@@ -5,19 +5,20 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
-#include "previews.h"
+#include "rabbit/ui/settings/previews.h"
 
-#include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings/quick_action.h"
-#include <rabbit/settings/quick_action_ui.h>
-#include "styles/style_rabbit_assets.h"
-#include "styles/style_chat.h"
-#include "ui/painter.h"
+#include "rabbit/settings/quick_action_ui.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
+#include "ui/painter.h"
 
-#include <rpl/producer.h>
 #include <array>
+#include <rpl/producer.h>
+
+#include "styles/style_chat.h"
+#include "styles/style_rabbit_assets.h"
 
 namespace {
 
@@ -72,7 +73,7 @@ ChatPreview::ChatPreview(QWidget *parent) : RpWidget(parent) {
 	setMinimumHeight(st::stickerPreviewSize);
 
 	RabbitSettings::JsonSettings::Events(
-		"sticker_shape"
+		u"sticker_shape"_q
 	) | rpl::on_next([=] {
 		update();
 	}, lifetime());
@@ -234,13 +235,13 @@ QuickActionsPreview::QuickActionsPreview(QWidget *parent) : RpWidget(parent) {
 	setMinimumSize(st::quickActionPreviewWidth, st::quickActionPreviewHeight);
 
 	RabbitSettings::JsonSettings::Events(
-		"incoming_quick_action"
+		u"incoming_quick_action"_q
 	) | rpl::on_next([=] {
 		update();
 	}, lifetime());
 
 	RabbitSettings::JsonSettings::Events(
-		"outgoing_quick_action"
+		u"outgoing_quick_action"_q
 	) | rpl::on_next([=] {
 		update();
 	}, lifetime());
@@ -249,7 +250,7 @@ QuickActionsPreview::QuickActionsPreview(QWidget *parent) : RpWidget(parent) {
 void QuickActionsPreview::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	PainterHighQualityEnabler hq(p);
-	
+
 	const auto radius = st::quickActionBoxHeight / 4;
 	const auto incomingBox = QRect(
 		QPoint(1, 1),
@@ -264,21 +265,21 @@ void QuickActionsPreview::paintEvent(QPaintEvent *e) {
 	p.setBrush(st::windowBgOver);
 	p.drawRoundedRect(
 		incomingBox,
-		radius, 
+		radius,
 		radius);
-	
+
 	p.drawRoundedRect(
 		outgoingBox,
-		radius, 
+		radius,
 		radius);
 
-	auto incoming_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::incomingQuickAction());
-	auto outgoing_action = static_cast<RabbitSettings::QuickAction>(RabbitSettings::outgoingQuickAction());
-	auto incoming_icon = RabbitSettings::QuickActionIcon(incoming_action);
-	auto outgoing_icon = RabbitSettings::QuickActionIcon(outgoing_action);
+	const auto incomingAction = static_cast<RabbitSettings::QuickAction>(RabbitSettings::incomingQuickAction());
+	const auto outgoingAction = static_cast<RabbitSettings::QuickAction>(RabbitSettings::outgoingQuickAction());
+	auto incomingIcon = RabbitSettings::QuickActionIcon(incomingAction);
+	auto outgoingIcon = RabbitSettings::QuickActionIcon(outgoingAction);
 
-	if (incoming_icon) {
-		const auto icon = Settings::Icon(std::move(incoming_icon));
+	if (incomingIcon) {
+		const auto icon = Settings::Icon(std::move(incomingIcon));
 		const auto iconLeft = incomingBox.x()
 			+ (incomingBox.width() - icon.width()) / 2;
 		const auto iconTop = incomingBox.y()
@@ -286,8 +287,8 @@ void QuickActionsPreview::paintEvent(QPaintEvent *e) {
 		icon.paint(p, iconLeft, iconTop);
 	}
 
-	if (outgoing_icon) {
-		const auto icon = Settings::Icon(std::move(outgoing_icon));
+	if (outgoingIcon) {
+		const auto icon = Settings::Icon(std::move(outgoingIcon));
 		const auto iconLeft = outgoingBox.x()
 			+ (outgoingBox.width() - icon.width()) / 2;
 		const auto iconTop = outgoingBox.y()

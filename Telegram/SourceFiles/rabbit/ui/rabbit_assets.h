@@ -7,26 +7,27 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
-#define ICON(name, value) const auto name##_ICON = QStringLiteral(value)
+#include <QtGui/QImage>
 
-namespace RabbitAssets
-{
-    ICON(DEFAULT, "default");
-    ICON(ANGEL, "angel");
-    ICON(BLACKOUT, "blackout");
-    ICON(COLOR, "color");
-    ICON(IMPOSTOR, "impostor");
-    ICON(MATRIX, "matrix");
-    ICON(MOON, "moon");
-    ICON(OLD, "old");
-    ICON(SEASONAL, "seasonal");
-    ICON(TWITCH, "twitch");
+namespace RabbitAssets {
 
-    void loadAppIco();
+inline const auto DEFAULT_ICON = u"default"_q;
+inline const auto ANGEL_ICON = u"angel"_q;
+inline const auto BLACKOUT_ICON = u"blackout"_q;
+inline const auto COLOR_ICON = u"color"_q;
+inline const auto IMPOSTOR_ICON = u"impostor"_q;
+inline const auto MATRIX_ICON = u"matrix"_q;
+inline const auto MOON_ICON = u"moon"_q;
+inline const auto OLD_ICON = u"old"_q;
+inline const auto SEASONAL_ICON = u"seasonal"_q;
+inline const auto TWITCH_ICON = u"twitch"_q;
 
-    QImage loadPreview(const QString &name);
+void loadAppIco();
 
-    QString currentAppLogoName();
-    QImage currentAppLogo();
-    QImage currentAppLogoNoMargin();
-}
+[[nodiscard]] QImage loadPreview(const QString &name);
+
+[[nodiscard]] QString currentAppLogoName();
+[[nodiscard]] QImage currentAppLogo();
+[[nodiscard]] QImage currentAppLogoNoMargin();
+
+} // namespace RabbitAssets

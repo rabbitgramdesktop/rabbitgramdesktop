@@ -8,10 +8,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/deep_links/deep_links_rtg.h"
 
 #include "core/deep_links/deep_links_router.h"
-#include "rabbit/settings_menu/rabbit_settings_menu.h"
-#include "rabbit/settings_menu/sections/rabbit_general.h"
 #include "rabbit/settings_menu/sections/rabbit_appearance.h"
 #include "rabbit/settings_menu/sections/rabbit_chats.h"
+#include "rabbit/settings_menu/sections/rabbit_general.h"
+#include "rabbit/settings_menu/rabbit_settings_menu.h"
 #include "window/window_session_controller.h"
 
 namespace Core::DeepLinks {
@@ -34,7 +34,7 @@ struct RtgSectionMapping {
 Result HandleRtgSettingsWithSuffix(
 		const Context &ctx,
 		const QString &pathPrefix,
-		const Settings::Type& sectionId) {
+		const Settings::Type &sectionId) {
 	if (!ctx.controller) {
 		return Result::NeedsAuth;
 	}

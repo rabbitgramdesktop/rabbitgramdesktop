@@ -15,7 +15,7 @@ namespace Ui {
 class ChatStyle;
 } // namespace Ui
 
-class RoundnessPreview : public Ui::RpWidget {
+class RoundnessPreview final : public Ui::RpWidget {
 public:
 	RoundnessPreview(QWidget *parent);
 
@@ -24,7 +24,7 @@ protected:
 
 };
 
-class ChatPreview : public Ui::RpWidget {
+class ChatPreview final : public Ui::RpWidget {
 public:
 	ChatPreview(QWidget *parent);
 
@@ -40,18 +40,21 @@ private:
 
 };
 
-class StickerShapePicker : public Ui::RpWidget {
+class StickerShapePicker final : public Ui::RpWidget {
 public:
 	StickerShapePicker(QWidget *parent);
 
 protected:
 	void paintEvent(QPaintEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
+
 };
 
-class QuickActionsPreview : public Ui::RpWidget {
+class QuickActionsPreview final : public Ui::RpWidget {
 public:
 	QuickActionsPreview(QWidget *parent);
+
 protected:
 	void paintEvent(QPaintEvent *e) override;
+
 };
