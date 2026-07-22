@@ -9,8 +9,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/effects/ripple_animation.h"
 #include "ui/widgets/side_bar_button.h"
+#include "ui/painter.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
+#include "styles/style_rabbit_assets.h"
 
 #include <QScrollBar>
 
@@ -51,10 +54,19 @@ ChatsFiltersTabs::ChatsFiltersTabs(
 		update();
 	}, lifetime());
 	Ui::DiscreteSlider::setSelectOnPress(false);
+
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"folders_style"_q),
+		RabbitSettings::JsonSettings::Events(u"folders_show_icon"_q)
+	) | rpl::on_next([=] {
+		fitWidthToSections();
+		update();
+	}, lifetime());
 }
 
 bool ChatsFiltersTabs::setSectionsAndCheckChanged(
 		std::vector<TextWithEntities> &&sections,
+		std::vector<Ui::FilterIcon> &&icons,
 		const Text::MarkedContext &context,
 		Fn<bool()> paused) {
 	const auto &was = sectionsRef();
@@ -73,6 +85,7 @@ bool ChatsFiltersTabs::setSectionsAndCheckChanged(
 		Ui::DiscreteSlider::setSections(std::move(sections), context);
 		updateSectionsContentWidths();
 	}
+	_icons = std::move(icons);
 	_emojiPaused = std::move(paused);
 	return changed;
 }
@@ -143,6 +156,39 @@ void ChatsFiltersTabs::updateSectionsContentWidths() {
 }
 
 void ChatsFiltersTabs::fitWidthToSections() {
+	const auto unreadBadgeWidth = [&](int index) {
+		const auto it = _unreadCounts.find(index);
+		if (it == _unreadCounts.end()) {
+			return 0;
+		}
+		const auto count = it->second.count;
+		const auto widthIndex = (count < 10)
+			? 0
+			: (count < 100)
+			? 1
+			: 2;
+		return _cachedBadgeWidths[widthIndex] + _unreadSkip;
+	};
+
+	auto &sections = sectionsRef();
+	for (size_t i = 0; i < sections.size(); ++i) {
+		int width = sections[i].label.maxWidth();
+		
+		if (RabbitSettings::foldersShowIcon() && i < _icons.size()) {
+			const auto &icons = Ui::LookupFilterIcon(_icons[i]);
+			const auto iconHeight = icons.normal->height();
+			const auto targetHeight = _cachedBadgeHeight;
+			const auto targetWidth = (iconHeight > 0)
+				? int(std::round(icons.normal->width() * (double(targetHeight) / iconHeight)))
+				: icons.normal->width();
+			width += targetWidth + (st::lineWidth * 4);
+		}
+		
+		width += unreadBadgeWidth(i);
+		
+		sections[i].contentWidth = width;
+	}
+
 	SettingsSlider::fitWidthToSections();
 
 	_lockedFromX = calculateLockedFromX();
@@ -158,6 +204,7 @@ void ChatsFiltersTabs::fitWidthToSections() {
 
 void ChatsFiltersTabs::setUnreadCount(int index, int unreadCount, bool mute) {
 	const auto it = _unreadCounts.find(index);
+	auto changed = false;
 	if (it == _unreadCounts.end()) {
 		if (unreadCount) {
 			_unreadCounts.emplace(index, Unread{
@@ -168,18 +215,22 @@ void ChatsFiltersTabs::setUnreadCount(int index, int unreadCount, bool mute) {
 					int(std::numeric_limits<ushort>::max()))),
 				.muted = mute,
 			});
-			update();
+			changed = true;
 		}
 	} else if (!unreadCount) {
 		_unreadCounts.erase(it);
-		update();
+		changed = true;
 	} else if (it->second.count != unreadCount || it->second.muted != mute) {
 		it->second.count = unreadCount;
 		it->second.muted = mute;
 		it->second.cache = cacheUnreadCount(unreadCount, mute);
-		update();
+		changed = true;
 	}
 	updateSectionsContentWidths();
+	if (changed) {
+		fitWidthToSections();
+		update();
+	}
 }
 
 int ChatsFiltersTabs::calculateLockedFromX() const {
@@ -237,6 +288,14 @@ QImage ChatsFiltersTabs::cacheUnreadCount(int count, bool muted) const {
 	return image;
 }
 
+enum class FolderStyle {
+	Default = 0,
+	Indicator = 1,
+	Chip = 2,
+	Rounded = 3,
+	Text = 4,
+};
+
 void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
@@ -245,30 +304,57 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 	const auto activeIndex = activeSection();
 	const auto now = crl::now();
 
+	const auto activeHorizontalShift = (activeIndex >= 0 && activeIndex < _sections.size()) ? _sections[activeIndex].horizontalShift : 0;
+	
+	const auto style = static_cast<FolderStyle>(RabbitSettings::foldersStyle());
+	if (style == FolderStyle::Default || style == FolderStyle::Rounded || style == FolderStyle::Chip) {
+		const auto add = 8;
+		const auto from = std::max(range.left - add, 0);
+		const auto till = std::min(range.left + range.width + add, width());
+		if (from < till) {
+			auto hq = PainterHighQualityEnabler(p);
+			p.setPen(Qt::NoPen);
+			
+			QColor color = _st.rippleBgActive->c;
+			int h = height();
+			int top = 0;
+			double radius = 0;
+			
+			if (style == FolderStyle::Default) {
+				top = 2;
+				h = height() - 4;
+				radius = 4;
+			} else if (style == FolderStyle::Rounded) {
+				h = height() - 6;
+				top = 3;
+				radius = h * 0.5;
+			} else if (style == FolderStyle::Chip) {
+				h = height() - 6;
+				top = 3;
+				radius = h * 0.25;
+			}
+			
+			p.setBrush(color);
+			p.drawRoundedRect(
+				myrtlrect(
+					from,
+					top,
+					till - from,
+					h).translated(activeHorizontalShift, 0),
+				radius,
+				radius);
+		}
+	}
+
 	auto index = 0;
 	auto raisedIndex = -1;
-	auto activeHorizontalShift = 0;
 	const auto drawSection = [&](Section &section) {
-		// const auto activeWidth = _st.barSnapToLabel
-		// 	? section.contentWidth
-		// 	: section.width;
-
 		const auto horizontalShift = _sections[index].horizontalShift;
 		const auto shiftedLeft = section.left + horizontalShift;
 		if (_sections[index].raise) {
 			raisedIndex = index;
 		}
-		if (index == activeIndex) {
-			activeHorizontalShift = horizontalShift;
-		}
 
-		// const auto activeLeft = shiftedLeft
-		// 	+ (section.width - activeWidth) / 2;
-		// const auto active = 1.
-		// 	- std::clamp(
-		// 		std::abs(range.left - activeLeft) / float64(range.width),
-		// 		0.,
-		// 		1.);
 		const auto active = (index == activeIndex) ? 1. : 0.;
 		if (section.ripple) {
 			const auto color = anim::color(
@@ -300,32 +386,41 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 				? 0
 				: section.label.maxWidth();
 			p.setPen(anim::pen(_st.labelFg, _st.labelFgActive, active));
-			if (icon) {
-				icon->paint(
-					p,
-					labelLeft,
-					_st.labelTop
-						+ (_st.labelStyle.font->height - icon->height()) / 2,
-					width(),
-					anim::color(_st.labelFg, _st.labelFgActive, active));
+			auto textLeft = labelLeft;
+			if (RabbitSettings::foldersShowIcon() && index < _icons.size()) {
+				const auto &icons = Ui::LookupFilterIcon(_icons[index]);
+				const auto &icon = (active > 0.5) ? *icons.active : *icons.normal;
+				
+				const auto targetHeight = _cachedBadgeHeight;
+				const auto iconHeight = icon.height();
+				const auto targetWidth = (iconHeight > 0)
+					? int(std::round(icon.width() * (double(targetHeight) / iconHeight)))
+					: icon.width();
+				
+				p.save();
+				p.translate(labelLeft, _st.labelTop + (_st.labelStyle.font->height - targetHeight) / 2);
+				const auto scale = double(targetHeight) / iconHeight;
+				p.scale(scale, scale);
+				icon.paint(p, 0, 0, icon.width());
+				p.restore();
+				
+				textLeft += targetWidth + (st::lineWidth * 4);
 			}
-			if (labelWidth > 0) {
-				section.label.draw(p, {
-					.position = QPoint(labelLeft + iconExtra, _st.labelTop),
-					.outerWidth = width(),
-					.availableWidth = section.label.maxWidth(),
-					.now = now,
-					.pausedEmoji = _emojiPaused && _emojiPaused(),
-				});
-			}
+			
+			section.label.draw(p, {
+				.position = QPoint(textLeft, _st.labelTop),
+				.outerWidth = width(),
+				.availableWidth = section.label.maxWidth(),
+				.now = now,
+				.pausedEmoji = _emojiPaused && _emojiPaused(),
+			});
 			{
 				const auto it = _unreadCounts.find(index);
 				if (it != _unreadCounts.end()) {
 					p.drawImage(
-						labelLeft
-							+ iconExtra
-							+ labelWidth
-							+ _unreadSkip,
+						textLeft
+							+ _unreadSkip
+							+ section.label.maxWidth(),
 						_st.labelTop,
 						it->second.cache);
 				}
@@ -337,7 +432,7 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 				const auto size = _lockCache->size()
 					/ style::DevicePixelRatio();
 				p.drawImage(
-					labelLeft + (iconExtra + labelWidth - size.width()) / 2,
+					textLeft + (section.label.maxWidth() - size.width()) / 2,
 					height() - size.height() - st::lineWidth,
 					*_lockCache);
 				p.setOpacity(1.0);
@@ -351,26 +446,29 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 		index = raisedIndex;
 		drawSection(*_sections[raisedIndex].section);
 	}
-	if (_st.barSnapToLabel) {
-		const auto drawRect = [&](QRect rect, bool active) {
-			const auto &bar = active ? _barActive : _bar;
-			if (bar) {
-				bar->paint(p, rect);
-			} else {
-				p.fillRect(rect, active ? _st.barFgActive : _st.barFg);
-			}
+	
+	if (style == FolderStyle::Indicator) {
+		if (_st.barSnapToLabel) {
+			const auto drawRect = [&](QRect rect, bool active) {
+				const auto &bar = active ? _barActive : _bar;
+				if (bar) {
+					bar->paint(p, rect);
+				} else {
+					p.fillRect(rect, active ? _st.barFgActive : _st.barFg);
+				}
 			};
-		const auto add = _st.barStroke / 2;
-		const auto from = std::max(range.left - add, 0);
-		const auto till = std::min(range.left + range.width + add, width());
-				if (from < till) {
-			drawRect(
-				myrtlrect(
-					from,
-					_st.barTop,
-					till - from,
-					_st.barStroke).translated(activeHorizontalShift, 0),
-				true);
+			const auto add = _st.barStroke / 2;
+			const auto from = std::max(range.left - add, 0);
+			const auto till = std::min(range.left + range.width + add, width());
+			if (from < till) {
+				drawRect(
+					myrtlrect(
+						from,
+						_st.barTop,
+						till - from,
+						_st.barStroke).translated(activeHorizontalShift, 0),
+					true);
+			}
 		}
 	}
 }

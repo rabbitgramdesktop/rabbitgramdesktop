@@ -44,6 +44,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "storage/storage_media_prepare.h"
 #include "api/api_chat_filters.h"
 #include "apiwrap.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 #include "styles/style_menu_icons.h"
@@ -112,6 +113,7 @@ FiltersMenu::FiltersMenu(
 			_session->setActiveChatsFilter(_drag.filterId);
 		}
 	});
+	_menu.setFolderStyle(RabbitSettings::foldersStyle());
 	setup();
 }
 
@@ -159,6 +161,14 @@ void FiltersMenu::setup() {
 		rpl::single(rpl::empty) | rpl::then(filters->changed()),
 		std::move(premium)
 	) | rpl::on_next([=] {
+		refresh();
+	}, _outer.lifetime());
+
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"folders_style"_q),
+		RabbitSettings::JsonSettings::Events(u"folders_show_icon"_q)
+	) | rpl::on_next([=] {
+		_menu.setFolderStyle(RabbitSettings::foldersStyle());
 		refresh();
 	}, _outer.lifetime());
 
@@ -580,6 +590,7 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 	prepared->setIsListItem(listItem);
 	prepared->setShowIcon(mode != Ui::ChatsFiltersTabsMode::TextOnly);
 	prepared->setShowText(mode != Ui::ChatsFiltersTabsMode::IconsOnly);
+	prepared->setFolderStyle(RabbitSettings::foldersStyle());
 	auto added = toBeginning
 		? container->insert(0, std::move(prepared))
 		: container->add(std::move(prepared));

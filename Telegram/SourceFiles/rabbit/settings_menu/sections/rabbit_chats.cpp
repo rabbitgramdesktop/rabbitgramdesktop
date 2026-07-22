@@ -21,6 +21,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/ui/settings/previews.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
+#include "styles/style_boxes.h"
+#include "ui/layers/generic_box.h"
 #include "ui/cached_round_corners.h"
 #include "ui/chat/chat_style.h"
 #include "ui/boxes/confirm_box.h"
@@ -1257,11 +1259,130 @@ void BuildStickers(
 	}
 }
 
+void FoldersStyleBox(not_null<Ui::GenericBox *> box) {
+	box->setTitle(rktr(u"rtg_settings_folders_style"_q));
+
+	const auto layout = box->verticalLayout();
+
+	const auto styles = std::vector<int>{
+		0, // Default
+		1, // Indicator
+		2, // Chip
+		3, // Rounded
+		4  // Text
+	};
+
+	const auto addOption = [&](
+		rpl::producer<QString> label,
+		int value) {
+		Settings::AddButtonWithIcon(
+			layout,
+			std::move(label),
+			st::settingsButtonNoIcon,
+			{}
+		)->addClickHandler([=] {
+			RabbitSettings::setFoldersStyle(value);
+			box->closeBox();
+		});
+	};
+
+	for (const auto &val : styles) {
+		rpl::producer<QString> label;
+		switch (val) {
+		case 1: label = rktr(u"rtg_settings_folders_style_indicator"_q); break;
+		case 2: label = rktr(u"rtg_settings_folders_style_chip"_q); break;
+		case 3: label = rktr(u"rtg_settings_folders_style_rounded"_q); break;
+		case 4: label = rktr(u"rtg_settings_folders_style_text"_q); break;
+		default: label = rktr(u"rtg_settings_folders_style_default"_q); break;
+		}
+		addOption(std::move(label), val);
+	}
+
+	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+	box->setWidth(st::aboutWidth);
+}
+
+void BuildFolders(
+	SectionBuilder &builder,
+	Window::SessionController *controller) {
+	builder.addSubsectionTitle({
+		.id = u"rabbit/chats/folders"_q,
+		.title = rktr(u"rtg_settings_folders"_q),
+		.keywords = { u"folders"_q, u"tabs"_q },
+	});
+
+	AddToggle(
+		builder,
+		u"rabbit/chats/folders/horizontal"_q,
+		tr::lng_filters_horizontal(),
+		nullptr,
+		[] { return Core::App().settings().chatFiltersHorizontal(); },
+		[](bool value) {
+			Core::App().settings().setChatFiltersHorizontal(value);
+			Core::App().saveSettingsDelayed();
+		},
+		{ u"horizontal"_q, u"vertical"_q, u"alignment"_q });
+
+	const auto styleLabel = rpl::merge(
+		rpl::single(QString()),
+		RabbitSettings::JsonSettings::Events(u"folders_style"_q)
+	) | rpl::map([](const QString &) {
+		switch (RabbitSettings::foldersStyle()) {
+		case 1: return rktr(u"rtg_settings_folders_style_indicator"_q);
+		case 2: return rktr(u"rtg_settings_folders_style_chip"_q);
+		case 3: return rktr(u"rtg_settings_folders_style_rounded"_q);
+		case 4: return rktr(u"rtg_settings_folders_style_text"_q);
+		default: return rktr(u"rtg_settings_folders_style_default"_q);
+		}
+	}) | rpl::flatten_latest();
+
+	if (const auto button = builder.addButton({
+		.id = u"rabbit/chats/folders/style"_q,
+		.title = rktr(u"rtg_settings_folders_style"_q),
+		.st = &st::settingsButtonNoIcon,
+		.label = styleLabel,
+		.onClick = controller
+			? [=] { controller->show(Box(FoldersStyleBox)); }
+			: Fn<void()>(),
+		.keywords = { u"style"_q, u"folders"_q },
+	})) {
+		if (controller) {
+			RtgMenu::AttachSettingsContextMenu(
+				button,
+				u"rabbit/chats/folders/style"_q,
+				controller);
+		}
+	}
+
+	auto showIconShown = rpl::merge(
+		rpl::single(rpl::empty),
+		Core::App().settings().chatFiltersHorizontalChanges() | rpl::to_empty
+	) | rpl::map([=] {
+		return Core::App().settings().chatFiltersHorizontal();
+	});
+
+	builder.scope([&] {
+		AddToggle(
+			builder,
+			u"rabbit/chats/folders/show_icon"_q,
+			rktr(u"rtg_settings_folders_show_icon"_q),
+			nullptr,
+			[] { return RabbitSettings::foldersShowIcon(); },
+			[](bool value) { RabbitSettings::setFoldersShowIcon(value); },
+			{ u"show"_q, u"icon"_q, u"folders"_q });
+	}, std::move(showIconShown));
+}
+
 void BuildRabbitChats(
 	SectionBuilder &builder,
 	Window::SessionController *controller) {
 	builder.addSkip();
 	BuildTopGeneral(builder, controller);
+
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+	BuildFolders(builder, controller);
 
 	builder.addSkip();
 	builder.addDivider();

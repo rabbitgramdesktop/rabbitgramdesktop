@@ -181,6 +181,8 @@ inline void setSwipeActionsList(const std::vector<SwipeAction> &list) {
 	JsonSettings::Set(u"swipe_actions_list"_q, arr);
 }
 inline bool moreRecentStickers() { return JsonSettings::GetBool(u"more_recent_stickers"_q); }
+inline int foldersStyle() { return JsonSettings::GetInt(u"folders_style"_q); }
+inline bool foldersShowIcon() { return JsonSettings::GetBool(u"folders_show_icon"_q); }
 inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool(u"spoof_webview_as_android"_q); }
 inline bool preciseTime() { return JsonSettings::GetBool(u"precise_time"_q); }
 inline bool showOnlineIndicator() { return JsonSettings::GetBool(u"show_online_indicator"_q); }
@@ -234,6 +236,8 @@ inline void setStickerShape(int value) { JsonSettings::Set(u"sticker_shape"_q, v
 inline void setOutgoingQuickAction(int value) { JsonSettings::Set(u"outgoing_quick_action"_q, value); }
 inline void setIncomingQuickAction(int value) { JsonSettings::Set(u"incoming_quick_action"_q, value); }
 inline void setMoreRecentStickers(bool value) { JsonSettings::Set(u"more_recent_stickers"_q, value); }
+inline void setFoldersStyle(int value) { JsonSettings::Set(u"folders_style"_q, value); }
+inline void setFoldersShowIcon(bool value) { JsonSettings::Set(u"folders_show_icon"_q, value); }
 inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set(u"spoof_webview_as_android"_q, value); }
 inline void setPreciseTime(bool value) { JsonSettings::Set(u"precise_time"_q, value); }
 inline void setShowOnlineIndicator(bool value) { JsonSettings::Set(u"show_online_indicator"_q, value); }

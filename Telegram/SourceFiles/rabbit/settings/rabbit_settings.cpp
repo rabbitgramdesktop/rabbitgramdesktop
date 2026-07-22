@@ -433,6 +433,19 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"folders_style"_q, {
+			.type = IntSetting,
+			.defaultValue = 0,
+			.limitHandler = IntLimit(0, 4, 0),
+		}
+	},
+	{
+		u"folders_show_icon"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
+	},
+	{
 		u"spoof_webview_as_android"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,

@@ -39,6 +39,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_dialogs.h" // dialogsSearchTabs
 #include "styles/style_media_player.h" // mediaPlayerMenuCheck
 #include "styles/style_menu_icons.h"
+#include "ui/filter_icons.h"
 
 #include <QScrollBar>
 
@@ -388,6 +389,14 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			return On(PowerSaving::kEmojiChat)
 				|| controller->isGifPausedAtLeastFor(pauseLevel);
 		};
+		auto icons = ranges::views::all(
+			list
+		) | ranges::views::transform([](const Data::ChatFilter &filter) {
+			return filter.id()
+				? Ui::ComputeFilterIcon(filter)
+				: Ui::FilterIcon::All;
+		}) | ranges::to_vector;
+
 		const auto sectionsChanged = slider->setSectionsAndCheckChanged(
 			ranges::views::all(
 				list
@@ -398,7 +407,10 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					: title.isStatic
 					? Data::ForceCustomEmojiStatic(title.text)
 					: title.text;
-			}) | ranges::to_vector, context, paused);
+			}) | ranges::to_vector,
+			std::move(icons),
+			context,
+			paused);
 		slider->setSectionIcons(ranges::views::all(
 			list
 		) | ranges::views::transform([](const Data::ChatFilter &filter) {

@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/unread_badge_paint.h"
 #include "ui/widgets/chat_filters_tabs_mode.h"
 #include "ui/widgets/discrete_sliders.h"
+#include "ui/filter_icons.h"
 
 namespace style {
 namespace internal {
@@ -33,6 +34,7 @@ public:
 
 	bool setSectionsAndCheckChanged(
 		std::vector<TextWithEntities> &&sections,
+		std::vector<Ui::FilterIcon> &&icons,
 		const Text::MarkedContext &context,
 		Fn<bool()> paused);
 
@@ -108,6 +110,7 @@ private:
 	Fn<bool()> _emojiPaused;
 
 	int _reordering = 0;
+	std::vector<Ui::FilterIcon> _icons;
 
 	rpl::lifetime _paletteLifetime;
 	rpl::event_stream<int> _contextMenuRequested;
