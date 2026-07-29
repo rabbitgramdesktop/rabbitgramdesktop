@@ -281,22 +281,51 @@ void PeerMenuAddMuteSubmenuAction(
 
 Fn<void()> GoToFirstMessageHandler(
 	not_null<Window::SessionController*> controller,
-	not_null<PeerData*> peer)
+	Dialogs::Key key)
 {
 	const auto weak = base::make_weak(controller.get());
-	const auto jump = [=](const QDate &date)
-	{
-		const auto chat = peer->owner().history(peer->id);
-		const auto open = [=](not_null<PeerData*> peer, MsgId id)
+	return [=] {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		if (const auto topic = key.topic()) {
+			strong->showThread(topic, topic->rootId(), SectionShow::Way::Forward);
+			return;
+		}
+		const auto jump = [=](const QDate &date)
 		{
-			if (const auto strong = weak.get())
+			const auto thread = key.thread();
+			const auto open = [=](not_null<PeerData*> peer, MsgId id)
 			{
-				strong->showPeerHistory(peer, SectionShow::Way::Forward, id);
+				if (const auto s = weak.get())
+				{
+					if (thread)
+					{
+						s->showThread(thread, id, SectionShow::Way::Forward);
+					}
+					else
+					{
+						s->showPeerHistory(peer, SectionShow::Way::Forward, id);
+					}
+				}
+			};
+			if (const auto peer = key.peer())
+			{
+				peer->session().api().resolveJumpToDate(key, date, open);
 			}
 		};
-		peer->session().api().resolveJumpToDate(chat, date, open);
+		jump(QDate(2013, 8, 1));
 	};
-	return [=] { jump(QDate(2013, 8, 1)); };
+}
+
+Fn<void()> GoToFirstMessageHandler(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer)
+{
+	return GoToFirstMessageHandler(
+		controller,
+		Dialogs::Key(peer->owner().history(peer->id)));
 }	
 
 class Filler {
@@ -997,9 +1026,19 @@ void Filler::addBlockUser() {
 
 void Filler::addGoToFirstMessage()
 {
+	const auto key = _request.key
+		? _request.key
+		: _topic
+		? Dialogs::Key(_topic)
+		: _peer
+		? Dialogs::Key(_peer->owner().history(_peer->id))
+		: Dialogs::Key();
+	if (!key) {
+		return;
+	}
 	_addAction(
 		ktr("rtg_goto_first_message"),
-		GoToFirstMessageHandler(_controller, _peer),
+		GoToFirstMessageHandler(_controller, key),
 		&st::menuIconGoToBeginning);
 }
 
@@ -1944,6 +1983,7 @@ void Filler::fillContextMenuActions() {
 		}
 	}
 	addBanFromChannel();
+	addGoToFirstMessage();
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
@@ -1989,6 +2029,7 @@ void Filler::fillProfileActions() {
 	addSetPersonalChannel();
 	addTopicLink();
 	addManageTopic();
+	addGoToFirstMessage();
 	addToggleTopicClosed();
 	addViewDiscussion();
 	addDirectMessages();
@@ -2007,6 +2048,7 @@ void Filler::fillRepliesActions() {
 	if (_topic) {
 		addInfo();
 		addManageTopic();
+		addGoToFirstMessage();
 	}
 	addBoostChat();
 	addCreatePoll();
