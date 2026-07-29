@@ -149,7 +149,9 @@ void SetupSubButtonBackground(
 		auto hq = PainterHighQualityEnabler(p);
 		p.setBrush(st::boxBg);
 		p.setPen(Qt::NoPen);
-		p.drawEllipse(background->rect());
+		const auto radius = background->rect().height()
+			* RabbitSettings::userpicRoundness() / 100.0;
+		p.drawRoundedRect(background->rect(), radius, radius);
 	}, background->lifetime());
 
 	upload->positionValue(
