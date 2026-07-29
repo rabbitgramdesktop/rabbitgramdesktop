@@ -45,6 +45,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/ui_integration.h"
 #include "styles/style_chat.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 namespace HistoryView {
 namespace {
 
@@ -52,6 +54,18 @@ constexpr auto kStoryWidth = 720;
 constexpr auto kStoryHeight = 1280;
 
 using Data::PhotoSize;
+
+[[nodiscard]] int UserpicRadius(int side, bool forum) {
+	auto radius = side * (RabbitSettings::userpicRoundness() / 100.);
+	if (forum && !RabbitSettings::generalRoundness()) {
+		radius *= Ui::ForumUserpicRadiusMultiplier();
+	}
+	return int(std::round(radius));
+}
+
+[[nodiscard]] int UserpicRadius(QSize size, bool forum) {
+	return UserpicRadius(std::min(size.width(), size.height()), forum);
+}
 
 [[nodiscard]] bool IsHostedInstantViewMedia(not_null<const Element*> parent) {
 	return parent->Get<InstantViewMediaRuntime>() != nullptr;
@@ -522,12 +536,12 @@ void Photo::drawSpoilerTag(
 }
 
 void Photo::validateUserpicImageCache(QSize size, bool forum) const {
-	const auto forumValue = forum ? 1 : 0;
+	const auto radius = UserpicRadius(size, forum);
 	const auto large = _dataMedia->image(PhotoSize::Large);
 	const auto ratio = style::DevicePixelRatio();
 	const auto blurredValue = large ? 0 : 1;
 	if (_imageCache.size() == (size * ratio)
-		&& _imageCacheForum == forumValue
+		&& _imageCacheRadius == radius
 		&& _imageCacheBlurred == blurredValue) {
 		return;
 	}
@@ -551,16 +565,11 @@ void Photo::validateUserpicImageCache(QSize size, bool forum) const {
 		args = args.blurred();
 	}
 	original = Images::Prepare(std::move(original), size * ratio, args);
-	if (forumValue) {
-		original = Images::Round(
-			std::move(original),
-			Images::CornersMask(std::min(size.width(), size.height())
-				* Ui::ForumUserpicRadiusMultiplier()));
-	} else {
-		original = Images::Circle(std::move(original));
-	}
+	original = Images::Round(
+		std::move(original),
+		Images::CornersMask(radius));
 	_imageCache = std::move(original);
-	_imageCacheForum = forumValue;
+	_imageCacheRadius = radius;
 	_imageCacheBlurred = blurredValue;
 }
 
@@ -651,20 +660,12 @@ void Photo::paintUserpicFrame(
 		const auto ratio = style::DevicePixelRatio();
 		auto request = ::Media::Streaming::FrameRequest();
 		request.outer = request.resize = size * ratio;
-		if (forum) {
-			const auto radius = int(std::min(size.width(), size.height())
-				* Ui::ForumUserpicRadiusMultiplier());
-			if (_streamed->roundingCorners[0].width() != radius * ratio) {
-				_streamed->roundingCorners = Images::CornersMask(radius);
-			}
-			request.rounding = Images::CornersMaskRef(
-				_streamed->roundingCorners);
-		} else {
-			if (_streamed->roundingMask.size() != request.outer) {
-				_streamed->roundingMask = Images::EllipseMask(size);
-			}
-			request.mask = _streamed->roundingMask;
+		const auto radius = UserpicRadius(size, forum);
+		if (_streamed->roundingCorners[0].width() != radius * ratio) {
+			_streamed->roundingCorners = Images::CornersMask(radius);
 		}
+		request.rounding = Images::CornersMaskRef(
+			_streamed->roundingCorners);
 		if (_streamed->instance.playerLocked()) {
 			if (_streamed->frozenFrame.isNull()
 				|| _streamed->frozenRequest != request) {
