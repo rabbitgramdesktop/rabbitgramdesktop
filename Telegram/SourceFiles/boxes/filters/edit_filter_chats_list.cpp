@@ -24,6 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_user.h"
 #include "styles/style_window.h"
 #include "styles/style_boxes.h"
+#include "rabbit/settings/rabbit_settings.h"
 
 namespace {
 
@@ -366,12 +367,13 @@ void PaintFilterChatsTypeIcon(
 		Unexpected("Flag in icon paintFlagIcon.");
 	}();
 	const auto rect = style::rtlrect(x, y, size, size, outerWidth);
+	const auto radius = size * RabbitSettings::userpicRoundness() / 100.0;
 	auto hq = PainterHighQualityEnabler(p);
 	auto bg = QLinearGradient(x, y, x, y + size);
 	bg.setStops({ { 0., color1->c }, { 1., color2->c } });
 	p.setBrush(bg);
 	p.setPen(Qt::NoPen);
-	p.drawEllipse(rect);
+	p.drawRoundedRect(rect, radius, radius);
 	icon.paintInCenter(p, rect);
 }
 
