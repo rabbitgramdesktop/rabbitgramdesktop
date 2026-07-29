@@ -100,7 +100,7 @@ void BuildTopGeneral(
 		auto wrap = object_ptr<Ui::VerticalLayout>(ctx.container);
 
 		const auto chatPreview = wrap->add(
-			object_ptr<ChatPreview>(wrap),
+			object_ptr<ChatPreview>(wrap, ctx.controller),
 			st::defaultSubsectionTitlePadding);
 
 		const auto stickerSizeLabel = wrap->add(

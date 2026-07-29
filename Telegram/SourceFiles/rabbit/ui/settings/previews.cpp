@@ -21,7 +21,41 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_chat_style.h"
 #include "styles/style_rabbit_assets.h"
 
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_helpers.h"
+#include "data/data_session.h"
+#include "data/data_peer.h"
+#include "main/main_session.h"
+#include "window/window_session_controller.h"
+#include "lang/lang_keys.h"
+#include "ui/empty_userpic.h"
+#include "ui/chat/chat_theme.h"
+#include "ui/image/image_prepare.h"
+#include "base/unixtime.h"
+#include "window/section_widget.h"
+
 namespace {
+
+[[nodiscard]] AdminLog::OwnedItem GenerateTextItem(
+		not_null<HistoryView::ElementDelegate*> delegate,
+		not_null<History*> history,
+		const QString &text,
+		bool out) {
+	Expects(history->peer->isUser());
+
+	const auto item = history->makeMessage({
+		.id = history->nextNonHistoryEntryId(),
+		.flags = (MessageFlag::FakeHistoryItem
+			| MessageFlag::HasFromId
+			| (out ? MessageFlag::Outgoing : MessageFlag(0))),
+		.from = (out
+			? history->session().userId()
+			: peerToUser(history->peer->id)),
+		.date = base::unixtime::now(),
+	}, TextWithEntities{ text }, MTP_messageMediaEmpty());
+	return AdminLog::OwnedItem(delegate, item);
+}
 
 [[nodiscard]] int StickerShapeRadius(int shape) {
 	switch (shape) {
@@ -70,101 +104,169 @@ void RoundnessPreview::paintEvent(QPaintEvent *e) {
 		skeletonRadius);
 }
 
-ChatPreview::ChatPreview(QWidget *parent) : RpWidget(parent) {
+ChatPreview::ChatPreview(
+	QWidget *parent,
+	not_null<Window::SessionController*> controller)
+: RpWidget(parent)
+, SimpleElementDelegate(controller, [=] { update(); })
+, _controller(controller)
+, _history(controller->session().data().history(PeerData::kServiceNotificationsId))
+, _item1(GenerateTextItem(delegate(), _history, u"Hello! This is a slightly longer message to show how bubbles look."_q, true))
+, _item2(GenerateTextItem(delegate(), _history, u"Oh, I see. Looks good!"_q, false))
+, _item3(GenerateTextItem(delegate(), _history, u"Right?"_q, true))
+	, _item4(GenerateTextItem(delegate(), _history, u"Yes, and the rounding looks great too."_q, false))
+{
 	setMinimumHeight(st::stickerPreviewSize);
 
-	RabbitSettings::JsonSettings::Events(
-		u"sticker_shape"_q
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"message_roundness"_q),
+		RabbitSettings::JsonSettings::Events(u"hide_bubble_tails"_q),
+		RabbitSettings::JsonSettings::Events(u"show_online_indicator"_q)
 	) | rpl::on_next([=] {
 		update();
 	}, lifetime());
 }
 
-void ChatPreview::ensureChatStyle() {
-	const auto version = style::PaletteVersion();
-	const auto roundness = RabbitSettings::messageRoundness();
-	if (_chatStyle
-		&& _paletteVersion == version
-		&& _messageRoundness == roundness) {
-		return;
-	}
-	_paletteVersion = version;
-	_messageRoundness = roundness;
-	_chatStyle = std::make_unique<Ui::ChatStyle>(
-		style::main_palette::get());
+not_null<HistoryView::ElementDelegate*> ChatPreview::delegate() {
+	return static_cast<HistoryView::ElementDelegate*>(this);
+}
+
+HistoryView::Context ChatPreview::elementContext() {
+	return HistoryView::Context::ContactPreview;
 }
 
 void ChatPreview::paintEvent(QPaintEvent *e) {
-	ensureChatStyle();
+	const auto version = style::PaletteVersion();
+	const auto roundness = RabbitSettings::messageRoundness();
+	if (!_chatStyle || _paletteVersion != version || _messageRoundness != roundness) {
+		_paletteVersion = version;
+		_messageRoundness = roundness;
+		_chatStyle = std::make_unique<Ui::ChatStyle>(
+			style::main_palette::get());
+	}
 
-	Painter p(this);
-	PainterHighQualityEnabler hq(p);
+	const auto ratio = style::DevicePixelRatio();
+	auto image = QImage(
+		QSize(width(), height()) * ratio,
+		QImage::Format_ARGB32_Premultiplied);
+	image.setDevicePixelRatio(ratio);
+	image.fill(Qt::transparent);
 
-	const auto stickerSize = RabbitSettings::stickerSize();
-	const auto stickerRect = QSize(stickerSize, static_cast<int>(stickerSize * 0.7));
-	const auto stickerShape = RabbitSettings::stickerShape();
-	const auto stickerRadius = static_cast<qreal>(StickerShapeRadius(stickerShape));
+	auto topOffset = st::stickerPreviewMargin;
 
-	p.setPen(Qt::NoPen);
-	p.setBrush(st::rndPreviewFill);
-	p.drawRoundedRect(
-		QRect(QPoint(0, 0), stickerRect),
-		stickerRadius,
-		stickerRadius);
+	{
+		Painter p(&image);
+		PainterHighQualityEnabler hq(p);
 
-	const auto timeRadius = st::stickerPreviewTimeHeight / 2.;
-	p.setBrush(st::rndSkeletonFill);
-	p.drawRoundedRect(
-		stickerRect.width() + st::stickerPreviewMargin,
-		stickerRect.height() - st::stickerPreviewTimeHeight,
-		st::stickerPreviewTimeWidth,
-		st::stickerPreviewTimeHeight,
-		timeRadius,
-		timeRadius);
+		Window::SectionWidget::PaintBackground(
+			p,
+			_controller->defaultChatTheme().get(),
+			QSize(width(), height()),
+			QRect(QPoint(), size()));
 
-	struct BubbleEntry {
-		bool outgoing;
-		double widthFraction;
-	};
-	constexpr auto bubbles = std::array<BubbleEntry, 4>{ {
-		{ .outgoing = true, .widthFraction = 0.85 },
-		{ .outgoing = false, .widthFraction = 0.6 },
-		{ .outgoing = true, .widthFraction = 0.5 },
-		{ .outgoing = false, .widthFraction = 0.7 },
-	} };
+		auto context = _controller->defaultChatTheme()->preparePaintContext(
+			_chatStyle.get(),
+			QRect(QPoint(), size()),
+			QRect(QPoint(), size()),
+			QRect(QPoint(), size()),
+			_controller->isGifPausedAtLeastFor(Window::GifPauseReason::Layer));
 
-	const auto bubbleHeight = st::stickerSpacefillerHeight;
-	const auto outerWidth = width();
-	const auto tailWidth = st::historyBubbleTailInLeft.width();
-	auto topOffset = stickerRect.height() + st::stickerPreviewMargin;
+		const auto paintUserpic = [&](
+				Painter &target,
+				int userpicLeft,
+				int userpicTop,
+				int outerWidth) {
+			Ui::EmptyUserpic emptyUserpic(
+				Ui::EmptyUserpic::UserpicColor(0),
+				u"U"_q);
+			emptyUserpic.paintCircle(
+				target,
+				userpicLeft,
+				userpicTop,
+				outerWidth,
+				st::msgPhotoSize);
+		};
 
-	for (const auto &entry : bubbles) {
-		const auto bubbleWidth = static_cast<int>(outerWidth * 0.5 * entry.widthFraction);
-		const auto bubbleLeft = entry.outgoing
-			? outerWidth - bubbleWidth - tailWidth
-			: tailWidth;
+		const auto paintOnlineIndicator = [&](
+				Painter &target,
+				int userpicLeft,
+				int userpicTop) {
+			const auto dotDiameter = 10.0;
+			const auto borderWidth = 2.0;
+			const auto totalSize = dotDiameter + borderWidth * 2;
+			const auto dotX = userpicLeft + st::msgPhotoSize - totalSize + borderWidth;
+			const auto dotY = userpicTop + st::msgPhotoSize - totalSize + borderWidth;
+			const auto outlineRect = QRectF(
+				dotX - borderWidth,
+				dotY - borderWidth,
+				totalSize,
+				totalSize);
+			const auto dotRect = QRectF(dotX, dotY, dotDiameter, dotDiameter);
 
-		Ui::BubbleRounding rounding;
-		rounding.topLeft = Ui::BubbleCornerRounding::Large;
-		rounding.topRight = Ui::BubbleCornerRounding::Large;
-		if (entry.outgoing) {
-			rounding.bottomLeft = Ui::BubbleCornerRounding::Large;
-			rounding.bottomRight = Ui::BubbleCornerRounding::Tail;
-		} else {
-			rounding.bottomLeft = Ui::BubbleCornerRounding::Tail;
-			rounding.bottomRight = Ui::BubbleCornerRounding::Large;
+			auto userpicImage = QImage(
+				QSize(st::msgPhotoSize, st::msgPhotoSize) * ratio,
+				QImage::Format_ARGB32_Premultiplied);
+			userpicImage.setDevicePixelRatio(ratio);
+			userpicImage.fill(Qt::transparent);
+			{
+				Painter q(&userpicImage);
+				PainterHighQualityEnabler hq(q);
+				paintUserpic(q, 0, 0, st::msgPhotoSize);
+				q.setPen(Qt::NoPen);
+				q.setCompositionMode(QPainter::CompositionMode_Clear);
+				q.setBrush(Qt::transparent);
+				q.drawEllipse(outlineRect.translated(
+					-userpicLeft,
+					-userpicTop));
+				q.setCompositionMode(QPainter::CompositionMode_SourceOver);
+				q.setBrush(st::dialogsOnlineBadgeFg);
+				q.drawEllipse(dotRect.translated(
+					-userpicLeft,
+					-userpicTop));
+			}
+			target.drawImage(userpicLeft, userpicTop, userpicImage);
+		};
+
+		for (auto item : { &_item1, &_item2, &_item3, &_item4 }) {
+			const auto isIncoming = !(*item)->hasOutLayout();
+			const auto photoSkip = isIncoming ? st::msgPhotoSkip : 0;
+
+			(*item)->initDimensions();
+			(*item)->resizeGetHeight(width() - photoSkip);
+
+			context.outbg = !isIncoming;
+			p.translate(photoSkip, topOffset);
+			(*item)->draw(p, context);
+			p.translate(-photoSkip, -topOffset);
+
+			if (isIncoming) {
+				const auto userpicLeft = st::historyPhotoLeft;
+				const auto userpicTop = topOffset
+					+ (*item)->height()
+					- st::msgPhotoSize;
+
+				if (RabbitSettings::showOnlineIndicator()) {
+					paintOnlineIndicator(p, userpicLeft, userpicTop);
+				} else {
+					paintUserpic(p, userpicLeft, userpicTop, width());
+				}
+			}
+
+			topOffset += (*item)->height() + st::msgMargin.bottom();
 		}
 
-		Ui::PaintBubble(p, Ui::SimpleBubble{
-			.st = _chatStyle.get(),
-			.geometry = QRect(bubbleLeft, topOffset, bubbleWidth, bubbleHeight),
-			.patternViewport = QRect(),
-			.outerWidth = outerWidth,
-			.outbg = entry.outgoing,
-			.rounding = rounding,
-		});
 
-		topOffset += st::stickerPreviewMargin + bubbleHeight + st::msgShadow;
+	}
+
+	const auto rounded = Images::Round(
+		std::move(image),
+		Images::CornersMask(ImageRoundRadius::Large));
+
+	QPainter pw(this);
+	pw.drawImage(QPoint(), rounded);
+
+	if (height() != topOffset) {
+		setMinimumHeight(topOffset);
 	}
 }
 
