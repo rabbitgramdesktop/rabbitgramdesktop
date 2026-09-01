@@ -8,7 +8,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/view/media_view_playback_progress.h"
 
 #include "media/audio/media_audio.h"
-#include "styles/style_media_view.h"
 
 namespace Media {
 namespace View {

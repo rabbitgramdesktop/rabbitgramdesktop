@@ -51,6 +51,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "lang/lang_keys.h"
+#include "menu/menu_mark_as_read.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
 #include "main/main_domain.h"
@@ -67,7 +68,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/unixtime.h"
 #include "base/random.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
-#include "styles/style_dialogs.h" // dialogsPremiumIcon
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 #include "styles/style_menu_icons.h"
@@ -142,7 +142,7 @@ ComposedBadge::ComposedBadge(
 		) | rpl::then(
 			session->data().unreadBadgeChanges()
 		) | rpl::map([=] {
-			auto &owner = session->data();
+			const auto &owner = session->data();
 			return Badge::UnreadBadge{
 				owner.unreadWithMentionsBadge(),
 				owner.unreadWithMentionsBadgeMuted(),
@@ -285,6 +285,7 @@ void SetupPhoto(
 		targets->uploadPhoto = upload;
 	}
 
+	upload->setVideoAllowed(true);
 	upload->chosenImages(
 	) | rpl::on_next([=](Ui::UserpicButton::ChosenImage &&chosen) {
 		auto &image = chosen.image;
@@ -294,9 +295,10 @@ void SetupPhoto(
 		self->session().api().peerPhoto().upload(
 			self,
 			{
-				std::move(image),
-				chosen.markup.documentId,
-				chosen.markup.colors,
+				.image = std::move(image),
+				.markupDocumentId = chosen.markup.documentId,
+				.markupColors = chosen.markup.colors,
+				.video = std::move(chosen.video),
 			});
 		if (!isMarkup) {
 			photo->showUploadProgress();
@@ -944,7 +946,7 @@ void SetupAccountsWrap(
 					callback({});
 				}, &st::menuIconProfile);
 			}
-			Window::MenuAddMarkAsReadAllChatsAction(
+			MarkAsReadMenu::AddAllChatsAction(
 				session,
 				window->uiShow(),
 				addAction);

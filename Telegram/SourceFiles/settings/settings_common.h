@@ -42,9 +42,12 @@ class Session;
 namespace Ui {
 class VerticalLayout;
 class FlatLabel;
+class InputField;
+class SearchFieldController;
 class SettingsButton;
 class AbstractButton;
 class MediaSlider;
+class ToggleView;
 } // namespace Ui
 
 namespace Ui::Menu {
@@ -66,6 +69,8 @@ struct IconDescriptor;
 } // namespace Lottie
 
 namespace Settings {
+
+class KeyNavigation;
 
 using Button = Ui::SettingsButton;
 
@@ -91,6 +96,7 @@ struct HighlightArgs {
 
 void HighlightWidget(QWidget *target, HighlightArgs &&args = {});
 void ScrollToWidget(not_null<QWidget*> target);
+void RevealWidget(not_null<QWidget*> target, int margin = 0);
 
 [[nodiscard]] HighlightArgs SubsectionTitleHighlight();
 
@@ -112,6 +118,7 @@ public:
 	AbstractSection(
 		QWidget *parent,
 		not_null<Window::SessionController*> controller);
+	~AbstractSection();
 
 	[[nodiscard]] not_null<Window::SessionController*> controller() const {
 		return _controller;
@@ -195,16 +202,20 @@ public:
 			showOther(type);
 		});
 	}
+	void setNavigationAnchor(not_null<QWidget*> widget);
 
 protected:
 	void build(
 		not_null<Ui::VerticalLayout*> container,
 		SectionBuildMethod method);
 
+	void keyPressEvent(QKeyEvent *e) override;
+
 private:
 	const not_null<Window::SessionController*> _controller;
 	rpl::event_stream<Type> _showOtherRequests;
 	rpl::event_stream<> _showFinished;
+	std::unique_ptr<KeyNavigation> _keyNavigation;
 
 };
 
@@ -271,6 +282,15 @@ void CreateRightLabel(
 	rpl::producer<QString> buttonText,
 	Ui::Text::MarkedContext context = {});
 
+struct SeparatedToggle {
+	not_null<Ui::SettingsButton*> button;
+	not_null<Ui::ToggleView*> checkView;
+};
+[[nodiscard]] SeparatedToggle AddSeparatedToggle(
+	not_null<Button*> button,
+	const style::SettingsButton &st,
+	bool checked);
+
 struct DividerWithLottieDescriptor {
 	QString lottie;
 	std::optional<anim::repeat> lottieRepeat;
@@ -318,5 +338,21 @@ void AddPremiumStar(
 	not_null<Button*> button,
 	bool credits,
 	Fn<bool()> isPaused);
+
+struct SectionSearchRow {
+	std::unique_ptr<Ui::SearchFieldController> controller;
+	not_null<Ui::RpWidget*> row;
+	not_null<Ui::InputField*> field;
+};
+
+[[nodiscard]] SectionSearchRow CreateSectionSearchRow(
+	not_null<QWidget*> parent,
+	const QString &query = QString());
+
+[[nodiscard]] QStringList SearchWords(const QString &text);
+
+[[nodiscard]] bool MatchesWords(
+	const QStringList &terms,
+	const QStringList &words);
 
 } // namespace Settings

@@ -32,6 +32,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang/lang_instance.h"
 
 #include <QtCore/QDirIterator>
+#include <QtCore/QSaveFile>
 
 #ifndef Q_OS_WIN
 #include <unistd.h>
@@ -574,6 +575,55 @@ QString readAutoupdatePrefix() {
 	return result.replace(RegExp, QString());
 }
 
+QString updateManifestFile() {
+	Expects(!Core::UpdaterDisabled());
+
+	return cWorkingDir() + "tdata/update-manifest";
+}
+
+// The file holds the detached 64-byte root Ed25519 signature followed by
+// the manifest JSON verbatim. The content is attacker-reachable bytes as
+// far as readers are concerned: the caller verifies it against the pinned
+// root key after reading.
+void writeUpdateManifest(
+		const QByteArray &manifest,
+		const QByteArray &signature) {
+	if (Core::UpdaterDisabled()
+		|| signature.size() != 64
+		|| manifest.isEmpty()) {
+		return;
+	}
+	QSaveFile f(updateManifestFile());
+	if (!f.open(QIODevice::WriteOnly)
+		|| f.write(signature) != signature.size()
+		|| f.write(manifest) != manifest.size()
+		|| !f.commit()) {
+		LOG(("Storage Error: Could not write the update manifest."));
+	}
+}
+
+bool readUpdateManifest(QByteArray *manifest, QByteArray *signature) {
+	Expects(manifest != nullptr && signature != nullptr);
+
+	if (Core::UpdaterDisabled()) {
+		return false;
+	}
+	QFile f(updateManifestFile());
+	if (!f.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	constexpr auto kSignatureSize = 64;
+	constexpr auto kMaxManifestSize = 256 * 1024;
+	const auto content = f.readAll();
+	if (content.size() <= kSignatureSize
+		|| content.size() > kSignatureSize + kMaxManifestSize) {
+		return false;
+	}
+	*signature = content.left(kSignatureSize);
+	*manifest = content.mid(kSignatureSize);
+	return true;
+}
+
 void writeBackground(const Data::WallPaper &paper, const QImage &image) {
 	Expects(_settingsWriteAllowed);
 
@@ -1058,7 +1108,7 @@ void writeTheme(const Window::Theme::Saved &saved) {
 	const auto &cache = saved.cache;
 	const auto tag = QString(kThemeNewPathRelativeTag);
 	auto chatTheme = QByteArray();
-	if (!object.cloud.emoticon.isEmpty() && !object.cloud.settings.empty()) {
+	if (!object.cloud.settings.empty()) {
 		auto stream = QDataStream(&chatTheme, QIODevice::WriteOnly);
 		stream.setVersion(QDataStream::Qt_5_1);
 		stream
@@ -1308,7 +1358,7 @@ std::vector<Lang::Language> readRecentLanguages() {
 Window::Theme::Object ReadThemeContent() {
 	using namespace Window::Theme;
 
-	auto &themeKey = IsNightMode() ? _themeKeyNight : _themeKeyDay;
+	const auto &themeKey = IsNightMode() ? _themeKeyNight : _themeKeyDay;
 	if (!themeKey) {
 		return Object();
 	}

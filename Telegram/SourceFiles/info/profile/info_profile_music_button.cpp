@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_music_button.h"
 
+#include "ui/color_contrast.h"
 #include "ui/effects/animation_value.h"
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
@@ -61,11 +62,23 @@ void MusicButton::paintEvent(QPaintEvent *e) {
 	} else {
 		p.fillRect(e->rect(), st::shadowFg);
 	}
-	paintRipple(p, QPoint());
+	const auto lightBackground = _overrideBg
+		&& Ui::IsLightBackground(*_overrideBg);
+	const auto rippleColor = !_overrideBg
+		? std::nullopt
+		: std::make_optional(anim::with_alpha(
+			(lightBackground
+				? QColor(Qt::black)
+				: st::groupCallMembersFg->c),
+			st::infoProfileTopBarBackdropRippleOpacity));
+	paintRipple(p, QPoint(), rippleColor ? &*rippleColor : nullptr);
 
 	const auto padding = st::infoMusicButtonPadding;
 	const auto contentLeft = padding.left();
-	const auto contentWidth = width() - padding.left() - padding.right();
+	const auto &icon = st::topicButtonArrow;
+	const auto iconWidth = icon.width();
+	const auto iconHeight = icon.height();
+	const auto contentWidth = width() - padding.left() - padding.right() - iconWidth - padding.right();
 
 	// title part
 	const auto titleFont = st::semiboldFont;
@@ -98,10 +111,6 @@ void MusicButton::paintEvent(QPaintEvent *e) {
 	});
 
 	// icon part
-	const auto &icon = st::topicButtonArrow;
-	const auto iconWidth = icon.width();
-	const auto iconHeight = icon.height();
-
 	const auto iconTop = (height() - iconHeight) / 2.0;
 	const auto iconLeft = width() - padding.right() - iconWidth;
 

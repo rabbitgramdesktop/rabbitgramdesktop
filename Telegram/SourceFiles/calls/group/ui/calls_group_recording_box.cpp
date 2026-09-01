@@ -17,7 +17,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_basic.h"
 #include "styles/style_calls.h"
 #include "styles/style_layers.h"
-#include "styles/style_boxes.h"
 
 #include <QSvgRenderer>
 

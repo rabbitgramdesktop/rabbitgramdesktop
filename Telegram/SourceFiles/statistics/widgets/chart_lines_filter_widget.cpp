@@ -14,7 +14,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/rect.h"
 #include "styles/style_basic.h"
 #include "styles/style_statistics.h"
-#include "styles/style_widgets.h"
 
 namespace Statistic {
 

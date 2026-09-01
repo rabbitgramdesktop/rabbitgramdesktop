@@ -20,6 +20,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/ui_integration.h"
 #include "lang/lang_keys.h"
 #include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
 #include "history/history_item.h"
 #include "history/history.h"
 #include "history/view/media/history_view_media.h"
@@ -36,7 +37,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
-#include "styles/style_dialogs.h"
 
 namespace HistoryView {
 namespace {
@@ -455,7 +455,7 @@ void BottomInfo::paintEffect(
 		x += width + add;
 		widthLeft -= width + add;
 	}
-	if (!animations.empty()) {
+	if (!animations.empty() && context.reactionInfo) {
 		const auto now = context.now;
 		context.reactionInfo->effectPaint = [
 			now,
@@ -501,21 +501,21 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto editedPrimary = (_data.flags & Data::Flag::EditedPrimary)
-        && !(_data.flags & Data::Flag::ForwardedDate);
-
-    const auto edited = [&] {
-        if (editedPrimary) {
-            return QString();
-        }
-        if (_data.flags & Data::Flag::EstimateDate) {
-            return tr::lng_approximate(tr::now) + ' ';
-        }
-        if (_data.scheduleRepeatPeriod) {
-            return SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ';
-        }
-        return QString();
-    }();
+	const auto updated = (_data.flags & Data::Flag::Updated);
+	const auto editedPrimary = !updated
+		&& (_data.flags & Data::Flag::EditedPrimary)
+		&& !(_data.flags & Data::Flag::ForwardedDate);
+	const auto edited = editedPrimary
+		? QString()
+		: updated
+		? (tr::lng_ephemeral_updated(tr::now) + ' ')
+		: (_data.flags & Data::Flag::Edited)
+		? (tr::lng_edited(tr::now) + ' ')
+		: (_data.flags & Data::Flag::EstimateDate)
+		? (tr::lng_approximate(tr::now) + ' ')
+		: _data.scheduleRepeatPeriod
+		? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
+		: QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
 	const auto date = editedPrimary
@@ -719,6 +719,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 			result.flags |= Flag::EditedPrimary;
 			result.editedDate = base::unixtime::parse(editedDate);
 		}
+	}
+	if (IsAnchoredEphemeral(item)) {
+		result.flags |= Flag::Updated;
 	}
 	if (const auto views = item->Get<HistoryMessageViews>()) {
 		if (views->views.count >= 0) {

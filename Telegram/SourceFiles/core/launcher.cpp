@@ -384,8 +384,12 @@ int Launcher::exec() {
 
 	if (cLaunchMode() == LaunchModeFixPrevious) {
 		return psFixPrevious();
-	} else if (cLaunchMode() == LaunchModeCleanup) {
-		return psCleanup();
+	}
+
+	// Before Logs::start(), which is where the working directory gets
+	// chosen: a translocated bundle never sees its TelegramForcePortable.
+	if (!Platform::CheckAppTranslocation()) {
+		return 0;
 	}
 
 	// Must be started before Platform is started.
@@ -556,6 +560,7 @@ void Launcher::processArguments() {
 	auto parseMap = std::map<QByteArray, KeyFormat> {
 		{ "-debug"          , KeyFormat::NoValues },
 		{ "-testagent"      , KeyFormat::NoValues },
+		{ Platform::kUntranslocatedArgument, KeyFormat::NoValues },
 		{ "-key"            , KeyFormat::OneValue },
 		{ "-autostart"      , KeyFormat::NoValues },
 		{ "-fixprevious"    , KeyFormat::NoValues },

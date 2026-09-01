@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <rpl/producer.h>
 
 #include <QtCore/QPointer>
+#include <QtCore/QRect>
 #include <QtCore/QString>
 #include <QtGui/QImage>
 
@@ -21,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <optional>
 
 class PeerData;
+class QPainter;
 class QWidget;
 
 namespace ChatHelpers {
@@ -58,6 +60,11 @@ void SetupToolbarButton(
 	ToolbarButtonState state,
 	anim::type animated = anim::type::normal);
 
+void PaintPremiumStar(
+	QPainter &p,
+	QRect inner,
+	std::optional<QColor> halo = std::nullopt);
+
 struct ShowWindowDescriptor {
 	enum class SubmitType {
 		Send,
@@ -67,8 +74,10 @@ struct ShowWindowDescriptor {
 	not_null<Main::Session*> session;
 	not_null<PeerData*> peer;
 	std::shared_ptr<State> state;
+	QString title;
 	QString submitLabel;
 	SubmitType submitType = SubmitType::Send;
+	QRect centerOver;
 	Fn<bool()> discarded;
 	Fn<void(std::shared_ptr<ChatHelpers::Show>)> showCreated;
 	Fn<void(not_null<Widget*>)> editorCreated;
@@ -83,6 +92,11 @@ struct ShowWindowDescriptor {
 		RequestMediaType)> requestMedia;
 	Fn<void(not_null<Widget*>, Ui::PreparedList, PreparedMediaPasteTarget)>
 		applyPreparedMedia;
+	Fn<void(
+		not_null<Widget*>,
+		Ui::PreparedList,
+		Fn<void(std::vector<std::optional<RichPage::Block>>)>)>
+		prepareDeferredMedia;
 	Fn<void(uint64 /*photoId*/, Fn<void(QImage)>)> requestPhotoEditSource;
 	Fn<void(not_null<Widget*>, Ui::PreparedList, State::ReplaceTarget)>
 		replacePhotoWithList;
@@ -99,7 +113,6 @@ class WindowHost final {
 public:
 	~WindowHost();
 	void close();
-	void activateClose();
 
 private:
 	friend std::unique_ptr<WindowHost> ShowWindow(

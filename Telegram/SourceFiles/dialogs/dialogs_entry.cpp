@@ -60,10 +60,6 @@ base::options::toggle OptionUnreadOnTop({
 		"pinned ones and keep them there until you read them.",
 });
 
-[[nodiscard]] bool UnreadOnTopEnabled() {
-	return OptionUnreadOnTop.value();
-}
-
 } // namespace
 
 const char kOptionDialogsUnreadOnTop[] = "dialogs-unread-on-top";
@@ -221,7 +217,11 @@ void Entry::updateChatListSortPosition() {
 		updateChatListEntry();
 		return;
 	}
-	_sortKeyByDate = DialogPosFromDate(adjustedChatListTimeId());
+	const auto sortKeyByDate = DialogPosFromDate(adjustedChatListTimeId());
+	_sortKeyByDate = (owner().dialogsUnreadOnTop()
+		&& hasUnreadUnmutedForSort())
+		? UnreadOnTopDialogPos(sortKeyByDate)
+		: sortKeyByDate;
 	const auto fixedIndex = fixedOnTopIndex();
 	_sortKeyInChatList = fixedIndex
 		? FixedOnTopDialogPos(fixedIndex)
@@ -247,19 +247,15 @@ int Entry::lookupPinnedIndex(FilterId filterId) const {
 
 uint64 Entry::computeSortPosition(FilterId filterId) const {
 	const auto index = lookupPinnedIndex(filterId);
-	if (index) {
-		return PinnedDialogPos(index);
-	} else if (UnreadOnTopEnabled() && hasUnreadUnmutedForSort()) {
-		return UnreadOnTopDialogPos(_sortKeyByDate);
-	}
-	return _sortKeyByDate;
+	return index ? PinnedDialogPos(index) : _sortKeyByDate;
 }
 
 bool Entry::hasUnreadUnmutedForSort() const {
 	const auto state = chatListUnreadState();
 	return (state.messages > state.messagesMuted)
 		|| (state.marks > state.marksMuted)
-		|| (state.reactions > state.reactionsMuted);
+		|| (state.reactions > state.reactionsMuted)
+		|| (state.mentions > 0);
 }
 
 void Entry::updateChatListExistence() {
@@ -326,7 +322,7 @@ void Entry::notifyUnreadStateChange(const UnreadState &wasState) {
 			sublist,
 			Data::SublistUpdate::Flag::UnreadView);
 	}
-	if (UnreadOnTopEnabled()) {
+	if (owner().dialogsUnreadOnTop()) {
 		updateChatListSortPosition();
 	}
 	updateChatListEntryPostponed();
@@ -472,7 +468,8 @@ void Entry::removeFromChatList(
 		FilterId filterId,
 		not_null<MainList*> list) {
 	if (isPinnedDialog(filterId)) {
-		owner().setChatPinned(this, filterId, false);
+		list->pinned()->setPinned(this, false);
+		owner().notifyPinnedDialogsOrderUpdated();
 	}
 	if (filterId) {
 		const auto it = _tagColors.find(filterId);

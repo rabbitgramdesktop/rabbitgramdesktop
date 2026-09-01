@@ -62,6 +62,7 @@ private:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	void hideEvent(QHideEvent *e) override;
 
 	void doSetInnerFocus() override {
 		setFocus();
@@ -72,6 +73,7 @@ private:
 	void setupAccounts();
 	void setupAccountsToggle();
 	void setupSetEmojiStatus();
+	void setupEmojiStatusDismiss();
 	void setupArchive();
 	void setupMenu();
 	void updateControlsGeometry();
@@ -113,6 +115,7 @@ private:
 
 	rpl::variable<bool> _showFinished = false;
 	bool _insideEventRedirect = false;
+	bool _emojiStatusDismissSetup = false;
 
 };
 

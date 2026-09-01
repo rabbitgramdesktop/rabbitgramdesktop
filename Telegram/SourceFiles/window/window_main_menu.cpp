@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "boxes/about_box.h"
+#include "core/update_channel.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/premium_preview_box.h"
 #include "calls/group/calls_group_common.h"
@@ -71,11 +72,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
-#include "styles/style_info.h" // infoTopBarMenu
-#include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_window.h"
+#include "styles/style_window_main_menu.h"
 
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
@@ -391,12 +391,15 @@ MainMenu::MainMenu(
 		u"rabbitGram Desktop"_q,
 		u"tg://resolve?domain=rabbitGramUpdates"_q));
 	_telegram->setLinksTrusted();
+	// The canary version is too long for the "Version {version}" form.
 	_version->setMarkedText(
 		tr::link(
-			tr::lng_settings_current_version(
-				tr::now,
-				lt_version,
-				currentVersionText()),
+			Core::BuildIsCanary
+				? currentVersionShortText()
+				: tr::lng_settings_current_version(
+					tr::now,
+					lt_version,
+					currentVersionShortText()),
 			1) // Link 1.
 		.append(QChar(' '))
 		.append(QChar(8211))
@@ -864,10 +867,28 @@ void MainMenu::chooseEmojiStatus() {
 	if (_controller->showFrozenError()) {
 		return;
 	} else if (const auto widget = _badge->widget()) {
+		setupEmojiStatusDismiss();
 		_emojiStatusPanel->show(_controller, widget, _badge->sizeTag());
 	} else {
 		ShowPremiumPreviewBox(_controller, PremiumFeature::EmojiStatus);
 	}
+}
+
+void MainMenu::setupEmojiStatusDismiss() {
+	if (_emojiStatusDismissSetup) {
+		return;
+	}
+	_emojiStatusDismissSetup = true;
+
+	base::install_event_filter(this, parentWidget(), [=](
+			not_null<QEvent*> e) {
+		if (e->type() != QEvent::MouseButtonPress
+			|| !_emojiStatusPanel->shown()) {
+			return base::EventFilterResult::Continue;
+		}
+		_emojiStatusPanel->hideAnimated();
+		return base::EventFilterResult::Cancel;
+	});
 }
 
 bool MainMenu::eventHook(QEvent *event) {
@@ -879,6 +900,10 @@ bool MainMenu::eventHook(QEvent *event) {
 		QGuiApplication::sendEvent(_inner, event);
 	}
 	return RpWidget::eventHook(event);
+}
+
+void MainMenu::hideEvent(QHideEvent *e) {
+	_emojiStatusPanel->hideFast();
 }
 
 void MainMenu::paintEvent(QPaintEvent *e) {
@@ -964,7 +989,7 @@ void MainMenu::initResetScaleButton() {
 
 OthersUnreadState OtherAccountsUnreadStateCurrent(
 		not_null<Main::Account*> current) {
-	auto &domain = Core::App().domain();
+	const auto &domain = Core::App().domain();
 	auto counter = 0;
 	auto allMuted = true;
 	for (const auto &[index, account] : domain.accounts()) {

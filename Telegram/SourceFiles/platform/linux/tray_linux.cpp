@@ -17,7 +17,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/widgets/popup_menu.h"
 #include "window/window_controller.h"
-#include "styles/style_window.h"
 
 #include <QtCore/QCoreApplication>
 #include <QtWidgets/QMenu>
