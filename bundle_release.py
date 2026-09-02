@@ -13,7 +13,7 @@
 #
 # Requirements:
 #   - Python 3.10+
-#   - Inno Setup (iscc) on PATH when building the installer
+#   - Inno Setup (iscc) on PATH or standard installation path
 #   - Packer.exe and Updater.exe in out/Release/ for OTA updates
 #   - A completed Release build in out/Release/
 
@@ -65,14 +65,14 @@ def update_installer_script(root: Path, version: VersionInfo) -> None:
     iss_path = root / "Telegram" / "build" / "setup.iss"
     content = iss_path.read_text(encoding="utf-8")
 
-    release_path = str(root / "out" / "Release").replace("\\", "\\\\")
+    release_path = str(root / "out" / "Release")
     replacements = {
         r'#define MyAppVersion ".*?"': f'#define MyAppVersion "{version.version_str}"',
         r'#define MyAppVersionFull ".*?"': f'#define MyAppVersionFull "{version.index}"',
         r'#define ReleasePath ".*?"': f'#define ReleasePath "{release_path}"',
     }
     for pattern, replacement in replacements.items():
-        content = re.sub(pattern, replacement, content)
+        content = re.sub(pattern, lambda match, r=replacement: r, content)
 
     iss_path.write_text(content, encoding="utf-8")
 
@@ -96,6 +96,9 @@ def bundle_portable(root: Path, version: VersionInfo) -> None:
     updater_src = release_dir / "Updater.exe"
     if updater_src.exists():
         shutil.copy2(updater_src, portable_dir / "Updater.exe")
+
+    # Create tdata directory marker required for Telegram portable mode
+    (portable_dir / "tdata").mkdir(parents=True, exist_ok=True)
 
     output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -150,11 +153,28 @@ def bundle_update(root: Path, version: VersionInfo) -> None:
     print(f"Update package created: {output_dir / update_file.name}")
 
 
+def find_iscc() -> str:
+    iscc = shutil.which("iscc")
+    if iscc:
+        return iscc
+    possible_paths = [
+        Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
+        Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
+        Path(r"C:\Program Files (x86)\Inno Setup 5\ISCC.exe"),
+        Path(r"C:\Program Files\Inno Setup 5\ISCC.exe"),
+    ]
+    for p in possible_paths:
+        if p.exists():
+            return str(p)
+    return "iscc"
+
+
 def bundle_installer(root: Path) -> None:
     print("Bundling installer...")
 
+    iscc_bin = find_iscc()
     iss_path = root / "Telegram" / "build" / "setup.iss"
-    result = subprocess.run(["iscc", str(iss_path)])
+    result = subprocess.run([iscc_bin, str(iss_path)])
     if result.returncode != 0:
         sys.exit(f"Inno Setup compiler failed with exit code {result.returncode}")
     print("Installer created successfully.")
