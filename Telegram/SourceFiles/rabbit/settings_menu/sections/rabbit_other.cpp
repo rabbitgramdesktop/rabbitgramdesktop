@@ -31,6 +31,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_settings.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
+#include "styles/style_edit_peer_members.h"
 #include "ui/text/text_utilities.h"
 #include "lang/lang_keys.h"
 

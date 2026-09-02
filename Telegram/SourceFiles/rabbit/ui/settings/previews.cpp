@@ -18,6 +18,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <rpl/producer.h>
 
 #include "styles/style_chat.h"
+#include "styles/style_chat_style.h"
 #include "styles/style_rabbit_assets.h"
 
 namespace {
