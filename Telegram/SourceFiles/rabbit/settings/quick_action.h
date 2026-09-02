@@ -17,7 +17,13 @@ enum QuickAction {
 	Forward,
 	Edit,
 	Save,
-	Delete
+	Delete,
+	Repeat,
+	Translate
 };
+
+inline QuickAction QuickActionFrom(int value) {
+	return static_cast<QuickAction>(value);
+}
 
 } // namespace RabbitSettings

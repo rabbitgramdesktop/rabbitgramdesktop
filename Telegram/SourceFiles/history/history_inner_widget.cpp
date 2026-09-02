@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings/quick_action.h"
+#include "rabbit/settings/quick_action_ui.h"
 
 #include "api/api_polls.h"
 #include "chat_helpers/stickers_emoji_pack.h"
@@ -886,7 +887,11 @@ void HistoryInner::repaintItem(const Element *view) {
 	}
 	const auto top = itemTop(view);
 	if (top >= 0) {
-		const auto range = view->verticalRepaintRange();
+		auto range = view->verticalRepaintRange();
+		if (_gestureHorizontal && (_gestureHorizontal.msgBareId == view->data()->fullId().msg.bare)) {
+			range.top -= 60;
+			range.height += 120;
+		}
 		update(0, top + range.top, width(), range.height);
 		const auto id = view->data()->fullId();
 		if (const auto area = _reactionsManager->lookupEffectArea(id)) {
@@ -1889,6 +1894,24 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 
 	_replyButtonManager->paint(p, context);
 	_reactionsManager->paint(p, context);
+
+	if (_gestureHorizontal.msgBareId && _gestureHorizontal.ratio > 0.) {
+		const auto item = _history
+			? _history->peer->owner().message(
+				_history->peer->id,
+				MsgId{ _gestureHorizontal.msgBareId })
+			: nullptr;
+		if (const auto view = item ? viewByItem(item) : nullptr) {
+			const auto top = itemTop(view);
+			if (top >= 0) {
+				p.translate(0, top);
+				context.translate(0, -top);
+				view->drawSwipeOverlay(p, context);
+				context.translate(0, top);
+				p.translate(0, -top);
+			}
+		}
+	}
 }
 
 bool HistoryInner::eventHook(QEvent *e) {
@@ -2239,6 +2262,16 @@ not_null<HistoryItem*> HistoryInner::lookupItemByPoint(
 }
 
 void HistoryInner::mousePressEvent(QMouseEvent *e) {
+	if (e->button() == Qt::RightButton) {
+		_rmbPressPos = e->pos();
+		_rmbWheelActive = false;
+		_rmbSuppressedMenu = false;
+		_rmbActionIndex = 0;
+		_rmbLockedMsgBareId = 0;
+		_rmbCurrentDelta = 0.0;
+		_rmbAnimation.stop();
+		_rmbCarouselAnimation.stop();
+	}
 	if (_menu) {
 		e->accept();
 		return; // ignore mouse press, that was hiding context menu
@@ -2705,6 +2738,63 @@ void HistoryInner::mouseActionFinish(
 }
 
 void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
+	if ((_rmbWheelActive || _rmbSuppressedMenu) && (e->button() == Qt::RightButton)) {
+		const auto msgBareId = _rmbLockedMsgBareId ? _rmbLockedMsgBareId : _gestureHorizontal.msgBareId;
+		const auto item = _history
+			? _history->peer->owner().message(
+				_history->peer->id,
+				MsgId{ msgBareId })
+			: nullptr;
+		const auto view = item ? viewByItem(item) : nullptr;
+
+		if (_gestureHorizontal.ratio >= 1.0 && item) {
+			const auto actions = availableQuickActions(item, view);
+			if (!actions.empty()) {
+				const auto idx = std::clamp(_rmbActionIndex, 0, int(actions.size()) - 1);
+				executeQuickAction(actions[idx], item, view);
+			}
+		}
+
+		_rmbWheelActive = false;
+		_rmbActionIndex = 0;
+		_rmbLockedMsgBareId = 0;
+
+		if (item && _rmbCurrentDelta > 0.0) {
+			const auto lastIcon = _gestureHorizontal.customIcon;
+			const auto lastBefore = _gestureHorizontal.beforeIcon;
+			const auto lastAfter = _gestureHorizontal.afterIcon;
+			const auto lastFarBefore = _gestureHorizontal.farBeforeIcon;
+			const auto lastFarAfter = _gestureHorizontal.farAfterIcon;
+
+			_rmbAnimation.stop();
+			_rmbAnimation.start([=](float64 val) {
+				_rmbCurrentDelta = val;
+				const auto r = std::min(val / 70.0, 1.0);
+				_gestureHorizontal.msgBareId = msgBareId;
+				_gestureHorizontal.translation = -int(base::SafeRound(val));
+				_gestureHorizontal.ratio = r;
+				_gestureHorizontal.reachRatio = (r >= 1.0) ? 1.0 : 0.0;
+				_gestureHorizontal.customIcon = lastIcon;
+				_gestureHorizontal.beforeIcon = lastBefore;
+				_gestureHorizontal.afterIcon = lastAfter;
+				_gestureHorizontal.farBeforeIcon = lastFarBefore;
+				_gestureHorizontal.farAfterIcon = lastFarAfter;
+				if (val <= 0.0) {
+					_gestureHorizontal = {};
+				}
+				repaintItem(item);
+			}, _rmbCurrentDelta, 0.0, 150, anim::easeOutCubic);
+		} else {
+			_gestureHorizontal = {};
+			_rmbCurrentDelta = 0.0;
+			update();
+		}
+
+		mouseActionCancel();
+		ClickHandler::unpressed();
+		e->accept();
+		return;
+	}
 	if (_middleClickAutoscroll.finishHold(e->button())) {
 		e->accept();
 		return;
@@ -2887,8 +2977,260 @@ HistoryView::SelectedQuote HistoryInner::selectedQuote(
 	return view->selectedQuote(_selectedTextSelection);
 }
 
+bool HistoryInner::isQuickActionAllowed(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view) const {
+	const auto hasCopyRestr = hasCopyRestriction(item);
+
+	switch (action) {
+	case RabbitSettings::QuickAction::Disable:
+		return false;
+	case RabbitSettings::QuickAction::Reply:
+		return CanSendReply(item);
+	case RabbitSettings::QuickAction::Reaction:
+		return !item->isService() && ranges::contains(
+			Data::LookupPossibleReactions(item).recent,
+			session().data().reactions().favoriteId(),
+			&Data::Reaction::id);
+	case RabbitSettings::QuickAction::Copy:
+		return !hasCopyRestr && (!item->originalText().text.isEmpty() || (item->media() != nullptr));
+	case RabbitSettings::QuickAction::Forward:
+		return !hasCopyRestr && item->allowsForward();
+	case RabbitSettings::QuickAction::Edit:
+		return item->allowsEdit(crl::now());
+	case RabbitSettings::QuickAction::Save:
+		return !hasCopyRestr && item->allowsForward();
+	case RabbitSettings::QuickAction::Repeat:
+		return !hasCopyRestr && item->allowsForward();
+	case RabbitSettings::QuickAction::Delete:
+		return item->canDelete();
+	case RabbitSettings::QuickAction::Translate:
+		return !item->originalText().text.isEmpty() && Core::App().settings().translateButtonEnabled();
+	}
+	return false;
+}
+
+std::vector<RabbitSettings::QuickAction> HistoryInner::availableQuickActions(
+		not_null<HistoryItem*> item,
+		Element *view) const {
+	const auto configured = RabbitSettings::swipeActionsList();
+	auto result = std::vector<RabbitSettings::QuickAction>();
+
+	for (const auto action : configured) {
+		if (isQuickActionAllowed(action, item, view)) {
+			result.push_back(action);
+		}
+	}
+
+	return result;
+}
+
+void HistoryInner::executeQuickAction(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view) {
+	const auto itemId = item->fullId();
+
+	switch (action) {
+	case RabbitSettings::QuickAction::Reply:
+		if (CanSendReply(item)) {
+			_widget->replyToMessage({ .messageId = itemId });
+		}
+		break;
+	case RabbitSettings::QuickAction::Reaction:
+		if (view) {
+			toggleFavoriteReaction(view);
+		}
+		break;
+	case RabbitSettings::QuickAction::Copy:
+		if (const auto selected = selectedQuote(item); !selected.highlight.quote.empty()) {
+			TextUtilities::SetClipboardText(TextForMimeData::WithExpandedLinks(selected.highlight.quote));
+		} else {
+			TextUtilities::SetClipboardText(item->clipboardText());
+		}
+		break;
+	case RabbitSettings::QuickAction::Forward:
+		if (item->allowsForward()) {
+			forwardItem(itemId);
+		}
+		break;
+	case RabbitSettings::QuickAction::Edit:
+		if (item->allowsEdit(crl::now())) {
+			_widget->editMessage(item, TextSelection());
+		}
+		break;
+	case RabbitSettings::QuickAction::Save:
+		if (item->allowsForward()) {
+			Window::ForwardToSelf(
+				_controller->uiShow(),
+				Data::ForwardDraft{ .ids = { 1, itemId } });
+		}
+		break;
+	case RabbitSettings::QuickAction::Repeat:
+		if (item->allowsForward()) {
+			auto sendAction = Api::SendAction(item->history());
+			sendAction.clearDraft = false;
+			session().api().forwardMessages(
+				Data::ResolvedForwardDraft{ .items = { item } },
+				std::move(sendAction));
+		}
+		break;
+	case RabbitSettings::QuickAction::Delete:
+		if (item->canDelete()) {
+			deleteItem(itemId);
+		}
+		break;
+	case RabbitSettings::QuickAction::Translate:
+		if (!item->originalText().text.isEmpty()) {
+			const auto peer = item->history()->peer;
+			const auto mediaHasTextForCopy = (view && view->media() && view->media()->hasTextForCopy());
+			const auto translate = mediaHasTextForCopy
+				? (HistoryView::TransribedText(item)
+					.append('\n')
+					.append(item->originalText()))
+				: item->originalText();
+			if (!translate.text.isEmpty()) {
+				_controller->show(Box(
+					Ui::TranslateBox,
+					peer,
+					mediaHasTextForCopy ? MsgId() : item->id,
+					translate,
+					hasCopyRestriction(item)));
+			}
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
+	if (_rmbSuppressedMenu || _rmbWheelActive) {
+		_rmbSuppressedMenu = false;
+		e->accept();
+		return;
+	}
 	showContextMenu(e);
+}
+
+void HistoryInner::wheelEvent(QWheelEvent *e) {
+	const auto isRmbHold = (e->buttons() & Qt::RightButton)
+		|| (QGuiApplication::mouseButtons() & Qt::RightButton);
+	if (isRmbHold || _rmbWheelActive) {
+		const auto deltaY = e->angleDelta().y();
+		const auto deltaX = e->angleDelta().x();
+		const auto step = (deltaY != 0) ? -deltaY : deltaX;
+
+		if (step != 0) {
+			_rmbWheelActive = true;
+			_rmbSuppressedMenu = true;
+
+			Element *foundView = nullptr;
+			if (_rmbLockedMsgBareId && _history) {
+				if (const auto lockedItem = _history->peer->owner().message(_history->peer->id, MsgId{ _rmbLockedMsgBareId })) {
+					foundView = viewByItem(lockedItem);
+				}
+			}
+
+			if (!foundView) {
+				const auto point = mapFromGlobal(e->globalPosition().toPoint());
+				enumerateItems<EnumItemsDirection::BottomToTop>([&](
+						not_null<Element*> view,
+						int itemtop,
+						int itembottom) {
+					if ((point.y() < itemtop)
+						|| (point.y() > itembottom)
+						|| (!view->data()->isRegular()
+							&& (!view->data()->isEphemeral()
+								|| view->data()->out()))
+							|| view->data()->isService()) {
+						return true;
+					}
+					foundView = view;
+					return false;
+				});
+			}
+
+			if (foundView) {
+				const auto item = foundView->data();
+				const auto viewItemId = item->fullId();
+				_rmbLockedMsgBareId = viewItemId.msg.bare;
+
+				const auto actions = availableQuickActions(item, foundView);
+
+				if (!actions.empty()) {
+					const auto count = int(actions.size());
+					const auto isFirstPull = !_gestureHorizontal.translation;
+
+					if (isFirstPull) {
+						_rmbActionIndex = 0;
+					} else if (count > 1) {
+						const auto actionStep = (step > 0) ? 1 : -1;
+						_rmbActionIndex = (_rmbActionIndex + actionStep + count) % count;
+					}
+
+					const auto activeIdx = std::clamp(_rmbActionIndex, 0, count - 1);
+					const auto activeIcon = RabbitSettings::QuickActionIcon(actions[activeIdx]).icon;
+
+					const style::icon *beforeIcon = nullptr;
+					const style::icon *afterIcon = nullptr;
+					const style::icon *farBeforeIcon = nullptr;
+					const style::icon *farAfterIcon = nullptr;
+
+					if (count > 1) {
+						const auto beforeIdx = (activeIdx - 1 + count) % count;
+						beforeIcon = RabbitSettings::QuickActionIcon(actions[beforeIdx]).icon;
+						if (count > 2) {
+							const auto afterIdx = (activeIdx + 1) % count;
+							afterIcon = RabbitSettings::QuickActionIcon(actions[afterIdx]).icon;
+							if (count > 3) {
+								const auto farBeforeIdx = (activeIdx - 2 + count) % count;
+								farBeforeIcon = RabbitSettings::QuickActionIcon(actions[farBeforeIdx]).icon;
+								const auto farAfterIdx = (activeIdx + 2) % count;
+								farAfterIcon = RabbitSettings::QuickActionIcon(actions[farAfterIdx]).icon;
+							}
+						}
+					}
+
+					_gestureHorizontal.msgBareId = viewItemId.msg.bare;
+					_gestureHorizontal.customIcon = activeIcon;
+					_gestureHorizontal.beforeIcon = beforeIcon;
+					_gestureHorizontal.afterIcon = afterIcon;
+					_gestureHorizontal.farBeforeIcon = farBeforeIcon;
+					_gestureHorizontal.farAfterIcon = farAfterIcon;
+
+					if (isFirstPull) {
+						_gestureHorizontal.carouselOffset = 0.0;
+						_rmbAnimation.start([=](float64 val) {
+							_rmbCurrentDelta = val;
+							const auto ratio = std::min(val / 70.0, 1.0);
+							_gestureHorizontal.translation = -int(base::SafeRound(val));
+							_gestureHorizontal.ratio = ratio;
+							_gestureHorizontal.reachRatio = (ratio >= 1.0) ? 1.0 : 0.0;
+							repaintItem(item);
+						}, _rmbCurrentDelta, 70.0, 120, anim::easeOutCubic);
+					} else if (count > 1) {
+						const auto startOffset = (step > 0) ? 1.0 : -1.0;
+						_gestureHorizontal.carouselOffset = startOffset;
+						repaintItem(item);
+						_rmbCarouselAnimation.stop();
+						_rmbCarouselAnimation.start([=](float64 val) {
+							_gestureHorizontal.carouselOffset = val;
+							repaintItem(item);
+						}, startOffset, 0.0, 150, anim::easeOutCubic);
+					}
+				}
+
+				mouseActionCancel();
+				ClickHandler::unpressed();
+			}
+		}
+
+		e->accept();
+		return;
+	}
+	Ui::RpWidget::wheelEvent(e);
 }
 
 void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {

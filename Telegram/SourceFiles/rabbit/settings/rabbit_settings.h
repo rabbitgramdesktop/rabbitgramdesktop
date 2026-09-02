@@ -12,6 +12,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QVariant>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
+#include <vector>
+#include "rabbit/settings/quick_action.h"
 
 namespace RabbitSettings {
 
@@ -157,6 +159,24 @@ inline bool hideBubbleTails() { return JsonSettings::GetBool(u"hide_bubble_tails
 inline int stickerShape() { return JsonSettings::GetInt(u"sticker_shape"_q); }
 inline int outgoingQuickAction() { return JsonSettings::GetInt(u"outgoing_quick_action"_q); }
 inline int incomingQuickAction() { return JsonSettings::GetInt(u"incoming_quick_action"_q); }
+inline std::vector<QuickAction> swipeActionsList() {
+	const auto arr = JsonSettings::GetJsonArray(u"swipe_actions_list"_q);
+	auto result = std::vector<QuickAction>();
+	for (const auto val : arr) {
+		result.push_back(static_cast<QuickAction>(val.toInt()));
+	}
+	if (result.empty()) {
+		result.push_back(QuickAction::Reply);
+	}
+	return result;
+}
+inline void setSwipeActionsList(const std::vector<QuickAction> &list) {
+	auto arr = QJsonArray();
+	for (const auto action : list) {
+		arr.append(static_cast<int>(action));
+	}
+	JsonSettings::Set(u"swipe_actions_list"_q, arr);
+}
 inline bool moreRecentStickers() { return JsonSettings::GetBool(u"more_recent_stickers"_q); }
 inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool(u"spoof_webview_as_android"_q); }
 inline bool preciseTime() { return JsonSettings::GetBool(u"precise_time"_q); }

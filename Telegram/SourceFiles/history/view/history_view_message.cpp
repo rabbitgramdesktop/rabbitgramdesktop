@@ -2233,76 +2233,6 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			const auto shift = context.gestureHorizontal.translation;
 			context.reactionInfo->effectOffset += QPoint(shift, 0);
 		}
-
-		constexpr auto kShiftRatio = 1.5;
-		constexpr auto kBouncePart = 0.25;
-		constexpr auto kMaxHeightRatio = 3.5;
-		constexpr auto kStrokeWidth = 2.;
-		constexpr auto kWaveWidth = 10.;
-		const auto isLeftSize = !context.outbg
-			|| (delegate()->elementChatMode() == ElementChatMode::Wide);
-		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
-		const auto reachRatio = context.gestureHorizontal.reachRatio;
-		const auto size = st::historyFastShareSize;
-		const auto outerWidth = st::historySwipeIconSkip
-			+ (isLeftSize ? rect::right(g) : width())
-			+ ((g.height() < size * kMaxHeightRatio)
-				? rightActionSize().value_or(QSize()).width()
-				: 0);
-		const auto shift = std::min(
-			(size * kShiftRatio * context.gestureHorizontal.ratio),
-			-1. * context.gestureHorizontal.translation
-		) + (st::historySwipeIconSkip * ratio * (isLeftSize ? .7 : 1.));
-		const auto rect = QRectF(
-			outerWidth - shift,
-			g.y() + (g.height() - size) / 2,
-			size,
-			size);
-		const auto center = rect::center(rect);
-		const auto spanAngle = ratio * arc::kFullLength;
-		const auto strokeWidth = style::ConvertFloatScale(kStrokeWidth);
-
-		const auto reachScale = std::clamp(
-			(reachRatio > kBouncePart)
-				? (kBouncePart * 2 - reachRatio)
-				: reachRatio,
-			0.,
-			1.);
-		auto pen = Window::Theme::IsNightMode()
-			? QPen(anim::with_alpha(context.st->msgServiceFg()->c, 0.3))
-			: QPen(context.st->msgServiceBg());
-		pen.setWidthF(strokeWidth - (1. * (reachScale / kBouncePart)));
-		const auto arcRect = rect - Margins(strokeWidth);
-		p.save();
-		{
-			auto hq = PainterHighQualityEnabler(p);
-			p.setPen(Qt::NoPen);
-			p.setBrush(context.st->msgServiceBg());
-			p.setOpacity(ratio);
-			p.translate(center);
-			if (reachScale) {
-				p.scale(-(1. + 1. * reachScale), (1. + 1. * reachScale));
-			} else {
-				p.scale(-1., 1.);
-			}
-			p.translate(-center);
-			// All the next draws are mirrored.
-			p.drawEllipse(rect);
-			context.st->historyFastShareIcon().paintInCenter(p, rect);
-			p.setPen(pen);
-			p.setBrush(Qt::NoBrush);
-			p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
-			// p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
-			if (reachRatio) {
-				const auto w = style::ConvertFloatScale(kWaveWidth);
-				p.setOpacity(ratio - reachRatio);
-				p.drawArc(
-					arcRect + Margins(reachRatio * reachRatio * w),
-					arc::kQuarterLength,
-					spanAngle);
-			}
-		}
-		p.restore();
 	}
 	if (selectionTranslation) {
 		p.translate(-selectionTranslation, 0);
@@ -7254,6 +7184,117 @@ void Message::paintSummarize(
 		x - (right ? 0 : s.width()),
 		buttonY,
 		context);
+}
+
+void Message::drawSwipeOverlay(Painter &p, const PaintContext &context) const {
+	const auto hasGesture = context.gestureHorizontal.translation
+		&& (context.gestureHorizontal.msgBareId
+			== data()->fullId().msg.bare);
+	if (!hasGesture) {
+		return;
+	}
+
+	const auto g = countGeometry();
+
+	constexpr auto kShiftRatio = 1.5;
+	constexpr auto kBouncePart = 0.25;
+	constexpr auto kMaxHeightRatio = 3.5;
+	constexpr auto kStrokeWidth = 2.;
+	constexpr auto kWaveWidth = 10.;
+	const auto isLeftSize = !context.outbg
+		|| (delegate()->elementChatMode() == ElementChatMode::Wide);
+	const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
+	const auto reachRatio = context.gestureHorizontal.reachRatio;
+	const auto size = st::historyFastShareSize;
+	const auto outerWidth = st::historySwipeIconSkip
+		+ (isLeftSize ? rect::right(g) : width())
+		+ ((g.height() < size * kMaxHeightRatio)
+			? rightActionSize().value_or(QSize()).width()
+			: 0);
+	const auto shift = std::min(
+		(size * kShiftRatio * context.gestureHorizontal.ratio),
+		-1. * context.gestureHorizontal.translation
+	) + (st::historySwipeIconSkip * ratio * (isLeftSize ? .7 : 1.));
+	const auto rect = QRectF(
+		outerWidth - shift,
+		g.y() + (g.height() - size) / 2.,
+		size,
+		size);
+	const auto center = rect::center(rect);
+	const auto spanAngle = ratio * arc::kFullLength;
+	const auto strokeWidth = style::ConvertFloatScale(kStrokeWidth);
+
+	const auto reachScale = std::clamp(
+		(reachRatio > kBouncePart)
+			? (kBouncePart * 2 - reachRatio)
+			: reachRatio,
+		0.,
+		1.);
+	auto pen = Window::Theme::IsNightMode()
+		? QPen(anim::with_alpha(context.st->msgServiceFg()->c, 0.3))
+		: QPen(context.st->msgServiceBg());
+	pen.setWidthF(strokeWidth - (1. * (reachScale / kBouncePart)));
+	const auto arcRect = rect.marginsRemoved(Margins(strokeWidth));
+	p.save();
+	{
+		auto hq = PainterHighQualityEnabler(p);
+		const auto offset = context.gestureHorizontal.carouselOffset;
+
+		const auto drawSlot = [&](int slotIndex, const style::icon *ic) {
+			if (!ic) return;
+			const auto t = slotIndex + offset;
+			const auto alpha = std::max(0.0, 1.0 - 0.55 * std::abs(t));
+			if (alpha <= 0.0) return;
+
+			const auto pos = QPointF(center.x(), center.y() + t * size * 0.95);
+			const auto scaleVal = std::clamp(1.0 - 0.28 * std::min(std::abs(t), 1.0), 0.3, 1.0);
+
+			p.save();
+			p.setPen(Qt::NoPen);
+			p.setBrush(context.st->msgServiceBg());
+			p.setOpacity(ratio * alpha);
+			p.translate(pos);
+
+			const auto finalScale = scaleVal * (1. + (reachScale ? (1. * reachScale) : 0.0));
+			p.scale(-finalScale, finalScale);
+			p.translate(-center);
+
+			p.drawEllipse(rect);
+			ic->paintInCenter(p, rect);
+
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
+			p.restore();
+		};
+
+		const auto activeIcon = context.gestureHorizontal.customIcon
+			? context.gestureHorizontal.customIcon
+			: &context.st->historyFastShareIcon();
+
+		drawSlot(-2, context.gestureHorizontal.farBeforeIcon);
+		drawSlot(-1, context.gestureHorizontal.beforeIcon);
+		drawSlot(1, context.gestureHorizontal.afterIcon);
+		drawSlot(2, context.gestureHorizontal.farAfterIcon);
+		drawSlot(0, activeIcon);
+
+		if (reachRatio) {
+			p.save();
+			p.translate(center);
+			p.scale(-1., 1.);
+			p.translate(-center);
+			const auto w = style::ConvertFloatScale(kWaveWidth);
+			p.setOpacity(ratio - reachRatio);
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(
+				arcRect.marginsAdded(Margins(reachRatio * reachRatio * w)),
+				arc::kQuarterLength,
+				spanAngle);
+			p.restore();
+		}
+	}
+	p.restore();
 }
 
 } // namespace HistoryView

@@ -23,7 +23,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
+#include "rabbit/settings/quick_action.h"
 
+#include <vector>
 #include <QtGui/QPainterPath>
 
 struct ClickContext;
@@ -308,6 +310,7 @@ protected:
 	void resizeEvent(QResizeEvent *e) override;
 	void keyPressEvent(QKeyEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	void wheelEvent(QWheelEvent *e) override;
 
 private:
 	[[nodiscard]] std::vector<Element*> accessibleElements() const;
@@ -696,6 +699,27 @@ private:
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;
 	Ui::Controls::SwipeBackResult _swipeBackData;
+
+	bool _rmbWheelActive = false;
+	bool _rmbSuppressedMenu = false;
+	QPoint _rmbPressPos;
+	int64 _rmbLockedMsgBareId = 0;
+	int _rmbActionIndex = 0;
+	float64 _rmbCurrentDelta = 0.;
+	Ui::Animations::Simple _rmbAnimation;
+	Ui::Animations::Simple _rmbCarouselAnimation;
+
+	[[nodiscard]] std::vector<RabbitSettings::QuickAction> availableQuickActions(
+		not_null<HistoryItem*> item,
+		Element *view) const;
+	[[nodiscard]] bool isQuickActionAllowed(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view) const;
+	void executeQuickAction(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view);
 
 	// _menu must be destroyed before _whoReactedMenuLifetime.
 	rpl::lifetime _whoReactedMenuLifetime;

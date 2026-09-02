@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "ui/style/style_core_types.h"
+
 namespace Ui::Controls {
 
 struct SwipeContextData final {
@@ -26,6 +28,12 @@ struct SwipeContextData final {
 	int64 msgBareId = 0;
 	int translation = 0;
 	int cursorTop = 0;
+	float64 carouselOffset = 0.;
+	const style::icon *customIcon = nullptr;
+	const style::icon *beforeIcon = nullptr;
+	const style::icon *afterIcon = nullptr;
+	const style::icon *farBeforeIcon = nullptr;
+	const style::icon *farAfterIcon = nullptr;
 };
 
 struct SwipeHandlerInitData final {

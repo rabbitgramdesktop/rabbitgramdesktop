@@ -553,6 +553,7 @@ public:
 	void refreshForumThreadBar(Element *previous, bool enabled);
 
 	virtual void draw(Painter &p, const PaintContext &context) const = 0;
+	virtual void drawSwipeOverlay(Painter &p, const PaintContext &context) const {}
 	[[nodiscard]] virtual PointState pointState(QPoint point) const = 0;
 	[[nodiscard]] virtual TextState textState(
 		QPoint point,

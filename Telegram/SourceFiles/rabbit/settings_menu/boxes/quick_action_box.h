@@ -11,3 +11,4 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 void OutgoingQuickActionBox(not_null<Ui::GenericBox *> box);
 void IncomingQuickActionBox(not_null<Ui::GenericBox *> box);
+void SwipeActionsBox(not_null<Ui::GenericBox *> box);

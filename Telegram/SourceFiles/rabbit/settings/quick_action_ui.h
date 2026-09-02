@@ -26,6 +26,8 @@ inline rpl::producer<QString> QuickActionString(QuickAction action) {
 	case Edit: return rktr(u"quick_action_edit"_q);
 	case Save: return rktr(u"quick_action_save"_q);
 	case Delete: return rktr(u"quick_action_delete"_q);
+	case Repeat: return rktr(u"quick_action_repeat"_q);
+	case Translate: return rktr(u"quick_action_translate"_q);
 	}
 	return rktr(u"quick_action_disable"_q);
 }
@@ -40,6 +42,8 @@ inline Settings::IconDescriptor QuickActionIcon(QuickAction action) {
 	case Edit: return { &st::menuIconEdit };
 	case Save: return { &st::menuIconSavedMessages };
 	case Delete: return { &st::menuIconDelete };
+	case Repeat: return { &st::menuIconRestore };
+	case Translate: return { &st::menuIconTranslate };
 	}
 	return {};
 }

@@ -228,8 +228,9 @@ void BuildQuickActions(
 	builder.addSubsectionTitle({
 		.id = u"rabbit/chats/quick_actions"_q,
 		.title = rktr(u"rtg_chats_quick_actions"_q),
-		.keywords = { u"quick"_q, u"actions"_q },
+		.keywords = { u"quick"_q, u"actions"_q, u"swipe"_q },
 	});
+
 	const auto outgoingAction = QuickActionFrom(
 		RabbitSettings::outgoingQuickAction());
 	const auto incomingAction = QuickActionFrom(
@@ -259,6 +260,7 @@ void BuildQuickActions(
 				controller);
 		}
 	}
+
 	if (const auto button = builder.addButton({
 		.id = u"rabbit/chats/quick_actions/outgoing"_q,
 		.title = rktr(u"rtg_outgoing_quick_actions"_q),
@@ -273,6 +275,23 @@ void BuildQuickActions(
 			RtgMenu::AttachSettingsContextMenu(
 				button,
 				u"rabbit/chats/quick_actions/outgoing"_q,
+				controller);
+		}
+	}
+
+	if (const auto button = builder.addButton({
+		.id = u"rabbit/chats/swipe_actions/manage"_q,
+		.title = rktr(u"rtg_chats_swipe_actions"_q),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = controller
+			? [=] { controller->show(Box(SwipeActionsBox)); }
+			: Fn<void()>(),
+		.keywords = { u"swipe"_q, u"actions"_q },
+	})) {
+		if (controller) {
+			RtgMenu::AttachSettingsContextMenu(
+				button,
+				u"rabbit/chats/swipe_actions/manage"_q,
 				controller);
 		}
 	}

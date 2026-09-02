@@ -413,6 +413,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"swipe_actions_list"_q, {
+			.type = QJsonArraySetting,
+			.defaultValue = QJsonArray{ static_cast<int>(QuickAction::Reply) },
+		}
+	},
+	{
 		u"more_recent_stickers"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
