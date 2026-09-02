@@ -231,10 +231,23 @@ void BuildQuickActions(
 		.keywords = { u"quick"_q, u"actions"_q, u"swipe"_q },
 	});
 
-	const auto outgoingAction = QuickActionFrom(
-		RabbitSettings::outgoingQuickAction());
-	const auto incomingAction = QuickActionFrom(
-		RabbitSettings::incomingQuickAction());
+	const auto incomingLabel = rpl::single(
+		RabbitSettings::incomingQuickAction()
+	) | rpl::then(
+		RabbitSettings::JsonSettings::Events(u"incoming_quick_action"_q)
+		| rpl::map([] { return RabbitSettings::incomingQuickAction(); })
+	) | rpl::map([](int val) {
+		return RabbitSettings::QuickActionString(QuickActionFrom(val));
+	}) | rpl::flatten_latest();
+
+	const auto outgoingLabel = rpl::single(
+		RabbitSettings::outgoingQuickAction()
+	) | rpl::then(
+		RabbitSettings::JsonSettings::Events(u"outgoing_quick_action"_q)
+		| rpl::map([] { return RabbitSettings::outgoingQuickAction(); })
+	) | rpl::map([](int val) {
+		return RabbitSettings::QuickActionString(QuickActionFrom(val));
+	}) | rpl::flatten_latest();
 
 	builder.add([](const WidgetContext &ctx) {
 		return SectionBuilder::WidgetToAdd{
@@ -247,7 +260,7 @@ void BuildQuickActions(
 		.id = u"rabbit/chats/quick_actions/incoming"_q,
 		.title = rktr(u"rtg_incoming_quick_actions"_q),
 		.st = &st::settingsButtonNoIcon,
-		.label = RabbitSettings::QuickActionString(incomingAction),
+		.label = std::move(incomingLabel),
 		.onClick = controller
 			? [=] { controller->show(Box(IncomingQuickActionBox)); }
 			: Fn<void()>(),
@@ -265,7 +278,7 @@ void BuildQuickActions(
 		.id = u"rabbit/chats/quick_actions/outgoing"_q,
 		.title = rktr(u"rtg_outgoing_quick_actions"_q),
 		.st = &st::settingsButtonNoIcon,
-		.label = RabbitSettings::QuickActionString(outgoingAction),
+		.label = std::move(outgoingLabel),
 		.onClick = controller
 			? [=] { controller->show(Box(OutgoingQuickActionBox)); }
 			: Fn<void()>(),
@@ -284,7 +297,12 @@ void BuildQuickActions(
 		.title = rktr(u"rtg_chats_swipe_actions"_q),
 		.st = &st::settingsButtonNoIcon,
 		.onClick = controller
-			? [=] { controller->show(Box(SwipeActionsBox)); }
+			? [=] {
+				auto box = Box([=](not_null<Ui::GenericBox*> box) {
+					SwipeActionsBox(box);
+				});
+				controller->show(std::move(box));
+			}
 			: Fn<void()>(),
 		.keywords = { u"swipe"_q, u"actions"_q },
 	})) {
@@ -294,6 +312,54 @@ void BuildQuickActions(
 				u"rabbit/chats/swipe_actions/manage"_q,
 				controller);
 		}
+
+		const auto iconsWidget = Ui::CreateChild<Ui::RpWidget>(button);
+		iconsWidget->setAttribute(Qt::WA_TransparentForMouseEvents);
+		iconsWidget->show();
+
+		const auto updateIconsGeometry = [=] {
+			const auto list = RabbitSettings::swipeActionsList();
+			auto totalWidth = 0;
+			auto maxHeight = 0;
+			for (const auto act : list) {
+				if (const auto icon = RabbitSettings::QuickActionIcon(act).icon) {
+					totalWidth += icon->width() + 4;
+					maxHeight = std::max(maxHeight, icon->height());
+				}
+			}
+			if (totalWidth > 0) {
+				totalWidth -= 4;
+			}
+			const auto rightMargin = st::settingsButton.padding.right();
+			const auto x = button->width() - totalWidth - rightMargin;
+			const auto y = (button->height() - maxHeight) / 2;
+			iconsWidget->setGeometry(x, y, totalWidth, maxHeight);
+			iconsWidget->update();
+		};
+
+		button->sizeValue(
+		) | rpl::on_next([=](QSize size) {
+			updateIconsGeometry();
+		}, button->lifetime());
+
+		RabbitSettings::JsonSettings::Events(
+			u"swipe_actions_list"_q
+		) | rpl::on_next([=] {
+			updateIconsGeometry();
+		}, button->lifetime());
+
+		iconsWidget->paintRequest(
+		) | rpl::on_next([=] {
+			auto p = QPainter(iconsWidget);
+			const auto list = RabbitSettings::swipeActionsList();
+			auto x = 0;
+			for (const auto act : list) {
+				if (const auto icon = RabbitSettings::QuickActionIcon(act).icon) {
+					icon->paint(p, x, (iconsWidget->height() - icon->height()) / 2, iconsWidget->width());
+					x += icon->width() + 4;
+				}
+			}
+		}, iconsWidget->lifetime());
 	}
 }
 
