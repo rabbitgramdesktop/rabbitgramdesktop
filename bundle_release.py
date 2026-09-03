@@ -72,9 +72,11 @@ def update_installer_script(root: Path, version: VersionInfo) -> None:
         r'#define ReleasePath ".*?"': f'#define ReleasePath "{release_path}"',
     }
     for pattern, replacement in replacements.items():
+        if not re.search(pattern, content):
+            sys.exit(f"Failed to find pattern {pattern} in {iss_path}")
         content = re.sub(pattern, lambda match, r=replacement: r, content)
 
-    iss_path.write_text(content, encoding="utf-8")
+    iss_path.write_text(content, encoding="utf-8", newline="\r\n")
 
 
 def bundle_portable(root: Path, version: VersionInfo) -> None:
