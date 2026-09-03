@@ -81,13 +81,7 @@ void AddToggle(
 	}
 }
 
-void BuildChats(SectionBuilder &builder) {
-	builder.addSubsectionTitle({
-		.id = u"rabbit/chats/settings"_q,
-		.title = rktr(u"rtg_settings_chats"_q),
-		.keywords = { u"chats"_q, u"messages"_q },
-	});
-
+void BuildTopGeneral(SectionBuilder &builder) {
 	builder.add([](const WidgetContext &ctx) {
 		auto wrap = object_ptr<Ui::VerticalLayout>(ctx.container);
 
@@ -179,6 +173,15 @@ void BuildChats(SectionBuilder &builder) {
 		[] { return RabbitSettings::showActionsTime(); },
 		[](bool value) { RabbitSettings::setShowActionsTime(value); },
 		{ u"actions"_q, u"time"_q });
+}
+
+void BuildChats(SectionBuilder &builder) {
+	builder.addSubsectionTitle({
+		.id = u"rabbit/chats/settings"_q,
+		.title = rktr(u"rtg_settings_chats"_q),
+		.keywords = { u"chats"_q, u"messages"_q },
+	});
+
 	AddToggle(
 		builder,
 		u"rabbit/chats/comma_after_mention"_q,
@@ -187,6 +190,15 @@ void BuildChats(SectionBuilder &builder) {
 		[] { return RabbitSettings::commaAfterMention(); },
 		[](bool value) { RabbitSettings::setCommaAfterMention(value); },
 		{ u"mention"_q, u"comma"_q });
+}
+
+void BuildMessages(SectionBuilder &builder) {
+	builder.addSubsectionTitle({
+		.id = u"rabbit/chats/messages"_q,
+		.title = rktr(u"rtg_chats_messages"_q),
+		.keywords = { u"messages"_q },
+	});
+
 	AddToggle(
 		builder,
 		u"rabbit/chats/hide_bubble_tails"_q,
@@ -662,7 +674,7 @@ void BuildRabbitChats(
 	SectionBuilder &builder,
 	Window::SessionController *controller) {
 	builder.addSkip();
-	BuildChats(builder);
+	BuildTopGeneral(builder);
 
 	builder.addSkip();
 	builder.addDivider();
@@ -672,12 +684,22 @@ void BuildRabbitChats(
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
+	BuildStickers(builder, controller);
+
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
 	BuildQuickActions(builder, controller);
 
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
-	BuildStickers(builder, controller);
+	BuildChats(builder);
+
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+	BuildMessages(builder);
 }
 
 const auto kMeta = BuildHelper({
