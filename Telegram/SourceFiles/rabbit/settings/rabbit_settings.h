@@ -192,6 +192,7 @@ inline bool telemetryCpuArch() { return JsonSettings::GetBool(u"telemetry_cpu_ar
 inline bool analytics() { return JsonSettings::GetBool(u"analytics"_q); }
 inline QString telemetryClientId() { return JsonSettings::GetString(u"telemetry_client_id"_q); }
 inline bool replaceEditedLabel() { return JsonSettings::GetBool(u"replace_edited_label"_q); }
+inline int channelBottomButton() { return JsonSettings::GetInt(u"channel_bottom_button"_q); }
 inline bool hideReactionsChannels() { return JsonSettings::GetBool(u"hide_reactions_channels"_q); }
 inline bool hideReactionsGroups() { return JsonSettings::GetBool(u"hide_reactions_groups"_q); }
 inline bool hideReactionsPrivates() { return JsonSettings::GetBool(u"hide_reactions_privates"_q); }
@@ -241,6 +242,7 @@ inline void setTelemetryCpuArch(bool value) { JsonSettings::Set(u"telemetry_cpu_
 inline void setAnalytics(bool value) { JsonSettings::Set(u"analytics"_q, value); }
 inline void setTelemetryClientId(const QString &value) { JsonSettings::Set(u"telemetry_client_id"_q, value); }
 inline void setReplaceEditedLabel(bool value) { JsonSettings::Set(u"replace_edited_label"_q, value); }
+inline void setChannelBottomButton(int value) { JsonSettings::Set(u"channel_bottom_button"_q, value); }
 inline void setHideReactions(bool value) { JsonSettings::Set(u"hide_reactions"_q, value); }
 inline void setHideReactionsChannels(bool value) { JsonSettings::Set(u"hide_reactions_channels"_q, value); }
 inline void setHideReactionsGroups(bool value) { JsonSettings::Set(u"hide_reactions_groups"_q, value); }

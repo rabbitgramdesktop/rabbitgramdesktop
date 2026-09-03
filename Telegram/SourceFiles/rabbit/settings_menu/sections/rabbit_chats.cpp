@@ -175,12 +175,45 @@ void BuildTopGeneral(SectionBuilder &builder) {
 		{ u"actions"_q, u"time"_q });
 }
 
-void BuildChats(SectionBuilder &builder) {
+void BuildChats(
+	SectionBuilder &builder,
+	Window::SessionController *controller) {
 	builder.addSubsectionTitle({
 		.id = u"rabbit/chats/settings"_q,
 		.title = rktr(u"rtg_settings_chats"_q),
 		.keywords = { u"chats"_q, u"messages"_q },
 	});
+
+	const auto bottomButtonLabel = rpl::single(
+		RabbitSettings::channelBottomButton()
+	) | rpl::then(
+		RabbitSettings::JsonSettings::Events(u"channel_bottom_button"_q)
+		| rpl::map([] { return RabbitSettings::channelBottomButton(); })
+	) | rpl::map([](int val) -> rpl::producer<QString> {
+		switch (val) {
+		case 1: return rktr(u"rtg_chats_channel_bottom_button_discuss"_q);
+		case 2: return rktr(u"rtg_chats_channel_bottom_button_hide"_q);
+		default: return rktr(u"rtg_chats_channel_bottom_button_mute"_q);
+		}
+	}) | rpl::flatten_latest();
+
+	if (const auto button = builder.addButton({
+		.id = u"rabbit/chats/channel_bottom_button"_q,
+		.title = rktr(u"rtg_chats_channel_bottom_button"_q),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(bottomButtonLabel),
+		.onClick = controller
+			? [=] { controller->show(Box(ChannelBottomButtonBox)); }
+			: Fn<void()>(),
+		.keywords = { u"channel"_q, u"bottom"_q, u"button"_q },
+	})) {
+		if (controller) {
+			RtgMenu::AttachSettingsContextMenu(
+				button,
+				u"rabbit/chats/channel_bottom_button"_q,
+				controller);
+		}
+	}
 
 	AddToggle(
 		builder,
@@ -694,7 +727,7 @@ void BuildRabbitChats(
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
-	BuildChats(builder);
+	BuildChats(builder, controller);
 
 	builder.addSkip();
 	builder.addDivider();

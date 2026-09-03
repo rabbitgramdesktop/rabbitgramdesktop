@@ -94,6 +94,30 @@ void IncomingQuickActionBox(not_null<Ui::GenericBox *> box) {
 		});
 }
 
+void ChannelBottomButtonBox(not_null<Ui::GenericBox *> box) {
+	box->setTitle(rktr(u"rtg_chats_channel_bottom_button"_q));
+
+	const auto layout = box->verticalLayout();
+
+	const auto addOption = [&](rpl::producer<QString> label, int value) {
+		Settings::AddButtonWithIcon(
+			layout,
+			std::move(label),
+			st::settingsButton
+		)->addClickHandler([=] {
+			RabbitSettings::setChannelBottomButton(value);
+			box->closeBox();
+		});
+	};
+
+	addOption(rktr(u"rtg_chats_channel_bottom_button_mute"_q), 0);
+	addOption(rktr(u"rtg_chats_channel_bottom_button_discuss"_q), 1);
+	addOption(rktr(u"rtg_chats_channel_bottom_button_hide"_q), 2);
+
+	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+	box->setWidth(st::aboutWidth);
+}
+
 void SwipeActionsBox(not_null<Ui::GenericBox *> box) {
 	box->setTitle(rktr(u"rtg_chats_swipe_actions"_q));
 

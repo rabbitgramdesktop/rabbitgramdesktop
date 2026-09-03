@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "history/view/history_view_chat_section.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/history_view_top_controls.h"
 #include "history/view/controls/history_view_bottom_controls.h"
@@ -2902,6 +2904,15 @@ void ChatWidget::joinGroupAction() {
 }
 
 void ChatWidget::toggleMuteUnmute() {
+	const auto setting = RabbitSettings::channelBottomButton();
+	if (setting == 1) {
+		if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
+			if (const auto discuss = channel->discussionLink()) {
+				controller()->showPeerHistory(discuss);
+				return;
+			}
+		}
+	}
 	const auto wasMuted = _history->muted();
 	const auto muteForSeconds = Data::MuteValue{
 		.unmute = wasMuted,

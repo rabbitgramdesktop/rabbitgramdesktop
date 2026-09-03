@@ -103,5 +103,9 @@
     "rtg_chats_hide_reactions_groups": "Группы",
     "rtg_chats_hide_reactions_privates": "Личные чаты",
     "rtg_replace_edited_label": "Заменять \"изменено\" иконкой",
+    "rtg_chats_channel_bottom_button": "Нижняя кнопка",
+    "rtg_chats_channel_bottom_button_mute": "Убрать звук",
+    "rtg_chats_channel_bottom_button_discuss": "Обсудить",
+    "rtg_chats_channel_bottom_button_hide": "Скрыть",
     "last_string": null
 }

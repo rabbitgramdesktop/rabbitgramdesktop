@@ -783,7 +783,8 @@ HistoryWidget::HistoryWidget(
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_channels"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_groups"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q),
-		RabbitSettings::JsonSettings::Events(u"replace_edited_label"_q)
+		RabbitSettings::JsonSettings::Events(u"replace_edited_label"_q),
+		RabbitSettings::JsonSettings::Events(u"channel_bottom_button"_q)
 	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
 			if (_history) {
@@ -793,6 +794,9 @@ HistoryWidget::HistoryWidget(
 					}
 				}
 			}
+			updateNotifyControls();
+			updateControlsVisibility();
+			updateControlsGeometry();
 			updateHistoryGeometry();
 		});
 	}, lifetime());
@@ -3802,9 +3806,15 @@ void HistoryWidget::updateNotifyControls() {
 		return;
 	}
 
-	_muteUnmute->setText((_history->muted()
-		? tr::lng_channel_unmute(tr::now)
-		: tr::lng_channel_mute(tr::now)).toUpper());
+	const auto channel = _peer->asChannel();
+	const auto setting = RabbitSettings::channelBottomButton();
+	if (setting == 1 && channel && channel->discussionLink()) {
+		_muteUnmute->setText(tr::lng_profile_action_short_discuss(tr::now).toUpper());
+	} else {
+		_muteUnmute->setText((_history->muted()
+			? tr::lng_channel_unmute(tr::now)
+			: tr::lng_channel_mute(tr::now)).toUpper());
+	}
 	if (!session().data().notifySettings().silentPostsUnknown(_peer)) {
 		if (_silent) {
 			_silent->setChecked(
@@ -5995,6 +6005,15 @@ void HistoryWidget::joinChannel() {
 }
 
 void HistoryWidget::toggleMuteUnmute() {
+	const auto setting = RabbitSettings::channelBottomButton();
+	if (setting == 1) {
+		if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
+			if (const auto discuss = channel->discussionLink()) {
+				controller()->showPeerHistory(discuss);
+				return;
+			}
+		}
+	}
 	const auto wasMuted = _history->muted();
 	const auto muteForSeconds = Data::MuteValue{
 		.unmute = wasMuted,
@@ -6663,11 +6682,16 @@ bool HistoryWidget::isChoosingTheme() const {
 }
 
 bool HistoryWidget::isMuteUnmute() const {
-	return _peer
-		&& ((_peer->isBroadcast() && !_peer->asChannel()->canPostMessages())
-			|| (_peer->isGigagroup() && !Data::CanSendAnything(_peer))
-			|| _peer->isRepliesChat()
-			|| _peer->isVerifyCodes());
+	if (!_peer) {
+		return false;
+	}
+	if (RabbitSettings::channelBottomButton() == 2 && _peer->isBroadcast()) {
+		return false;
+	}
+	return (_peer->isBroadcast() && !_peer->asChannel()->canPostMessages())
+		|| (_peer->isGigagroup() && !Data::CanSendAnything(_peer))
+		|| _peer->isRepliesChat()
+		|| _peer->isVerifyCodes();
 }
 
 bool HistoryWidget::isSearching() const {

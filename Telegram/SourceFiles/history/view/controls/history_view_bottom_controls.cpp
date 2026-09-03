@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/controls/history_view_bottom_controls.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "apiwrap.h"
 #include "boxes/star_gift_box.h"
 #include "chat_helpers/message_field.h"
@@ -419,7 +421,8 @@ void BottomControls::setupPeerUpdates() {
 		_peer->session().data().notifySettings().defaultUpdates(
 			DefaultNotify::Group),
 		_peer->session().data().notifySettings().defaultUpdates(
-			DefaultNotify::Broadcast)
+			DefaultNotify::Broadcast),
+		RabbitSettings::JsonSettings::Events(u"channel_bottom_button"_q) | rpl::to_empty
 	) | rpl::on_next([=] {
 		refreshMuteUnmuteText();
 		updateControlsVisibility();
@@ -468,9 +471,15 @@ void BottomControls::refreshMuteUnmuteText() {
 	if (!_muteUnmute) {
 		return;
 	}
-	_muteUnmute->setText((_history->muted()
-		? tr::lng_channel_unmute(tr::now)
-		: tr::lng_channel_mute(tr::now)).toUpper());
+	const auto channel = _peer ? _peer->asChannel() : nullptr;
+	const auto setting = RabbitSettings::channelBottomButton();
+	if (setting == 1 && channel && channel->discussionLink()) {
+		_muteUnmute->setText(tr::lng_profile_action_short_discuss(tr::now).toUpper());
+	} else {
+		_muteUnmute->setText((_history->muted()
+			? tr::lng_channel_unmute(tr::now)
+			: tr::lng_channel_mute(tr::now)).toUpper());
+	}
 }
 
 void BottomControls::refreshGiftToChannelShown() {
@@ -564,7 +573,10 @@ bool BottomControls::isJoinGroup() const {
 }
 
 bool BottomControls::isMuteUnmute() const {
-	if (_mode != BottomControlsMode::History) {
+	if (_mode != BottomControlsMode::History || !_peer) {
+		return false;
+	}
+	if (RabbitSettings::channelBottomButton() == 2 && _peer->isBroadcast()) {
 		return false;
 	}
 	return (_peer->isBroadcast() && !_peer->asChannel()->canPostMessages())

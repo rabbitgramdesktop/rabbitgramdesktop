@@ -103,5 +103,9 @@
     "rtg_chats_hide_reactions_groups": "Groups",
     "rtg_chats_hide_reactions_privates": "Private chats",
     "rtg_replace_edited_label": "Replace \"edited\" label with icon",
+    "rtg_chats_channel_bottom_button": "Bottom button",
+    "rtg_chats_channel_bottom_button_mute": "Mute",
+    "rtg_chats_channel_bottom_button_discuss": "Discuss",
+    "rtg_chats_channel_bottom_button_hide": "Hide",
     "last_string": null
 }

@@ -510,6 +510,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"channel_bottom_button"_q, {
+			.type = IntSetting,
+			.defaultValue = 0,
+		}
+	},
+	{
 		u"replace_edited_label"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
