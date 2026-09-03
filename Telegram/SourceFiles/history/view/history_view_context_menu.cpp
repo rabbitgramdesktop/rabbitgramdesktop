@@ -2453,8 +2453,7 @@ void AddWhenEditedForwardedAuthorActionHelper(
 			if (insertSeparator && !menu->empty()) {
 				menu->addSeparator(&st::expandedMenuSeparator);
 			}
-			if (!RabbitSettings::replaceEditedIcon()
-				&& item->history()->session().messagePrimaryEditedDate()) {
+			if (!RabbitSettings::replaceEditedLabel()) {
 				const auto sent = base::unixtime::parse(item->date());
 				auto label = base::make_unique_q<Ui::Menu::MultilineAction>(
 					menu->menu(),

@@ -510,7 +510,7 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
-		u"replace_edited_icon"_q, {
+		u"replace_edited_label"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
 		}

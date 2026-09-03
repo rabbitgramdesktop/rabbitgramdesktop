@@ -783,9 +783,16 @@ HistoryWidget::HistoryWidget(
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_channels"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_groups"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q),
-		RabbitSettings::JsonSettings::Events(u"replace_edited_icon"_q)
+		RabbitSettings::JsonSettings::Events(u"replace_edited_label"_q)
 	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
+			if (_history) {
+				for (const auto &block : _history->blocks) {
+					for (const auto &msg : block->messages) {
+						session().data().notifyItemDataChange(msg->data());
+					}
+				}
+			}
 			updateHistoryGeometry();
 		});
 	}, lifetime());

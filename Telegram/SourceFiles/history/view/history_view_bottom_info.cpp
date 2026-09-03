@@ -712,9 +712,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 		}
 	}
 	if (const auto editedDate = message->displayedEditDate()) {
-		result.flags |= Flag::Edited;
-		if (!RabbitSettings::replaceEditedIcon()
-			&& item->history()->session().messagePrimaryEditedDate()) {
+		if (RabbitSettings::replaceEditedLabel()) {
+			result.flags |= Flag::Edited;
+		} else {
 			result.flags |= Flag::EditedPrimary;
 			result.editedDate = base::unixtime::parse(editedDate);
 		}
