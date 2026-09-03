@@ -23,17 +23,23 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/chat/chat_style.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/painter.h"
 #include "window/window_session_controller.h"
 #include "lang_auto.h"
 #include "mainwindow.h"
+#include "lang/lang_text_entity.h"
 
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "styles/style_info.h"
+#include "styles/style_edit_peer_members.h"
+#include "ui/text/text_utilities.h"
 
 namespace Settings {
 namespace {
@@ -363,7 +369,263 @@ void BuildQuickActions(
 	}
 }
 
-void BuildStickers(SectionBuilder &builder) {
+object_ptr<Ui::RpWidget> CreateHideReactionsControl(
+		not_null<QWidget*> parent,
+		not_null<Window::SessionController*> controller) {
+	auto container = object_ptr<Ui::VerticalLayout>(parent);
+	const auto containerRaw = container.data();
+
+	const auto &st = st::rightsButton;
+
+	// Main button
+	const auto button = containerRaw->add(object_ptr<Ui::SettingsButton>(
+		containerRaw,
+		nullptr,
+		st));
+
+	// Toggle button on the right
+	const auto toggleButton = Ui::CreateChild<Ui::SettingsButton>(
+		containerRaw,
+		nullptr,
+		st);
+
+	struct State final {
+		State(const style::Toggle &st, Fn<void()> c)
+		: checkView(st, false, c) {
+		}
+		Ui::ToggleView checkView;
+		Ui::Animations::Simple animation;
+	};
+	const auto state = button->lifetime().make_state<State>(
+		st.toggle,
+		[=] { toggleButton->update(); });
+
+	const auto checkView = &state->checkView;
+
+	// Separator
+	const auto separator = Ui::CreateChild<Ui::RpWidget>(containerRaw);
+	separator->paintRequest(
+	) | rpl::on_next([=, bg = st.textBgOver] {
+		auto p = QPainter(separator);
+		p.fillRect(separator->rect(), bg);
+	}, separator->lifetime());
+
+	const auto separatorHeight = 2 * st.toggle.border + st.toggle.diameter;
+
+	button->geometryValue(
+	) | rpl::on_next([=](const QRect &r) {
+		const auto w = st::rightsButtonToggleWidth;
+		toggleButton->setGeometry(
+			r.x() + r.width() - w,
+			r.y(),
+			w,
+			r.height());
+		separator->setGeometry(
+			toggleButton->x() - st::lineWidth,
+			r.y() + (r.height() - separatorHeight) / 2,
+			st::lineWidth,
+			separatorHeight);
+	}, toggleButton->lifetime());
+
+	const auto checkWidget = Ui::CreateChild<Ui::RpWidget>(toggleButton);
+	checkWidget->resize(checkView->getSize());
+	checkWidget->paintRequest(
+	) | rpl::on_next([=] {
+		auto p = QPainter(checkWidget);
+		checkView->paint(p, 0, 0, checkWidget->width());
+	}, checkWidget->lifetime());
+
+	toggleButton->sizeValue(
+	) | rpl::on_next([=](const QSize &s) {
+		checkWidget->moveToRight(
+			st.toggleSkip,
+			(s.height() - checkWidget->height()) / 2);
+	}, toggleButton->lifetime());
+
+	// Slide wrap for checkboxes
+	auto wrap = containerRaw->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			containerRaw,
+			object_ptr<Ui::VerticalLayout>(containerRaw)));
+
+	const auto wrapRaw = wrap;
+	const auto layout = wrapRaw->entity();
+
+	wrapRaw->hide(anim::type::instant);
+
+	containerRaw->widthValue(
+	) | rpl::on_next([=](int w) {
+		wrapRaw->resizeToWidth(w);
+	}, wrapRaw->lifetime());
+
+	const auto addCheckbox = [&](
+		const QString &optionKey,
+		rpl::producer<QString> labelText) {
+		const auto checkbox = layout->add(
+			object_ptr<Ui::Checkbox>(
+				layout,
+				std::move(labelText),
+				RabbitSettings::JsonSettings::GetBool(optionKey),
+				st::settingsCheckbox),
+			st::settingsCheckboxPadding);
+
+		RabbitSettings::JsonSettings::Events(optionKey)
+		| rpl::on_next([=] {
+			checkbox->setChecked(
+				RabbitSettings::JsonSettings::GetBool(optionKey),
+				Ui::Checkbox::NotifyAboutChange::DontNotify);
+		}, checkbox->lifetime());
+
+		checkbox->checkedChanges(
+		) | rpl::filter([=](bool checked) {
+			return checked != RabbitSettings::JsonSettings::GetBool(optionKey);
+		}) | rpl::on_next([=](bool checked) {
+			RabbitSettings::JsonSettings::Set(optionKey, checked);
+		}, checkbox->lifetime());
+
+		return checkbox;
+	};
+
+	const auto cbChannels = addCheckbox(u"hide_reactions_channels"_q, rktr(u"rtg_chats_hide_reactions_channels"_q));
+	const auto cbGroups = addCheckbox(u"hide_reactions_groups"_q, rktr(u"rtg_chats_hide_reactions_groups"_q));
+	const auto cbPrivates = addCheckbox(u"hide_reactions_privates"_q, rktr(u"rtg_chats_hide_reactions_privates"_q));
+
+	const auto countChecked = [=] {
+		auto count = 0;
+		if (cbChannels->checked()) count++;
+		if (cbGroups->checked()) count++;
+		if (cbPrivates->checked()) count++;
+		return count;
+	};
+
+	const auto updateGlobalToggle = [=] {
+		checkView->setChecked(countChecked() > 0, anim::type::normal);
+	};
+
+	const auto handleCheckboxChange = [=] {
+		updateGlobalToggle();
+	};
+
+	cbChannels->checkedChanges() | rpl::on_next(handleCheckboxChange, cbChannels->lifetime());
+	cbGroups->checkedChanges() | rpl::on_next(handleCheckboxChange, cbGroups->lifetime());
+	cbPrivates->checkedChanges() | rpl::on_next(handleCheckboxChange, cbPrivates->lifetime());
+
+	// Initialize
+	const auto initialCount = countChecked();
+	wrapRaw->toggle(initialCount > 0, anim::type::instant);
+	checkView->setChecked(initialCount > 0, anim::type::instant);
+
+	// Toggle button clicks
+	toggleButton->clicks(
+	) | rpl::on_next([=] {
+		const auto targetChecked = (countChecked() == 0);
+
+		// Set all checkboxes
+		cbChannels->setChecked(targetChecked);
+		cbGroups->setChecked(targetChecked);
+		cbPrivates->setChecked(targetChecked);
+
+		updateGlobalToggle();
+	}, toggleButton->lifetime());
+
+	// Main button clicks
+	button->clicks(
+	) | rpl::on_next([=] {
+		wrapRaw->toggle(!wrapRaw->toggled(), anim::type::normal);
+	}, button->lifetime());
+
+	// Arrow
+	const auto arrow = Ui::CreateChild<Ui::RpWidget>(button);
+	{
+		const auto &icon = st::permissionsExpandIcon;
+		arrow->resize(icon.size());
+		arrow->paintRequest(
+		) | rpl::on_next([=, &icon] {
+			auto p = QPainter(arrow);
+			const auto center = QPointF(
+				icon.width() / 2.,
+				icon.height() / 2.);
+			const auto progress = state->animation.value(
+				wrapRaw->toggled() ? 1. : 0.);
+			auto hq = std::optional<PainterHighQualityEnabler>();
+			if (progress > 0.) {
+				hq.emplace(p);
+				p.translate(center);
+				p.rotate(progress * 180.);
+				p.translate(-center);
+			}
+			icon.paint(p, 0, 0, arrow->width());
+		}, arrow->lifetime());
+	}
+
+	wrapRaw->toggledValue(
+	) | rpl::skip(1) | rpl::on_next([=](bool toggled) {
+		state->animation.start(
+			[=] { arrow->update(); },
+			toggled ? 0. : 1.,
+			toggled ? 1. : 0.,
+			st::slideWrapDuration);
+	}, button->lifetime());
+
+	auto countCheckedProducer = rpl::combine(
+		rpl::single(cbChannels->checked()) | rpl::then(cbChannels->checkedChanges()),
+		rpl::single(cbGroups->checked()) | rpl::then(cbGroups->checkedChanges()),
+		rpl::single(cbPrivates->checked()) | rpl::then(cbPrivates->checkedChanges())
+	) | rpl::map([=](bool a, bool b, bool c) {
+		return (a ? 1 : 0) + (b ? 1 : 0) + (c ? 1 : 0);
+	});
+
+	const auto label = Ui::CreateChild<Ui::FlatLabel>(
+		button,
+		rpl::combine(
+			rktr(u"rtg_chats_hide_reactions"_q),
+			std::move(countCheckedProducer)
+		) | rpl::map([=](const QString &t, int checked) {
+			auto count = tr::bold("  "
+				+ QString::number(checked)
+				+ "/3");
+			return TextWithEntities::Simple(t).append(std::move(count));
+		})
+	);
+	label->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	const auto reposition = [=, &st] {
+		const auto s = button->size();
+		const auto labelLeft = st.padding.left();
+		const auto labelRight = s.width() - toggleButton->width();
+
+		const auto arrowSkip = st::rightsButtonArrowSkip;
+		label->resizeToWidth(
+			labelRight - labelLeft - arrow->width() - arrowSkip);
+		label->moveToLeft(
+			labelLeft,
+			(s.height() - label->height()) / 2);
+		arrow->moveToLeft(
+			std::min(
+				labelLeft + label->textMaxWidth() + arrowSkip,
+				labelRight - arrow->width()),
+			(s.height() - arrow->height()) / 2);
+	};
+
+	rpl::merge(
+		button->sizeValue() | rpl::to_empty,
+		cbChannels->checkedChanges() | rpl::to_empty,
+		cbGroups->checkedChanges() | rpl::to_empty,
+		cbPrivates->checkedChanges() | rpl::to_empty
+	) | rpl::on_next([=] {
+		reposition();
+	}, button->lifetime());
+
+	// Context menu
+	RtgMenu::AttachSettingsContextMenu(
+		button, u"rabbit/chats/hide_reactions"_q, controller);
+
+	return container;
+}
+
+void BuildStickers(
+		SectionBuilder &builder,
+		Window::SessionController *controller) {
 	builder.addSubsectionTitle({
 		.id = u"rabbit/chats/stickers"_q,
 		.title = rktr(u"rtg_chats_stickers"_q),
@@ -378,6 +640,14 @@ void BuildStickers(SectionBuilder &builder) {
 		[] { return RabbitSettings::moreRecentStickers(); },
 		[](bool value) { RabbitSettings::setMoreRecentStickers(value); },
 		{ u"stickers"_q, u"recent"_q });
+
+	if (controller) {
+		builder.add([=](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+			return SectionBuilder::WidgetToAdd{
+				.widget = CreateHideReactionsControl(ctx.container, controller),
+			};
+		});
+	}
 }
 
 void BuildRabbitChats(
@@ -399,7 +669,7 @@ void BuildRabbitChats(
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
-	BuildStickers(builder);
+	BuildStickers(builder, controller);
 }
 
 const auto kMeta = BuildHelper({

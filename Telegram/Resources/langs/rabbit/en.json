@@ -97,5 +97,9 @@
     "rtg_telemetry_os": "Operating system",
     "rtg_telemetry_features": "Enabled features",
     "rtg_telemetry_cpu_arch": "CPU architecture",
+    "rtg_chats_hide_reactions": "Hide reactions",
+    "rtg_chats_hide_reactions_channels": "Channels",
+    "rtg_chats_hide_reactions_groups": "Groups",
+    "rtg_chats_hide_reactions_privates": "Private chats",
     "last_string": null
 }

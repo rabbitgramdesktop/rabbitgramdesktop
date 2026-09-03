@@ -915,6 +915,9 @@ void InlineList::continueAnimations(base::flat_map<
 InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 	using Flag = InlineListData::Flag;
 	const auto item = view->data();
+	if (RabbitSettings::ShouldHideReactions(item->history()->peer)) {
+		return InlineListData();
+	}
 	auto result = InlineListData();
 	result.reactions = item->reactionsWithLocal();
 

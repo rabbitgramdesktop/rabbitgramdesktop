@@ -4833,7 +4833,7 @@ Reactions::ButtonParameters ListWidget::reactionButtonParameters(
 		not_null<const Element*> view,
 		QPoint position,
 		const TextState &reactionState) const {
-	if (!_useCornerReaction) {
+	if (!_useCornerReaction || RabbitSettings::ShouldHideReactions(view->data()->history()->peer)) {
 		return {};
 	}
 	const auto top = itemTop(view);

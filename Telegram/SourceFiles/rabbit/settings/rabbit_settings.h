@@ -15,6 +15,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <vector>
 #include "rabbit/settings/quick_action.h"
 
+class PeerData;
+
 namespace RabbitSettings {
 
 inline const auto DEFAULT_ICON = u"default"_q;
@@ -189,6 +191,10 @@ inline bool telemetryFeatures() { return JsonSettings::GetBool(u"telemetry_featu
 inline bool telemetryCpuArch() { return JsonSettings::GetBool(u"telemetry_cpu_arch"_q); }
 inline bool analytics() { return JsonSettings::GetBool(u"analytics"_q); }
 inline QString telemetryClientId() { return JsonSettings::GetString(u"telemetry_client_id"_q); }
+inline bool hideReactionsChannels() { return JsonSettings::GetBool(u"hide_reactions_channels"_q); }
+inline bool hideReactionsGroups() { return JsonSettings::GetBool(u"hide_reactions_groups"_q); }
+inline bool hideReactionsPrivates() { return JsonSettings::GetBool(u"hide_reactions_privates"_q); }
+inline bool hideReactions() { return hideReactionsChannels() || hideReactionsGroups() || hideReactionsPrivates(); }
 
 inline void setStreamerMode(bool value) { JsonSettings::Set(u"streamer_mode"_q, value); }
 inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set(u"auto_hide_notifications"_q, value); }
@@ -233,5 +239,11 @@ inline void setTelemetryFeatures(bool value) { JsonSettings::Set(u"telemetry_fea
 inline void setTelemetryCpuArch(bool value) { JsonSettings::Set(u"telemetry_cpu_arch"_q, value); }
 inline void setAnalytics(bool value) { JsonSettings::Set(u"analytics"_q, value); }
 inline void setTelemetryClientId(const QString &value) { JsonSettings::Set(u"telemetry_client_id"_q, value); }
+inline void setHideReactions(bool value) { JsonSettings::Set(u"hide_reactions"_q, value); }
+inline void setHideReactionsChannels(bool value) { JsonSettings::Set(u"hide_reactions_channels"_q, value); }
+inline void setHideReactionsGroups(bool value) { JsonSettings::Set(u"hide_reactions_groups"_q, value); }
+inline void setHideReactionsPrivates(bool value) { JsonSettings::Set(u"hide_reactions_privates"_q, value); }
+
+[[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 
 } // namespace RabbitSettings

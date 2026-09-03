@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/settings/rabbit_settings.h"
+#include "data/data_peer.h"
 
 #include "base/parse_helper.h"
 #include "base/timer.h"
@@ -488,6 +489,30 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		u"telemetry_client_id"_q, {
 			.type = QStringSetting,
 			.defaultValue = QString(),
+		}
+	},
+	{
+		u"hide_reactions"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"hide_reactions_channels"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"hide_reactions_groups"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"hide_reactions_privates"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
 		}
 	}
 };
@@ -1109,3 +1134,23 @@ QJsonObject GetFeaturesTelemetryData() {
 }
 
 } // namespace RabbitSettings::JsonSettings
+
+namespace RabbitSettings {
+
+bool ShouldHideReactions(const PeerData *peer) {
+	if (!peer) {
+		return false;
+	}
+	if (peer->isUser()) {
+		return hideReactionsPrivates();
+	}
+	if (peer->isChat() || (peer->isChannel() && peer->isMegagroup())) {
+		return hideReactionsGroups();
+	}
+	if (peer->isChannel() && !peer->isMegagroup()) {
+		return hideReactionsChannels();
+	}
+	return false;
+}
+
+} // namespace RabbitSettings

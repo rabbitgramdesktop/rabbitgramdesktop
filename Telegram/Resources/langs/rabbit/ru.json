@@ -97,5 +97,9 @@
     "rtg_telemetry_os": "Операционная система",
     "rtg_telemetry_features": "Включённые функции",
     "rtg_telemetry_cpu_arch": "Архитектура процессора",
+    "rtg_chats_hide_reactions": "Скрыть реакции",
+    "rtg_chats_hide_reactions_channels": "Каналы",
+    "rtg_chats_hide_reactions_groups": "Группы",
+    "rtg_chats_hide_reactions_privates": "Личные чаты",
     "last_string": null
 }

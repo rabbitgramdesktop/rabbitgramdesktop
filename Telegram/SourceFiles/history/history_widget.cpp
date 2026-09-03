@@ -778,6 +778,17 @@ HistoryWidget::HistoryWidget(
 			});
 		}, lifetime());
 
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"hide_reactions"_q),
+		RabbitSettings::JsonSettings::Events(u"hide_reactions_channels"_q),
+		RabbitSettings::JsonSettings::Events(u"hide_reactions_groups"_q),
+		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q)
+	) | rpl::on_next([=] {
+		crl::on_main(this, [=] {
+			updateHistoryGeometry();
+		});
+	}, lifetime());
+
 	session().data().channelDifferenceTooLong(
 	) | rpl::filter([=](not_null<ChannelData*> channel) {
 		return _peer == channel.get();

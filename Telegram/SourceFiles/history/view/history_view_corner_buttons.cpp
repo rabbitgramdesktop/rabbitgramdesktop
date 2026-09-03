@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "history/view/history_view_corner_buttons.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "ui/chat/chat_style.h"
 #include "ui/controls/jump_down_button.h"
 #include "ui/widgets/elastic_scroll.h"
@@ -318,6 +320,7 @@ void CornerButtons::updateUnreadThingsVisibility() {
 	}
 
 	if (_delegate->cornerButtonsHas(Type::Reactions)
+		&& !RabbitSettings::ShouldHideReactions(thread->peer())
 		&& unreadThings.trackReactions(thread)) {
 		if (const auto count = thread->unreadReactions().count(0)) {
 			_reactions.widget->setUnreadCount(count);
