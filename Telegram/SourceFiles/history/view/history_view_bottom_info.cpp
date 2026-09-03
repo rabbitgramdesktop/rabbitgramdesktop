@@ -509,8 +509,6 @@ void BottomInfo::layoutDateText() {
 		? QString()
 		: updated
 		? (tr::lng_ephemeral_updated(tr::now) + ' ')
-		: (_data.flags & Data::Flag::Edited)
-		? (tr::lng_edited(tr::now) + ' ')
 		: (_data.flags & Data::Flag::EstimateDate)
 		? (tr::lng_approximate(tr::now) + ' ')
 		: _data.scheduleRepeatPeriod
