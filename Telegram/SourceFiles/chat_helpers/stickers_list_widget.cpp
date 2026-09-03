@@ -3286,11 +3286,11 @@ auto StickersListWidget::collectRecentStickers() -> std::vector<Sticker> {
 
 	auto recent_stickers_limit = []() {
 		return RabbitSettings::moreRecentStickers()
-			? kRecentDisplayLimitMore : kRecentDisplayLimit;
+			? std::numeric_limits<int>::max() : kRecentDisplayLimit;
 	};
 
 	auto add = [&](not_null<DocumentData*> document, bool custom) {
-		if (result.size() >= kRecentDisplayLimit
+		if (result.size() >= recent_stickers_limit()
 			&& !OptionUnlimitedRecentStickers.value()) {
 			return;
 		}
