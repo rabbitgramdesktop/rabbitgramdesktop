@@ -1311,10 +1311,6 @@ ChannelData *PeerData::broadcastMonoforum() const {
 const QString &PeerData::topBarNameText() const {
 	if (const auto to = migrateTo()) {
 		return to->topBarNameText();
-	} else if (const auto user = asUser()) {
-		if (!user->nameOrPhone.isEmpty()) {
-			return user->nameOrPhone;
-		}
 	}
 	return _name;
 }
