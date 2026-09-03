@@ -129,7 +129,7 @@ void SwipeActionsBox(not_null<Ui::GenericBox *> box) {
 		activeButtons.push_back(button);
 
 		const auto handle = Ui::CreateChild<Ui::RpWidget>(button.get());
-		const auto &reorderIcon = st::menuIconReorder;
+		const auto &reorderIcon = st::menuIconReorderHandle;
 		handle->resize(reorderIcon.width(), reorderIcon.height());
 		handle->setCursor(style::cur_sizeall);
 		handle->paintRequest(
