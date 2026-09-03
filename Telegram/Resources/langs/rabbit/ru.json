@@ -101,5 +101,6 @@
     "rtg_chats_hide_reactions_channels": "Каналы",
     "rtg_chats_hide_reactions_groups": "Группы",
     "rtg_chats_hide_reactions_privates": "Личные чаты",
+    "rtg_replace_edited_icon": "Заменять \"изменено\" иконкой",
     "last_string": null
 }

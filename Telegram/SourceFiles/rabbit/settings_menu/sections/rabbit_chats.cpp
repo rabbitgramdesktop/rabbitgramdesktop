@@ -197,6 +197,14 @@ void BuildChats(SectionBuilder &builder) {
 		{ u"bubble"_q, u"tails"_q });
 	AddToggle(
 		builder,
+		u"rabbit/chats/replace_edited_icon"_q,
+		rktr(u"rtg_replace_edited_icon"_q),
+		nullptr,
+		[] { return RabbitSettings::replaceEditedIcon(); },
+		[](bool value) { RabbitSettings::setReplaceEditedIcon(value); },
+		{ u"edited"_q, u"icon"_q });
+	AddToggle(
+		builder,
 		u"rabbit/chats/show_online_indicator"_q,
 		rktr(u"rtg_show_online_indicator"_q),
 		nullptr,

@@ -101,5 +101,6 @@
     "rtg_chats_hide_reactions_channels": "Channels",
     "rtg_chats_hide_reactions_groups": "Groups",
     "rtg_chats_hide_reactions_privates": "Private chats",
+    "rtg_replace_edited_icon": "Replace \"edited\" label with icon",
     "last_string": null
 }

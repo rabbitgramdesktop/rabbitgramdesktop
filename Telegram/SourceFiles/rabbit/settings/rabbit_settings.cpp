@@ -510,6 +510,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"replace_edited_icon"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
 		u"hide_reactions_privates"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,

@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_context_menu.h"
 
 #include "api/api_attached_stickers.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "api/api_editing.h"
 #include "api/api_global_privacy.h"
 #include "api/api_polls.h"
@@ -2452,7 +2453,8 @@ void AddWhenEditedForwardedAuthorActionHelper(
 			if (insertSeparator && !menu->empty()) {
 				menu->addSeparator(&st::expandedMenuSeparator);
 			}
-			if (item->history()->session().messagePrimaryEditedDate()) {
+			if (!RabbitSettings::replaceEditedIcon()
+				&& item->history()->session().messagePrimaryEditedDate()) {
 				const auto sent = base::unixtime::parse(item->date());
 				auto label = base::make_unique_q<Ui::Menu::MultilineAction>(
 					menu->menu(),

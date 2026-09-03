@@ -782,7 +782,8 @@ HistoryWidget::HistoryWidget(
 		RabbitSettings::JsonSettings::Events(u"hide_reactions"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_channels"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_groups"_q),
-		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q)
+		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q),
+		RabbitSettings::JsonSettings::Events(u"replace_edited_icon"_q)
 	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
 			updateHistoryGeometry();
