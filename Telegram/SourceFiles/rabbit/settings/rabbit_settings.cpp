@@ -526,6 +526,24 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 			.type = BoolSetting,
 			.defaultValue = false,
 		}
+	},
+	{
+		u"reply_colors"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
+	},
+	{
+		u"reply_emoji"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
+	},
+	{
+		u"reply_bg"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
 	}
 };
 

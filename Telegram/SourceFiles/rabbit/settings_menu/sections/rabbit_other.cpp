@@ -230,7 +230,7 @@ object_ptr<Ui::RpWidget> CreateTelemetryControl(
 
 	// Initialize
 	const auto initialEnabled = RabbitSettings::analytics();
-	wrapRaw->toggle(initialEnabled, anim::type::instant);
+	wrapRaw->toggle(false, anim::type::instant);
 	checkView->setChecked(initialEnabled && (countChecked() > 0), anim::type::instant);
 
 	// Toggle button clicks

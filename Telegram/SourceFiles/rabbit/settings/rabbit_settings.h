@@ -197,6 +197,9 @@ inline bool hideReactionsChannels() { return JsonSettings::GetBool(u"hide_reacti
 inline bool hideReactionsGroups() { return JsonSettings::GetBool(u"hide_reactions_groups"_q); }
 inline bool hideReactionsPrivates() { return JsonSettings::GetBool(u"hide_reactions_privates"_q); }
 inline bool hideReactions() { return hideReactionsChannels() || hideReactionsGroups() || hideReactionsPrivates(); }
+inline bool replyColors() { return JsonSettings::GetBool(u"reply_colors"_q); }
+inline bool replyEmoji() { return JsonSettings::GetBool(u"reply_emoji"_q); }
+inline bool replyBg() { return JsonSettings::GetBool(u"reply_bg"_q); }
 
 inline void setStreamerMode(bool value) { JsonSettings::Set(u"streamer_mode"_q, value); }
 inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set(u"auto_hide_notifications"_q, value); }
@@ -247,6 +250,9 @@ inline void setHideReactions(bool value) { JsonSettings::Set(u"hide_reactions"_q
 inline void setHideReactionsChannels(bool value) { JsonSettings::Set(u"hide_reactions_channels"_q, value); }
 inline void setHideReactionsGroups(bool value) { JsonSettings::Set(u"hide_reactions_groups"_q, value); }
 inline void setHideReactionsPrivates(bool value) { JsonSettings::Set(u"hide_reactions_privates"_q, value); }
+inline void setReplyColors(bool value) { JsonSettings::Set(u"reply_colors"_q, value); }
+inline void setReplyEmoji(bool value) { JsonSettings::Set(u"reply_emoji"_q, value); }
+inline void setReplyBg(bool value) { JsonSettings::Set(u"reply_bg"_q, value); }
 
 [[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 

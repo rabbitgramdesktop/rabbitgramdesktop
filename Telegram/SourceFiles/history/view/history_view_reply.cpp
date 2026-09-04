@@ -26,6 +26,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_item_helpers.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_style_radius.h"
 #include "ui/effects/ripple_animation.h"
@@ -657,11 +658,17 @@ void Reply::updateName(
 		: 0;
 	auto nameFull = TextWithEntities();
 	if (displayAsExternal && !groupNameAdded && !fields.storyId) {
-		nameFull.append(PeerEmoji(sender));
+		if (RabbitSettings::replyEmoji()) {
+			nameFull.append(PeerEmoji(sender));
+		}
 	}
 	nameFull.append(name);
 	if (groupNameAdded) {
-		nameFull.append(' ').append(PeerEmoji(externalPeer));
+		if (RabbitSettings::replyEmoji()) {
+			nameFull.append(' ').append(PeerEmoji(externalPeer));
+		} else {
+			nameFull.append(' ');
+		}
 		nameFull.append(externalPeer->name());
 	} else if (originalNameAdded) {
 		nameFull.append(' ').append(
@@ -816,12 +823,14 @@ void Reply::paint(
 	const auto &colorCollectible = _colorPeer
 		? _colorPeer->colorCollectible()
 		: nullptr;
-	const auto useColorCollectible = colorCollectible && !context.outbg;
-	const auto useColorIndex = colorIndexPlusOne && !context.outbg;
-	const auto colorPattern = colorCollectible
-		? st->collectiblePatternIndex(colorCollectible)
-		: colorIndexPlusOne
-		? st->colorPatternIndex(colorIndexPlusOne - 1)
+	const auto useColorCollectible = colorCollectible && !context.outbg && RabbitSettings::replyColors();
+	const auto useColorIndex = colorIndexPlusOne && !context.outbg && RabbitSettings::replyColors();
+	const auto colorPattern = (useColorCollectible || useColorIndex)
+		? (colorCollectible
+			? st->collectiblePatternIndex(colorCollectible)
+			: colorIndexPlusOne
+			? st->colorPatternIndex(colorIndexPlusOne - 1)
+			: 0)
 		: 0;
 	const auto cache = !inBubble
 		? (_hasQuoteIcon
@@ -845,7 +854,7 @@ void Reply::paint(
 		result.radius = MessageQuoteRadius(result);
 		return result;
 	}();
-	const auto backgroundEmojiData = backgroundEmojiId
+	const auto backgroundEmojiData = (backgroundEmojiId && RabbitSettings::replyEmoji())
 		? st->backgroundEmojiData(backgroundEmojiId, colorCollectible).get()
 		: nullptr;
 	const auto backgroundEmojiCache = !backgroundEmojiData
@@ -858,7 +867,7 @@ void Reply::paint(
 			inBubble,
 			useColorIndex ? colorIndexPlusOne : 0)];
 	const auto rippleColor = cache->bg;
-	if (!inBubble) {
+	if (!inBubble || !RabbitSettings::replyBg()) {
 		cache->bg = QColor(0, 0, 0, 0);
 	}
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
@@ -880,7 +889,7 @@ void Reply::paint(
 				backgroundEmojiData->firstGiftFrame);
 		}
 	}
-	if (!inBubble) {
+	if (!inBubble || !RabbitSettings::replyBg()) {
 		cache->bg = rippleColor;
 	}
 

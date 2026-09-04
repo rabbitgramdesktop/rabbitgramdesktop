@@ -107,5 +107,9 @@
     "rtg_chats_channel_bottom_button_mute": "Mute",
     "rtg_chats_channel_bottom_button_discuss": "Discuss",
     "rtg_chats_channel_bottom_button_hide": "Hide",
+    "rtg_chats_replies": "Replies",
+    "rtg_chats_replies_colors": "Colors",
+    "rtg_chats_replies_emoji": "Emoji",
+    "rtg_chats_replies_bg": "Background",
     "last_string": null
 }
