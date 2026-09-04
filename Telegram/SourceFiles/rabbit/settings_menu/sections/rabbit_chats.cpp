@@ -291,6 +291,15 @@ void BuildMessages(SectionBuilder &builder) {
 		[] { return RabbitSettings::showOnlineIndicator(); },
 		[](bool value) { RabbitSettings::setShowOnlineIndicator(value); },
 		{ u"online"_q, u"indicator"_q });
+	AddToggle(
+		builder,
+		u"rabbit/chats/math_autocomplete"_q,
+		rktr(u"rtg_math_autocomplete"_q),
+		nullptr,
+		[] { return RabbitSettings::mathAutocomplete(); },
+		[](bool value) { RabbitSettings::setMathAutocomplete(value); },
+		{ u"math"_q, u"inline"_q, u"results"_q, u"calculate"_q, u"equals"_q });
+	builder.addDividerText(rktr(u"rtg_math_autocomplete_about"_q));
 }
 
 void BuildStickerShape(SectionBuilder &builder) {

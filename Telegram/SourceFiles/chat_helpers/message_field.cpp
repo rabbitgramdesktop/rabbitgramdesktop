@@ -48,6 +48,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "settings/sections/settings_premium.h"
+#include "rabbit/math_evaluator/math_autocomplete.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
@@ -597,6 +598,7 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 		const auto colorIndex = session->user()->colorIndex();
 		return style->coloredQuoteCache(false, colorIndex).get();
 	});
+	Rabbit::AttachMathAutocomplete(field);
 	return style;
 }
 

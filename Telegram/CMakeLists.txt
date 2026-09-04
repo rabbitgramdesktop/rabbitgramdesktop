@@ -1796,6 +1796,10 @@ PRIVATE
     rabbit/deep_links/deep_links_rtg.h
     rabbit/lang/rabbit_lang.cpp
     rabbit/lang/rabbit_lang.h
+    rabbit/math_evaluator/math_autocomplete.cpp
+    rabbit/math_evaluator/math_autocomplete.h
+    rabbit/math_evaluator/math_evaluator.cpp
+    rabbit/math_evaluator/math_evaluator.h
     rabbit/settings/quick_action.h
     rabbit/settings/rabbit_settings.cpp
     rabbit/settings/rabbit_settings.h

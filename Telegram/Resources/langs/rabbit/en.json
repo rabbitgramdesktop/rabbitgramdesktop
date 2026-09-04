@@ -23,6 +23,8 @@
     "rtg_comma_after_mention": "Add comma after mention",
     "rtg_hide_bubble_tails": "Hide message bubble tail",
     "rtg_show_online_indicator": "Show online indicator",
+    "rtg_math_autocomplete": "Inline math results",
+    "rtg_math_autocomplete_about": "Show calculation result after '=' and insert it with Space.",
     "rtg_chats_quick_actions": "Gestures",
     "rtg_chats_swipe_actions": "Swipe actions",
     "rtg_chats_swipe_actions_about": "Hold the Right Mouse Button on a message and scroll the wheel to select and perform a quick action.",

@@ -258,6 +258,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"math_autocomplete"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
+	},
+	{
 		u"auto_hide_notifications"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,

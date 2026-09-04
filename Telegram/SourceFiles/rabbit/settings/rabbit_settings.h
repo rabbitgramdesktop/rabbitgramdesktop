@@ -198,12 +198,14 @@ inline bool hideReactionsChannels() { return JsonSettings::GetBool(u"hide_reacti
 inline bool hideReactionsGroups() { return JsonSettings::GetBool(u"hide_reactions_groups"_q); }
 inline bool hideReactionsPrivates() { return JsonSettings::GetBool(u"hide_reactions_privates"_q); }
 inline bool hideReactions() { return hideReactionsChannels() || hideReactionsGroups() || hideReactionsPrivates(); }
+inline bool mathAutocomplete() { return JsonSettings::GetBool(u"math_autocomplete"_q); }
 inline bool quickSwipeChannels() { return JsonSettings::GetBool(u"quick_swipe_channels"_q); }
 inline bool quickSwipeTopics() { return JsonSettings::GetBool(u"quick_swipe_topics"_q); }
 inline bool replyColors() { return JsonSettings::GetBool(u"reply_colors"_q); }
 inline bool replyEmoji() { return JsonSettings::GetBool(u"reply_emoji"_q); }
 inline bool replyBg() { return JsonSettings::GetBool(u"reply_bg"_q); }
 
+inline void setMathAutocomplete(bool value) { JsonSettings::Set(u"math_autocomplete"_q, value); }
 inline void setStreamerMode(bool value) { JsonSettings::Set(u"streamer_mode"_q, value); }
 inline void setHideNotificationsAutomatically(bool value) { JsonSettings::Set(u"auto_hide_notifications"_q, value); }
 inline void setShowUserpicInTopBar(bool value) { JsonSettings::Set(u"userpic_in_top_bar"_q, value); }
