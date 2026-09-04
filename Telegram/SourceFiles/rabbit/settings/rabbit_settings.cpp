@@ -544,6 +544,18 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 			.type = BoolSetting,
 			.defaultValue = true,
 		}
+	},
+	{
+		u"quick_swipe_channels"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
+	},
+	{
+		u"quick_swipe_topics"_q, {
+			.type = BoolSetting,
+			.defaultValue = true,
+		}
 	}
 };
 

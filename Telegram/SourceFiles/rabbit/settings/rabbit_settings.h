@@ -198,6 +198,8 @@ inline bool hideReactionsChannels() { return JsonSettings::GetBool(u"hide_reacti
 inline bool hideReactionsGroups() { return JsonSettings::GetBool(u"hide_reactions_groups"_q); }
 inline bool hideReactionsPrivates() { return JsonSettings::GetBool(u"hide_reactions_privates"_q); }
 inline bool hideReactions() { return hideReactionsChannels() || hideReactionsGroups() || hideReactionsPrivates(); }
+inline bool quickSwipeChannels() { return JsonSettings::GetBool(u"quick_swipe_channels"_q); }
+inline bool quickSwipeTopics() { return JsonSettings::GetBool(u"quick_swipe_topics"_q); }
 inline bool replyColors() { return JsonSettings::GetBool(u"reply_colors"_q); }
 inline bool replyEmoji() { return JsonSettings::GetBool(u"reply_emoji"_q); }
 inline bool replyBg() { return JsonSettings::GetBool(u"reply_bg"_q); }
@@ -255,6 +257,8 @@ inline void setHideReactionsPrivates(bool value) { JsonSettings::Set(u"hide_reac
 inline void setReplyColors(bool value) { JsonSettings::Set(u"reply_colors"_q, value); }
 inline void setReplyEmoji(bool value) { JsonSettings::Set(u"reply_emoji"_q, value); }
 inline void setReplyBg(bool value) { JsonSettings::Set(u"reply_bg"_q, value); }
+inline void setQuickSwipeChannels(bool value) { JsonSettings::Set(u"quick_swipe_channels"_q, value); }
+inline void setQuickSwipeTopics(bool value) { JsonSettings::Set(u"quick_swipe_topics"_q, value); }
 
 [[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "menu/menu_mark_as_read.h"
 #include "storage/storage_shared_media.h"
 #include "support/support_preload.h"
@@ -784,6 +785,13 @@ PullToNextChannel::PullToNextChannel(
 		handleOverscroll(position, movement);
 	}, _lifetime);
 
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"quick_swipe_channels"_q),
+		RabbitSettings::JsonSettings::Events(u"quick_swipe_topics"_q)
+	) | rpl::on_next([=] {
+		updatePullCurve();
+	}, _lifetime);
+
 	_dwellTimer.setCallback([=] {
 		if (_pulling && _pull >= float64(PullThreshold())) {
 			_reached = true;
@@ -831,7 +839,7 @@ bool PullToNextChannel::active() const {
 	switch (_mode) {
 	case Mode::History: {
 		const auto history = _history.get();
-		return Core::App().settings().pullToNextChannel()
+		return RabbitSettings::quickSwipeChannels()
 			&& history
 			&& history->peer->isBroadcast()
 			&& atBottom()
@@ -839,7 +847,7 @@ bool PullToNextChannel::active() const {
 				history);
 	}
 	case Mode::Topic:
-		return Core::App().settings().pullToNextChannel()
+		return RabbitSettings::quickSwipeTopics()
 			&& _topic
 			&& atBottom();
 	case Mode::None:
