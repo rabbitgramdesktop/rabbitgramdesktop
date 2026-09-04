@@ -40,6 +40,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_item_reply_markup.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "settings/business/settings_chat_intro.h"
 #include "settings/sections/settings_credits.h" // BuyStarsHandler
 #include "settings/sections/settings_premium.h"
@@ -753,18 +754,32 @@ bool AboutView::refresh() {
 			setItem(makeNewPeerInfo(user), nullptr);
 			return true;
 		} else if (user && !user->isSelf() && displayedEmpty()) {
-			if (_item) {
-				return false;
-			} else if (user->requiresPremiumToWrite()
+			if (user->requiresPremiumToWrite()
 				&& !user->session().premium()) {
+				if (_item) {
+					return false;
+				}
 				setItem(makePremiumRequired(), nullptr);
 			} else if (user->isBlocked()) {
+				if (_item) {
+					return false;
+				}
 				setItem(makeBlocked(), nullptr);
-			} else if (user->businessDetails().intro) {
-				makeIntro(user);
 			} else if (const auto stars = user->starsPerMessageChecked()) {
+				if (_item) {
+					return false;
+				}
 				setItem(makeStarsPerMessage(stars), nullptr);
+			} else if (RabbitSettings::hideWelcomeSticker()) {
+				if (_item) {
+					setItem({}, nullptr);
+					return true;
+				}
+				return false;
 			} else {
+				if (_item) {
+					return false;
+				}
 				makeIntro(user);
 			}
 			return true;

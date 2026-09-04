@@ -231,6 +231,15 @@ void BuildChats(
 
 	AddToggle(
 		builder,
+		u"rabbit/chats/hide_welcome_sticker"_q,
+		rktr(u"rtg_chats_hide_welcome_sticker"_q),
+		nullptr,
+		[] { return RabbitSettings::hideWelcomeSticker(); },
+		[](bool value) { RabbitSettings::setHideWelcomeSticker(value); },
+		{ u"welcome"_q, u"sticker"_q, u"hide"_q, u"empty"_q, u"chat"_q });
+
+	AddToggle(
+		builder,
 		u"rabbit/chats/comma_after_mention"_q,
 		rktr(u"rtg_comma_after_mention"_q),
 		nullptr,

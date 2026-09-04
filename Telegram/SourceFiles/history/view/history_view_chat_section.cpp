@@ -1071,6 +1071,15 @@ ChatWidget::ChatWidget(
 
 	refreshAboutView();
 
+	RabbitSettings::JsonSettings::Events(
+		u"hide_welcome_sticker"_q
+	) | rpl::on_next([=] {
+		crl::on_main(this, [=] {
+			refreshAboutView(true);
+			update();
+		});
+	}, lifetime());
+
 	if (_topControls) {
 		_topControls->finishAnimating();
 	}

@@ -778,6 +778,17 @@ HistoryWidget::HistoryWidget(
 			});
 		}, lifetime());
 
+	RabbitSettings::JsonSettings::Events(
+		u"hide_welcome_sticker"_q
+	) | rpl::on_next([=] {
+		crl::on_main(this, [=] {
+			if (_list) {
+				_list->refreshAboutView(true);
+			}
+			updateHistoryGeometry();
+		});
+	}, lifetime());
+
 	rpl::merge(
 		RabbitSettings::JsonSettings::Events(u"hide_reactions"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_channels"_q),
