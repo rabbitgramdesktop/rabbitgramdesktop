@@ -9,6 +9,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/math_evaluator/math_evaluator.h"
 #include "rabbit/settings/rabbit_settings.h"
 
+#include "base/unique_qptr.h"
 #include "ui/rp_widget.h"
 #include "styles/style_basic.h"
 #include "styles/style_widgets.h"
@@ -69,7 +70,7 @@ public:
 	: QObject(field)
 	, _field(field) {
 		const auto rawEdit = _field->rawTextEdit();
-		_overlay = std::make_unique<MathGhostOverlay>(rawEdit);
+		_overlay = base::make_unique_q<MathGhostOverlay>(rawEdit);
 		_overlay->setGeometry(rawEdit->rect());
 
 		rawEdit->installEventFilter(this);
@@ -161,7 +162,7 @@ private:
 	}
 
 	not_null<Ui::InputField*> _field;
-	std::unique_ptr<MathGhostOverlay> _overlay;
+	base::unique_qptr<MathGhostOverlay> _overlay;
 	QString _suggestionText;
 	rpl::lifetime _lifetime;
 };
