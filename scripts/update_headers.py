@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
 Script to replace tdesktop license headers with rabbitGram license headers
-across the codebase.
+across the codebase and display detailed statistics.
 """
 
 import os
 import sys
 import re
+
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 OLD_C_HEADER_RE = re.compile(
     r'/\*\s*\n'
@@ -45,10 +51,22 @@ NEW_CMAKE_HEADER = """# This file is part of rabbitGram Desktop,
 EXTENSIONS = {'.cpp', '.h', '.hpp', '.c', '.mm', '.m', '.style', '.cmake', '.py', '.sh', '.iss'}
 EXCLUDE_DIRS = {'.git', 'out', 'Libraries', 'win64', 'ThirdParty'}
 
+RABBIT_HEADER_MARKER = "This file is part of rabbitGram Desktop,"
+
 def process_file(filepath):
+    """
+    Returns one of:
+    - 'updated': Header replaced from tdesktop to rabbitGram
+    - 'already_rabbit': Already contained rabbitGram header
+    - 'no_header': No recognized header found
+    - 'error': Failed to read/write file
+    """
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
+
+        if RABBIT_HEADER_MARKER in content:
+            return 'already_rabbit'
 
         new_content = OLD_C_HEADER_RE.sub(NEW_C_HEADER, content, count=1)
         new_content = OLD_CMAKE_HEADER_RE.sub(NEW_CMAKE_HEADER, new_content, count=1)
@@ -56,19 +74,30 @@ def process_file(filepath):
         if new_content != content:
             with open(filepath, 'w', encoding='utf-8', newline='') as f:
                 f.write(new_content)
-            return True
+            return 'updated'
+        
+        return 'no_header'
     except Exception as e:
         print(f"Error processing {filepath}: {e}")
-    return False
+        return 'error'
 
 def main(target_path):
-    updated_count = 0
-    total_scanned = 0
+    stats = {
+        'total_scanned': 0,
+        'already_rabbit': 0,
+        'updated': 0,
+        'no_header': 0,
+        'error': 0,
+    }
+
+    def process_and_count(path):
+        stats['total_scanned'] += 1
+        res = process_file(path)
+        if res in stats:
+            stats[res] += 1
 
     if os.path.isfile(target_path):
-        total_scanned += 1
-        if process_file(target_path):
-            updated_count += 1
+        process_and_count(target_path)
     else:
         for dirpath, dirnames, filenames in os.walk(target_path):
             dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
@@ -76,12 +105,25 @@ def main(target_path):
                 ext = os.path.splitext(filename)[1].lower()
                 if ext in EXTENSIONS or filename == 'CMakeLists.txt':
                     filepath = os.path.join(dirpath, filename)
-                    total_scanned += 1
-                    if process_file(filepath):
-                        updated_count += 1
+                    process_and_count(filepath)
 
-    print(f"Scanned {total_scanned} file(s).")
-    print(f"Updated {updated_count} file(s) to rabbitGram license header.")
+    total_scanned = stats['total_scanned']
+    already_rabbit = stats['already_rabbit']
+    updated = stats['updated']
+    total_rabbit_now = already_rabbit + updated
+    no_header = stats['no_header']
+
+    print("=" * 50)
+    print("Header Update Statistics")
+    print("=" * 50)
+    print(f"Total files scanned:           {total_scanned}")
+    print(f"Already rabbitGram (Was):      {already_rabbit}")
+    print(f"Updated from tdesktop (New):   {updated}")
+    print(f"Total rabbitGram now (Now):    {total_rabbit_now}")
+    print(f"Files without header/other:    {no_header}")
+    if stats['error'] > 0:
+        print(f"Errors:                        {stats['error']}")
+    print("=" * 50)
 
 if __name__ == '__main__':
     target = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
