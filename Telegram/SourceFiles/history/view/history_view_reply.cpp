@@ -1007,12 +1007,12 @@ void Reply::paint(
 			if (namew > 0) {
 				p.setPen(!inBubble
 					? st->msgImgReplyBarColor()->c
-					: (colorCollectible || colorIndexPlusOne)
+					: (useColorCollectible || useColorIndex)
 					? FromNameFg(
 						context,
 						colorIndexPlusOne - 1,
 						colorCollectible)
-					: stm->msgServiceFg->c);
+					: cache->icon);
 				_name.drawLeftElided(
 					p,
 					x + st::historyReplyPadding.left() + previewSkip,
@@ -1034,7 +1034,7 @@ void Reply::paint(
 					: stm->replyTextPalette);
 				auto owned = std::optional<style::owned_color>();
 				auto copy = std::optional<style::TextPalette>();
-				if (inBubble && colorIndexPlusOne) {
+				if (inBubble && (useColorCollectible || useColorIndex)) {
 					copy.emplace(*replyToTextPalette);
 					owned.emplace(cache->icon);
 					copy->linkFg = owned->color();
