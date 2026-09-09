@@ -246,8 +246,6 @@ public:
 	History *listTranslateHistory() override;
 	void listAddTranslatedItems(
 		not_null<TranslateTracker*> tracker) override;
-	Ui::ChatPaintContext listPreparePaintContext(
-		Ui::ChatPaintContextArgs &&args) override;
 	base::unique_qptr<Ui::PopupMenu> listFillSenderUserpicMenu(
 		PeerId userpicPeerId) override;
 	Ui::ElasticScroll *listScrollArea() const override;
@@ -603,7 +601,6 @@ private:
 	rpl::lifetime _historySponsoredPreloading;
 	bool _injectingSponsored = false;
 
-	Ui::Controls::SwipeContextData _gestureHorizontal;
 	Ui::Controls::SwipeBackResult _swipeBackData;
 
 	SendPaymentHelper _sendPayment;

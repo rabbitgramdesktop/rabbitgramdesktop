@@ -1816,20 +1816,7 @@ void ChatWidget::setupComposeControls() {
 }
 
 void ChatWidget::setupSwipeReplyAndBack() {
-	const auto can = [=](not_null<HistoryItem*> still) {
-		const auto canSendReply = CanSendResolved(
-			_peer,
-			resolvedTopic(),
-			SendPermission::Anything);
-		const auto allowInAnotherChat = still && still->allowsForward();
-		const auto bottomBarActive = _bottom->isButtonActive();
-		if (allowInAnotherChat && (bottomBarActive || !canSendReply)) {
-			return true;
-		} else if (!bottomBarActive && canSendReply) {
-			return true;
-		}
-		return false;
-	};
+	const auto swipeActionIcon = std::make_shared<const style::icon *>(nullptr);
 
 	auto update = [=](Ui::Controls::SwipeContextData data) {
 		if (data.translation > 0) {
@@ -1851,23 +1838,18 @@ void ChatWidget::setupSwipeReplyAndBack() {
 		} else if (_swipeBackData.lifetime) {
 			_swipeBackData = {};
 		}
-		const auto changed = (_gestureHorizontal.msgBareId != data.msgBareId)
-			|| (_gestureHorizontal.translation != data.translation)
-			|| (_gestureHorizontal.reachRatio != data.reachRatio);
-		if (changed) {
-			_gestureHorizontal = data;
-			const auto item = _peer->owner().message(
-				_peer->id,
-				MsgId{ data.msgBareId });
-			if (item) {
-				_history->owner().requestItemRepaint(item);
-			}
+		if (!data.customIcon && *swipeActionIcon) {
+			data.customIcon = *swipeActionIcon;
+		}
+		if (_inner) {
+			_inner->setGestureHorizontal(data);
 		}
 	};
 
 	auto init = [=, show = controller()->uiShow()](
 			Ui::Controls::SwipeHandlerInitData data) {
 		auto result = Ui::Controls::SwipeHandlerFinishData();
+		*swipeActionIcon = nullptr;
 		const auto horizontalScrollDelta = (data.direction == Qt::LeftToRight)
 			? 1
 			: -1;
@@ -1899,9 +1881,13 @@ void ChatWidget::setupSwipeReplyAndBack() {
 		const auto item = _inner->lookupItemByPoint(
 			data.cursorPosition,
 			view);
-		if (!can(item)) {
+
+		const auto actions = _inner->availableQuickActions(item, view);
+		if (actions.empty()) {
 			return result;
 		}
+		const auto action = actions.front();
+		*swipeActionIcon = RabbitSettings::QuickActionIcon(action).icon;
 
 		_inner->hideElementOverlay();
 		const auto viewItemId = view->data()->fullId();
@@ -1912,23 +1898,14 @@ void ChatWidget::setupSwipeReplyAndBack() {
 			const auto view = still
 				? _inner->viewByPosition(still->position())
 				: nullptr;
-			const auto selected = (still && view)
-				? view->selectedQuote(_inner->getSelectedTextSelection(still))
-				: SelectedQuote();
-			const auto exact = selected.item
-				? selected.item
+			const auto exact = still
+				? still
 				: show->session().data().message(itemId);
 			if (!exact) {
 				return;
 			}
 			Window::ActivateWindow(controller());
-			_inner->replyToMessageRequestNotify({
-				.messageId = exact->fullId(),
-				.quote = selected.highlight.quote,
-				.quoteOffset = selected.highlight.quoteOffset,
-				.todoItemId = selected.highlight.todoItemId,
-				.pollOption = selected.highlight.pollOption,
-			});
+			_inner->executeQuickAction(action, exact, view);
 		};
 		return result;
 	};
@@ -5833,13 +5810,6 @@ void ChatWidget::listAddTranslatedItems(
 	}
 }
 
-Ui::ChatPaintContext ChatWidget::listPreparePaintContext(
-		Ui::ChatPaintContextArgs &&args) {
-	auto context = WindowListDelegate::listPreparePaintContext(
-		std::move(args));
-	context.gestureHorizontal = _gestureHorizontal;
-	return context;
-}
 
 base::unique_qptr<Ui::PopupMenu> ChatWidget::listFillSenderUserpicMenu(
 		PeerId userpicPeerId) {

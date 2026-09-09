@@ -23,6 +23,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_inner_widget_accessibility.h"
 #include "history/history_view_highlight_manager.h"
 #include "history/history_view_top_toast.h"
+#include "ui/controls/swipe_handler_data.h"
+#include "rabbit/settings/rabbit_settings.h"
 
 struct ClickHandlerContext;
 
@@ -478,6 +480,19 @@ public:
 		QPoint position,
 		const TextState &replyState) const;
 	void toggleFavoriteReaction(not_null<Element*> view) const;
+	void setGestureHorizontal(const Ui::Controls::SwipeContextData &data);
+	[[nodiscard]] Ui::Controls::SwipeContextData gestureHorizontal() const;
+	[[nodiscard]] std::vector<RabbitSettings::QuickAction> availableQuickActions(
+		not_null<HistoryItem*> item,
+		Element *view) const;
+	[[nodiscard]] bool isQuickActionAllowed(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view) const;
+	void executeQuickAction(
+		RabbitSettings::QuickAction action,
+		not_null<HistoryItem*> item,
+		Element *view);
 
 
 	[[nodiscard]] auto scrollKeyEvents() const
@@ -598,6 +613,7 @@ protected:
 	void enterEventHook(QEnterEvent *e) override;
 	void leaveEventHook(QEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	void wheelEvent(QWheelEvent *e) override;
 
 	// Resize content and count natural widget height for the desired width.
 	int resizeGetHeight(int newWidth) override;
@@ -1105,6 +1121,16 @@ private:
 	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
 
 	rpl::lifetime _viewerLifetime;
+
+	Ui::Controls::SwipeContextData _gestureHorizontal;
+	bool _rmbWheelActive = false;
+	bool _rmbSuppressedMenu = false;
+	int _rmbActionIndex = 0;
+	FullMsgId _rmbLockedFullId;
+	float64 _rmbCurrentDelta = 0.0;
+	Ui::Animations::Simple _rmbAnimation;
+	Ui::Animations::Simple _rmbCarouselAnimation;
+	QPoint _rmbPressPos;
 
 };
 
