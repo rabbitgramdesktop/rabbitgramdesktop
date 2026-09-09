@@ -95,6 +95,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_media_types.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_document_media.h"
 #include "data/data_peer.h"
 #include "data/data_user.h"
 #include "data/data_chat.h"
@@ -6979,7 +6981,13 @@ bool ListWidget::isQuickActionAllowed(
 			session().data().reactions().favoriteId(),
 			&Data::Reaction::id);
 	case RabbitSettings::QuickAction::Copy:
-		return !hasCopyRestr && (!item->originalText().text.isEmpty() || (item->media() != nullptr));
+		if (!hasCopyRestr && (!item->originalText().text.isEmpty() || (view && view->hasVisibleText()))) {
+			return true;
+		}
+		if (!hasCopyMediaRestriction(item) && item->media() != nullptr) {
+			return true;
+		}
+		return false;
 	case RabbitSettings::QuickAction::Forward:
 		return !hasCopyRestr && item->allowsForward();
 	case RabbitSettings::QuickAction::Edit:
@@ -7039,9 +7047,57 @@ void ListWidget::executeQuickAction(
 		break;
 	case RabbitSettings::QuickAction::Copy:
 		if (const auto selected = view ? view->selectedQuote(getSelectedTextSelection(item)) : SelectedQuote(); !selected.highlight.quote.empty()) {
-			TextUtilities::SetClipboardText(TextForMimeData::WithExpandedLinks(selected.highlight.quote));
-		} else {
-			TextUtilities::SetClipboardText(item->clipboardText());
+			if (!showCopyRestriction(item)) {
+				TextUtilities::SetClipboardText(TextForMimeData::WithExpandedLinks(selected.highlight.quote));
+			}
+		} else if (const auto text = item->clipboardText(); !text.empty()) {
+			if (!showCopyRestriction(item)) {
+				if (const auto group = item->history()->owner().groups().find(item)) {
+					TextUtilities::SetClipboardText(HistoryGroupText(group));
+				} else {
+					TextUtilities::SetClipboardText(text);
+				}
+			}
+		} else if (const auto media = item->media()) {
+			if (!showCopyMediaRestriction(item)) {
+				if (const auto photo = media->photo()) {
+					const auto photoMedia = photo->activeMediaView()
+						? photo->activeMediaView()
+						: photo->createMediaView();
+					if (photoMedia) {
+						if (!photoMedia->setToClipboard()) {
+							if (const auto img = photoMedia->image(PhotoSize::Thumbnail)
+								? photoMedia->image(PhotoSize::Thumbnail)
+								: photoMedia->thumbnailInline()) {
+								if (!img->original().isNull()) {
+									auto mime = std::make_unique<QMimeData>();
+									mime->setImageData(img->original());
+									QGuiApplication::clipboard()->setMimeData(mime.release());
+								}
+							}
+						}
+					}
+				} else if (const auto document = media->document()) {
+					const auto docMedia = document->activeMediaView()
+						? document->activeMediaView()
+						: document->createMediaView();
+					if (docMedia) {
+						if (const auto sticker = docMedia->getStickerLarge()) {
+							if (!sticker->original().isNull()) {
+								auto mime = std::make_unique<QMimeData>();
+								mime->setImageData(sticker->original());
+								QGuiApplication::clipboard()->setMimeData(mime.release());
+							}
+						} else if (const auto image = docMedia->goodThumbnail()) {
+							if (!image->original().isNull()) {
+								auto mime = std::make_unique<QMimeData>();
+								mime->setImageData(image->original());
+								QGuiApplication::clipboard()->setMimeData(mime.release());
+							}
+						}
+					}
+				}
+			}
 		}
 		break;
 	case RabbitSettings::QuickAction::Forward:
