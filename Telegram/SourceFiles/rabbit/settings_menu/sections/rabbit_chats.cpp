@@ -12,6 +12,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "main/main_session.h"
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings/quick_action_ui.h"
+#include "rabbit/swipe_actions/swipe_action_ui.h"
+#include "rabbit/swipe_actions/swipe_actions_box.h"
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings_menu/boxes/quick_action_box.h"
 #include "rabbit/settings_menu/rabbit_context_menu.h"
@@ -425,7 +427,7 @@ void BuildQuickActions(
 			auto totalWidth = 0;
 			auto maxHeight = 0;
 			for (const auto act : list) {
-				if (const auto icon = RabbitSettings::QuickActionIcon(act).icon) {
+				if (const auto icon = RabbitSettings::SwipeActionIcon(act).icon) {
 					totalWidth += icon->width() + 4;
 					maxHeight = std::max(maxHeight, icon->height());
 				}
@@ -457,7 +459,7 @@ void BuildQuickActions(
 			const auto list = RabbitSettings::swipeActionsList();
 			auto x = 0;
 			for (const auto act : list) {
-				if (const auto icon = RabbitSettings::QuickActionIcon(act).icon) {
+				if (const auto icon = RabbitSettings::SwipeActionIcon(act).icon) {
 					icon->paint(p, x, (iconsWidget->height() - icon->height()) / 2, iconsWidget->width());
 					x += icon->width() + 4;
 				}

@@ -11,6 +11,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_report.h"
 #include "ui/rp_widget.h"
 #include "ui/controls/swipe_handler_data.h"
+#include "rabbit/swipe_actions/swipe_action.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/thanos_effect_controller.h"
 #include "ui/dragging_scroll_manager.h"
@@ -709,15 +710,15 @@ private:
 	Ui::Animations::Simple _rmbAnimation;
 	Ui::Animations::Simple _rmbCarouselAnimation;
 
-	[[nodiscard]] std::vector<RabbitSettings::QuickAction> availableQuickActions(
+	[[nodiscard]] std::vector<RabbitSettings::SwipeAction> availableSwipeActions(
 		not_null<HistoryItem*> item,
 		Element *view) const;
-	[[nodiscard]] bool isQuickActionAllowed(
-		RabbitSettings::QuickAction action,
+	[[nodiscard]] bool isSwipeActionAllowed(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view) const;
-	void executeQuickAction(
-		RabbitSettings::QuickAction action,
+	void executeSwipeAction(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view);
 

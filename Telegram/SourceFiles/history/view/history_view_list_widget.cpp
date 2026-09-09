@@ -97,6 +97,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_document_media.h"
+#include "rabbit/swipe_actions/swipe_action_ui.h"
 #include "data/data_peer.h"
 #include "data/data_user.h"
 #include "data/data_chat.h"
@@ -4510,10 +4511,10 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 		const auto view = item ? viewByPosition(item->position()) : nullptr;
 
 		if (_gestureHorizontal.ratio >= 1.0 && item) {
-			const auto actions = availableQuickActions(item, view);
+			const auto actions = availableSwipeActions(item, view);
 			if (!actions.empty()) {
 				const auto idx = std::clamp(_rmbActionIndex, 0, int(actions.size()) - 1);
-				executeQuickAction(actions[idx], item, view);
+				executeSwipeAction(actions[idx], item, view);
 			}
 		}
 
@@ -6888,7 +6889,7 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 				const auto viewItemId = item->fullId();
 				_rmbLockedFullId = viewItemId;
 
-				const auto actions = availableQuickActions(item, foundView);
+				const auto actions = availableSwipeActions(item, foundView);
 
 				if (!actions.empty()) {
 					const auto count = int(actions.size());
@@ -6902,7 +6903,7 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 					}
 
 					const auto activeIdx = std::clamp(_rmbActionIndex, 0, count - 1);
-					const auto activeIcon = RabbitSettings::QuickActionIcon(actions[activeIdx]).icon;
+					const auto activeIcon = RabbitSettings::SwipeActionIcon(actions[activeIdx]).icon;
 
 					const style::icon *beforeIcon = nullptr;
 					const style::icon *afterIcon = nullptr;
@@ -6911,15 +6912,15 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 
 					if (count > 1) {
 						const auto beforeIdx = (activeIdx - 1 + count) % count;
-						beforeIcon = RabbitSettings::QuickActionIcon(actions[beforeIdx]).icon;
+						beforeIcon = RabbitSettings::SwipeActionIcon(actions[beforeIdx]).icon;
 						if (count > 2) {
 							const auto afterIdx = (activeIdx + 1) % count;
-							afterIcon = RabbitSettings::QuickActionIcon(actions[afterIdx]).icon;
+							afterIcon = RabbitSettings::SwipeActionIcon(actions[afterIdx]).icon;
 							if (count > 3) {
 								const auto farBeforeIdx = (activeIdx - 2 + count) % count;
-								farBeforeIcon = RabbitSettings::QuickActionIcon(actions[farBeforeIdx]).icon;
+								farBeforeIcon = RabbitSettings::SwipeActionIcon(actions[farBeforeIdx]).icon;
 								const auto farAfterIdx = (activeIdx + 2) % count;
-								farAfterIcon = RabbitSettings::QuickActionIcon(actions[farAfterIdx]).icon;
+								farAfterIcon = RabbitSettings::SwipeActionIcon(actions[farAfterIdx]).icon;
 							}
 						}
 					}
@@ -6964,23 +6965,23 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 	Ui::RpWidget::wheelEvent(e);
 }
 
-bool ListWidget::isQuickActionAllowed(
-		RabbitSettings::QuickAction action,
+bool ListWidget::isSwipeActionAllowed(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view) const {
 	const auto hasCopyRestr = hasCopyRestriction(item);
 
 	switch (action) {
-	case RabbitSettings::QuickAction::Disable:
+	case RabbitSettings::SwipeAction::Disable:
 		return false;
-	case RabbitSettings::QuickAction::Reply:
+	case RabbitSettings::SwipeAction::Reply:
 		return CanSendReply(item);
-	case RabbitSettings::QuickAction::Reaction:
+	case RabbitSettings::SwipeAction::Reaction:
 		return !item->isService() && ranges::contains(
 			Data::LookupPossibleReactions(item).recent,
 			session().data().reactions().favoriteId(),
 			&Data::Reaction::id);
-	case RabbitSettings::QuickAction::Copy:
+	case RabbitSettings::SwipeAction::Copy:
 		if (!hasCopyRestr && (!item->originalText().text.isEmpty() || (view && view->hasVisibleText()))) {
 			return true;
 		}
@@ -6988,30 +6989,30 @@ bool ListWidget::isQuickActionAllowed(
 			return true;
 		}
 		return false;
-	case RabbitSettings::QuickAction::Forward:
+	case RabbitSettings::SwipeAction::Forward:
 		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::QuickAction::Edit:
+	case RabbitSettings::SwipeAction::Edit:
 		return item->allowsEdit(crl::now());
-	case RabbitSettings::QuickAction::Save:
+	case RabbitSettings::SwipeAction::Save:
 		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::QuickAction::Repeat:
+	case RabbitSettings::SwipeAction::Repeat:
 		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::QuickAction::Delete:
+	case RabbitSettings::SwipeAction::Delete:
 		return item->canDelete();
-	case RabbitSettings::QuickAction::Translate:
+	case RabbitSettings::SwipeAction::Translate:
 		return !item->originalText().text.isEmpty() && Core::App().settings().translateButtonEnabled();
 	}
 	return false;
 }
 
-std::vector<RabbitSettings::QuickAction> ListWidget::availableQuickActions(
+std::vector<RabbitSettings::SwipeAction> ListWidget::availableSwipeActions(
 		not_null<HistoryItem*> item,
 		Element *view) const {
 	const auto configured = RabbitSettings::swipeActionsList();
-	auto result = std::vector<RabbitSettings::QuickAction>();
+	auto result = std::vector<RabbitSettings::SwipeAction>();
 
 	for (const auto action : configured) {
-		if (isQuickActionAllowed(action, item, view)) {
+		if (isSwipeActionAllowed(action, item, view)) {
 			result.push_back(action);
 		}
 	}
@@ -7019,14 +7020,14 @@ std::vector<RabbitSettings::QuickAction> ListWidget::availableQuickActions(
 	return result;
 }
 
-void ListWidget::executeQuickAction(
-		RabbitSettings::QuickAction action,
+void ListWidget::executeSwipeAction(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view) {
 	const auto itemId = item->fullId();
 
 	switch (action) {
-	case RabbitSettings::QuickAction::Reply:
+	case RabbitSettings::SwipeAction::Reply:
 		if (CanSendReply(item)) {
 			const auto selected = view
 				? view->selectedQuote(getSelectedTextSelection(item))
@@ -7040,12 +7041,12 @@ void ListWidget::executeQuickAction(
 			});
 		}
 		break;
-	case RabbitSettings::QuickAction::Reaction:
+	case RabbitSettings::SwipeAction::Reaction:
 		if (view) {
 			toggleFavoriteReaction(view);
 		}
 		break;
-	case RabbitSettings::QuickAction::Copy:
+	case RabbitSettings::SwipeAction::Copy:
 		if (const auto selected = view ? view->selectedQuote(getSelectedTextSelection(item)) : SelectedQuote(); !selected.highlight.quote.empty()) {
 			if (!showCopyRestriction(item)) {
 				TextUtilities::SetClipboardText(TextForMimeData::WithExpandedLinks(selected.highlight.quote));
@@ -7100,19 +7101,19 @@ void ListWidget::executeQuickAction(
 			}
 		}
 		break;
-	case RabbitSettings::QuickAction::Forward:
+	case RabbitSettings::SwipeAction::Forward:
 		if (item->allowsForward()) {
 			if (controllerOrNull()) {
 				Window::ShowForwardMessagesBox(controller()->uiShow(), { itemId });
 			}
 		}
 		break;
-	case RabbitSettings::QuickAction::Edit:
+	case RabbitSettings::SwipeAction::Edit:
 		if (item->allowsEdit(crl::now())) {
 			editMessageRequestNotify(itemId);
 		}
 		break;
-	case RabbitSettings::QuickAction::Save:
+	case RabbitSettings::SwipeAction::Save:
 		if (item->allowsForward()) {
 			if (controllerOrNull()) {
 				Window::ForwardToSelf(
@@ -7121,7 +7122,7 @@ void ListWidget::executeQuickAction(
 			}
 		}
 		break;
-	case RabbitSettings::QuickAction::Repeat:
+	case RabbitSettings::SwipeAction::Repeat:
 		if (item->allowsForward()) {
 			auto sendAction = Api::SendAction(item->history());
 			sendAction.clearDraft = false;
@@ -7130,14 +7131,14 @@ void ListWidget::executeQuickAction(
 				std::move(sendAction));
 		}
 		break;
-	case RabbitSettings::QuickAction::Delete:
+	case RabbitSettings::SwipeAction::Delete:
 		if (item->canDelete()) {
 			if (controllerOrNull()) {
 				controller()->show(Box<DeleteMessagesBox>(item));
 			}
 		}
 		break;
-	case RabbitSettings::QuickAction::Translate:
+	case RabbitSettings::SwipeAction::Translate:
 		if (!item->originalText().text.isEmpty()) {
 			if (controllerOrNull()) {
 				const auto peer = item->history()->peer;

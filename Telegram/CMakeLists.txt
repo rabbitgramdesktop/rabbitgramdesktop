@@ -1817,6 +1817,10 @@ PRIVATE
     rabbit/settings_menu/rabbit_context_menu.h
     rabbit/settings_menu/rabbit_settings_menu.cpp
     rabbit/settings_menu/rabbit_settings_menu.h
+    rabbit/swipe_actions/swipe_action.h
+    rabbit/swipe_actions/swipe_action_ui.h
+    rabbit/swipe_actions/swipe_actions_box.cpp
+    rabbit/swipe_actions/swipe_actions_box.h
     rabbit/telemetry/rabbit_telemetry.cpp
     rabbit/telemetry/rabbit_telemetry.h
     rabbit/ui/settings/icon_picker.cpp

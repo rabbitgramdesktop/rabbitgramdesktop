@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/swipe_actions/swipe_action.h"
 #include "data/data_peer.h"
 
 #include "base/parse_helper.h"
@@ -422,7 +423,7 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 	{
 		u"swipe_actions_list"_q, {
 			.type = QJsonArraySetting,
-			.defaultValue = QJsonArray{ static_cast<int>(QuickAction::Reply) },
+			.defaultValue = QJsonArray{ static_cast<int>(SwipeAction::Reply) },
 		}
 	},
 	{

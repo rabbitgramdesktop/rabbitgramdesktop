@@ -24,7 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_view_highlight_manager.h"
 #include "history/history_view_top_toast.h"
 #include "ui/controls/swipe_handler_data.h"
-#include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/swipe_actions/swipe_action.h"
 
 struct ClickHandlerContext;
 
@@ -482,15 +482,15 @@ public:
 	void toggleFavoriteReaction(not_null<Element*> view) const;
 	void setGestureHorizontal(const Ui::Controls::SwipeContextData &data);
 	[[nodiscard]] Ui::Controls::SwipeContextData gestureHorizontal() const;
-	[[nodiscard]] std::vector<RabbitSettings::QuickAction> availableQuickActions(
+	[[nodiscard]] std::vector<RabbitSettings::SwipeAction> availableSwipeActions(
 		not_null<HistoryItem*> item,
 		Element *view) const;
-	[[nodiscard]] bool isQuickActionAllowed(
-		RabbitSettings::QuickAction action,
+	[[nodiscard]] bool isSwipeActionAllowed(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view) const;
-	void executeQuickAction(
-		RabbitSettings::QuickAction action,
+	void executeSwipeAction(
+		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
 		Element *view);
 

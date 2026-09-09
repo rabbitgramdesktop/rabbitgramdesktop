@@ -14,6 +14,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QJsonObject>
 #include <vector>
 #include "rabbit/settings/quick_action.h"
+#include "rabbit/swipe_actions/swipe_action.h"
 
 class PeerData;
 
@@ -161,18 +162,18 @@ inline bool hideBubbleTails() { return JsonSettings::GetBool(u"hide_bubble_tails
 inline int stickerShape() { return JsonSettings::GetInt(u"sticker_shape"_q); }
 inline int outgoingQuickAction() { return JsonSettings::GetInt(u"outgoing_quick_action"_q); }
 inline int incomingQuickAction() { return JsonSettings::GetInt(u"incoming_quick_action"_q); }
-inline std::vector<QuickAction> swipeActionsList() {
+inline std::vector<SwipeAction> swipeActionsList() {
 	const auto arr = JsonSettings::GetJsonArray(u"swipe_actions_list"_q);
-	auto result = std::vector<QuickAction>();
+	auto result = std::vector<SwipeAction>();
 	for (const auto val : arr) {
-		result.push_back(static_cast<QuickAction>(val.toInt()));
+		result.push_back(static_cast<SwipeAction>(val.toInt()));
 	}
 	if (result.empty()) {
-		result.push_back(QuickAction::Reply);
+		result.push_back(SwipeAction::Reply);
 	}
 	return result;
 }
-inline void setSwipeActionsList(const std::vector<QuickAction> &list) {
+inline void setSwipeActionsList(const std::vector<SwipeAction> &list) {
 	auto arr = QJsonArray();
 	for (const auto action : list) {
 		arr.append(static_cast<int>(action));

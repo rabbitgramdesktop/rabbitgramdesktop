@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_chat_section.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/swipe_actions/swipe_action_ui.h"
 
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/history_view_top_controls.h"
@@ -1882,12 +1883,12 @@ void ChatWidget::setupSwipeReplyAndBack() {
 			data.cursorPosition,
 			view);
 
-		const auto actions = _inner->availableQuickActions(item, view);
+		const auto actions = _inner->availableSwipeActions(item, view);
 		if (actions.empty()) {
 			return result;
 		}
 		const auto action = actions.front();
-		*swipeActionIcon = RabbitSettings::QuickActionIcon(action).icon;
+		*swipeActionIcon = RabbitSettings::SwipeActionIcon(action).icon;
 
 		_inner->hideElementOverlay();
 		const auto viewItemId = view->data()->fullId();
@@ -1905,7 +1906,7 @@ void ChatWidget::setupSwipeReplyAndBack() {
 				return;
 			}
 			Window::ActivateWindow(controller());
-			_inner->executeQuickAction(action, exact, view);
+			_inner->executeSwipeAction(action, exact, view);
 		};
 		return result;
 	};
