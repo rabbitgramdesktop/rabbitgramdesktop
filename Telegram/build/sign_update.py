@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# This file is part of Telegram Desktop,
-# the official desktop application for the Telegram messaging service.
+# This file is part of rabbitGram Desktop,
+# the unofficial app based on Telegram Desktop.
 #
 # For license and copyright information please follow this link:
-# https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+# https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 # ES256 signing glue for the v2 update packer, shared by build.bat,
 # build.sh and canary.yml. Standard library only: the actual signing

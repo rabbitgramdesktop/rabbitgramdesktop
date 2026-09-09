@@ -1,8 +1,8 @@
-# This file is part of Telegram Desktop,
-# the official desktop application for the Telegram messaging service.
+# This file is part of rabbitGram Desktop,
+# the unofficial app based on Telegram Desktop.
 #
 # For license and copyright information please follow this link:
-# https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+# https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 # The focused v2 update verification test is built alongside the Packer
 # for special targets as well as with the development test apps: it runs

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# This file is part of Telegram Desktop,
-# the official desktop application for the Telegram messaging service.
+# This file is part of rabbitGram Desktop,
+# the unofficial app based on Telegram Desktop.
 #
 # For license and copyright information please follow this link:
-# https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+# https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #
 # Publishes ONE platform build of a canary lane: posts the update file(s)
 # and the portable archive to the lane's channel through the local Bot
