@@ -679,6 +679,10 @@ OverlayWidget::OverlayWidget()
 	updateSpeedBoost();
 	return isSpeedBoostShown();
 }) {
+	_titleBugWorkaround->setAttribute(Qt::WA_TransparentForMouseEvents);
+	_titleBugWorkaround->setAttribute(Qt::WA_NoSystemBackground);
+	_titleBugWorkaround->setGeometry(0, 0, 0, 0);
+
 	_layerBg->setStyleOverrides(&st::groupCallBox, &st::groupCallLayerBox);
 	_layerBg->setHideByBackgroundClick(true);
 
