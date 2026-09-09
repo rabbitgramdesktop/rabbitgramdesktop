@@ -1,10 +1,10 @@
 # Bundle rabbitGram Desktop release artifacts.
 #
 # Usage:
-#   python bundle_release.py                 Bundle all (portable + update + installer)
-#   python bundle_release.py --no-portable   Skip portable archive
-#   python bundle_release.py --no-update     Skip OTA update package
-#   python bundle_release.py --no-installer  Skip installer
+#   python scripts/bundle_release.py                 Bundle all (portable + update + installer)
+#   python scripts/bundle_release.py --no-portable   Skip portable archive
+#   python scripts/bundle_release.py --no-update     Skip OTA update package
+#   python scripts/bundle_release.py --no-installer  Skip installer
 #
 # The script reads the version from Telegram/SourceFiles/core/version.h,
 # updates Telegram/build/setup.iss with the resolved version, then
@@ -118,65 +118,46 @@ def bundle_update(root: Path, version: VersionInfo) -> None:
     if not packer.exists():
         sys.exit(
             f"Packer.exe not found: {packer}\n"
-            "Make sure to configure with -D DESKTOP_APP_SPECIAL_TARGET=win64 "
-            "and build the Packer target."
+            "Build Telegram with target 'Packer' to enable update bundling."
         )
-
-    exe = release_dir / "rabbitGram.exe"
-    updater = release_dir / "Updater.exe"
-    if not exe.exists():
-        sys.exit(f"rabbitGram.exe not found: {exe}")
-    if not updater.exists():
-        sys.exit(f"Updater.exe not found: {updater}")
-
-    cmd = [
-        str(packer),
-        "-version", version.version_num,
-        "-path", "rabbitGram.exe",
-        "-path", "Updater.exe",
-    ]
-
-    cmd.extend(["-target", "win64"])
-
-    if version.is_beta:
-        cmd.append("-beta")
-
-    result = subprocess.run(cmd, cwd=str(release_dir))
-    if result.returncode != 0:
-        sys.exit(f"Packer failed with exit code {result.returncode}")
-
-    update_file = release_dir / f"tx64upd{version.version_num}"
-    if not update_file.exists():
-        sys.exit(f"Update file not created: {update_file}")
 
     output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
     output_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(update_file, output_dir / update_file.name)
-    print(f"Update package created: {output_dir / update_file.name}")
 
-
-def find_iscc() -> str:
-    iscc = shutil.which("iscc")
-    if iscc:
-        return iscc
-    possible_paths = [
-        Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
-        Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
-        Path(r"C:\Program Files (x86)\Inno Setup 5\ISCC.exe"),
-        Path(r"C:\Program Files\Inno Setup 5\ISCC.exe"),
+    target_file = output_dir / f"rtgdupdate-{version.index}"
+    cmd = [
+        str(packer),
+        "-path",
+        str(release_dir / "rabbitGram.exe"),
+        "-version",
+        version.version_num,
+        "-output",
+        str(target_file),
     ]
-    for p in possible_paths:
-        if p.exists():
-            return str(p)
-    return "iscc"
+
+    print(f"Running Packer: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        sys.exit(f"Packer failed with exit code {result.returncode}:\n{result.stderr}")
+    print(f"OTA update package created: {target_file}")
 
 
 def bundle_installer(root: Path) -> None:
-    print("Bundling installer...")
+    print("Bundling Inno Setup installer...")
 
-    iscc_bin = find_iscc()
+    iscc = shutil.which("iscc")
+    if not iscc:
+        standard_path = Path("C:/Program Files (x86)/Inno Setup 6/ISCC.exe")
+        if standard_path.exists():
+            iscc = str(standard_path)
+        else:
+            sys.exit("Inno Setup compiler (iscc) not found on PATH or standard location.")
+
     iss_path = root / "Telegram" / "build" / "setup.iss"
-    result = subprocess.run([iscc_bin, str(iss_path)])
+    cmd = [iscc, str(iss_path)]
+
+    print(f"Running Inno Setup: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         sys.exit(f"Inno Setup compiler failed with exit code {result.returncode}")
     print("Installer created successfully.")
@@ -189,7 +170,7 @@ def main() -> None:
     parser.add_argument("--no-update", action="store_true", help="Skip OTA update package")
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parent.parent
     version = parse_version(root)
     print(f"Version: {version.version_str} ({version.index})")
 
