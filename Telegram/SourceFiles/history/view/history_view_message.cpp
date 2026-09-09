@@ -7256,7 +7256,8 @@ void Message::drawSwipeOverlay(Painter &p, const PaintContext &context) const {
 			p.translate(pos);
 
 			const auto finalScale = scaleVal * (1. + (reachScale ? (1. * reachScale) : 0.0));
-			p.scale(-finalScale, finalScale);
+			const auto scaleX = context.gestureHorizontal.customIcon ? finalScale : -finalScale;
+			p.scale(scaleX, finalScale);
 			p.translate(-center);
 
 			p.drawEllipse(rect);
