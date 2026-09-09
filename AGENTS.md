@@ -235,10 +235,11 @@ All custom features, settings, and UI additions specific to rabbitGram must be i
 ### 1. Structure & Architecture
 - **`Telegram/SourceFiles/rabbit/settings/`**: Stores settings declarations, JSON storage, getters/setters, default values, and reactive `rpl::producer` event streams.
 - **`Telegram/SourceFiles/rabbit/settings_menu/`**: Implements rabbitGram settings UI sections (`sections/section_chats.cpp`, `section_appearance.cpp`, etc.) and custom setting boxes.
-- **`Telegram/SourceFiles/rabbit/ui/`**: Custom UI elements, badges, animations, and controls specific to rabbitGram.
+- **`Telegram/SourceFiles/rabbit/ui/`**: Custom UI elements, badges, animations, setting previews, and controls specific to rabbitGram.
 - **`Telegram/SourceFiles/rabbit/lang/`**: Custom localization strings and language key definitions.
-- **`Telegram/SourceFiles/rabbit/utils/`**: Helper utilities and domain logic for rabbitGram features.
-- **Modular Subfolders for Major Features**: Large, standalone features should be isolated in dedicated subdirectories under `Telegram/SourceFiles/rabbit/<feature_name>/` (e.g. `math_evaluator/`, `telemetry/`, `deep_links/`) to maintain high modularity and clean separation of concerns.
+- **`Telegram/SourceFiles/rabbit/utils/`**: Helper functions, utilities, algorithms, and domain logic for rabbitGram features.
+- **Modular Subfolders for Major Features**: Large, standalone features should be isolated in dedicated subdirectories under `Telegram/SourceFiles/rabbit/<feature_name>/` (e.g. `swipe_actions/`, `math_evaluator/`, `telemetry/`, `deep_links/`) to maintain high modularity and clean separation of concerns.
+- **Feature Subdirectories in `ui/` & `utils/`**: It is completely encouraged to group feature-specific UI and utility components under subfolders like `Telegram/SourceFiles/rabbit/ui/<feature_name>/` or `Telegram/SourceFiles/rabbit/utils/<feature_name>/` when appropriate.
 
 ### 2. Declaring Settings (`RabbitSettings`)
 - Add new settings keys, getters, setters, and event producers in `Telegram/SourceFiles/rabbit/settings/rabbit_settings.h` and `rabbit_settings.cpp`.
