@@ -7067,8 +7067,8 @@ void ListWidget::executeSwipeAction(
 						: photo->createMediaView();
 					if (photoMedia) {
 						if (!photoMedia->setToClipboard()) {
-							if (const auto img = photoMedia->image(PhotoSize::Thumbnail)
-								? photoMedia->image(PhotoSize::Thumbnail)
+							if (const auto img = photoMedia->image(Data::PhotoSize::Thumbnail)
+								? photoMedia->image(Data::PhotoSize::Thumbnail)
 								: photoMedia->thumbnailInline()) {
 								if (!img->original().isNull()) {
 									auto mime = std::make_unique<QMimeData>();
@@ -7104,7 +7104,7 @@ void ListWidget::executeSwipeAction(
 	case RabbitSettings::SwipeAction::Forward:
 		if (item->allowsForward()) {
 			if (controllerOrNull()) {
-				Window::ShowForwardMessagesBox(controller()->uiShow(), { itemId });
+				Window::ShowForwardMessagesBox(controller(), { itemId });
 			}
 		}
 		break;
