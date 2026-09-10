@@ -163,6 +163,10 @@ user to close that checkout's Telegram/debugger before rebuilding.
 1. **Always use Debug builds** - Release builds are extremely heavy
 2. **Don't build Release configuration** - it's too heavy for testing
 
+## Submodules Policy
+
+Do NOT edit code inside git submodules (e.g. `Telegram/ThirdParty/` or external submodule dependencies). If modifying code inside a submodule is an absolute necessity, you MUST notify the user first and obtain explicit permission before making any changes.
+
 ## Debug-Only Code
 
 Production translation units stay free of debug machinery. The permanent test
@@ -190,7 +194,8 @@ publication at a construction seam).
 
 ## Commits
 
-- Subject: one concise, plain-language line summarizing the change, ~50-60 characters, matching the style of recent `git log` subjects. This is usually the entire message.
+- **Conventional Commits**: Follow the Conventional Commits specification for commit messages (`<type>(<scope>): <description>`, e.g., `fix(history): ...`, `docs(agents): ...`, `feat(rabbit): ...`). Supported types include `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
+- Subject: one concise line summarizing the change, ~50-60 characters.
 - Decide the `[ai] ` prefix separately for each commit. Use it only when every
   retained change in that commit, and the commit's purpose, are exclusively
   about the AI workflow: the agent harness, skills, prompts, custom commands,
