@@ -33,6 +33,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "styles/style_widgets.h"
 
 #include <QAction>
+#include <QtSvg/QSvgRenderer>
 
 namespace Settings {
 namespace {
@@ -763,40 +764,10 @@ void AddLottieIconWithCircle(
 void AddPremiumStar(
 		not_null<Button*> button,
 		bool credits,
-		Fn<bool()> isPaused) {
+		Fn<bool()> /*isPaused*/) {
 	const auto stops = credits
 		? Ui::Premium::CreditsIconGradientStops()
 		: Ui::Premium::ButtonGradientStops();
-
-	const auto ministarsContainer = Ui::CreateChild<Ui::RpWidget>(button);
-	const auto &buttonSt = button->st();
-	const auto fullHeight = buttonSt.height
-		+ rect::m::sum::v(buttonSt.padding);
-	using MiniStars = Ui::Premium::ColoredMiniStars;
-	const auto ministars = button->lifetime().make_state<MiniStars>(
-		ministarsContainer,
-		false);
-	ministars->setColorOverride(stops);
-
-	const auto isPausedValue
-		= button->lifetime().make_state<rpl::variable<bool>>(isPaused());
-	isPausedValue->value() | rpl::on_next([=](bool value) {
-		ministars->setPaused(value);
-	}, ministarsContainer->lifetime());
-
-	ministarsContainer->paintRequest(
-	) | rpl::on_next([=] {
-		(*isPausedValue) = isPaused();
-		auto p = QPainter(ministarsContainer);
-		{
-			constexpr auto kScale = 0.35;
-			const auto r = ministarsContainer->rect();
-			p.translate(r.center());
-			p.scale(kScale, kScale);
-			p.translate(-r.center());
-		}
-		ministars->paint(p);
-	}, ministarsContainer->lifetime());
 
 	const auto badge = Ui::CreateChild<Ui::RpWidget>(button.get());
 
@@ -827,14 +798,9 @@ void AddPremiumStar(
 		badge->moveToLeft(
 			button->st().iconLeft
 				+ (st::menuIconShop.width() - badge->width()) / 2,
-			(s.height() - badge->height()) / 2);
-		ministarsContainer->moveToLeft(
-			badge->x() - (fullHeight - badge->height()) / 2,
-			0);
+			(s.height() - badge->height()) / 2,
+			s.width());
 	}, badge->lifetime());
-
-	ministarsContainer->resize(fullHeight, fullHeight);
-	ministars->setCenter(ministarsContainer->rect());
 }
 
 SectionSearchRow CreateSectionSearchRow(
