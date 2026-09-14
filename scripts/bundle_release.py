@@ -124,22 +124,39 @@ def bundle_update(root: Path, version: VersionInfo) -> None:
     output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    target_file = output_dir / f"rtgdupdate-{version.index}"
     cmd = [
         str(packer),
+        "-target",
+        "win64",
         "-path",
         str(release_dir / "rabbitGram.exe"),
         "-version",
         version.version_num,
-        "-output",
-        str(target_file),
     ]
 
     print(f"Running Packer: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, cwd=output_dir, capture_output=True, text=True)
     if result.returncode != 0:
         sys.exit(f"Packer failed with exit code {result.returncode}:\n{result.stderr}")
-    print(f"OTA update package created: {target_file}")
+
+    # Move any tupdate* / tx64upd* / tarm64upd* files from root/scripts to output_dir
+    possible_dirs = [root, root / "scripts", Path.cwd()]
+    for search_dir in possible_dirs:
+        if not search_dir.exists() or search_dir.resolve() == output_dir.resolve():
+            continue
+        for item in search_dir.iterdir():
+            if item.is_file() and (item.name.startswith("tupdate") or item.name.startswith("tx64upd") or item.name.startswith("tarm64upd")):
+                dest = output_dir / item.name
+                shutil.move(str(item), str(dest))
+                print(f"Moved {item.name} from {search_dir} to {output_dir}")
+
+    tupdate_files = [
+        f for f in output_dir.iterdir()
+        if f.is_file() and (f.name.startswith("tupdate") or f.name.startswith("tx64upd") or f.name.startswith("tarm64upd"))
+    ]
+
+    for tup in tupdate_files:
+        print(f"OTA update package created in releases: {tup}")
 
 
 def bundle_installer(root: Path) -> None:
