@@ -80,6 +80,13 @@ constexpr auto kSeekPreviewInterval = crl::time(100);
 
 using ::Media::ValidFrameSize;
 
+[[nodiscard]] QSize InlineFrameSize(not_null<DocumentData*> document) {
+	const auto video = document->video();
+	return (video && !video->realVideoSize.isEmpty())
+		? video->realVideoSize
+		: document->dimensions;
+}
+
 [[nodiscard]] bool IsHostedInstantViewMedia(not_null<const Element*> parent) {
 	return parent->Get<InstantViewMediaRuntime>() != nullptr;
 }
@@ -283,8 +290,45 @@ Gif::~Gif() {
 	togglePollingStory(false);
 }
 
-bool Gif::CanPlayInline(not_null<DocumentData*> document) {
-	return ValidFrameSize(document->dimensions, kMaxInlineArea);
+DocumentData *Gif::ChooseInlineQuality(
+		not_null<DocumentData*> document,
+		HistoryItem *context,
+		int maxArea,
+		::Media::VideoQuality request) {
+	const auto fits = [&](not_null<DocumentData*> quality) {
+		return ValidFrameSize(InlineFrameSize(quality), maxArea)
+			&& (quality == document
+				|| (quality->useStreamingLoader()
+					&& quality->canBeStreamed()
+					&& !quality->inappPlaybackFailed()));
+	};
+	const auto &list = document->resolveQualities(context);
+	if (list.empty()) {
+		return fits(document) ? document.get() : nullptr;
+	}
+	const auto chosen = document->chooseQuality(context, request);
+	if (fits(chosen)) {
+		return chosen;
+	}
+
+	// The requested rendition does not fit inline: either the settings ask
+	// for the original, which they do as soon as the original file is on
+	// disk, or the closest match by height is itself over the area cap.
+	// Fall back to the largest rendition that does fit, measured by the
+	// same area the cap is expressed in, because resolveVideoQuality()
+	// reports the largest packed height for a self-packed original rather
+	// than the original's own.
+	auto result = (DocumentData*)nullptr;
+	auto resultArea = int64(0);
+	for (const auto &quality : list) {
+		const auto area = int64(quality->dimensions.width())
+			* quality->dimensions.height();
+		if (area > resultArea && fits(quality)) {
+			result = quality;
+			resultArea = area;
+		}
+	}
+	return result;
 }
 
 int Gif::maxInlineArea() const {
@@ -294,7 +338,12 @@ int Gif::maxInlineArea() const {
 }
 
 bool Gif::canPlayInline() const {
-	return ValidFrameSize(_data->dimensions, maxInlineArea());
+	return !_inlineOverCap
+		&& ChooseInlineQuality(
+			_data,
+			_realParent,
+			maxInlineArea(),
+			Core::App().settings().videoQuality()) != nullptr;
 }
 
 QSize Gif::sizeForAspectRatio() const {
@@ -2450,10 +2499,17 @@ void Gif::playAnimation(bool autoplay) {
 }
 
 void Gif::createStreamedPlayer() {
+	if (_inlineOverCap) {
+		return;
+	}
 	const auto quality = _data->initialPlaybackVideoQuality(
 		Core::App().settings().videoQuality());
-	const auto chosen = _data->chooseQuality(_realParent, quality);
-	if (_streamed && _streamed->chosen == chosen) {
+	const auto chosen = ChooseInlineQuality(
+		_data,
+		_realParent,
+		maxInlineArea(),
+		quality);
+	if (!chosen || (_streamed && _streamed->chosen == chosen)) {
 		return;
 	}
 	auto shared = _data->owner().streaming().sharedDocument(
@@ -2574,10 +2630,22 @@ void Gif::repaintStreamedContent() {
 }
 
 void Gif::streamingReady(::Media::Streaming::Information &&info) {
-	if (!ValidFrameSize(info.video.size, maxInlineArea())) {
-		if (!info.video.size.isEmpty()) {
-			_data->dimensions = info.video.size;
-		}
+	Expects(_streamed != nullptr);
+
+	const auto chosen = _streamed->chosen;
+	const auto measured = info.video.realSize;
+	const auto video = measured.isEmpty() ? nullptr : chosen->video();
+	if (video) {
+		video->realVideoSize = measured;
+	}
+	const auto effective = measured.isEmpty()
+		? InlineFrameSize(chosen)
+		: measured;
+	if (!ValidFrameSize(effective, maxInlineArea())) {
+		// A document with no VideoData can't remember the measurement,
+		// so the refusal is remembered on the element instead. Such a
+		// document never has a quality list, so nothing to step down to.
+		_inlineOverCap = !video;
 		stopAnimation();
 	} else {
 		history()->owner().requestViewResize(_parent);

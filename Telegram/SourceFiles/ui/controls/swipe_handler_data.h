@@ -22,6 +22,13 @@ struct SwipeContextData final {
 		return !empty();
 	}
 
+	[[nodiscard]] int visualTranslationFor(int64 bareId) const {
+		if (!translation || (msgBareId != bareId)) {
+			return 0;
+		}
+		return inverted ? translation : -translation;
+	}
+
 	float64 ratio = 0.;
 	float64 reachRatio = 0.;
 	float64 exactTranslation = 0.;
@@ -34,6 +41,7 @@ struct SwipeContextData final {
 	const style::icon *afterIcon = nullptr;
 	const style::icon *farBeforeIcon = nullptr;
 	const style::icon *farAfterIcon = nullptr;
+	bool inverted = false;
 };
 
 struct SwipeHandlerInitData final {

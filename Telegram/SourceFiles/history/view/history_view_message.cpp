@@ -2233,6 +2233,76 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			const auto shift = context.gestureHorizontal.translation;
 			context.reactionInfo->effectOffset += QPoint(shift, 0);
 		}
+
+		constexpr auto kShiftRatio = 1.5;
+		constexpr auto kBouncePart = 0.25;
+		constexpr auto kMaxHeightRatio = 3.5;
+		constexpr auto kStrokeWidth = 2.;
+		constexpr auto kWaveWidth = 10.;
+		const auto isLeftSize = !context.outbg
+			|| (delegate()->elementChatMode() == ElementChatMode::Wide);
+		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
+		const auto reachRatio = context.gestureHorizontal.reachRatio;
+		const auto size = st::historyFastShareSize;
+		const auto outerWidth = st::historySwipeIconSkip
+			+ (isLeftSize ? rect::right(g) : width())
+			+ ((g.height() < size * kMaxHeightRatio)
+				? rightActionSize().value_or(QSize()).width()
+				: 0);
+		const auto shift = std::min(
+			(size * kShiftRatio * context.gestureHorizontal.ratio),
+			-1. * context.gestureHorizontal.translation
+		) + (st::historySwipeIconSkip * ratio * (isLeftSize ? .7 : 1.));
+		const auto rect = QRectF(
+			outerWidth - shift,
+			g.y() + (g.height() - size) / 2,
+			size,
+			size);
+		const auto center = rect::center(rect);
+		const auto spanAngle = ratio * arc::kFullLength;
+		const auto strokeWidth = style::ConvertFloatScale(kStrokeWidth);
+
+		const auto reachScale = std::clamp(
+			(reachRatio > kBouncePart)
+				? (kBouncePart * 2 - reachRatio)
+				: reachRatio,
+			0.,
+			1.);
+		auto pen = Window::Theme::IsNightMode()
+			? QPen(anim::with_alpha(context.st->msgServiceFg()->c, 0.3))
+			: QPen(context.st->msgServiceBg());
+		pen.setWidthF(strokeWidth - (1. * (reachScale / kBouncePart)));
+		const auto arcRect = rect - Margins(strokeWidth);
+		p.save();
+		{
+			auto hq = PainterHighQualityEnabler(p);
+			p.setPen(Qt::NoPen);
+			p.setBrush(context.st->msgServiceBg());
+			p.setOpacity(ratio);
+			p.translate(center);
+			if (reachScale) {
+				p.scale(-(1. + 1. * reachScale), (1. + 1. * reachScale));
+			} else {
+				p.scale(-1., 1.);
+			}
+			p.translate(-center);
+			// All the next draws are mirrored.
+			p.drawEllipse(rect);
+			context.st->historyFastShareIcon().paintInCenter(p, rect);
+			p.setPen(pen);
+			p.setBrush(Qt::NoBrush);
+			p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
+			// p.drawArc(arcRect, arc::kQuarterLength, spanAngle);
+			if (reachRatio) {
+				const auto w = style::ConvertFloatScale(kWaveWidth);
+				p.setOpacity(ratio - reachRatio);
+				p.drawArc(
+					arcRect + Margins(reachRatio * reachRatio * w),
+					arc::kQuarterLength,
+					spanAngle);
+			}
+		}
+		p.restore();
 	}
 	if (selectionTranslation) {
 		p.translate(-selectionTranslation, 0);
@@ -2453,9 +2523,16 @@ void Message::paintFromName(
 	const auto statusWidth = _fromNameStatus
 		? st::dialogsPremiumIcon.icon.width()
 		: 0;
-	const auto nameAvailableWidth = (statusWidth && availableWidth > statusWidth)
-		? (availableWidth - statusWidth)
-		: availableWidth;
+	const auto via = item->Get<HistoryMessageVia>();
+	const auto viaShown = via && !displayForwardedFrom() && via->width;
+	const auto viaSkipWidth = viaShown
+		? (via->width + st::msgServiceFont->spacew)
+		: 0;
+	const auto nameAvailableWidth = std::max(
+		((statusWidth && availableWidth > statusWidth)
+			? (availableWidth - statusWidth)
+			: availableWidth) - viaSkipWidth,
+		0);
 	if (statusWidth && availableWidth > statusWidth) {
 		const auto x = availableLeft
 			+ std::min(nameAvailableWidth, nameText->maxWidth());
@@ -2518,7 +2595,7 @@ void Message::paintFromName(
 		.availableWidth = nameAvailableWidth,
 		.elisionLines = 1,
 	});
-	const auto skipWidth = nameText->maxWidth()
+	const auto skipWidth = nameWidth
 		+ (_fromNameStatus
 			? (st::dialogsPremiumIcon.icon.width()
 				+ st::msgServiceFont->spacew)
@@ -2527,7 +2604,6 @@ void Message::paintFromName(
 	availableLeft += skipWidth;
 	availableWidth -= skipWidth;
 
-	auto via = item->Get<HistoryMessageVia>();
 	if (via && !displayForwardedFrom() && availableWidth > 0) {
 		p.setPen(stm->msgServiceFg);
 		paintLinkRipple(
@@ -3238,7 +3314,9 @@ PointState Message::pointState(QPoint point) const {
 }
 
 bool Message::displayFromPhoto() const {
-	return hasFromPhoto() && !isAttachedToNext();
+	return hasFromPhoto()
+		&& !isAttachedToNext()
+		&& !data()->isSponsored();
 }
 
 void Message::clickHandlerPressedChanged(
@@ -3771,9 +3849,7 @@ bool Message::hasFromPhoto() const {
 	case Context::SavedSublist:
 	case Context::ScheduledTopic: {
 		const auto item = data();
-		if (item->isSponsored()) {
-			return false;
-		} else if (item->isPostHidingAuthor()) {
+		if (item->isPostHidingAuthor()) {
 			return false;
 		} else if (item->isPost()) {
 			return true;
@@ -4159,11 +4235,23 @@ bool Message::getStateFromName(
 		const auto statusWidth = (from && _fromNameStatus)
 			? st::dialogsPremiumIcon.icon.width()
 			: 0;
+		const auto via = item->Get<HistoryMessageVia>();
+		const auto viaShown = via && !displayForwardedFrom() && via->width;
+		const auto viaSkipWidth = viaShown
+			? (via->width + st::msgServiceFont->spacew)
+			: 0;
+		const auto nameAvailableWidth = std::max(
+			((statusWidth && availableWidth > statusWidth)
+				? (availableWidth - statusWidth)
+				: availableWidth) - viaSkipWidth,
+			0);
+		const auto nameWidth = std::min(
+			nameText->maxWidth(),
+			nameAvailableWidth);
 		if (statusWidth && availableWidth > statusWidth) {
-			const auto x = availableLeft + std::min(
-				availableWidth - statusWidth,
-				nameText->maxWidth()
-			) - (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
+			const auto x = availableLeft
+				+ nameWidth
+				- (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
 			const auto checkWidth = _fromNameStatus->custom
 				? (st::emojiSize - 2 * _fromNameStatus->skip)
 				: statusWidth;
@@ -4175,14 +4263,14 @@ bool Message::getStateFromName(
 		}
 		if (point.x() >= availableLeft
 			&& point.x() < availableLeft + availableWidth
-			&& point.x() < availableLeft + nameText->maxWidth()) {
+			&& point.x() < availableLeft + nameWidth) {
 			outResult->link = fromLink();
 			recordLinkRipplePoint(point, trect.topLeft());
 			_fromLinkRipplePointSet = 1;
 			return true;
 		}
 
-		const auto skipWidth = nameText->maxWidth()
+		const auto skipWidth = nameWidth
 			+ (_fromNameStatus
 				? (st::dialogsPremiumIcon.icon.width()
 					+ st::msgServiceFont->spacew)
@@ -4191,7 +4279,6 @@ bool Message::getStateFromName(
 		availableLeft += skipWidth;
 		availableWidth -= skipWidth;
 
-		auto via = item->Get<HistoryMessageVia>();
 		if (via
 			&& !displayForwardedFrom()
 			&& point.x() >= availableLeft
@@ -6258,29 +6345,24 @@ void Message::fromNameUpdated(int width) const {
 	}
 	const auto from = displayFrom();
 	validateFromNameText(from);
-	if (const auto via = item->Get<HistoryMessageVia>()) {
-		if (!displayForwardedFrom()) {
-			const auto nameText = [&]() -> const Ui::Text::String * {
-				if (from) {
-					return &_fromName;
-				} else if (const auto info = item->originalHiddenSenderInfo()) {
-					return &info->nameText();
-				} else {
-					Unexpected("Corrupted forwarded information in message.");
-				}
-			}();
-			via->resize(width
-				- st::msgPadding.left()
-				- st::msgPadding.right()
-				- nameText->maxWidth()
-				- (_fromNameStatus
-					? (st::dialogsPremiumIcon.icon.width()
-						+ st::msgServiceFont->spacew)
-					: 0)
-				- st::msgServiceFont->spacew);
-		}
+	const auto via = item->Get<HistoryMessageVia>();
+	const auto guestChat = item->Get<HistoryMessageGuestChat>();
+	if (!via && !guestChat) {
+		return;
 	}
-	if (const auto guestChat = item->Get<HistoryMessageGuestChat>()) {
+	const auto available = width
+		- st::msgPadding.left()
+		- st::msgPadding.right()
+		- (_fromNameStatus
+			? (st::dialogsPremiumIcon.icon.width()
+				+ st::msgServiceFont->spacew)
+			: 0);
+	auto viaWidth = 0;
+	if (via && !displayForwardedFrom()) {
+		via->resize(available - st::msgServiceFont->spacew);
+		viaWidth = st::msgServiceFont->spacew + via->width;
+	}
+	if (guestChat) {
 		const auto nameText = [&]() -> const Ui::Text::String * {
 			if (from) {
 				return &_fromName;
@@ -6290,22 +6372,13 @@ void Message::fromNameUpdated(int width) const {
 				Unexpected("Corrupted forwarded information in message.");
 			}
 		}();
-		auto viaWidth = 0;
-		if (const auto via = item->Get<HistoryMessageVia>()) {
-			if (!displayForwardedFrom()) {
-				viaWidth = st::msgServiceFont->spacew + via->width;
-			}
-		}
-		guestChat->resize(width
-			- st::msgPadding.left()
-			- st::msgPadding.right()
-			- nameText->maxWidth()
-			- (_fromNameStatus
-				? (st::dialogsPremiumIcon.icon.width()
-					+ st::msgServiceFont->spacew)
-				: 0)
-			- st::msgServiceFont->spacew
-			- viaWidth);
+		const auto nameWidth = std::min(
+			nameText->maxWidth(),
+			std::max(available - viaWidth, 0));
+		guestChat->resize(available
+			- viaWidth
+			- nameWidth
+			- st::msgServiceFont->spacew);
 	}
 }
 

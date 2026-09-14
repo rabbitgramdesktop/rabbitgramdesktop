@@ -15,7 +15,7 @@ The build system expects this directory layout:
 
 ```text
 L:\source\                    # BuildPath
-L:\source\rabbitgramdesktop\           # Repository (you work here)
+L:\source\rabbitgramdesktop\  # Repository (you work here)
 L:\source\Libraries\          # 32-bit dependencies (Linux/macOS)
 L:\source\win64\Libraries\    # 64-bit dependencies (Windows)
 L:\source\ThirdParty\         # Build tools (NuGet, Python, etc.)
