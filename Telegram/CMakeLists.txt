@@ -1831,6 +1831,8 @@ PRIVATE
     rabbit/ui/settings/previews.h
     rabbit/ui/rabbit_assets.cpp
     rabbit/ui/rabbit_assets.h
+    rabbit/utils/chat_utils.cpp
+    rabbit/utils/chat_utils.h
     rabbit/utils/windows_utils.cpp
     rabbit/utils/windows_utils.h
     settings/business/settings_away_message.cpp

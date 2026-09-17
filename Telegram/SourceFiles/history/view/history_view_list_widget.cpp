@@ -10,6 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_inner_widget.h"
 #include "boxes/translate_box.h"
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/utils/chat_utils.h"
 #include "base/unixtime.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/qt/qt_common_adapters.h"
@@ -6997,46 +6998,6 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 	Ui::RpWidget::wheelEvent(e);
 }
 
-bool ListWidget::isSwipeActionAllowed(
-		RabbitSettings::SwipeAction action,
-		not_null<HistoryItem*> item,
-		Element *view) const {
-	const auto hasCopyRestr = hasCopyRestriction(item);
-
-	switch (action) {
-	case RabbitSettings::SwipeAction::Disable:
-		return false;
-	case RabbitSettings::SwipeAction::Reply:
-		return CanSendReply(item);
-	case RabbitSettings::SwipeAction::Reaction:
-		return !item->isService() && ranges::contains(
-			Data::LookupPossibleReactions(item).recent,
-			session().data().reactions().favoriteId(),
-			&Data::Reaction::id);
-	case RabbitSettings::SwipeAction::Copy:
-		if (!hasCopyRestr && (!item->originalText().text.isEmpty() || (view && view->hasVisibleText()))) {
-			return true;
-		}
-		if (!hasCopyMediaRestriction(item) && item->media() != nullptr) {
-			return true;
-		}
-		return false;
-	case RabbitSettings::SwipeAction::Forward:
-		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::SwipeAction::Edit:
-		return item->allowsEdit(crl::now());
-	case RabbitSettings::SwipeAction::Save:
-		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::SwipeAction::Repeat:
-		return !hasCopyRestr && item->allowsForward();
-	case RabbitSettings::SwipeAction::Delete:
-		return item->canDelete();
-	case RabbitSettings::SwipeAction::Translate:
-		return !item->originalText().text.isEmpty() && Core::App().settings().translateButtonEnabled();
-	}
-	return false;
-}
-
 std::vector<RabbitSettings::SwipeAction> ListWidget::availableSwipeActions(
 		not_null<HistoryItem*> item,
 		Element *view) const {
@@ -7044,7 +7005,12 @@ std::vector<RabbitSettings::SwipeAction> ListWidget::availableSwipeActions(
 	auto result = std::vector<RabbitSettings::SwipeAction>();
 
 	for (const auto action : configured) {
-		if (isSwipeActionAllowed(action, item, view)) {
+		if (RabbitUtils::Chats::isSwipeActionAllowed(
+				action,
+				item,
+				view,
+				hasCopyRestriction(item),
+				hasCopyMediaRestriction(item))) {
 			result.push_back(action);
 		}
 	}

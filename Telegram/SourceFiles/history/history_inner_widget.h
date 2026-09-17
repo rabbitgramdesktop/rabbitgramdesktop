@@ -713,10 +713,6 @@ private:
 	[[nodiscard]] std::vector<RabbitSettings::SwipeAction> availableSwipeActions(
 		not_null<HistoryItem*> item,
 		Element *view) const;
-	[[nodiscard]] bool isSwipeActionAllowed(
-		RabbitSettings::SwipeAction action,
-		not_null<HistoryItem*> item,
-		Element *view) const;
 	void executeSwipeAction(
 		RabbitSettings::SwipeAction action,
 		not_null<HistoryItem*> item,
