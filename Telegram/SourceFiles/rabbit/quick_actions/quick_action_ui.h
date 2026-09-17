@@ -10,7 +10,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <rpl/producer.h>
 
 #include "rabbit/lang/rabbit_lang.h"
-#include "rabbit/settings/quick_action.h"
+#include "quick_action.h"
 #include "settings/settings_common.h"
 #include "styles/style_menu_icons.h"
 

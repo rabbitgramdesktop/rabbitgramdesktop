@@ -13,7 +13,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <vector>
-#include "rabbit/settings/quick_action.h"
+#include "rabbit/quick_actions/quick_action.h"
 #include "rabbit/swipe_actions/swipe_action.h"
 
 class PeerData;

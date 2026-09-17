@@ -8,8 +8,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/history_inner_widget.h"
 
 #include "rabbit/settings/rabbit_settings.h"
-#include "rabbit/settings/quick_action.h"
-#include "rabbit/settings/quick_action_ui.h"
+#include "rabbit/quick_actions/quick_action.h"
+#include "rabbit/quick_actions/quick_action_ui.h"
 #include "rabbit/swipe_actions/swipe_action.h"
 #include "rabbit/swipe_actions/swipe_action_ui.h"
 

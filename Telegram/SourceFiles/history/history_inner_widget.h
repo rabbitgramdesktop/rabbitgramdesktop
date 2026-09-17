@@ -24,7 +24,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
-#include "rabbit/settings/quick_action.h"
+#include "rabbit/quick_actions/quick_action.h"
 
 #include <vector>
 #include <QtGui/QPainterPath>

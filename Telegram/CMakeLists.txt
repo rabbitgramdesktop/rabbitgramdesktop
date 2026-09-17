@@ -1801,11 +1801,12 @@ PRIVATE
     rabbit/math_evaluator/math_autocomplete.h
     rabbit/math_evaluator/math_evaluator.cpp
     rabbit/math_evaluator/math_evaluator.h
-    rabbit/settings/quick_action.h
+    rabbit/quick_actions/quick_action.h
+    rabbit/quick_actions/quick_action_box.cpp
+    rabbit/quick_actions/quick_action_box.h
+    rabbit/quick_actions/quick_action_ui.h
     rabbit/settings/rabbit_settings.cpp
     rabbit/settings/rabbit_settings.h
-    rabbit/settings_menu/boxes/quick_action_box.cpp
-    rabbit/settings_menu/boxes/quick_action_box.h
     rabbit/settings_menu/sections/rabbit_appearance.cpp
     rabbit/settings_menu/sections/rabbit_appearance.h
     rabbit/settings_menu/sections/rabbit_chats.cpp

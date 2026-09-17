@@ -7,8 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/ui/settings/previews.h"
 
-#include "rabbit/settings/quick_action.h"
-#include "rabbit/settings/quick_action_ui.h"
+#include "rabbit/quick_actions/quick_action.h"
+#include "rabbit/quick_actions/quick_action_ui.h"
 #include "rabbit/settings/rabbit_settings.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"

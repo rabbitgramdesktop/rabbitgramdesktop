@@ -5,9 +5,9 @@ the unofficial app based on Telegram Desktop.
 For license and copyright information please follow this link:
 https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
-#include "rabbit/settings_menu/boxes/quick_action_box.h"
+#include "rabbit/quick_actions/quick_action_box.h"
 
-#include "rabbit/settings/quick_action_ui.h"
+#include "quick_action_ui.h"
 #include "rabbit/settings/rabbit_settings.h"
 #include "settings/settings_common.h"
 #include "ui/vertical_list.h"
