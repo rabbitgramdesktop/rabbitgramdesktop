@@ -379,12 +379,6 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 				constexpr auto kPremiumLockedOpacity = 0.6;
 				p.setOpacity(kPremiumLockedOpacity);
 			}
-			const auto icon = sectionIcon(index);
-			const auto iconExtra = iconExtraWidth(icon);
-			const auto labelWidth = (_tabsMode
-				== ChatsFiltersTabsMode::IconsOnly)
-				? 0
-				: section.label.maxWidth();
 			p.setPen(anim::pen(_st.labelFg, _st.labelFgActive, active));
 			auto textLeft = labelLeft;
 			if (RabbitSettings::foldersShowIcon() && index < _icons.size()) {
