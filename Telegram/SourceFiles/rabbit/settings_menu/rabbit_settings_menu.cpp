@@ -7,6 +7,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
 
+#include <QtCore/QTemporaryFile>
+#include <memory>
+
 #include "api/api_common.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
@@ -165,16 +168,17 @@ void Rabbit::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		ktr(u"rtg_share_settings_to_chat"_q),
 		[=] {
 			const auto data = RabbitSettings::JsonSettings::ExportSettingsJson();
-			const auto tempPath = QDir::temp().filePath(u"settings.rtgconfig"_q);
-			auto f = QFile(tempPath);
-			if (!f.open(QIODevice::WriteOnly)) {
+			auto tempFile = std::make_shared<QTemporaryFile>(
+				QDir::tempPath() + u"/settings_XXXXXX.rtgconfig"_q);
+			if (!tempFile->open()) {
 				return;
 			}
-			f.write(data);
-			f.close();
+			tempFile->write(data);
+			tempFile->flush();
 
+			const auto tempPath = tempFile->fileName();
 			const auto ctrl = controller();
-			auto chosen = [=](not_null<Data::Thread *> thread) mutable -> bool {
+			auto chosen = [ctrl, tempPath, tempFile](not_null<Data::Thread *> thread) mutable -> bool {
 				auto list = Storage::PrepareMediaList(
 					QStringList{ tempPath },
 					st::sendMediaPreviewSize,
@@ -200,7 +204,7 @@ void Rabbit::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			const auto data = RabbitSettings::JsonSettings::ExportSettingsJson();
 			FileDialog::GetWritePath(
 				Core::App().getFileDialogParent(),
-				u"Export RabbitGram Settings"_q,
+				u"Export rabbitGram Settings"_q,
 				u"RTG Config (*.rtgconfig)"_q,
 				u"settings.rtgconfig"_q,
 				[=](QString &&path) {
