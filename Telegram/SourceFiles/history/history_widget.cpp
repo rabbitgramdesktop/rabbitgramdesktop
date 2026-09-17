@@ -1908,8 +1908,8 @@ void HistoryWidget::scrollToAnimationCallback(
 	if (itemTop < 0) {
 		_scrollToAnimation.stop();
 	} else {
-		synteticScrollToY(qRound(_scrollToAnimation.value(relativeTo))
-			+ itemTop);
+		const auto value = _scrollToAnimation.value(relativeTo);
+		synteticScrollToY(int(base::SafeRound(value)) + itemTop);
 	}
 	if (!_scrollToAnimation.animating()) {
 		preloadHistoryByScroll();
@@ -7091,7 +7091,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 		_kbShown = true;
 
 		const auto maxheight = computeMaxFieldHeight();
-		const auto kbheight = qMin(
+		const auto kbheight = std::min(
 			_keyboard->height(),
 			maxheight - (maxheight / 2));
 		_field->setMaxHeight(maxheight - kbheight);
@@ -7438,7 +7438,7 @@ void HistoryWidget::moveFieldControls() {
 	auto maxKeyboardHeight = computeMaxFieldHeight() - fieldHeight();
 	_keyboard->resizeToWidth(width(), maxKeyboardHeight);
 	if (_kbShown) {
-		keyboardHeight = qMin(_keyboard->height(), maxKeyboardHeight);
+		keyboardHeight = std::min(_keyboard->height(), maxKeyboardHeight);
 		bottom -= keyboardHeight;
 		_kbScroll->setGeometryToLeft(0, bottom, width(), keyboardHeight);
 	}
@@ -8846,7 +8846,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 			}
 			const auto maxheight = computeMaxFieldHeight();
 			const auto kbheight = hasMarkup
-				? qMin(_keyboard->height(), maxheight - (maxheight / 2))
+				? std::min(_keyboard->height(), maxheight - (maxheight / 2))
 				: 0;
 			_field->setMaxHeight(maxheight - kbheight);
 			_kbShown = hasMarkup;
@@ -11391,7 +11391,7 @@ void HistoryWidget::paintEditHeader(
 	if (editTimeLeft < 2) {
 		editTimeLeftText = u"0:00"_q;
 	} else if (editTimeLeft > kDisplayEditTimeWarningMs) {
-		updateIn = static_cast<int>(qMin(
+		updateIn = static_cast<int>(std::min(
 			editTimeLeft - kDisplayEditTimeWarningMs,
 			qint64(kFullDayInMs)));
 	} else {

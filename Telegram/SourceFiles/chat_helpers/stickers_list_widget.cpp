@@ -417,15 +417,10 @@ void StickersListWidget::checkVisibleFeatured(
 	}
 
 	const auto rowHeight = featuredRowHeight();
-	const auto destroyAbove = floorclamp(
+	const auto [destroyAbove, destroyBelow] = Ui::RowsInRange(
 		visibleTop - visibleHeight,
-		rowHeight,
-		0,
-		_officialSets.size());
-	const auto destroyBelow = ceilclamp(
 		visibleBottom + visibleHeight,
 		rowHeight,
-		0,
 		_officialSets.size());
 	for (auto i = 0; i != destroyAbove; ++i) {
 		clearHeavyIn(_officialSets[i]);
@@ -473,15 +468,10 @@ void StickersListWidget::readVisibleFeatured(
 		int visibleTop,
 		int visibleBottom) {
 	const auto rowHeight = featuredRowHeight();
-	const auto rowFrom = floorclamp(
+	const auto [rowFrom, rowTo] = Ui::RowsInRange(
 		visibleTop,
-		rowHeight,
-		0,
-		_featuredSetsCount);
-	const auto rowTo = ceilclamp(
 		visibleBottom,
 		rowHeight,
-		0,
 		_featuredSetsCount);
 	for (auto i = rowFrom; i < rowTo; ++i) {
 		const auto &set = _officialSets[i];
@@ -492,7 +482,7 @@ void StickersListWidget::readVisibleFeatured(
 			|| (i + 1) * rowHeight > visibleBottom) {
 			continue;
 		}
-		int count = qMin(int(set.stickers.size()), _columnCount);
+		int count = std::min(int(set.stickers.size()), _columnCount);
 		int loaded = 0;
 		for (int j = 0; j < count; ++j) {
 			if (!set.stickers[j].document->hasThumbnail()
@@ -619,12 +609,14 @@ int StickersListWidget::countDesiredHeight(int newWidth) {
 		}
 		const auto info = sectionInfo(sets.size() - 1);
 		return info.top
-			+ qMax(info.rowsBottom - info.top, minimalLastHeight);
+			+ std::max(info.rowsBottom - info.top, minimalLastHeight);
 	};
 	const auto minimalLastHeight = (_section == Section::Stickers)
 		? minimalHeight
 		: 0;
-	const auto result = qMax(minimalHeight, countResult(minimalLastHeight));
+	const auto result = std::max(
+		minimalHeight,
+		countResult(minimalLastHeight));
 	return result ? (result + st::stickerPanPadding) : 0;
 }
 
@@ -1614,18 +1606,13 @@ void StickersListWidget::paintSearchShortcutIcon(
 }
 
 void StickersListWidget::paintStickers(Painter &p, QRect clip) {
-	auto fromColumn = floorclamp(
+	auto [fromColumn, toColumn] = Ui::RowsInRange(
 		clip.x() - stickersLeft(),
-		_singleSize.width(),
-		0,
-		_columnCount);
-	auto toColumn = ceilclamp(
 		clip.x() + clip.width() - stickersLeft(),
 		_singleSize.width(),
-		0,
 		_columnCount);
 	if (rtl()) {
-		qSwap(fromColumn, toColumn);
+		std::swap(fromColumn, toColumn);
 		fromColumn = _columnCount - fromColumn;
 		toColumn = _columnCount - toColumn;
 	}
@@ -1891,15 +1878,10 @@ void StickersListWidget::paintStickers(Painter &p, QRect clip) {
 			paintMegagroupEmptySet(p, info.rowsTop, buttonSelected);
 			return true;
 		}
-		const auto fromRow = floorclamp(
+		const auto [fromRow, toRow] = Ui::RowsInRange(
 			clip.y() - info.rowsTop,
-			_singleSize.height(),
-			0,
-			info.rowsCount);
-		const auto toRow = ceilclamp(
 			clip.y() + clip.height() - info.rowsTop,
 			_singleSize.height(),
-			0,
 			info.rowsCount);
 		for (auto i = fromRow; i < toRow; ++i) {
 			for (auto j = fromColumn; j < toColumn; ++j) {
@@ -3699,8 +3681,10 @@ void StickersListWidget::updateSelected() {
 					newSelected = OverGroupAdd{};
 				}
 			} else {
-				const auto rowIndex = qFloor(yOffset / _singleSize.height());
-				const auto columnIndex = qFloor(sx / _singleSize.width());
+				const auto rowIndex
+					= int(std::floor(yOffset / _singleSize.height()));
+				const auto columnIndex
+					= int(std::floor(sx / _singleSize.width()));
 				const auto index = rowIndex * _columnCount + columnIndex;
 				if (index >= 0 && index < set.stickers.size()) {
 					auto overDelete = false;
