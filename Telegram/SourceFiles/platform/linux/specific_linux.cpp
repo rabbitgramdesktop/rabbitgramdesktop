@@ -333,6 +333,19 @@ bool GenerateDesktopFile(
 		target.remove_key("Desktop Entry", "DBusActivatable");
 	}
 
+	target.set_string(
+		"Desktop Entry",
+		"Name",
+		"rabbitGram");
+	target.set_string(
+		"Desktop Entry",
+		"Icon",
+		ApplicationIconName().toStdString());
+	target.set_string(
+		"Desktop Entry",
+		"StartupWMClass",
+		ApplicationIconName().toStdString());
+
 	const auto saved = target.save_to_file(targetFile.toStdString());
 	if (!saved) {
 		if (!silent) {
@@ -350,118 +363,22 @@ bool GenerateDesktopFile(
 
 	if (!Core::UpdaterDisabled()) {
 		DEBUG_LOG(("App Info: removing old .desktop files"));
-		QFile::remove(u"%1telegram.desktop"_q.arg(targetPath));
-		QFile::remove(u"%1telegramdesktop.desktop"_q.arg(targetPath));
-
-		const auto appimagePath = u"file://%1%2"_q.arg(
-			cExeDir(),
-			cExeName()).toUtf8();
-
-		char md5Hash[33] = { 0 };
-		hashMd5Hex(
-			appimagePath.constData(),
-			appimagePath.size(),
-			md5Hash);
-
-		QFile::remove(u"%1appimagekit_%2-%3.desktop"_q.arg(
-			targetPath,
-			md5Hash,
-			AppName.utf16().replace(' ', '_')));
-
-		const auto d = QFile::encodeName(QDir(cWorkingDir()).absolutePath());
-		hashMd5Hex(d.constData(), d.size(), md5Hash);
-
-		if (!Core::Launcher::Instance().customWorkingDir()) {
-			QFile::remove(u"%1org.telegram.desktop._%2.desktop"_q.arg(
-				targetPath,
-				md5Hash));
-
-			const auto exePath = QFile::encodeName(
-				cExeDir() + cExeName());
-			hashMd5Hex(exePath.constData(), exePath.size(), md5Hash);
+		const auto dir = QDir(targetPath);
+		for (const auto &file : dir.entryList({ u"rabbitGram._*.desktop"_q })) {
+			QFile::remove(targetPath + file);
 		}
-
-		QFile::remove(u"%1org.telegram.desktop.%2.desktop"_q.arg(
-			targetPath,
-			md5Hash));
 	}
 
 	return true;
 }
 
-bool GenerateServiceFile(bool silent = false) {
-	const auto executable = ExecutablePathForShortcuts();
-	if (executable.isEmpty()) {
-		return false;
-	}
-
+void CleanupOldServiceFiles() {
 	const auto targetPath = QStandardPaths::writableLocation(
 		QStandardPaths::GenericDataLocation) + u"/dbus-1/services/"_q;
-
-	const auto targetFile = targetPath
-		+ QGuiApplication::desktopFileName()
-		+ u".service"_q;
-
-	DEBUG_LOG(("App Info: placing D-Bus service file to %1").arg(targetPath));
-	if (!QDir(targetPath).exists()) QDir().mkpath(targetPath);
-
-	auto target = GLib::KeyFile::new_();
-	constexpr auto group = "D-BUS Service";
-
-	target.set_string(
-		group,
-		"Name",
-		QGuiApplication::desktopFileName().toStdString());
-
-	QStringList exec;
-	exec.append(executable);
-	if (Core::Launcher::Instance().customWorkingDir()) {
-		exec.append(u"-workdir"_q);
-		exec.append(cWorkingDir());
+	const auto dir = QDir(targetPath);
+	for (const auto &file : dir.entryList({ u"rabbitGram*.service"_q })) {
+		QFile::remove(targetPath + file);
 	}
-	target.set_string(
-		group,
-		"Exec",
-		KShell::joinArgs(exec).toStdString());
-
-	const auto saved = target.save_to_file(targetFile.toStdString());
-	if (!saved) {
-		if (!silent) {
-			LOG(("App Error: %1").arg(saved.error().message_().c_str()));
-		}
-		return false;
-	}
-
-	if (!Core::UpdaterDisabled()
-			&& !Core::Launcher::Instance().customWorkingDir()) {
-		DEBUG_LOG(("App Info: removing old D-Bus service files"));
-
-		char md5Hash[33] = { 0 };
-		const auto d = QFile::encodeName(QDir(cWorkingDir()).absolutePath());
-		hashMd5Hex(d.constData(), d.size(), md5Hash);
-
-		QFile::remove(u"%1org.telegram.desktop._%2.service"_q.arg(
-			targetPath,
-			md5Hash));
-	}
-
-	XdgDBus::DBusProxy::new_for_bus(
-		Gio::BusType::SESSION_,
-		Gio::DBusProxyFlags::NONE_,
-		base::Platform::DBus::kService,
-		base::Platform::DBus::kObjectPath,
-		[=](GObject::Object, Gio::AsyncResult res) {
-			auto interface = XdgDBus::DBus(
-				XdgDBus::DBusProxy::new_for_bus_finish(res, nullptr));
-
-			if (!interface) {
-				return;
-			}
-
-			interface.call_reload_config(nullptr);
-		});
-
-	return true;
 }
 
 void InstallLauncher() {
@@ -480,7 +397,7 @@ void InstallLauncher() {
 		QStandardPaths::ApplicationsLocation) + '/';
 
 	GenerateDesktopFile(applicationsPath);
-	GenerateServiceFile();
+	CleanupOldServiceFiles();
 
 	const auto icons = QStandardPaths::writableLocation(
 		QStandardPaths::GenericDataLocation) + u"/icons/"_q;
@@ -490,7 +407,6 @@ void InstallLauncher() {
 
 	const auto icon = appIcons + ApplicationIconName() + u".png"_q;
 	QFile::remove(icon);
-	QFile::remove(icons + u"telegram.png"_q);
 	if (QFile::copy(u":/gui/art/logo_256.png"_q, icon)) {
 		DEBUG_LOG(("App Info: Icon copied to '%1'").arg(icon));
 	}
@@ -505,13 +421,15 @@ void InstallLauncher() {
 	};
 
 	for (const auto &icon : monochromeIcons) {
+		const auto destFile = symbolicIcons
+			+ ApplicationIconName()
+			+ (!icon.isEmpty() ? u"-"_q + icon : QString())
+			+ u"-symbolic.svg"_q;
+		QFile::remove(destFile);
 		QFile::copy(
 			u":/gui/icons/tray/monochrome%1.svg"_q.arg(
 				!icon.isEmpty() ? u"_"_q + icon : QString()),
-			symbolicIcons
-				+ ApplicationIconName()
-				+ (!icon.isEmpty() ? u"-"_q + icon : QString())
-				+ u"-symbolic.svg"_q);
+			destFile);
 	}
 
 	QProcess::execute("update-desktop-database", {
@@ -737,12 +655,7 @@ void start() {
 				+ cExeName();
 		}
 
-		if (!Core::UpdaterDisabled()) {
-			return u"org.telegram.desktop._%1"_q.arg(
-				Core::Launcher::Instance().instanceHash().constData());
-		}
-
-		return u"org.telegram.desktop"_q;
+		return u"rabbitGram"_q;
 	}());
 
 	LOG(("App ID: %1").arg(QGuiApplication::desktopFileName()));
