@@ -1,22 +1,21 @@
 [Desktop Entry]
-Name=Telegram
-Comment=New era of messaging
-TryExec=Telegram
-Exec=Telegram -- %U
-Icon=org.telegram.desktop
+Name=rabbitGram
+Comment=rabbitGram Desktop Messaging Client
+TryExec=rabbitGram
+Exec=rabbitGram -- %U
+Icon=rabbitGram
 Terminal=false
-StartupWMClass=TelegramDesktop
+StartupWMClass=rabbitGram
 Type=Application
 Categories=Chat;Network;InstantMessaging;Qt;
 MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
-Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;rabbitgram;rabbitGram;
 Actions=quit;
-DBusActivatable=true
 SingleMainWindow=true
 X-GNOME-UsesNotifications=true
 X-GNOME-SingleWindow=true
 
 [Desktop Action quit]
-Exec=Telegram -quit
-Name=Quit Telegram
+Exec=rabbitGram -quit
+Name=Quit rabbitGram
 Icon=application-exit
