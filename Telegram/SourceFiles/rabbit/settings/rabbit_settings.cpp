@@ -127,11 +127,11 @@ CheckHandler IntLimit(int min, int max, int defaultValue) {
 	};
 }
 
-CheckHandler IntLimit(int min, int max) {
+[[maybe_unused]] CheckHandler IntLimit(int min, int max) {
 	return IntLimit(min, max, min);
 }
 
-CheckHandler IntLimitMin(int min) {
+[[maybe_unused]] CheckHandler IntLimitMin(int min) {
 	return [=](QVariant value) -> QVariant {
 		if (!value.canConvert<int>()) {
 			return min;
@@ -141,7 +141,7 @@ CheckHandler IntLimitMin(int min) {
 	};
 }
 
-CheckHandler ScalesLimit() {
+[[maybe_unused]] CheckHandler ScalesLimit() {
 	return [=](const QVariant &value) -> QVariant {
 		auto newArrayValue = QJsonArray();
 		if (value.canConvert<QJsonArray>()) {
@@ -1127,24 +1127,6 @@ bool ImportSettingsFromJson(const QByteArray &json) {
 	if (settings.isEmpty()) {
 		return false;
 	}
-
-	const auto getObjectValue = [&settings](
-		QStringList &keyParts,
-		const Definition &def) -> QJsonValue {
-		const auto firstKey = keyParts.takeFirst();
-		if (!settings.contains(firstKey)) {
-			return QJsonValue();
-		}
-		auto resultRef = settings.value(firstKey);
-		for (const auto &key : keyParts) {
-			auto referenced = resultRef.toObject();
-			if (!referenced.contains(key)) {
-				return QJsonValue();
-			}
-			resultRef = referenced.value(key);
-		}
-		return resultRef;
-	};
 
 	for (const auto &[key, def] : DefinitionMap) {
 		if (def.storage == None) {

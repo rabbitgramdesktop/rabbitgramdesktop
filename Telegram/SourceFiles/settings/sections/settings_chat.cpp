@@ -1590,7 +1590,6 @@ void SetupMessages(
 	Ui::AddSkip(container, st::settingsSendTypeSkip);
 
 	using SendByType = Ui::InputSubmitSettings;
-	using Quick = HistoryView::DoubleClickQuickAction;
 
 	const auto skip = st::settingsSendTypeSkip;
 	auto wrap = object_ptr<Ui::VerticalLayout>(container);

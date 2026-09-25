@@ -225,7 +225,7 @@ private:
 
 class MtpChecker : public Checker {
 public:
-	MtpChecker(base::weak_ptr<Main::Session> session, bool testing);
+	[[maybe_unused]] MtpChecker(base::weak_ptr<Main::Session> session, bool testing);
 
 	void start() override;
 
@@ -305,7 +305,7 @@ std::shared_ptr<Updater> GetUpdaterInstance() {
 	return result;
 }
 
-[[nodiscard]] base::weak_ptr<Main::Session> LookupCanaryPrivateSession(
+[[maybe_unused]] [[nodiscard]] base::weak_ptr<Main::Session> LookupCanaryPrivateSession(
 		base::weak_ptr<Main::Session> fallback) {
 	if (BuildUpdateChannel != Updates::Channel::CanaryPrivate
 		|| !CanaryPrivateChannelId
@@ -1259,7 +1259,7 @@ void HttpLoaderActor::partFailed(QNetworkReply::NetworkError e) {
 	_parent->threadSafeFailed();
 }
 
-MtpChecker::MtpChecker(
+[[maybe_unused]] MtpChecker::MtpChecker(
 	base::weak_ptr<Main::Session> session,
 	bool testing)
 : Checker(testing)

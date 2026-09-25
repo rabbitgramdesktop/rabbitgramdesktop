@@ -34,11 +34,11 @@ Data::StatisticalChart StatisticalChartFromJSON(const QByteArray &json) {
 	}
 
 	const auto hiddenLinesRaw = root.value(u"hidden"_q).toArray();
-	const auto hiddenLines = ranges::views::all(
-		hiddenLinesRaw
-	) | ranges::views::transform([](const auto &q) {
-		return q.toString();
-	}) | ranges::to_vector;
+	auto hiddenLines = std::vector<QString>();
+	hiddenLines.reserve(hiddenLinesRaw.size());
+	for (const auto &q : hiddenLinesRaw) {
+		hiddenLines.push_back(q.toString());
+	}
 
 	auto result = Data::StatisticalChart();
 

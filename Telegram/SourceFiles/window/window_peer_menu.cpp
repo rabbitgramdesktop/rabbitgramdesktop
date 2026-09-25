@@ -319,15 +319,6 @@ Fn<void()> GoToFirstMessageHandler(
 	};
 }
 
-Fn<void()> GoToFirstMessageHandler(
-	not_null<Window::SessionController*> controller,
-	not_null<PeerData*> peer)
-{
-	return GoToFirstMessageHandler(
-		controller,
-		Dialogs::Key(peer->owner().history(peer->id)));
-}	
-
 class Filler {
 public:
 	Filler(

@@ -57,6 +57,14 @@ include(cmake/target_prepare_qrc.cmake)
 include(cmake/options.cmake)
 include(cmake/external/qt/package.cmake)
 
+if (LINUX)
+    target_compile_options_if_exists(common_options
+    INTERFACE
+        -Wno-uninitialized
+        -Wno-dangling-pointer
+    )
+endif()
+
 set(desktop_app_skip_libs
     glibmm
     variant

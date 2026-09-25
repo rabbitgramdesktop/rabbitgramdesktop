@@ -40,34 +40,6 @@ namespace {
 
 using namespace Builder;
 
-void AddJsonToggle(
-	SectionBuilder &builder,
-	QString id,
-	const QString &titleKey,
-	const QString &optionKey,
-	QStringList keywords = {}) {
-	const auto current = RabbitSettings::JsonSettings::GetBool(optionKey);
-	const auto controlId = id;
-	if (const auto button = builder.addButton({
-		.id = std::move(id),
-		.title = rktr(titleKey),
-		.st = &st::settingsButtonNoIcon,
-		.toggled = rpl::single(current),
-		.keywords = std::move(keywords),
-	})) {
-		button->toggledValue()
-			| rpl::filter([=](bool enabled) {
-				return enabled != RabbitSettings::JsonSettings::GetBool(optionKey);
-			})
-			| rpl::on_next([=](bool enabled) {
-				RabbitSettings::JsonSettings::Set(optionKey, enabled);
-			}, button->lifetime());
-		if (const auto controller = builder.controller()) {
-			RtgMenu::AttachSettingsContextMenu(
-				button, controlId, controller);
-		}
-	}
-}
 
 object_ptr<Ui::RpWidget> CreateTelemetryControl(
 		not_null<QWidget*> parent,
