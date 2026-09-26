@@ -33,7 +33,7 @@ function(generate_lang target_name lang_file src_loc)
     )
     generate_target(${target_name} lang ${gen_timestamp} "${gen_files}" ${gen_dst})
 
-    if (NOT CMAKE_GENERATOR MATCHES "Visual Studio|Xcode")
+    if (NOT CMAKE_GENERATOR MATCHES "Visual Studio|Xcode" AND NOT CLION_IDE AND NOT DEFINED ENV{CLION_IDE} AND NOT DESKTOP_APP_NO_LANG_SUBSETS)
         file(GLOB_RECURSE lang_sources CONFIGURE_DEPENDS
             ${src_loc}/*.cpp
             ${src_loc}/*.h
