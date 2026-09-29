@@ -7,9 +7,11 @@
 #   python scripts/bundle_win.py --no-installer  Skip installer
 #
 # The script reads the version from Telegram/SourceFiles/core/version.h,
-# updates Telegram/build/setup.iss with the resolved version, then
-# produces a portable .zip archive, an OTA update package (via Packer.exe),
+# then produces a portable .zip archive, an OTA update package (via Packer.exe),
 # and/or an Inno Setup installer into out/Release/releases/rtgdrelease-<version>/.
+# Dynamic definitions (version, release path, target) are passed directly
+# to the Inno Setup compiler (iscc) via preprocessor flags (/d), leaving
+# setup.iss untouched in git.
 #
 # Requirements:
 #   - Python 3.10+
@@ -122,25 +124,6 @@ def parse_version(root: Path) -> VersionInfo:
     return info
 
 
-def update_installer_script(root: Path, version: VersionInfo, pbar: SingleLineProgressBar, step_idx: int) -> None:
-    pbar.update(step_idx, 0.1, "Updating setup.iss version info...")
-    iss_path = root / "Telegram" / "build" / "setup.iss"
-    content = iss_path.read_text(encoding="utf-8")
-
-    release_path = str(root / "out" / "Release")
-    replacements = {
-        r'#define MyAppVersion ".*?"': f'#define MyAppVersion "{version.version_str}"',
-        r'#define MyAppVersionFull ".*?"': f'#define MyAppVersionFull "{version.index}"',
-        r'#define ReleasePath ".*?"': f'#define ReleasePath "{release_path}"',
-    }
-    for pattern, replacement in replacements.items():
-        if not re.search(pattern, content):
-            sys.exit(f"Failed to find pattern {pattern} in {iss_path}")
-        content = re.sub(pattern, lambda match, r=replacement: r, content)
-
-    iss_path.write_text(content, encoding="utf-8", newline="\r\n")
-    pbar.update(step_idx, 1.0, "Updated setup.iss")
-
 
 def create_zip_archive(source_dir: Path, output_zip: Path, pbar: SingleLineProgressBar, step_idx: int) -> None:
     files = [f for f in source_dir.rglob("*") if f.is_file()]
@@ -233,18 +216,37 @@ def bundle_update(root: Path, version: VersionInfo, pbar: SingleLineProgressBar,
     pbar.update(step_idx, 1.0, f"OTA update package created ({len(tupdate_files)} package(s))")
 
 
-def bundle_installer(root: Path, pbar: SingleLineProgressBar, step_idx: int) -> None:
+def bundle_installer(root: Path, version: VersionInfo, pbar: SingleLineProgressBar, step_idx: int) -> None:
     pbar.update(step_idx, 0.05, "Locating Inno Setup (iscc)...")
     iscc = shutil.which("iscc")
     if not iscc:
-        standard_path = Path("C:/Program Files (x86)/Inno Setup 6/ISCC.exe")
-        if standard_path.exists():
-            iscc = str(standard_path)
+        standard_paths = [
+            Path("C:/Program Files/Inno Setup 6/ISCC.exe"),
+            Path("C:/Program Files (x86)/Inno Setup 6/ISCC.exe"),
+            Path("C:/Program Files/Inno Setup 5/ISCC.exe"),
+            Path("C:/Program Files (x86)/Inno Setup 5/ISCC.exe"),
+        ]
+        for p in standard_paths:
+            if p.exists():
+                iscc = str(p)
+                break
         else:
             sys.exit("Inno Setup compiler (iscc) not found on PATH or standard location.")
 
+    release_dir = (root / "out" / "Release").resolve()
+    release_path_str = str(release_dir).rstrip("\\/")
+    output_dir = release_dir / "releases" / f"rtgdrelease-{version.index}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     iss_path = root / "Telegram" / "build" / "setup.iss"
-    cmd = [iscc, str(iss_path)]
+    cmd = [
+        iscc,
+        f"/dMyAppVersion='{version.version_str}'",
+        f"/dMyAppVersionFull='{version.index}'",
+        f"/dReleasePath='{release_path_str}'",
+        "/dMyBuildTarget='win64'",
+        str(iss_path),
+    ]
 
     pbar.update(step_idx, 0.1, "Compiling Inno Setup script...")
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -284,15 +286,17 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     version = parse_version(root)
 
-    steps = [
-        ("Update setup.iss", lambda p, idx: update_installer_script(root, version, p, idx)),
-    ]
+    steps = []
     if not args.no_portable:
         steps.append(("Portable bundle", lambda p, idx: bundle_portable(root, version, p, idx)))
     if not args.no_update:
         steps.append(("OTA update bundle", lambda p, idx: bundle_update(root, version, p, idx)))
     if not args.no_installer:
-        steps.append(("Installer bundle", lambda p, idx: bundle_installer(root, p, idx)))
+        steps.append(("Installer bundle", lambda p, idx: bundle_installer(root, version, p, idx)))
+
+    if not steps:
+        print("No bundle targets selected.")
+        return
 
     total_steps = len(steps)
     pbar = SingleLineProgressBar(total_steps=total_steps, length=30)
