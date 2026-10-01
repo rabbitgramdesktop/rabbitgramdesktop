@@ -241,10 +241,10 @@ def bundle_installer(root: Path, version: VersionInfo, pbar: SingleLineProgressB
     iss_path = root / "Telegram" / "build" / "setup.iss"
     cmd = [
         iscc,
-        f"/dMyAppVersion='{version.version_str}'",
-        f"/dMyAppVersionFull='{version.index}'",
-        f"/dReleasePath='{release_path_str}'",
-        "/dMyBuildTarget='win64'",
+        f"/dMyAppVersion={version.version_str}",
+        f"/dMyAppVersionFull={version.index}",
+        f"/dReleasePath={release_path_str}",
+        "/dMyBuildTarget=win64",
         str(iss_path),
     ]
 
