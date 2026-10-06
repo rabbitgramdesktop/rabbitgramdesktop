@@ -58,6 +58,9 @@ generate_update_keys(Telegram ${res_loc}/update)
 
 if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
     include(cmake/test_update_verify.cmake)
+    if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE)
+        include(cmake/test_update_unpack.cmake)
+    endif()
 endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_NAME "rabbitGram" OUTPUT_NAME "rabbitGram")
@@ -87,6 +90,7 @@ PRIVATE
     desktop-app::lib_webview
     desktop-app::lib_ffmpeg
     desktop-app::lib_stripe
+    desktop-app::external_ada
     desktop-app::external_zlib
     desktop-app::external_minizip
     desktop-app::external_kcoreaddons
@@ -601,6 +605,8 @@ PRIVATE
     core/update_checker.h
     core/update_keys.cpp
     core/update_keys.h
+    core/update_unpack.cpp
+    core/update_unpack.h
     core/update_verify.cpp
     core/update_verify.h
     core/utils.cpp
@@ -1700,6 +1706,8 @@ PRIVATE
     platform/linux/translate_provider_linux.h
     platform/linux/tray_linux.cpp
     platform/linux/tray_linux.h
+    platform/linux/update_install_linux.cpp
+    platform/linux/update_install_linux.h
     platform/linux/webauthn_linux.cpp
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
@@ -2619,6 +2627,8 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
             target_link_options(Updater PRIVATE -municode)
         endif()
     elseif (APPLE)
+        # Keep the launch API available to macOS 10.13 release builds.
+        target_compile_options(Updater PRIVATE -Wno-error=deprecated-declarations)
         add_custom_command(TARGET Updater
         POST_BUILD
             COMMAND mkdir -p $<TARGET_FILE_DIR:Telegram>/../Frameworks

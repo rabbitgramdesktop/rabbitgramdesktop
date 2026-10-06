@@ -1,10 +1,11 @@
-import os, sys, pprint, re, json, pathlib, hashlib, subprocess, glob, tempfile
+import os, sys, pprint, re, json, pathlib, hashlib, subprocess, glob, tempfile, plistlib
 
 executePath = os.getcwd()
 sys.dont_write_bytecode = True
 scriptPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scriptPath + '/..')
 import qt_version
+import build_mac
 
 def finish(code):
     global executePath
@@ -77,13 +78,8 @@ for arg in sys.argv[1:]:
         customRunCommand = True
         runCommand.append('shell')
 
-if not os.path.isdir(os.path.join(libsDir, keysLoc)):
-    pathlib.Path(os.path.join(libsDir, keysLoc)).mkdir(parents=True, exist_ok=True)
-if not os.path.isdir(os.path.join(thirdPartyDir, keysLoc)):
-    pathlib.Path(os.path.join(thirdPartyDir, keysLoc)).mkdir(parents=True, exist_ok=True)
-
 pathPrefixes = [
-    'ThirdParty\\msys64\\mingw64\\bin',
+    'ThirdParty\\msys64\\ucrt64\\bin',
     'ThirdParty\\jom',
     'ThirdParty\\gyp',
 ] if win else [
@@ -117,12 +113,52 @@ elif (winarm):
         'X8664': 'ARM64',
     })
 elif (mac):
+    macToolchain = pathlib.Path(rootDir) / 'Toolchains/CommandLineTools-26.6'
+    macToolchainChoice = os.environ.get('TDESKTOP_MAC_TOOLCHAIN', 'auto')
+    if macToolchainChoice not in ('auto', '26.6', 'system'):
+        error('TDESKTOP_MAC_TOOLCHAIN must be auto, 26.6, or system.')
+    macRelease = macToolchainChoice == '26.6' or (macToolchainChoice == 'auto'
+        and (pathlib.Path(rootDir) / 'DesktopPrivate').is_dir())
+    if macRelease:
+        if os.environ.get('MACOSX_DEPLOYMENT_TARGET', '10.13') != '10.13':
+            error('Official dependency preparation requires deployment target 10.13.')
+        try:
+            macEnvironment, macSdk = build_mac.toolchain_environment(macToolchain)
+        except (OSError, RuntimeError, subprocess.CalledProcessError) as exception:
+            error(str(exception))
+        macSdk = str(macSdk)
+        macDeployment = '10.13'
+        environment['PATH_PREFIX'] = str(macToolchain / 'usr/bin') + pathSep + pathPrefix
+        for variable, program in (('CC', 'clang'), ('CXX', 'clang++'),
+                ('OBJC', 'clang'), ('OBJCXX', 'clang++'),
+                ('AR', 'ar'), ('RANLIB', 'ranlib'), ('LD', 'ld')):
+            environment[variable] = str(macToolchain / 'usr/bin' / program)
+        macCompiler = environment['CC']
+        for target in ('AARCH64_APPLE_DARWIN', 'X86_64_APPLE_DARWIN'):
+            environment['CARGO_TARGET_' + target + '_LINKER'] = macCompiler
+            for variable in ('CC', 'CXX', 'AR'):
+                environment[variable + '_' + target.lower()] = environment[variable]
+        if 'build-stackwalk' in options:
+            error('Legacy stackwalk preparation still requires full Xcode 26.6.')
+    else:
+        macSdk = subprocess.check_output(
+            ['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
+        macCompiler = subprocess.check_output(['xcrun', '--find', 'clang'], text=True).strip()
+    with open(os.path.join(macSdk, 'SDKSettings.plist'), 'rb') as file:
+        macSdkSettings = plistlib.load(file)
+    macMinimum = macSdkSettings['SupportedTargets']['macosx']['MinimumDeploymentTarget']
+    if not macRelease:
+        macDeployment = os.environ.get('MACOSX_DEPLOYMENT_TARGET', macMinimum)
+    if tuple(map(int, macDeployment.split('.'))) < tuple(map(int, macMinimum.split('.'))):
+        error('The selected macOS SDK requires deployment target ' + macMinimum
+            + ' or newer; select the older toolchain to build for ' + macDeployment + '.')
     environment.update({
         'SPECIAL_TARGET': 'mac',
         'MAKE_THREADS_CNT': '-j' + str(os.cpu_count()),
-        'MACOSX_DEPLOYMENT_TARGET': '10.13',
+        'SDKROOT': macSdk,
+        'MACOSX_DEPLOYMENT_TARGET': macDeployment,
         'UNGUARDED': '-Werror=unguarded-availability-new',
-        'MIN_VER': '-mmacosx-version-min=10.13',
+        'MIN_VER': '-mmacosx-version-min=' + macDeployment,
         'CMAKE_GENERATOR': 'Ninja',
     })
 
@@ -140,16 +176,42 @@ for key in environment:
     environmentKeyString += part
     if not key in ignoreInCacheForThirdParty:
         envForThirdPartyKeyString += part
+if mac:
+    environmentKeyString += subprocess.check_output(
+        [macCompiler, '--version'], text=True)
+    environmentKeyString += json.dumps(macSdkSettings, sort_keys=True)
 environmentKey = hashlib.sha1(environmentKeyString.encode('utf-8')).hexdigest()
 envForThirdPartyKey = hashlib.sha1(envForThirdPartyKeyString.encode('utf-8')).hexdigest()
 
 modifiedEnv = os.environ.copy()
+if mac and macRelease:
+    modifiedEnv.pop('TOOLCHAINS', None)
+    modifiedEnv['PREPARE_DIR'] = scriptPath
 for key in environment:
     modifiedEnv[key] = environment[key]
 if win and 'NoDefaultCurrentDirectoryInExePath' in modifiedEnv:
     del modifiedEnv['NoDefaultCurrentDirectoryInExePath']
 
 modifiedEnv['PATH'] = environment['PATH_PREFIX'] + modifiedEnv['PATH']
+
+if mac:
+    toolchainState = pathlib.Path(libsDir) / 'macos_toolchain.json'
+    purpose = 'release' if macRelease else 'development'
+    if toolchainState.is_file():
+        previous = json.loads(toolchainState.read_text())
+        if previous['purpose'] != purpose:
+            error('Libraries was prepared for ' + previous['purpose']
+                + ' builds. Use a separate dependency directory for ' + purpose + ' builds.')
+    pathlib.Path(libsDir).mkdir(parents=True, exist_ok=True)
+    toolchainState.write_text(json.dumps({
+        'purpose': purpose,
+        'compiler': macCompiler,
+        'sdk': macSdk,
+        'deployment_target': macDeployment,
+    }, indent=2) + '\n')
+
+pathlib.Path(os.path.join(libsDir, keysLoc)).mkdir(parents=True, exist_ok=True)
+pathlib.Path(os.path.join(thirdPartyDir, keysLoc)).mkdir(parents=True, exist_ok=True)
 
 def computeFileHash(path):
     sha1 = hashlib.sha1()
@@ -458,8 +520,9 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout c6b2868d527e2d00a2438e95225a22ce9346d79f
+    git checkout 4ca9e1e9d86cc87b78c2480f41ba61871c76f2fa
 mac:
+    sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
     cd qt6_highsierra
     git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
@@ -471,18 +534,18 @@ win:
     SET CHERE_INVOKING=enabled_from_arguments
     SET MSYS2_PATH_TYPE=inherit
 
-    powershell -Command "iwr -OutFile ./msys64.exe https://github.com/msys2/msys2-installer/releases/download/2025-08-30/msys2-base-x86_64-20250830.sfx.exe"
+    powershell -Command "iwr -OutFile ./msys64.exe https://github.com/msys2/msys2-installer/releases/download/2026-09-27/msys2-base-x86_64-20260927.sfx.exe"
     msys64.exe
     del msys64.exe
 
     bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
     pacman -Syu --noconfirm ^
         make ^
-        diffutils ^
-        mingw-w64-x86_64-gperf ^
-        mingw-w64-x86_64-nasm ^
-        mingw-w64-x86_64-perl ^
-        mingw-w64-x86_64-pkgconf
+        mingw-w64-ucrt-x86_64-diffutils ^
+        mingw-w64-ucrt-x86_64-gperf ^
+        mingw-w64-ucrt-x86_64-nasm ^
+        mingw-w64-ucrt-x86_64-perl ^
+        mingw-w64-ucrt-x86_64-pkgconf
 """, 'ThirdParty')
 
 stage('python', """
@@ -1106,7 +1169,7 @@ stage('regex', """
 """)
 
 stage('ffmpeg', """
-    git clone -b n6.1.6 https://github.com/FFmpeg/FFmpeg.git ffmpeg
+    git clone -b n8.1.3 https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
 win:
 depends:patches/ffmpeg.patch
@@ -1329,6 +1392,7 @@ mac:
         -D BUILD_DOCUMENTATION=OFF \\
         -D BUILD_TESTING=OFF \\
         -D ENABLE_PLUGIN_LOADING=OFF \\
+        -D WITH_GDK_PIXBUF=OFF \\
         -D WITH_AOM_ENCODER=OFF \\
         -D WITH_AOM_DECODER=OFF \\
         -D WITH_X265=OFF \\
@@ -1392,8 +1456,32 @@ depends:patches/breakpad.diff
     cd ../../build
     PYTHONPATH=$THIRDPARTY_DIR/gyp python3 gyp_breakpad
     cd ../processor
-    xcodebuild -project processor.xcodeproj -target minidump_stackwalk -configuration Release build
+    xcodebuild -project processor.xcodeproj -target minidump_stackwalk -configuration Release MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET build
 """)
+
+macBreakpadBuild = """
+mac:
+    cd src/client/mac
+    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Debug MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET build
+release:
+    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Release MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET build
+    cd ../../tools/mac/dump_syms
+    xcodebuild -project dump_syms.xcodeproj -target dump_syms -configuration Release MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET build
+"""
+if mac and macRelease:
+    macBreakpadBuild = """
+version: """ + computeFileHash(os.path.join(scriptPath, 'breakpad/CMakeLists.txt')) + """
+mac:
+    cmake -S "$PREPARE_DIR/breakpad" -B out -G "Ninja Multi-Config" \\
+        -DBREAKPAD_SOURCE_DIR="$PWD" \\
+        -DCMAKE_INSTALL_PREFIX="$PWD" \\
+        -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+    cmake --build out --config Debug --parallel
+    cmake --install out --config Debug
+release:
+    cmake --build out --config Release --parallel
+    cmake --install out --config Release
+"""
 
 stage('breakpad', """
     git clone https://chromium.googlesource.com/breakpad/breakpad
@@ -1430,13 +1518,7 @@ mac:
     cd src/third_party/lss
     git checkout e1e7b0ad8e
     cd ../../..
-    cd src/client/mac
-    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Debug build
-release:
-    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Release build
-    cd ../../tools/mac/dump_syms
-    xcodebuild -project dump_syms.xcodeproj -target dump_syms -configuration Release build
-""")
+""" + macBreakpadBuild)
 
 stage('crashpad', """
 mac:
@@ -1619,6 +1701,8 @@ mac:
         -no-feature-cxx17_filesystem \
         -platform macx-clang -- \
         -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+        -DCMAKE_OSX_SYSROOT="$SDKROOT" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
         -DCMAKE_PREFIX_PATH="$USED_PREFIX" \
         -DQT_NO_HANDLE_APPLE_SINGLE_ARCH_CROSS_COMPILING=ON \
         -DQT_SYNC_HEADERS_AT_CONFIGURE_TIME=ON
@@ -1700,7 +1784,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout 89df288dd6ba5b2ec95b3c5eaf1e7e0c3a870fc4
+    git checkout e2d0e88d1bde6cc600da5dc92581dc97e4c1e685
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg

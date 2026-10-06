@@ -505,6 +505,7 @@ void MainMenu::setupArchive() {
 				controller->openFolder(f);
 			}
 			controller->window().hideSettingsAndLayer();
+			controller->removeLayerBlackout();
 		}
 	};
 	const auto checkArchive = [=] {
@@ -685,9 +686,8 @@ void MainMenu::setupMenu() {
 					{ &st::menuIconProfile })
 			)->setClickedCallback([=] {
 				controller->showSection(
-					Info::Stories::Make(controller->session().user()));
+					Info::Stories::MakeMyProfile(controller->session().user()));
 			});
-			addSkip = true;
 		}
 
 		if (RabbitSettings::sidebarBots()) {

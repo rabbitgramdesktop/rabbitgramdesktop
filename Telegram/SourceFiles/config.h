@@ -42,22 +42,6 @@ inline const char *cGUIDStr() {
 	return gGuidStr;
 }
 
-static const char *UpdatesPublicKey = "\
------BEGIN RSA PUBLIC KEY-----\n\
-MIGJAoGBAN2ADx4vWZ1xOZdlBPkF/XsjoD/1x7DdMen7IdhEHGEYDhToPq+dfrXE\n\
-dEgBpq2a0giAcCiuxh1vkHtxNZGEVQvPEdxnFgwXiG9VTYSb4uht2m+YrP8aLdq/\n\
-QUan+AJdFdUS6MeASxHEaiNbRib0jMCGP4Dk2FLus1I6EprHDTq5AgMBAAE=\n\
------END RSA PUBLIC KEY-----\
-";
-
-static const char *UpdatesPublicBetaKey = "\
------BEGIN RSA PUBLIC KEY-----\n\
-MIGJAoGBAKH5+Ba6bvbJsdQfx4WpZfzBxL628zRmf5cn8iY/yYwm9vNl+3e02mPS\n\
-h75+jUFYmkgWEcE3XoDgEGfVqR6nqM+pexAP3MxxavmdCERytGgX16cDxZaA0k2s\n\
-ulf7SM2PV3MwWt0uJkKCtP+SzS2cRXcIUlkZnovV2CISRGmr6XLpAgMBAAE=\n\
------END RSA PUBLIC KEY-----\
-";
-
 #if defined TDESKTOP_API_ID && defined TDESKTOP_API_HASH
 
 constexpr auto ApiId = TDESKTOP_API_ID;
