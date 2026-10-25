@@ -75,3 +75,6 @@ settings.local.json
 
 # Generated changelog page (built by CI, deployed to GitHub Pages)
 /docs/changelog/
+
+# Source files of tg-ws proxy (thx Flowseal/tg-ws-proxy)
+tg-ws-proxy-main/

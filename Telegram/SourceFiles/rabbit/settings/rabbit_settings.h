@@ -266,7 +266,10 @@ inline void setReplyEmoji(bool value) { JsonSettings::Set(u"reply_emoji"_q, valu
 inline void setReplyBg(bool value) { JsonSettings::Set(u"reply_bg"_q, value); }
 inline void setQuickSwipeChannels(bool value) { JsonSettings::Set(u"quick_swipe_channels"_q, value); }
 inline void setQuickSwipeTopics(bool value) { JsonSettings::Set(u"quick_swipe_topics"_q, value); }
+inline bool tgWsProxyEnabled() { return JsonSettings::GetBool(u"tg_ws_proxy_enabled"_q); }
+void setTgWsProxyEnabled(bool value);
 
 [[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 
 } // namespace RabbitSettings
+

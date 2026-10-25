@@ -70,6 +70,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mtproto/mtproto_dc_options.h"
 #include "mtproto/mtproto_config.h"
 #include "mtproto/web_proxy/web_proxy_transport.h"
+#include "rabbit/tg_ws_proxy/tg_ws_proxy_controller.h"
 #include "media/audio/media_audio_track.h"
 #include "media/player/media_player_instance.h"
 #include "media/player/media_player_float.h"
@@ -246,6 +247,8 @@ Application::Application()
 			.cancelText = tr::lng_cancel(tr::now),
 		}));
 	}, _lifetime);
+
+	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 }
 
 void Application::closeAdditionalWindows() {
@@ -1935,6 +1938,7 @@ void Application::refreshGlobalProxy() {
 	} else {
 		MTP::WebProxy::Transport::Deactivate();
 	}
+	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 	Sandbox::Instance().refreshGlobalProxy();
 }
 

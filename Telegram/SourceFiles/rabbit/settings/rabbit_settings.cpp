@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/swipe_actions/swipe_action.h"
+#include "rabbit/tg_ws_proxy/tg_ws_proxy_controller.h"
 #include "data/data_peer.h"
 
 #include "base/parse_helper.h"
@@ -248,6 +249,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 	{
 		u"api_start_params"_q, {
 			.storage = None,
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"tg_ws_proxy_enabled"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
 		}
@@ -1195,6 +1202,11 @@ bool ShouldHideReactions(const PeerData *peer) {
 		return hideReactionsChannels();
 	}
 	return false;
+}
+
+void setTgWsProxyEnabled(bool value) {
+	JsonSettings::Set(u"tg_ws_proxy_enabled"_q, value);
+	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 }
 
 } // namespace RabbitSettings

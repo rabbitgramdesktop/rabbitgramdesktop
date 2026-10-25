@@ -1833,6 +1833,18 @@ PRIVATE
     rabbit/swipe_actions/swipe_actions_box.h
     rabbit/telemetry/rabbit_telemetry.cpp
     rabbit/telemetry/rabbit_telemetry.h
+    rabbit/tg_ws_proxy/tg_ws_bridge.cpp
+    rabbit/tg_ws_proxy/tg_ws_bridge.h
+    rabbit/tg_ws_proxy/tg_ws_client.cpp
+    rabbit/tg_ws_proxy/tg_ws_client.h
+    rabbit/tg_ws_proxy/tg_ws_crypto.cpp
+    rabbit/tg_ws_proxy/tg_ws_crypto.h
+    rabbit/tg_ws_proxy/tg_ws_msg_splitter.h
+    rabbit/tg_ws_proxy/tg_ws_proxy_constants.h
+    rabbit/tg_ws_proxy/tg_ws_proxy_controller.cpp
+    rabbit/tg_ws_proxy/tg_ws_proxy_controller.h
+    rabbit/tg_ws_proxy/tg_ws_proxy_server.cpp
+    rabbit/tg_ws_proxy/tg_ws_proxy_server.h
     rabbit/ui/settings/icon_picker.cpp
     rabbit/ui/settings/icon_picker.h
     rabbit/ui/settings/previews.cpp

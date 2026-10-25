@@ -22,6 +22,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "mtproto/proxy_check.h"
 #include "mtproto/web_proxy/web_proxy_transport.h"
+#include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/lang/rabbit_lang.h"
+#include "rabbit/tg_ws_proxy/tg_ws_proxy_controller.h"
 #include "qr/qr_generate.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
@@ -1171,41 +1174,64 @@ void ProxiesBox::setupTopButton() {
 void ProxiesBox::setupContent() {
 	const auto inner = setInnerWidget(object_ptr<Ui::VerticalLayout>(this));
 
-	_tryIPv6 = inner->add(
+	const auto tgWsProxy = inner->add(
 		object_ptr<Ui::Checkbox>(
 			inner,
+			ktr(u"rtg_proxy_tg_ws_proxy"_q),
+			RabbitSettings::tgWsProxyEnabled()),
+		st::proxyTryIPv6Padding);
+	inner->add(
+		object_ptr<Ui::FlatLabel>(
+			inner,
+			ktr(u"rtg_proxy_tg_ws_proxy_about"_q),
+			st::boxDividerLabel),
+		style::margins(
+			st::proxyTryIPv6Padding.left(),
+			0,
+			st::proxyTryIPv6Padding.right(),
+			st::proxyTryIPv6Padding.bottom()));
+
+	const auto rest = inner->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			inner,
+			object_ptr<Ui::VerticalLayout>(inner)));
+	const auto content = rest->entity();
+
+	_tryIPv6 = content->add(
+		object_ptr<Ui::Checkbox>(
+			content,
 			tr::lng_connection_try_ipv6(tr::now),
 			_settings.tryIPv6()),
 		st::proxyTryIPv6Padding);
 	_proxySettings
 		= std::make_shared<Ui::RadioenumGroup<ProxyData::Settings>>(
 			_settings.settings());
-	inner->add(
+	content->add(
 		object_ptr<Ui::Radioenum<ProxyData::Settings>>(
-			inner,
+			content,
 			_proxySettings,
 			ProxyData::Settings::Disabled,
 			tr::lng_proxy_disable(tr::now)),
 		st::proxyUsePadding);
-	inner->add(
+	content->add(
 		object_ptr<Ui::Radioenum<ProxyData::Settings>>(
-			inner,
+			content,
 			_proxySettings,
 			ProxyData::Settings::System,
 			tr::lng_proxy_use_system_settings(tr::now)),
 		st::proxyUsePadding);
-	inner->add(
+	content->add(
 		object_ptr<Ui::Radioenum<ProxyData::Settings>>(
-			inner,
+			content,
 			_proxySettings,
 			ProxyData::Settings::Enabled,
 			tr::lng_proxy_use_custom(tr::now)),
 		st::proxyUsePadding);
-	_proxyForCalls = inner->add(
+	_proxyForCalls = content->add(
 		object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
-			inner,
+			content,
 			object_ptr<Ui::Checkbox>(
-				inner,
+				content,
 				tr::lng_proxy_use_for_calls(tr::now),
 				_settings.useProxyForCalls()),
 			style::margins(
@@ -1218,11 +1244,11 @@ void ProxiesBox::setupContent() {
 			0,
 			st::proxyTryIPv6Padding.right(),
 			st::proxyTryIPv6Padding.top()));
-	_proxyRotation = inner->add(
+	_proxyRotation = content->add(
 		object_ptr<Ui::SlideWrap<Ui::Checkbox>>(
-			inner,
+			content,
 			object_ptr<Ui::Checkbox>(
-				inner,
+				content,
 				tr::lng_proxy_auto_switch(tr::now),
 				_settings.proxyRotationEnabled()),
 			style::margins(
@@ -1235,10 +1261,10 @@ void ProxiesBox::setupContent() {
 			0,
 			st::proxyTryIPv6Padding.right(),
 			st::proxyTryIPv6Padding.top()));
-	_proxyRotationOptions = inner->add(
+	_proxyRotationOptions = content->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			inner,
-			object_ptr<Ui::VerticalLayout>(inner)));
+			content,
+			object_ptr<Ui::VerticalLayout>(content)));
 	_proxyRotationTimeout = _proxyRotationOptions->entity()->add(
 		object_ptr<Ui::SettingsSlider>(
 			_proxyRotationOptions->entity(),
@@ -1260,22 +1286,25 @@ void ProxiesBox::setupContent() {
 			st::boxDividerLabel),
 		st::proxyAboutPadding);
 
-	_about = inner->add(
+	_about = content->add(
 		object_ptr<Ui::DividerLabel>(
-			inner,
+			content,
 			object_ptr<Ui::FlatLabel>(
-				inner,
+				content,
 				tr::lng_proxy_about(tr::now),
 				st::boxDividerLabel),
 			st::proxyAboutPadding),
 		style::margins(0, 0, 0, st::proxyRowPadding.top()));
 
-	_wrap = inner->add(std::move(_initialWrap));
-	inner->add(object_ptr<Ui::FixedHeightWidget>(
-		inner,
+	_wrap = content->add(std::move(_initialWrap));
+	content->add(object_ptr<Ui::FixedHeightWidget>(
+		content,
 		st::proxyRowPadding.bottom()));
 
 	_proxySettings->setChangedCallback([=](ProxyData::Settings value) {
+		if (value != ProxyData::Settings::Enabled && RabbitSettings::tgWsProxyEnabled()) {
+			RabbitSettings::setTgWsProxyEnabled(false);
+		}
 		if (!_controller->setProxySettings(value)) {
 			_proxySettings->setValue(_settings.settings());
 			addNewProxy();
@@ -1283,6 +1312,18 @@ void ProxiesBox::setupContent() {
 		refreshProxyForCalls();
 		refreshProxyRotation();
 	});
+	tgWsProxy->checkedChanges(
+	) | rpl::on_next([=](bool checked) {
+		RabbitSettings::setTgWsProxyEnabled(checked);
+		rest->toggle(!checked, anim::type::normal);
+	}, tgWsProxy->lifetime());
+	rest->toggle(!tgWsProxy->checked(), anim::type::instant);
+
+	Rabbit::TgWsProxy::Controller::Instance().runningValue(
+	) | rpl::on_next([=](bool running) {
+		tgWsProxy->setChecked(running);
+	}, tgWsProxy->lifetime());
+
 	_tryIPv6->checkedChanges(
 	) | rpl::on_next([=](bool checked) {
 		_controller->setTryIPv6(checked);
@@ -1320,10 +1361,10 @@ void ProxiesBox::setupContent() {
 	_proxyRotationOptions->finishAnimating();
 
 	{
-		const auto wrap = inner->add(
+		const auto wrap = content->add(
 			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				inner,
-				object_ptr<Ui::VerticalLayout>(inner)));
+				content,
+				object_ptr<Ui::VerticalLayout>(content)));
 		const auto shareList = Settings::AddButtonWithIcon(
 			wrap->entity(),
 			tr::lng_proxy_edit_share_list_button(),
@@ -1342,7 +1383,7 @@ void ProxiesBox::setupContent() {
 	inner->heightValue(
 	) | rpl::map([=](int height) {
 		return std::min(
-			std::max(height, _about->y()
+			std::max(height, rest->y() + _about->y()
 				+ _about->height()
 				+ 3 * rowHeight()),
 			st::boxMaxListHeight);
@@ -2280,6 +2321,10 @@ void ProxiesBoxController::shareItems() {
 
 void ProxiesBoxController::applyItem(int id) {
 	auto item = findById(id);
+	if (RabbitSettings::tgWsProxyEnabled()
+		&& item->data != Rabbit::TgWsProxy::Controller::Instance().proxyData()) {
+		RabbitSettings::setTgWsProxyEnabled(false);
+	}
 	if (_settings.isEnabled() && (_settings.selected() == item->data)) {
 		return;
 	} else if (item->deleted) {
@@ -2461,6 +2506,9 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
 }
 
 bool ProxiesBoxController::setProxySettings(ProxyData::Settings value) {
+	if (value != ProxyData::Settings::Enabled && RabbitSettings::tgWsProxyEnabled()) {
+		RabbitSettings::setTgWsProxyEnabled(false);
+	}
 	if (_settings.settings() == value) {
 		return true;
 	} else if (value == ProxyData::Settings::Enabled) {
