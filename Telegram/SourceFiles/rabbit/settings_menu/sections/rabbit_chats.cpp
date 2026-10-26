@@ -99,16 +99,17 @@ void BuildTopGeneral(
 	builder.add([](const WidgetContext &ctx) {
 		auto wrap = object_ptr<Ui::VerticalLayout>(ctx.container);
 
-		const auto chatPreview = wrap->add(
-			object_ptr<ChatPreview>(wrap, ctx.controller),
-			st::defaultSubsectionTitlePadding);
-
 		const auto stickerSizeLabel = wrap->add(
 			object_ptr<Ui::LabelSimple>(wrap, st::settingsAudioVolumeLabel),
 			st::settingsAudioVolumeLabelPadding);
 		const auto stickerSizeSlider = wrap->add(
 			object_ptr<Ui::MediaSlider>(wrap, st::settingsAudioVolumeSlider),
 			st::settingsAudioVolumeSliderPadding);
+
+		const auto chatPreview = wrap->add(
+			object_ptr<ChatPreview>(wrap, ctx.controller),
+			st::defaultSubsectionTitlePadding);
+
 		const auto updateStickerSizeLabel = [=](int value) {
 			const auto pixels = QString::number(value);
 			stickerSizeLabel->setText(ktr(
@@ -118,7 +119,7 @@ void BuildTopGeneral(
 		const auto updateStickerSize = [=](int value) {
 			updateStickerSizeLabel(value);
 			RabbitSettings::setStickerSize(value);
-			chatPreview->repaint();
+			chatPreview->updateItems();
 		};
 		stickerSizeSlider->resize(st::settingsAudioVolumeSlider.seekSize);
 		stickerSizeSlider->setPseudoDiscrete(
@@ -1469,12 +1470,12 @@ void BuildRabbitChats(
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
-	BuildFolders(builder, controller);
+	BuildStickerShape(builder);
 
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
-	BuildStickerShape(builder);
+	BuildFolders(builder, controller);
 
 	builder.addSkip();
 	builder.addDivider();

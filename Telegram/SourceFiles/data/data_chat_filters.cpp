@@ -23,6 +23,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/chat/more_chats_bar.h"
 #include "main/main_session.h"
 #include "main/main_app_config.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "apiwrap.h"
 
 namespace Data {
@@ -907,6 +908,18 @@ FilterId ChatFilters::defaultId() const {
 
 FilterId ChatFilters::lookupId(int index) const {
 	Expects(index >= 0 && index < _list.size());
+
+	if (RabbitSettings::foldersHideAllChats() && _list.size() > 1) {
+		auto current = 0;
+		for (const auto &filter : _list) {
+			if (filter.id()) {
+				if (current == index) {
+					return filter.id();
+				}
+				++current;
+			}
+		}
+	}
 
 	if (_owner->session().user()->isPremium() || !_list.front().id()) {
 		return _list[index].id();

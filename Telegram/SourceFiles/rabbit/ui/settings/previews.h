@@ -13,6 +13,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include <memory>
 
+namespace Data {
+class DocumentMedia;
+} // namespace Data
+
 namespace Ui {
 class ChatStyle;
 } // namespace Ui
@@ -40,12 +44,16 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller);
 
+	int resizeGetHeight(int newWidth) override;
+	void updateItems();
+
 protected:
 	void paintEvent(QPaintEvent *e) override;
 
 private:
 	not_null<HistoryView::ElementDelegate*> delegate();
 	HistoryView::Context elementContext() override;
+	void regenerateItems();
 
 	const not_null<Window::SessionController*> _controller;
 	std::unique_ptr<Ui::ChatStyle> _chatStyle;
@@ -53,10 +61,10 @@ private:
 	int _messageRoundness = -1;
 
 	const not_null<History*> _history;
+	std::shared_ptr<Data::DocumentMedia> _stickerMedia;
+	AdminLog::OwnedItem _item0;
 	AdminLog::OwnedItem _item1;
 	AdminLog::OwnedItem _item2;
-	AdminLog::OwnedItem _item3;
-	AdminLog::OwnedItem _item4;
 
 };
 

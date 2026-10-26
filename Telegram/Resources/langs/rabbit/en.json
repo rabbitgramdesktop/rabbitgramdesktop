@@ -132,5 +132,8 @@
     "rtg_chats_replies_bg": "Background",
     "rtg_proxy_tg_ws_proxy": "Use TG-WS-Proxy (WebSocket)",
     "rtg_proxy_tg_ws_proxy_about": "Bypasses provider blocks by tunneling MTProto traffic through Telegram Web WebSocket servers without requiring third-party tools.",
+    "rtg_chats_preview_user": "xmdnusr",
+    "rtg_chats_preview_message1": "wow...",
+    "rtg_chats_preview_message2": "wait where'd he go",
     "last_string": null
 }

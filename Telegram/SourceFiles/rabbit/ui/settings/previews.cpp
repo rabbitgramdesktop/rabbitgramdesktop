@@ -1,3 +1,4 @@
+#include <QtCore/QFile>
 /*
 This file is part of rabbitGram Desktop,
 the unofficial app based on Telegram Desktop.
@@ -7,32 +8,36 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/ui/settings/previews.h"
 
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "rabbit/quick_actions/quick_action.h"
 #include "rabbit/quick_actions/quick_action_ui.h"
 #include "rabbit/settings/rabbit_settings.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "ui/filter_icons.h"
-#include "ui/unread_badge_paint.h"
-#include "styles/style_dialogs.h"
-#include "styles/style_window.h"
-#include "data/data_chat_filters.h"
+#include "rabbit/lang/rabbit_lang.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
+#include "ui/filter_icons.h"
 #include "ui/painter.h"
+#include "ui/unread_badge_paint.h"
 
 #include <array>
 #include <rpl/producer.h>
 
 #include "styles/style_chat.h"
 #include "styles/style_chat_style.h"
+#include "styles/style_dialogs.h"
 #include "styles/style_rabbit_assets.h"
+#include "styles/style_window.h"
 
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
 #include "data/data_session.h"
 #include "data/data_peer.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_user.h"
+#include "data/data_chat_filters.h"
 #include "main/main_session.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_keys.h"
@@ -44,23 +49,137 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace {
 
+void UpdatePreviewUser(not_null<UserData*> user) {
+	user->setLoadedStatus(PeerData::LoadedStatus::Full);
+	user->setName(ktr(u"rtg_chats_preview_user"_q), QString(), QString(), QString());
+}
+
+[[nodiscard]] not_null<UserData*> CreatePreviewUser(
+		not_null<Window::SessionController*> controller) {
+	const auto user = controller->session().data().user(UserId(123456789));
+	UpdatePreviewUser(user);
+	return user;
+}
+
+[[nodiscard]] QByteArray LoadStickerBytes() {
+	for (const auto &path : {
+		u":/gui/art/rabbit/sticker.webp"_q,
+		u"Telegram/Resources/art/rabbit/sticker.webp"_q,
+		u"/home/xmdnusr/source/rtgdesktopdev/Telegram/Resources/art/rabbit/sticker.webp"_q,
+		u"/home/xmdnusr/Downloads/sticker.webp"_q,
+	}) {
+		auto file = QFile(path);
+		if (file.open(QIODevice::ReadOnly)) {
+			const auto data = file.readAll();
+			if (!data.isEmpty()) {
+				return data;
+			}
+		}
+	}
+	return QByteArray();
+}
+
+[[nodiscard]] not_null<DocumentData*> CreatePreviewSticker(
+		not_null<Main::Session*> session,
+		std::shared_ptr<Data::DocumentMedia> &mediaViewHolder) {
+	static const auto kBytes = LoadStickerBytes();
+	const auto doc = session->data().document(
+		DocumentId(0x7fffffff12345678ULL),
+		0,
+		QByteArray(),
+		base::unixtime::now(),
+		QVector<MTPDocumentAttribute>{
+			MTP_documentAttributeImageSize(MTP_int(512), MTP_int(512)),
+			MTP_documentAttributeSticker(
+				MTP_flags(0),
+				MTP_string(u"👍"_q),
+				MTP_inputStickerSetShortName(MTP_string(u"HmdnPack"_q)),
+				MTPMaskCoords()),
+		},
+		u"image/webp"_q,
+		InlineImageLocation(),
+		ImageWithLocation(),
+		ImageWithLocation(),
+		false,
+		1,
+		int64(kBytes.size()));
+
+	if (!mediaViewHolder) {
+		const auto fileLoc = QFile::exists(u":/gui/art/rabbit/sticker.webp"_q)
+			? u":/gui/art/rabbit/sticker.webp"_q
+			: QFile::exists(u"/home/xmdnusr/Downloads/sticker.webp"_q)
+			? u"/home/xmdnusr/Downloads/sticker.webp"_q
+			: u"Telegram/Resources/art/rabbit/sticker.webp"_q;
+		doc->setLocation(Core::FileLocation(fileLoc));
+		mediaViewHolder = doc->createMediaView();
+		mediaViewHolder->setBytes(kBytes);
+		auto img = Images::Read({ .content = kBytes }).image;
+		if (img.isNull()) {
+			img.loadFromData(kBytes, "WEBP");
+		}
+		if (!img.isNull()) {
+			mediaViewHolder->goodThumbnailWanted();
+			mediaViewHolder->setGoodThumbnail(img);
+			mediaViewHolder->setThumbnail(img);
+		}
+		mediaViewHolder->checkStickerLarge();
+	}
+	return doc;
+}
+
 [[nodiscard]] AdminLog::OwnedItem GenerateTextItem(
 		not_null<HistoryView::ElementDelegate*> delegate,
 		not_null<History*> history,
 		const QString &text,
-		bool out) {
+		bool out,
+		HistoryItem *replyTo = nullptr) {
 	Expects(history->peer->isUser());
 
+	auto flags = MessageFlag::FakeHistoryItem
+		| MessageFlag::HasFromId
+		| (out ? MessageFlag::Outgoing : MessageFlag(0));
+	if (replyTo) {
+		flags |= MessageFlag::HasReplyInfo;
+	}
 	const auto item = history->makeMessage({
 		.id = history->nextNonHistoryEntryId(),
-		.flags = (MessageFlag::FakeHistoryItem
-			| MessageFlag::HasFromId
-			| (out ? MessageFlag::Outgoing : MessageFlag(0))),
+		.flags = flags,
 		.from = (out
 			? history->session().userId()
 			: peerToUser(history->peer->id)),
+		.replyTo = replyTo
+			? FullReplyTo{ .messageId = replyTo->fullId() }
+			: FullReplyTo(),
 		.date = base::unixtime::now(),
 	}, TextWithEntities{ text }, MTP_messageMediaEmpty());
+	return AdminLog::OwnedItem(delegate, item);
+}
+
+[[nodiscard]] AdminLog::OwnedItem GenerateStickerItem(
+		not_null<HistoryView::ElementDelegate*> delegate,
+		not_null<History*> history,
+		not_null<DocumentData*> sticker,
+		bool out,
+		HistoryItem *replyTo = nullptr) {
+	Expects(history->peer->isUser());
+
+	auto flags = MessageFlag::FakeHistoryItem
+		| MessageFlag::HasFromId
+		| (out ? MessageFlag::Outgoing : MessageFlag(0));
+	if (replyTo) {
+		flags |= MessageFlag::HasReplyInfo;
+	}
+	const auto item = history->makeMessage({
+		.id = history->nextNonHistoryEntryId(),
+		.flags = flags,
+		.from = (out
+			? history->session().userId()
+			: peerToUser(history->peer->id)),
+		.replyTo = replyTo
+			? FullReplyTo{ .messageId = replyTo->fullId() }
+			: FullReplyTo(),
+		.date = base::unixtime::now(),
+	}, sticker, TextWithEntities());
 	return AdminLog::OwnedItem(delegate, item);
 }
 
@@ -117,21 +236,86 @@ ChatPreview::ChatPreview(
 : RpWidget(parent)
 , SimpleElementDelegate(controller, [=] { update(); })
 , _controller(controller)
-, _history(controller->session().data().history(PeerData::kServiceNotificationsId))
-, _item1(GenerateTextItem(delegate(), _history, u"Hello! This is a slightly longer message to show how bubbles look."_q, true))
-, _item2(GenerateTextItem(delegate(), _history, u"Oh, I see. Looks good!"_q, false))
-, _item3(GenerateTextItem(delegate(), _history, u"Right?"_q, true))
-	, _item4(GenerateTextItem(delegate(), _history, u"Yes, and the rounding looks great too."_q, false))
+, _history(controller->session().data().history(CreatePreviewUser(controller)))
 {
+	regenerateItems();
 	setMinimumHeight(st::stickerPreviewSize);
+
+	rpl::merge(
+		RabbitSettings::JsonSettings::Events(u"sticker_size"_q),
+		RabbitSettings::JsonSettings::Events(u"sticker_shape"_q)
+	) | rpl::on_next([=] {
+		updateItems();
+	}, lifetime());
 
 	rpl::merge(
 		RabbitSettings::JsonSettings::Events(u"message_roundness"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_bubble_tails"_q),
 		RabbitSettings::JsonSettings::Events(u"show_online_indicator"_q)
 	) | rpl::on_next([=] {
+		updateGeometry();
 		update();
 	}, lifetime());
+
+	RabbitLang::Lang::Events(
+	) | rpl::on_next([=] {
+		updateItems();
+	}, lifetime());
+}
+
+void ChatPreview::regenerateItems() {
+	_item0 = nullptr;
+	_item1 = nullptr;
+	_item2 = nullptr;
+
+	if (const auto user = _history->peer->asUser()) {
+		UpdatePreviewUser(user);
+	}
+
+	_item0 = GenerateTextItem(
+		delegate(),
+		_history,
+		ktr(u"rtg_chats_preview_message1"_q),
+		false);
+	_item1 = GenerateStickerItem(
+		delegate(),
+		_history,
+		CreatePreviewSticker(&_controller->session(), _stickerMedia),
+		true,
+		_item0->data());
+	_item2 = GenerateTextItem(
+		delegate(),
+		_history,
+		ktr(u"rtg_chats_preview_message2"_q),
+		false,
+		_item1->data());
+}
+
+void ChatPreview::updateItems() {
+	regenerateItems();
+	if (width() > 0) {
+		const auto newHeight = resizeGetHeight(width());
+		if (height() != newHeight) {
+			resize(width(), newHeight);
+		}
+	}
+	update();
+}
+
+int ChatPreview::resizeGetHeight(int newWidth) {
+	if (!_item1 || !_item2) {
+		return st::stickerPreviewSize;
+	}
+	auto result = st::stickerPreviewMargin;
+	for (auto item : { &_item1, &_item2 }) {
+		const auto isIncoming = !(*item)->hasOutLayout();
+		const auto photoSkip = isIncoming ? st::msgPhotoSkip : 0;
+		(*item)->initDimensions();
+		(*item)->resizeGetHeight(newWidth - photoSkip);
+		result += (*item)->height() + st::msgMargin.bottom();
+	}
+	result += st::stickerPreviewMargin;
+	return std::max(result, int(st::stickerPreviewSize));
 }
 
 not_null<HistoryView::ElementDelegate*> ChatPreview::delegate() {
@@ -178,6 +362,10 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 			QRect(QPoint(), size()),
 			_controller->isGifPausedAtLeastFor(Window::GifPauseReason::Layer));
 
+		const auto userpicLetter = [&] {
+			const auto name = _history->peer->name();
+			return name.isEmpty() ? u"U"_q : name.left(1);
+		}();
 		const auto paintUserpic = [&](
 				Painter &target,
 				int userpicLeft,
@@ -185,7 +373,7 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 				int outerWidth) {
 			Ui::EmptyUserpic emptyUserpic(
 				Ui::EmptyUserpic::UserpicColor(0),
-				u"U"_q);
+				userpicLetter);
 			emptyUserpic.paintCircle(
 				target,
 				userpicLeft,
@@ -234,7 +422,11 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 			target.drawImage(userpicLeft, userpicTop, userpicImage);
 		};
 
-		for (auto item : { &_item1, &_item2, &_item3, &_item4 }) {
+		if (!_item1 || !_item2) {
+			return;
+		}
+
+		for (auto item : { &_item1, &_item2 }) {
 			const auto isIncoming = !(*item)->hasOutLayout();
 			const auto photoSkip = isIncoming ? st::msgPhotoSkip : 0;
 
@@ -271,10 +463,6 @@ void ChatPreview::paintEvent(QPaintEvent *e) {
 
 	QPainter pw(this);
 	pw.drawImage(QPoint(), rounded);
-
-	if (height() != topOffset) {
-		setMinimumHeight(topOffset);
-	}
 }
 
 StickerShapePicker::StickerShapePicker(QWidget *parent) : RpWidget(parent) {

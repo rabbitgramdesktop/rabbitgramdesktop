@@ -132,5 +132,8 @@
     "rtg_chats_replies_bg": "Фон",
     "rtg_proxy_tg_ws_proxy": "Использовать TG-WS-Proxy (WebSocket)",
     "rtg_proxy_tg_ws_proxy_about": "Обход блокировок провайдеров через WebSocket-серверы Telegram Web без использования сторонних приложений.",
+    "rtg_chats_preview_user": "хмдн++",
+    "rtg_chats_preview_message1": "ого...",
+    "rtg_chats_preview_message2": "ээ куда он",
     "last_string": null
 }

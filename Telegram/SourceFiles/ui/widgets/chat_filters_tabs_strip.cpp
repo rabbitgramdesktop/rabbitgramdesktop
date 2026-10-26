@@ -71,11 +71,25 @@ void ShowMenu(
 
 	auto id = FilterId(0);
 	{
-		const auto &list = session->data().chatsFilters().list();
-		if (index < 0 || index >= list.size()) {
+		const auto &rawList = session->data().chatsFilters().list();
+		const auto hideAll = RabbitSettings::foldersHideAllChats()
+			&& (rawList.size() > 1);
+		if (hideAll) {
+			auto current = 0;
+			for (const auto &filter : rawList) {
+				if (filter.id()) {
+					if (current == index) {
+						id = filter.id();
+						break;
+					}
+					++current;
+				}
+			}
+		} else if (index >= 0 && index < rawList.size()) {
+			id = rawList[index].id();
+		} else {
 			return;
 		}
-		id = list[index].id();
 	}
 	state->menu = base::make_unique_q<Ui::PopupMenu>(
 		parent,
@@ -231,6 +245,24 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 				? st::dialogsSearchTabs
 				: st::chatsFiltersTabs));
 	const auto state = wrap->lifetime().make_state<State>();
+	const auto filterByIndex = [=](int index) -> const Data::ChatFilter& {
+		const auto &rawList = session->data().chatsFilters().list();
+		const auto hideAll = RabbitSettings::foldersHideAllChats()
+			&& (rawList.size() > 1);
+		if (hideAll) {
+			auto current = 0;
+			for (const auto &filter : rawList) {
+				if (filter.id()) {
+					if (current == index) {
+						return filter;
+					}
+					++current;
+				}
+			}
+		}
+		Assert(index >= 0 && index < rawList.size());
+		return rawList[index];
+	};
 	const auto reassignUnreadValue = [=] {
 		state->reorderLifetime.destroy();
 		const auto &rawList = session->data().chatsFilters().list();
@@ -283,15 +315,29 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					filters->moveAllToFront();
 				}
 			}
-			Assert(oldPosition >= 0 && oldPosition < list.size());
-			Assert(newPosition >= 0 && newPosition < list.size());
+			const auto hideAll = RabbitSettings::foldersHideAllChats()
+				&& (list.size() > 1);
+			auto realOld = oldPosition;
+			auto realNew = newPosition;
+			if (hideAll) {
+				auto current = 0;
+				for (auto i = 0; i < list.size(); ++i) {
+					if (list[i].id()) {
+						if (current == oldPosition) realOld = i;
+						if (current == newPosition) realNew = i;
+						++current;
+					}
+				}
+			}
+			Assert(realOld >= 0 && realOld < list.size());
+			Assert(realNew >= 0 && realNew < list.size());
 
 			auto order = ranges::views::all(
 				list
 			) | ranges::views::transform(
 				&Data::ChatFilter::id
 			) | ranges::to_vector;
-			base::reorder(order, oldPosition, newPosition);
+			base::reorder(order, realOld, realNew);
 
 			state->ignoreRefresh = true;
 			filters->saveOrder(order);
@@ -326,20 +372,16 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 						? slider->lookupSectionLeft(i + 1)
 						: slider->width();
 					if (x >= left && x < right) {
-						const auto &list
-							= session->data().chatsFilters().list();
-						return (i < list.size())
-							? list[i].id()
-							: FilterId();
+						return filterByIndex(i).id();
 					}
 				}
 				return std::nullopt;
 			},
 			[=] { return state->lastFilterId.value_or(FilterId()); },
 			[=](FilterId id) {
-				const auto &list = session->data().chatsFilters().list();
-				for (auto i = 0; i < list.size(); i++) {
-					if (list[i].id() == id) {
+				const auto count = slider->sectionsCount();
+				for (auto i = 0; i < count; i++) {
+					if (filterByIndex(i).id() == id) {
 						slider->selectSection(i);
 						return;
 					}
@@ -382,25 +424,6 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			return;
 		}
 		choose(filter.id());
-	};
-
-	const auto filterByIndex = [=](int index) -> const Data::ChatFilter& {
-		const auto &rawList = session->data().chatsFilters().list();
-		const auto hideAll = RabbitSettings::foldersHideAllChats()
-			&& (rawList.size() > 1);
-		if (hideAll) {
-			auto current = 0;
-			for (const auto &filter : rawList) {
-				if (filter.id()) {
-					if (current == index) {
-						return filter;
-					}
-					++current;
-				}
-			}
-		}
-		Assert(index >= 0 && index < rawList.size());
-		return rawList[index];
 	};
 
 	const auto rebuild = [=] {
@@ -482,9 +505,12 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			reassignUnreadValue();
 		}
 		[&] {
+			const auto currentActive = controller->activeChatsFilterCurrent();
 			const auto lookingId = state->lastFilterId.value_or(
 				trackActiveFilterAndUnreadAndReorder
-					? controller->activeChatsFilterCurrent()
+					? (hideAll && !currentActive && !list.empty()
+						? list[0].id()
+						: currentActive)
 					: list[0].id());
 			for (auto i = 0; i < list.size(); i++) {
 				const auto &filter = list[i];
@@ -495,7 +521,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					scrollToIndex(
 						i,
 						wasLast ? anim::type::normal : anim::type::instant);
-					if (wasLast || !trackActiveFilterAndUnreadAndReorder) {
+					if (wasLast || !trackActiveFilterAndUnreadAndReorder || (hideAll && !currentActive)) {
 						applyFilter(filter);
 					}
 					return;
@@ -503,7 +529,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			}
 			if (list.size()) {
 				const auto index = 0;
-				const auto &filter = filterByIndex(index);
+				const auto &filter = list[index];
 				state->lastFilterId = filter.id();
 				slider->setActiveSectionFast(index);
 				scrollToIndex(index, anim::type::instant);
@@ -513,7 +539,10 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		if (trackActiveFilterAndUnreadAndReorder) {
 			controller->activeChatsFilter(
 			) | rpl::on_next([=](FilterId id) {
-				const auto &list = session->data().chatsFilters().list();
+				if (hideAll && !id && !list.empty()) {
+					controller->setActiveChatsFilter(list[0].id());
+					return;
+				}
 				for (auto i = 0; i < list.size(); ++i) {
 					if (list[i].id() == id) {
 						state->ignoreActivation = true;

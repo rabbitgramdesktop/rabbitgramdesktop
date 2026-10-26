@@ -23,6 +23,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "window/window_filters_menu.h"
 #include "window/section_widget.h"
 #include "window/window_separate_id.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
 #include "info/peer_gifts/info_peer_gifts_widget.h"
 #include "info/stories/info_stories_widget.h"
@@ -1676,7 +1677,8 @@ SessionController::SessionController(
 	rpl::merge(
 		enoughSpaceForFiltersValue() | rpl::skip(1) | rpl::to_empty,
 		Core::App().settings().chatFiltersHorizontalChanges() | rpl::to_empty,
-		session->data().chatsFilters().changed()
+		session->data().chatsFilters().changed(),
+		RabbitSettings::JsonSettings::Events(u"folders_hide_all_chats"_q) | rpl::to_empty
 	) | rpl::on_next([=] {
 		if (!_filtersActivated) {
 			processFiltersMenu();
@@ -2042,14 +2044,19 @@ rpl::producer<> SessionController::filtersMenuChanged() const {
 
 void SessionController::checkOpenedFilter() {
 	activateFirstChatsFilter();
-	if (const auto filterId = activeChatsFilterCurrent()) {
-		const auto &list = session().data().chatsFilters().list();
+	const auto filterId = activeChatsFilterCurrent();
+	const auto &list = session().data().chatsFilters().list();
+	if (filterId) {
 		const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
 		if (i == end(list)) {
 			setActiveChatsFilter(
-				0,
+				session().data().chatsFilters().defaultId(),
 				{ anim::type::normal, anim::activation::background });
 		}
+	} else if (RabbitSettings::foldersHideAllChats() && list.size() > 1) {
+		setActiveChatsFilter(
+			session().data().chatsFilters().defaultId(),
+			{ anim::type::normal, anim::activation::background });
 	}
 }
 
