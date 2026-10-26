@@ -3239,6 +3239,20 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 	if (_reactionsManager) {
 		_reactionsManager->paint(p, context);
 	}
+
+	if (_gestureHorizontal.msgBareId && _gestureHorizontal.ratio > 0.) {
+		const auto item = session->data().message(_rmbLockedFullId);
+		if (const auto view = item ? viewByPosition(item->position()) : nullptr) {
+			const auto top = itemTop(view);
+			if (top >= 0) {
+				p.translate(0, top);
+				context.translate(0, -top);
+				view->drawSwipeOverlay(p, context);
+				context.translate(0, top);
+				p.translate(0, -top);
+			}
+		}
+	}
 }
 
 void ListWidget::paintUserpics(
@@ -4024,6 +4038,12 @@ void ListWidget::contextMenuEvent(QContextMenuEvent *e) {
 		e->accept();
 		return;
 	}
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	if (e->reason() == QContextMenuEvent::Mouse) {
+		e->accept();
+		return;
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 	showContextMenu(e);
 }
 
@@ -4254,6 +4274,10 @@ void ListWidget::mousePressEvent(QMouseEvent *e) {
 		_rmbCurrentDelta = 0.0;
 		_rmbAnimation.stop();
 		_rmbCarouselAnimation.stop();
+		if (_gestureHorizontal.customIcon) {
+			_gestureHorizontal = {};
+			update();
+		}
 	}
 	if (_menu) {
 		e->accept();
@@ -4534,6 +4558,7 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 	if ((_rmbWheelActive || _rmbSuppressedMenu) && (e->button() == Qt::RightButton)) {
 		const auto item = session().data().message(_rmbLockedFullId);
 		const auto view = item ? viewByPosition(item->position()) : nullptr;
+		const auto msgBareId = item ? item->fullId().msg.bare : _gestureHorizontal.msgBareId;
 
 		if (_gestureHorizontal.ratio >= 1.0 && item) {
 			const auto actions = availableSwipeActions(item, view);
@@ -4546,6 +4571,7 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 		_rmbWheelActive = false;
 		_rmbActionIndex = 0;
 		_rmbLockedFullId = {};
+		_rmbSuppressedMenu = false;
 
 		if (item && _rmbCurrentDelta > 0.0) {
 			const auto lastIcon = _gestureHorizontal.customIcon;
@@ -4558,7 +4584,7 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 			_rmbAnimation.start([=](float64 val) {
 				_rmbCurrentDelta = val;
 				const auto r = std::min(val / 70.0, 1.0);
-				_gestureHorizontal.msgBareId = item->fullId().msg.bare;
+				_gestureHorizontal.msgBareId = msgBareId;
 				_gestureHorizontal.translation = -int(base::SafeRound(val));
 				_gestureHorizontal.ratio = r;
 				_gestureHorizontal.reachRatio = (r >= 1.0) ? 1.0 : 0.0;
@@ -4580,6 +4606,23 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 		e->accept();
 		return;
 	}
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	if (e->button() == Qt::RightButton) {
+		registerReadMetricsActivity();
+		mouseActionFinish(e->globalPos(), e->button());
+		if ((e->pos() - _rmbPressPos).manhattanLength()
+				< QApplication::startDragDistance()) {
+			auto contextMenu = QContextMenuEvent(
+				QContextMenuEvent::Mouse,
+				e->pos(),
+				e->globalPosition().toPoint(),
+				e->modifiers());
+			showContextMenu(&contextMenu);
+		}
+		e->accept();
+		return;
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 	if (_middleClickAutoscroll.finishHold(e->button())) {
 		e->accept();
 		return;
@@ -6909,9 +6952,6 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 		const auto step = (deltaY != 0) ? -deltaY : deltaX;
 
 		if (step != 0) {
-			_rmbWheelActive = true;
-			_rmbSuppressedMenu = true;
-
 			Element *foundView = nullptr;
 			if (_rmbLockedFullId) {
 				if (const auto lockedItem = session().data().message(_rmbLockedFullId)) {
@@ -6934,11 +6974,14 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 			if (foundView) {
 				const auto item = foundView->data();
 				const auto viewItemId = item->fullId();
-				_rmbLockedFullId = viewItemId;
 
 				const auto actions = availableSwipeActions(item, foundView);
 
 				if (!actions.empty()) {
+					_rmbWheelActive = true;
+					_rmbSuppressedMenu = true;
+					_rmbLockedFullId = viewItemId;
+
 					const auto count = int(actions.size());
 					const auto isFirstPull = !_gestureHorizontal.translation;
 
@@ -6999,15 +7042,19 @@ void ListWidget::wheelEvent(QWheelEvent *e) {
 							update();
 						}, startOffset, 0.0, 150, anim::easeOutCubic);
 					}
-				}
 
-				mouseActionCancel();
-				ClickHandler::unpressed();
+					mouseActionCancel();
+					ClickHandler::unpressed();
+					e->accept();
+					return;
+				}
 			}
 		}
 
-		e->accept();
-		return;
+		if (_rmbWheelActive) {
+			e->accept();
+			return;
+		}
 	}
 	Ui::RpWidget::wheelEvent(e);
 }

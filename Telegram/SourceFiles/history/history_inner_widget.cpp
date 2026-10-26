@@ -2298,6 +2298,10 @@ void HistoryInner::mousePressEvent(QMouseEvent *e) {
 		_rmbCurrentDelta = 0.0;
 		_rmbAnimation.stop();
 		_rmbCarouselAnimation.stop();
+		if (_gestureHorizontal.customIcon) {
+			_gestureHorizontal = {};
+			update();
+		}
 	}
 	if (_menu) {
 		e->accept();
@@ -2785,6 +2789,7 @@ void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
 		_rmbWheelActive = false;
 		_rmbActionIndex = 0;
 		_rmbLockedMsgBareId = 0;
+		_rmbSuppressedMenu = false;
 
 		if (item && _rmbCurrentDelta > 0.0) {
 			const auto lastIcon = _gestureHorizontal.customIcon;
@@ -2809,7 +2814,16 @@ void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
 				if (val <= 0.0) {
 					_gestureHorizontal = {};
 				}
-				repaintItem(item);
+				const auto currentItem = _history
+					? _history->peer->owner().message(
+						_history->peer->id,
+						MsgId{ msgBareId })
+					: nullptr;
+				if (currentItem) {
+					repaintItem(currentItem);
+				} else {
+					update();
+				}
 			}, _rmbCurrentDelta, 0.0, 150, anim::easeOutCubic);
 		} else {
 			_gestureHorizontal = {};
@@ -2822,6 +2836,23 @@ void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
 		e->accept();
 		return;
 	}
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	if (e->button() == Qt::RightButton) {
+		registerReadMetricsActivity();
+		mouseActionFinish(e->globalPos(), e->button());
+		if ((e->pos() - _rmbPressPos).manhattanLength()
+				< QApplication::startDragDistance()) {
+			auto contextMenu = QContextMenuEvent(
+				QContextMenuEvent::Mouse,
+				e->pos(),
+				e->globalPosition().toPoint(),
+				e->modifiers());
+			showContextMenu(&contextMenu);
+		}
+		e->accept();
+		return;
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 	if (_middleClickAutoscroll.finishHold(e->button())) {
 		e->accept();
 		return;
@@ -3016,7 +3047,7 @@ std::vector<RabbitSettings::SwipeAction> HistoryInner::availableSwipeActions(
 				item,
 				view,
 				hasCopyRestriction(item),
-				hasCopyRestriction(item))) {
+				hasCopyMediaRestriction(item))) {
 			result.push_back(action);
 		}
 	}
@@ -3109,6 +3140,12 @@ void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
 		e->accept();
 		return;
 	}
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	if (e->reason() == QContextMenuEvent::Mouse) {
+		e->accept();
+		return;
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 	showContextMenu(e);
 }
 
@@ -3121,9 +3158,6 @@ void HistoryInner::wheelEvent(QWheelEvent *e) {
 		const auto step = (deltaY != 0) ? -deltaY : deltaX;
 
 		if (step != 0) {
-			_rmbWheelActive = true;
-			_rmbSuppressedMenu = true;
-
 			Element *foundView = nullptr;
 			if (_rmbLockedMsgBareId && _history) {
 				if (const auto lockedItem = _history->peer->owner().message(_history->peer->id, MsgId{ _rmbLockedMsgBareId })) {
@@ -3142,7 +3176,8 @@ void HistoryInner::wheelEvent(QWheelEvent *e) {
 						|| (!view->data()->isRegular()
 							&& (!view->data()->isEphemeral()
 								|| view->data()->out()))
-							|| view->data()->isService()) {
+						|| view->data()->isService()
+						|| view->data()->showSimilarChannels()) {
 						return true;
 					}
 					foundView = view;
@@ -3153,11 +3188,14 @@ void HistoryInner::wheelEvent(QWheelEvent *e) {
 			if (foundView) {
 				const auto item = foundView->data();
 				const auto viewItemId = item->fullId();
-				_rmbLockedMsgBareId = viewItemId.msg.bare;
 
 				const auto actions = availableSwipeActions(item, foundView);
 
 				if (!actions.empty()) {
+					_rmbWheelActive = true;
+					_rmbSuppressedMenu = true;
+					_rmbLockedMsgBareId = viewItemId.msg.bare;
+
 					const auto count = int(actions.size());
 					const auto isFirstPull = !_gestureHorizontal.translation;
 
@@ -3218,15 +3256,19 @@ void HistoryInner::wheelEvent(QWheelEvent *e) {
 							repaintItem(item);
 						}, startOffset, 0.0, 150, anim::easeOutCubic);
 					}
-				}
 
-				mouseActionCancel();
-				ClickHandler::unpressed();
+					mouseActionCancel();
+					ClickHandler::unpressed();
+					e->accept();
+					return;
+				}
 			}
 		}
 
-		e->accept();
-		return;
+		if (_rmbWheelActive) {
+			e->accept();
+			return;
+		}
 	}
 	Ui::RpWidget::wheelEvent(e);
 }

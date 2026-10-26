@@ -26,7 +26,7 @@ struct SwipeContextData final {
 		if (!translation || (msgBareId != bareId)) {
 			return 0;
 		}
-		return inverted ? translation : -translation;
+		return translation;
 	}
 
 	float64 ratio = 0.;
