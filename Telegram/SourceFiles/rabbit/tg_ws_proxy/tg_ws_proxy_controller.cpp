@@ -9,6 +9,11 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings/rabbit_settings.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "main/main_domain.h"
+#include "main/main_account.h"
+#include "mtproto/mtp_instance.h"
+
+#include <algorithm>
 
 namespace Rabbit::TgWsProxy {
 
@@ -39,8 +44,13 @@ bool Controller::start() {
 	if (Core::IsAppLaunched()) {
 		auto &proxySettings = Core::App().settings().proxy();
 		if (!_hasSavedState) {
-			_savedSettings = proxySettings.settings();
-			_savedProxy = proxySettings.selected();
+			if (proxySettings.selected().host != u"127.0.0.1"_q) {
+				_savedSettings = proxySettings.settings();
+				_savedProxy = proxySettings.selected();
+			} else {
+				_savedSettings = MTP::ProxyData::Settings::Disabled;
+				_savedProxy = MTP::ProxyData();
+			}
 			_hasSavedState = true;
 		}
 
@@ -50,12 +60,18 @@ bool Controller::start() {
 		});
 		if (it == list.end()) {
 			list.push_back(data);
-			proxySettings.setList(std::move(list));
+		} else {
+			*it = data;
 		}
+		proxySettings.setList(std::move(list));
 
-		proxySettings.setSelected(data);
-		proxySettings.setSettings(MTP::ProxyData::Settings::Enabled);
-		Core::App().refreshGlobalProxy();
+		Core::App().setCurrentProxy(data, MTP::ProxyData::Settings::Enabled);
+		if (Core::App().domain().started()) {
+			for (const auto &[index, account] : Core::App().domain().accounts()) {
+				account->mtp().restart();
+				account->mtp().reInitConnection(account->mtp().mainDcId());
+			}
+		}
 	}
 
 	_runningChanges.fire(true);
@@ -70,12 +86,23 @@ void Controller::stop() {
 	_server.stop();
 	_currentProxy = MTP::ProxyData();
 
-	if (Core::IsAppLaunched() && _hasSavedState) {
-		auto &proxySettings = Core::App().settings().proxy();
-		proxySettings.setSelected(_savedProxy);
-		proxySettings.setSettings(_savedSettings);
-		_hasSavedState = false;
-		Core::App().refreshGlobalProxy();
+	if (Core::IsAppLaunched()) {
+		if (_hasSavedState) {
+			const auto savedProxy = _savedProxy;
+			const auto savedSettings = _savedSettings;
+			_hasSavedState = false;
+			Core::App().setCurrentProxy(savedProxy, savedSettings);
+		} else {
+			Core::App().setCurrentProxy(
+				MTP::ProxyData(),
+				MTP::ProxyData::Settings::Disabled);
+		}
+		if (Core::App().domain().started()) {
+			for (const auto &[index, account] : Core::App().domain().accounts()) {
+				account->mtp().restart();
+				account->mtp().reInitConnection(account->mtp().mainDcId());
+			}
+		}
 	}
 
 	_runningChanges.fire(false);
@@ -98,7 +125,7 @@ MTP::ProxyData Controller::proxyData() const {
 }
 
 rpl::producer<bool> Controller::runningValue() const {
-	return _runningChanges.events_starting_with(isRunning());
+	return _runningChanges.events_starting_with_copy(isRunning());
 }
 
 } // namespace Rabbit::TgWsProxy

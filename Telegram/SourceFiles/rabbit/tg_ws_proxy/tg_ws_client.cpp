@@ -8,6 +8,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/tg_ws_proxy/tg_ws_client.h"
 
 #include <QtCore/QtEndian>
+#include <QtNetwork/QSslError>
 #include <openssl/rand.h>
 
 namespace Rabbit::TgWsProxy {
@@ -32,6 +33,13 @@ TgWsClient::TgWsClient(QObject *parent)
 		_fragmentBuffer.clear();
 		Q_EMIT disconnected();
 	});
+	connect(
+		&_socket,
+		QOverload<const QList<QSslError>&>::of(&QSslSocket::sslErrors),
+		this,
+		[=](const QList<QSslError> &) {
+			_socket.ignoreSslErrors();
+		});
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 	connect(&_socket, &QSslSocket::errorOccurred, this, [=](QAbstractSocket::SocketError) {
 		if (_state != State::Closed) {
@@ -60,6 +68,7 @@ void TgWsClient::connectToHost(
 	const auto peerName = sni.isEmpty() ? domain : sni;
 	_socket.setPeerVerifyName(peerName);
 	_socket.setPeerVerifyMode(QSslSocket::VerifyNone);
+	_socket.ignoreSslErrors();
 	_socket.connectToHostEncrypted(targetIp, 443, peerName);
 }
 

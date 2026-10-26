@@ -248,7 +248,6 @@ Application::Application()
 		}));
 	}, _lifetime);
 
-	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 }
 
 void Application::closeAdditionalWindows() {
@@ -263,6 +262,8 @@ void Application::closeAdditionalWindows() {
 }
 
 Application::~Application() {
+	Rabbit::TgWsProxy::Controller::Instance().stop();
+
 	if (_savedWindows) {
 		_savedWindows->writeNow();
 	}
@@ -326,6 +327,8 @@ void Application::run() {
 	ValidateScale();
 
 	refreshGlobalProxy(); // Depends on app settings being read.
+
+	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 
 	if (const auto old = Local::oldSettingsVersion(); old < AppVersion) {
 		autoRegisterUrlScheme();
@@ -1938,7 +1941,6 @@ void Application::refreshGlobalProxy() {
 	} else {
 		MTP::WebProxy::Transport::Deactivate();
 	}
-	Rabbit::TgWsProxy::Controller::Instance().applyIfEnabled();
 	Sandbox::Instance().refreshGlobalProxy();
 }
 
