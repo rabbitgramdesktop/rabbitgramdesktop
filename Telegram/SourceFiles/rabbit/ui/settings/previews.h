@@ -78,3 +78,20 @@ protected:
 	void paintEvent(QPaintEvent *e) override;
 
 };
+
+class FoldersPreview final : public Ui::RpWidget {
+public:
+	FoldersPreview(
+		QWidget *parent,
+		Window::SessionController *controller = nullptr);
+
+	int resizeGetHeight(int newWidth) override;
+
+protected:
+	void paintEvent(QPaintEvent *e) override;
+
+private:
+	Window::SessionController *_controller = nullptr;
+	int _activeTab = 0;
+
+};

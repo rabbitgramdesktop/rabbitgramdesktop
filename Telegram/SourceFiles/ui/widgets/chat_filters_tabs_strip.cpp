@@ -23,6 +23,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "lang/lang_keys.h"
 #include "menu/menu_mark_as_read.h"
 #include "main/main_session.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "settings/sections/settings_folders.h"
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/filter_icons.h"
@@ -232,22 +233,35 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 	const auto state = wrap->lifetime().make_state<State>();
 	const auto reassignUnreadValue = [=] {
 		state->reorderLifetime.destroy();
-		const auto &list = session->data().chatsFilters().list();
-		auto includeMuted = Data::IncludeMutedCounterFoldersValue();
-		for (auto i = 0; i < list.size(); i++) {
+		const auto &rawList = session->data().chatsFilters().list();
+		const auto hideAll = RabbitSettings::foldersHideAllChats()
+			&& (rawList.size() > 1);
+		auto sliderIndex = 0;
+		for (auto i = 0; i < rawList.size(); i++) {
+			if (hideAll && !rawList[i].id()) {
+				continue;
+			}
+			const auto index = sliderIndex++;
 			rpl::combine(
-				Data::UnreadStateValue(session, list[i].id()),
-				rpl::duplicate(includeMuted)
+				Data::UnreadStateValue(session, rawList[i].id()),
+				Data::IncludeMutedCounterFoldersValue()
 			) | rpl::on_next([=](
 					const Dialogs::UnreadState &state,
 					bool includeMuted) {
+				const auto counterMode = RabbitSettings::foldersUnreadCounter();
+				if (counterMode == 2) {
+					slider->setUnreadCount(index, 0, false);
+					slider->fitWidthToSections();
+					return;
+				}
 				const auto chats = state.chats;
 				const auto chatsMuted = state.chatsMuted;
 				const auto muted = (chatsMuted + state.marksMuted);
+				const auto countIncludeMuted = (counterMode == 0);
 				const auto count = (chats + state.marks)
-					- (includeMuted ? 0 : muted);
-				const auto isMuted = includeMuted && (count == muted);
-				slider->setUnreadCount(i, count, isMuted);
+					- (countIncludeMuted ? 0 : muted);
+				const auto isMuted = countIncludeMuted && (count == muted);
+				slider->setUnreadCount(index, count, isMuted);
 				slider->fitWidthToSections();
 			}, state->reorderLifetime);
 		}
@@ -371,16 +385,38 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 	};
 
 	const auto filterByIndex = [=](int index) -> const Data::ChatFilter& {
-		const auto &list = session->data().chatsFilters().list();
-		Assert(index >= 0 && index < list.size());
-		return list[index];
+		const auto &rawList = session->data().chatsFilters().list();
+		const auto hideAll = RabbitSettings::foldersHideAllChats()
+			&& (rawList.size() > 1);
+		if (hideAll) {
+			auto current = 0;
+			for (const auto &filter : rawList) {
+				if (filter.id()) {
+					if (current == index) {
+						return filter;
+					}
+					++current;
+				}
+			}
+		}
+		Assert(index >= 0 && index < rawList.size());
+		return rawList[index];
 	};
 
 	const auto rebuild = [=] {
-		const auto &list = session->data().chatsFilters().list();
-		if ((list.size() <= 1 && !slider->width()) || state->ignoreRefresh) {
+		const auto &rawList = session->data().chatsFilters().list();
+		if ((rawList.size() <= 1 && !slider->width()) || state->ignoreRefresh) {
 			return;
 		}
+		const auto hideAll = RabbitSettings::foldersHideAllChats()
+			&& (rawList.size() > 1);
+		const auto list = hideAll
+			? (ranges::views::all(rawList)
+				| ranges::views::filter([](const Data::ChatFilter &f) {
+					return f.id() != 0;
+				})
+				| ranges::to_vector)
+			: rawList;
 		const auto context = Core::TextContext({ .session = session });
 		const auto paused = [=] {
 			return On(PowerSaving::kEmojiChat)
@@ -534,6 +570,18 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		scrollToIndex(slider->activeSection(), anim::type::instant);
 	}, wrap->lifetime());
 	rebuild();
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_hide_all_chats"_q
+	) | rpl::on_next([=] {
+		rebuild();
+	}, wrap->lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_unread_counter"_q
+	) | rpl::on_next([=] {
+		reassignUnreadValue();
+	}, wrap->lifetime());
 
 	session->data().chatsFilters().isChatlistChanged(
 	) | rpl::on_next([=](FilterId id) {

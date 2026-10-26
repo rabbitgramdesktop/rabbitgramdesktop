@@ -177,7 +177,7 @@ void ChatsFiltersTabs::fitWidthToSections() {
 		if (RabbitSettings::foldersShowIcon() && i < _icons.size()) {
 			const auto &icons = Ui::LookupFilterIcon(_icons[i]);
 			const auto iconHeight = icons.normal->height();
-			const auto targetHeight = _cachedBadgeHeight;
+			const auto targetHeight = 20;
 			const auto targetWidth = (iconHeight > 0)
 				? int(std::round(icons.normal->width() * (double(targetHeight) / iconHeight)))
 				: icons.normal->width();
@@ -385,7 +385,7 @@ void ChatsFiltersTabs::paintEvent(QPaintEvent *e) {
 				const auto &icons = Ui::LookupFilterIcon(_icons[index]);
 				const auto &icon = (active > 0.5) ? *icons.active : *icons.normal;
 				
-				const auto targetHeight = _cachedBadgeHeight;
+				const auto targetHeight = 20;
 				const auto iconHeight = icon.height();
 				const auto targetWidth = (iconHeight > 0)
 					? int(std::round(icon.width() * (double(targetHeight) / iconHeight)))

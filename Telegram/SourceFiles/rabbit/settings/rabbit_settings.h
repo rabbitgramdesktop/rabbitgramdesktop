@@ -183,6 +183,8 @@ inline void setSwipeActionsList(const std::vector<SwipeAction> &list) {
 inline bool moreRecentStickers() { return JsonSettings::GetBool(u"more_recent_stickers"_q); }
 inline int foldersStyle() { return JsonSettings::GetInt(u"folders_style"_q); }
 inline bool foldersShowIcon() { return JsonSettings::GetBool(u"folders_show_icon"_q); }
+inline bool foldersHideAllChats() { return JsonSettings::GetBool(u"folders_hide_all_chats"_q); }
+inline int foldersUnreadCounter() { return JsonSettings::GetInt(u"folders_unread_counter"_q); }
 inline bool spoofWebviewAsAndroid() { return JsonSettings::GetBool(u"spoof_webview_as_android"_q); }
 inline bool preciseTime() { return JsonSettings::GetBool(u"precise_time"_q); }
 inline bool showOnlineIndicator() { return JsonSettings::GetBool(u"show_online_indicator"_q); }
@@ -238,6 +240,8 @@ inline void setIncomingQuickAction(int value) { JsonSettings::Set(u"incoming_qui
 inline void setMoreRecentStickers(bool value) { JsonSettings::Set(u"more_recent_stickers"_q, value); }
 inline void setFoldersStyle(int value) { JsonSettings::Set(u"folders_style"_q, value); }
 inline void setFoldersShowIcon(bool value) { JsonSettings::Set(u"folders_show_icon"_q, value); }
+inline void setFoldersHideAllChats(bool value) { JsonSettings::Set(u"folders_hide_all_chats"_q, value); }
+inline void setFoldersUnreadCounter(int value) { JsonSettings::Set(u"folders_unread_counter"_q, value); }
 inline void setSpoofWebviewAsAndroid(bool value) { JsonSettings::Set(u"spoof_webview_as_android"_q, value); }
 inline void setPreciseTime(bool value) { JsonSettings::Set(u"precise_time"_q, value); }
 inline void setShowOnlineIndicator(bool value) { JsonSettings::Set(u"show_online_indicator"_q, value); }

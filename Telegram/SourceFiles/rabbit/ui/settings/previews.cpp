@@ -10,6 +10,13 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/quick_actions/quick_action.h"
 #include "rabbit/quick_actions/quick_action_ui.h"
 #include "rabbit/settings/rabbit_settings.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include "ui/filter_icons.h"
+#include "ui/unread_badge_paint.h"
+#include "styles/style_dialogs.h"
+#include "styles/style_window.h"
+#include "data/data_chat_filters.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
 #include "ui/painter.h"
@@ -398,4 +405,378 @@ void QuickActionsPreview::paintEvent(QPaintEvent *e) {
 			+ (outgoingBox.height() - icon.height()) / 2;
 		icon.paint(p, iconLeft, iconTop);
 	}
+}
+
+FoldersPreview::FoldersPreview(
+	QWidget *parent,
+	Window::SessionController *controller)
+: RpWidget(parent)
+, _controller(controller) {
+	setMinimumHeight(220);
+
+	if (_controller) {
+		const auto filters = &_controller->session().data().chatsFilters();
+		filters->changed(
+		) | rpl::on_next([=] {
+			update();
+		}, lifetime());
+	}
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_style"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_show_icon"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_hide_all_chats"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"folders_unread_counter"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	Core::App().settings().chatFiltersHorizontalChanges(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
+	style::PaletteChanged(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+}
+
+int FoldersPreview::resizeGetHeight(int newWidth) {
+	return 220;
+}
+
+void FoldersPreview::paintEvent(QPaintEvent *e) {
+	Painter p(this);
+	PainterHighQualityEnabler hq(p);
+
+	const auto cardRect = QRect(0, 0, width(), height());
+	const auto radius = 8.;
+
+	auto clipPath = QPainterPath();
+	clipPath.addRoundedRect(cardRect, radius, radius);
+	p.setClipPath(clipPath);
+
+	p.fillRect(cardRect, st::windowBg);
+
+	struct TabData {
+		QString name;
+		Ui::FilterIcon icon;
+		int unread = 0;
+		bool muted = false;
+	};
+	const auto hideAll = RabbitSettings::foldersHideAllChats();
+	auto tabs = std::vector<TabData>();
+
+	if (_controller) {
+		const auto session = &_controller->session();
+		const auto &list = session->data().chatsFilters().list();
+		for (const auto &filter : list) {
+			if (hideAll && !filter.id()) {
+				continue;
+			}
+			const auto name = !filter.id()
+				? tr::lng_filters_all(tr::now)
+				: filter.titleText().text;
+			const auto icon = !filter.id()
+				? Ui::FilterIcon::All
+				: Ui::ComputeFilterIcon(filter);
+			const auto unread = !filter.id()
+				? session->data().chatsList()->unreadState()
+				: session->data().chatsFilters().chatsList(filter.id())->unreadState();
+			const auto count = unread.chats + unread.marks;
+			const auto isMuted = (count <= (unread.chatsMuted + unread.marksMuted));
+			tabs.push_back({ name, icon, count, isMuted });
+		}
+	}
+
+	if (tabs.empty() || (tabs.size() == 1 && !hideAll)) {
+		tabs.clear();
+		if (!hideAll) {
+			tabs.push_back({ tr::lng_filters_all(tr::now), Ui::FilterIcon::All, 12, false });
+		}
+		tabs.push_back({ tr::lng_filters_name_people(tr::now), Ui::FilterIcon::Private, 3, true });
+		tabs.push_back({ tr::lng_filters_include_channels(tr::now), Ui::FilterIcon::Channels, 0, false });
+		if (hideAll) {
+			tabs.push_back({ tr::lng_filters_name_unread(tr::now), Ui::FilterIcon::Unread, 5, false });
+		}
+	}
+
+	if (_activeTab >= int(tabs.size())) {
+		_activeTab = 0;
+	}
+
+	const auto counterMode = RabbitSettings::foldersUnreadCounter();
+	const auto shouldShowBadge = [=](const TabData &tab) {
+		if (counterMode == 2 || tab.unread <= 0) {
+			return false;
+		}
+		if (counterMode == 1 && tab.muted) {
+			return false;
+		}
+		return true;
+	};
+
+	const auto horizontal = Core::App().settings().chatFiltersHorizontal();
+	const auto foldersStyle = RabbitSettings::foldersStyle();
+
+	if (horizontal) {
+		const auto tabsHeight = 38;
+		p.fillRect(0, 0, width(), tabsHeight, st::windowBgOver);
+		p.fillRect(0, tabsHeight - 1, width(), 1, st::shadowFg);
+
+		const auto font = st::dialogsSearchTabs.labelStyle.font;
+		const auto showIcon = RabbitSettings::foldersShowIcon();
+		const auto iconHeight = 20;
+
+		auto unreadSt = Ui::UnreadBadgeStyle();
+		unreadSt.align = style::al_left;
+
+		p.save();
+		p.setClipRect(0, 0, width(), tabsHeight);
+
+		auto currentX = 10;
+		const auto count = std::min(int(tabs.size()), 3);
+		for (auto i = 0; i < count; ++i) {
+			const auto &tab = tabs[i];
+			const auto active = (i == _activeTab);
+
+			auto contentWidth = font->width(tab.name);
+			auto iconWidth = 0;
+			if (showIcon) {
+				const auto &icons = Ui::LookupFilterIcon(tab.icon);
+				const auto icon = active ? icons.active : icons.normal;
+				iconWidth = (icon->height() > 0)
+					? int(std::round(icon->width() * (double(iconHeight) / icon->height())))
+					: icon->width();
+				contentWidth += iconWidth + 6;
+			}
+			auto badgeWidth = 0;
+			if (shouldShowBadge(tab)) {
+				unreadSt.muted = tab.muted;
+				badgeWidth = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt).width() + 5;
+				contentWidth += badgeWidth;
+			}
+
+			const auto tabPadding = 8;
+			const auto tabWidth = contentWidth + tabPadding * 2;
+			if (currentX + tabWidth > width() - 8 && i > 0) {
+				break;
+			}
+			const auto tabRect = QRect(currentX, 0, tabWidth, tabsHeight);
+
+			if (active) {
+				p.setPen(Qt::NoPen);
+				if (foldersStyle == 0) {
+					p.setBrush(st::dialogsSearchTabs.rippleBgActive->c);
+					p.drawRoundedRect(tabRect.x(), 4, tabRect.width(), tabsHeight - 8, 4, 4);
+				} else if (foldersStyle == 1) {
+					p.setBrush(st::dialogsSearchTabs.labelFgActive->c);
+					p.drawRoundedRect(tabRect.x() + 4, tabsHeight - 4, tabRect.width() - 8, 3, 1.5, 1.5);
+				} else if (foldersStyle == 2) {
+					p.setBrush(st::dialogsSearchTabs.rippleBgActive->c);
+					const auto h = tabsHeight - 10;
+					p.drawRoundedRect(tabRect.x(), 5, tabRect.width(), h, h * 0.25, h * 0.25);
+				} else if (foldersStyle == 3) {
+					p.setBrush(st::dialogsSearchTabs.rippleBgActive->c);
+					const auto h = tabsHeight - 10;
+					p.drawRoundedRect(tabRect.x(), 5, tabRect.width(), h, h * 0.5, h * 0.5);
+				}
+			}
+
+			auto itemX = currentX + tabPadding;
+			if (showIcon) {
+				const auto &icons = Ui::LookupFilterIcon(tab.icon);
+				const auto icon = active ? icons.active : icons.normal;
+				p.save();
+				p.translate(itemX, (tabsHeight - iconHeight) / 2);
+				const auto scale = double(iconHeight) / icon->height();
+				p.scale(scale, scale);
+				icon->paint(p, 0, 0, icon->width());
+				p.restore();
+				itemX += iconWidth + 6;
+			}
+
+			p.setFont(font);
+			p.setPen(active ? st::dialogsSearchTabs.labelFgActive : st::dialogsSearchTabs.labelFg);
+			p.drawText(itemX, (tabsHeight - font->height) / 2 + font->ascent, tab.name);
+			itemX += font->width(tab.name);
+
+			if (shouldShowBadge(tab)) {
+				unreadSt.muted = tab.muted;
+				Ui::PaintUnreadBadge(p, QString::number(tab.unread), itemX + 5, (tabsHeight - 16) / 2, unreadSt);
+			}
+
+			currentX += tabWidth + 6;
+		}
+		p.restore();
+
+		p.save();
+		p.setClipRect(0, tabsHeight, width(), height() - tabsHeight);
+		for (auto row = 0; row < 4; ++row) {
+			const auto rowY = 46 + row * 40;
+			p.setPen(Qt::NoPen);
+			p.setBrush(st::rndPreviewFill);
+			p.drawEllipse(12, rowY, 32, 32);
+			p.setBrush(st::rndSkeletonFill);
+			const auto nameW = (row == 0) ? 80 : (row == 1) ? 100 : (row == 2) ? 70 : 90;
+			const auto textW = (row == 0) ? 130 : (row == 1) ? 140 : (row == 2) ? 100 : 120;
+			p.drawRoundedRect(54, rowY + 5, nameW, 9, 4, 4);
+			p.drawRoundedRect(54, rowY + 19, textW, 8, 4, 4);
+			p.drawRoundedRect(width() - 36, rowY + 5, 24, 8, 4, 4);
+		}
+		p.restore();
+	} else {
+		const auto sidebarWidth = 72;
+		p.fillRect(0, 0, sidebarWidth, height(), st::windowFiltersButton.textBg);
+		p.fillRect(sidebarWidth - 1, 0, 1, height(), st::shadowFg);
+
+		const auto showIcon = RabbitSettings::foldersShowIcon();
+		const auto buttonHeight = showIcon
+			? st::windowFiltersButton.minHeight
+			: st::windowFiltersButtonTextOnly.minHeight;
+		const auto gap = 4;
+		const auto count = std::min(int(tabs.size()), 3);
+		const auto totalButtonsHeight = count * buttonHeight + (count - 1) * gap;
+		const auto startY = std::max((height() - totalButtonsHeight) / 2, 4);
+
+		auto unreadSt = Ui::UnreadBadgeStyle();
+		unreadSt.align = style::al_left;
+
+		p.save();
+		p.setClipRect(0, 0, sidebarWidth - 1, height());
+
+		for (auto i = 0; i < count; ++i) {
+			const auto &tab = tabs[i];
+			const auto active = (i == _activeTab);
+			const auto y = startY + i * (buttonHeight + gap);
+			const auto buttonRect = QRect(0, y, sidebarWidth - 1, buttonHeight);
+
+			if (showIcon) {
+				const auto &icons = Ui::LookupFilterIcon(tab.icon);
+				const auto icon = active ? icons.active : icons.normal;
+				const auto iconX = (sidebarWidth - 1 - icon->width()) / 2;
+				const auto iconY = y + 6;
+
+				if (active) {
+					p.setPen(Qt::NoPen);
+					if (foldersStyle == 0) {
+						p.fillRect(buttonRect, st::windowFiltersButton.textBgActive);
+					} else if (foldersStyle == 1) {
+						p.setBrush(st::windowFiltersButton.textFgActive);
+						p.drawRoundedRect(sidebarWidth - 4, y + 12, 3, buttonHeight - 24, 1.5, 1.5);
+					} else if (foldersStyle == 2 || foldersStyle == 3) {
+						const auto bh = 36;
+						const auto cy = iconY + icon->height() / 2;
+						const auto by = cy - bh / 2;
+						const auto bx = 6;
+						const auto bw = sidebarWidth - 1 - 12;
+						const auto radius = (foldersStyle == 2) ? bh * 0.25 : bh * 0.5;
+						auto col = st::windowFiltersButton.textBgActive->c;
+						col.setAlpha(90);
+						p.setBrush(col);
+						p.drawRoundedRect(bx, by, bw, bh, radius, radius);
+					}
+				}
+
+				icon->paint(p, iconX, iconY, width());
+
+				const auto font = st::windowFiltersButton.style.font;
+				p.setFont(font);
+				p.setPen(active ? st::windowFiltersButton.textFgActive : st::windowFiltersButton.textFg);
+				const auto maxTextWidth = sidebarWidth - 1 - 12;
+				const auto elided = font->elided(tab.name, maxTextWidth);
+				const auto textWidth = font->width(elided);
+				const auto textX = (sidebarWidth - 1 - textWidth) / 2;
+				p.drawText(textX, y + 40 + font->ascent, elided);
+
+				if (shouldShowBadge(tab)) {
+					unreadSt.muted = tab.muted;
+					const auto badgeWidth = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt).width();
+					const auto badgeX = std::min(
+						(sidebarWidth - 1) / 2 + 3,
+						sidebarWidth - 1 - badgeWidth - 2);
+					const auto badgeY = y + 7;
+					Ui::PaintUnreadBadge(p, QString::number(tab.unread), badgeX, badgeY, unreadSt);
+				}
+			} else {
+				const auto cy = y + buttonHeight / 2;
+				if (active) {
+					p.setPen(Qt::NoPen);
+					if (foldersStyle == 0) {
+						p.fillRect(buttonRect, st::windowFiltersButton.textBgActive);
+					} else if (foldersStyle == 1) {
+						p.setBrush(st::windowFiltersButton.textFgActive);
+						p.drawRoundedRect(sidebarWidth - 4, y + 8, 3, buttonHeight - 16, 1.5, 1.5);
+					} else if (foldersStyle == 2 || foldersStyle == 3) {
+						const auto bh = 28;
+						const auto by = cy - bh / 2;
+						const auto bx = 6;
+						const auto bw = sidebarWidth - 1 - 12;
+						const auto radius = (foldersStyle == 2) ? bh * 0.25 : bh * 0.5;
+						auto col = st::windowFiltersButton.textBgActive->c;
+						col.setAlpha(90);
+						p.setBrush(col);
+						p.drawRoundedRect(bx, by, bw, bh, radius, radius);
+					}
+				}
+
+				const auto font = st::windowFiltersButtonTextOnly.style.font;
+				p.setFont(font);
+				p.setPen(active ? st::windowFiltersButton.textFgActive : st::windowFiltersButton.textFg);
+				const auto maxTextWidth = sidebarWidth - 1 - 12;
+				const auto elided = font->elided(tab.name, maxTextWidth);
+				const auto textWidth = font->width(elided);
+				const auto textX = (sidebarWidth - 1 - textWidth) / 2;
+				p.drawText(textX, y + 15 + font->ascent, elided);
+
+				if (shouldShowBadge(tab)) {
+					unreadSt.muted = tab.muted;
+					const auto badgeWidth = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt).width();
+					const auto badgeX = std::min(
+						(sidebarWidth - 1) / 2 + 15,
+						sidebarWidth - 1 - badgeWidth - 2);
+					const auto badgeY = y + 1;
+					Ui::PaintUnreadBadge(p, QString::number(tab.unread), badgeX, badgeY, unreadSt);
+				}
+			}
+		}
+		p.restore();
+
+		p.save();
+		p.setClipRect(sidebarWidth, 0, width() - sidebarWidth, height());
+		for (auto row = 0; row < 4; ++row) {
+			const auto rowY = 14 + row * 48;
+			p.setPen(Qt::NoPen);
+			p.setBrush(st::rndPreviewFill);
+			p.drawEllipse(sidebarWidth + 12, rowY, 34, 34);
+			p.setBrush(st::rndSkeletonFill);
+			const auto nameW = (row == 0) ? 85 : (row == 1) ? 100 : (row == 2) ? 70 : 90;
+			const auto textW = (row == 0) ? 120 : (row == 1) ? 140 : (row == 2) ? 100 : 130;
+			p.drawRoundedRect(sidebarWidth + 56, rowY + 5, nameW, 9, 4, 4);
+			p.drawRoundedRect(sidebarWidth + 56, rowY + 20, textW, 8, 4, 4);
+			p.drawRoundedRect(width() - 36, rowY + 5, 24, 8, 4, 4);
+		}
+		p.restore();
+	}
+
+	p.setClipping(false);
+	p.setPen(QPen(st::quickActionBoxStroke, 1.));
+	p.setBrush(Qt::NoBrush);
+	p.drawRoundedRect(cardRect.adjusted(0, 0, -1, -1), radius, radius);
 }

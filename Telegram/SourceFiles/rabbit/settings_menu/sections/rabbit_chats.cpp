@@ -1302,6 +1302,45 @@ void FoldersStyleBox(not_null<Ui::GenericBox *> box) {
 	box->setWidth(st::aboutWidth);
 }
 
+void FoldersUnreadCounterBox(not_null<Ui::GenericBox *> box) {
+	box->setTitle(rktr(u"rtg_settings_folders_unread_counter"_q));
+
+	const auto layout = box->verticalLayout();
+
+	const auto options = std::vector<int>{
+		0, // All chats
+		1, // With notifications
+		2  // Disabled
+	};
+
+	const auto addOption = [&](
+		rpl::producer<QString> label,
+		int value) {
+		Settings::AddButtonWithIcon(
+			layout,
+			std::move(label),
+			st::settingsButtonNoIcon,
+			{}
+		)->addClickHandler([=] {
+			RabbitSettings::setFoldersUnreadCounter(value);
+			box->closeBox();
+		});
+	};
+
+	for (const auto &val : options) {
+		rpl::producer<QString> label;
+		switch (val) {
+		case 1: label = rktr(u"rtg_settings_folders_unread_unmuted"_q); break;
+		case 2: label = rktr(u"rtg_settings_folders_unread_off"_q); break;
+		default: label = rktr(u"rtg_settings_folders_unread_all"_q); break;
+		}
+		addOption(std::move(label), val);
+	}
+
+	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+	box->setWidth(st::aboutWidth);
+}
+
 void BuildFolders(
 	SectionBuilder &builder,
 	Window::SessionController *controller) {
@@ -1309,6 +1348,23 @@ void BuildFolders(
 		.id = u"rabbit/chats/folders"_q,
 		.title = rktr(u"rtg_settings_folders"_q),
 		.keywords = { u"folders"_q, u"tabs"_q },
+	});
+
+	builder.add([=](const WidgetContext &ctx) {
+		return SectionBuilder::WidgetToAdd{
+			.widget = object_ptr<FoldersPreview>(ctx.container, controller),
+			.margin = st::defaultSubsectionTitlePadding,
+		};
+	});
+
+	builder.addSkip();
+
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"rabbit/chats/folders/preview"_q,
+			.title = ktr(u"rtg_settings_folders"_q),
+			.keywords = { u"folders"_q, u"preview"_q, u"tabs"_q },
+		};
 	});
 
 	AddToggle(
@@ -1354,23 +1410,54 @@ void BuildFolders(
 		}
 	}
 
-	auto showIconShown = rpl::merge(
-		rpl::single(rpl::empty),
-		Core::App().settings().chatFiltersHorizontalChanges() | rpl::to_empty
-	) | rpl::map([=] {
-		return Core::App().settings().chatFiltersHorizontal();
-	});
+	AddToggle(
+		builder,
+		u"rabbit/chats/folders/show_icon"_q,
+		rktr(u"rtg_settings_folders_show_icon"_q),
+		nullptr,
+		[] { return RabbitSettings::foldersShowIcon(); },
+		[](bool value) { RabbitSettings::setFoldersShowIcon(value); },
+		{ u"show"_q, u"icon"_q, u"folders"_q });
 
-	builder.scope([&] {
-		AddToggle(
-			builder,
-			u"rabbit/chats/folders/show_icon"_q,
-			rktr(u"rtg_settings_folders_show_icon"_q),
-			nullptr,
-			[] { return RabbitSettings::foldersShowIcon(); },
-			[](bool value) { RabbitSettings::setFoldersShowIcon(value); },
-			{ u"show"_q, u"icon"_q, u"folders"_q });
-	}, std::move(showIconShown));
+	builder.addSkip();
+
+	AddToggle(
+		builder,
+		u"rabbit/chats/folders/hide_all_chats"_q,
+		rktr(u"rtg_settings_folders_hide_all_chats"_q),
+		nullptr,
+		[] { return RabbitSettings::foldersHideAllChats(); },
+		[](bool value) { RabbitSettings::setFoldersHideAllChats(value); },
+		{ u"hide"_q, u"all"_q, u"chats"_q, u"folders"_q });
+
+	const auto unreadCounterLabel = rpl::merge(
+		rpl::single(QString()),
+		RabbitSettings::JsonSettings::Events(u"folders_unread_counter"_q)
+	) | rpl::map([](const QString &) {
+		switch (RabbitSettings::foldersUnreadCounter()) {
+		case 1: return rktr(u"rtg_settings_folders_unread_unmuted"_q);
+		case 2: return rktr(u"rtg_settings_folders_unread_off"_q);
+		default: return rktr(u"rtg_settings_folders_unread_all"_q);
+		}
+	}) | rpl::flatten_latest();
+
+	if (const auto button = builder.addButton({
+		.id = u"rabbit/chats/folders/unread_counter"_q,
+		.title = rktr(u"rtg_settings_folders_unread_counter"_q),
+		.st = &st::settingsButtonNoIcon,
+		.label = unreadCounterLabel,
+		.onClick = controller
+			? [=] { controller->show(Box(FoldersUnreadCounterBox)); }
+			: Fn<void()>(),
+		.keywords = { u"unread"_q, u"counter"_q, u"folders"_q },
+	})) {
+		if (controller) {
+			RtgMenu::AttachSettingsContextMenu(
+				button,
+				u"rabbit/chats/folders/unread_counter"_q,
+				controller);
+		}
+	}
 }
 
 void BuildRabbitChats(

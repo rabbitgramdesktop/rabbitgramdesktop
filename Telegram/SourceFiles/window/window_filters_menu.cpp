@@ -166,7 +166,9 @@ void FiltersMenu::setup() {
 
 	rpl::merge(
 		RabbitSettings::JsonSettings::Events(u"folders_style"_q),
-		RabbitSettings::JsonSettings::Events(u"folders_show_icon"_q)
+		RabbitSettings::JsonSettings::Events(u"folders_show_icon"_q),
+		RabbitSettings::JsonSettings::Events(u"folders_hide_all_chats"_q),
+		RabbitSettings::JsonSettings::Events(u"folders_unread_counter"_q)
 	) | rpl::on_next([=] {
 		_menu.setFolderStyle(RabbitSettings::foldersStyle());
 		refresh();
@@ -392,7 +394,12 @@ void FiltersMenu::refresh() {
 
 	auto now = base::flat_map<int, base::unique_qptr<Ui::SideBarButton>>();
 	const auto &currentFilter = _session->activeChatsFilterCurrent();
+	const auto hideAll = RabbitSettings::foldersHideAllChats()
+		&& (filters->list().size() > 1);
 	for (const auto &filter : filters->list()) {
+		if (hideAll && !filter.id()) {
+			continue;
+		}
 		const auto nextIsLocked = (now.size() >= premiumFrom);
 		if (nextIsLocked && (currentFilter == filter.id())) {
 			_session->setActiveChatsFilter(FilterId(0));
@@ -404,6 +411,14 @@ void FiltersMenu::refresh() {
 			Ui::ComputeFilterIcon(filter),
 			nextIsLocked);
 		now.emplace(filter.id(), std::move(button));
+	}
+	if (hideAll && !_activeFilterId && filters->list().size() > 1) {
+		for (const auto &filter : filters->list()) {
+			if (filter.id()) {
+				_session->setActiveChatsFilter(filter.id());
+				break;
+			}
+		}
 	}
 	_filters = std::move(now);
 	// Re-establish the list's Tab-stop on the folder that was focused (if it
@@ -541,6 +556,9 @@ Ui::ChatsFiltersTabsMode FiltersMenu::tabsMode() const {
 }
 
 const style::SideBarButton &FiltersMenu::buttonStyle() const {
+	if (!RabbitSettings::foldersShowIcon()) {
+		return st::windowFiltersButtonTextOnly;
+	}
 	using Mode = Ui::ChatsFiltersTabsMode;
 	switch (tabsMode()) {
 	case Mode::TextOnly: return st::windowFiltersButtonTextOnly;
@@ -590,8 +608,10 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		paused);
 	prepared->setLocked(locked);
 	prepared->setIsListItem(listItem);
-	prepared->setShowIcon(mode != Ui::ChatsFiltersTabsMode::TextOnly);
-	prepared->setShowText(mode != Ui::ChatsFiltersTabsMode::IconsOnly);
+	const auto showIcon = RabbitSettings::foldersShowIcon()
+		&& (mode != Ui::ChatsFiltersTabsMode::TextOnly);
+	prepared->setShowIcon(showIcon);
+	prepared->setShowText(mode != Ui::ChatsFiltersTabsMode::IconsOnly || !showIcon);
 	prepared->setFolderStyle(RabbitSettings::foldersStyle());
 	auto added = toBeginning
 		? container->insert(0, std::move(prepared))
@@ -621,17 +641,23 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		) | rpl::on_next([=](
 				const Dialogs::UnreadState &state,
 				bool includeMuted) {
+			const auto counterMode = RabbitSettings::foldersUnreadCounter();
+			if (counterMode == 2) {
+				raw->setBadge(QString(), false);
+				return;
+			}
 			const auto chats = state.chats;
 			const auto chatsMuted = state.chatsMuted;
 			const auto muted = (chatsMuted + state.marksMuted);
+			const auto countIncludeMuted = (counterMode == 0);
 			const auto count = (chats + state.marks)
-				- (includeMuted ? 0 : muted);
+				- (countIncludeMuted ? 0 : muted);
 			const auto string = !count
 				? QString()
 				: (count > 999)
 				? "99+"
 				: QString::number(count);
-			raw->setBadge(string, includeMuted && (count == muted));
+			raw->setBadge(string, countIncludeMuted && (count == muted));
 			if (!locked) {
 				raw->setAccessibleName(count
 					? tr::lng_filter_unread_chats(

@@ -453,6 +453,19 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"folders_hide_all_chats"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"folders_unread_counter"_q, {
+			.type = IntSetting,
+			.defaultValue = 0,
+			.limitHandler = IntLimit(0, 2, 0),
+		}
+	},
+	{
 		u"spoof_webview_as_android"_q, {
 			.type = BoolSetting,
 			.defaultValue = false,
