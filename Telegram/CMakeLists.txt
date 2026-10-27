@@ -1845,6 +1845,8 @@ PRIVATE
     rabbit/tg_ws_proxy/tg_ws_proxy_controller.h
     rabbit/tg_ws_proxy/tg_ws_proxy_server.cpp
     rabbit/tg_ws_proxy/tg_ws_proxy_server.h
+    rabbit/ui/settings/app_icon_box.cpp
+    rabbit/ui/settings/app_icon_box.h
     rabbit/ui/settings/icon_picker.cpp
     rabbit/ui/settings/icon_picker.h
     rabbit/ui/settings/previews.cpp

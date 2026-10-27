@@ -68,15 +68,7 @@ static void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, 
 }
 
 static void applyIcon() {
-#ifdef Q_OS_WIN
-	RabbitAssets::loadAppIco();
-	reloadAppIconFromTaskBar();
-#endif
-
-	Window::OverrideApplicationIcon(RabbitAssets::currentAppLogo());
-	Core::App().refreshApplicationIcon();
-	Core::App().tray().updateIconCounters();
-	Core::App().domain().notifyUnreadBadgeChanged();
+	RabbitAssets::applyAppIcon();
 }
 
 IconPicker::IconPicker(QWidget *parent)

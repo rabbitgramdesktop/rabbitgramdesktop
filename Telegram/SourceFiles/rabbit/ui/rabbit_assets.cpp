@@ -10,7 +10,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 
+#include "core/application.h"
+#include "main/main_domain.h"
 #include "rabbit/settings/rabbit_settings.h"
+#include "tray.h"
+#include "window/main_window.h"
+
+#ifdef Q_OS_WIN
+#include "rabbit/utils/windows_utils.h"
+#endif
 
 namespace RabbitAssets {
 namespace {
@@ -63,6 +71,18 @@ QImage currentAppLogo() {
 QImage currentAppLogoNoMargin() {
 	LoadIcons();
 	return LastLoadedNoMargin;
+}
+
+void applyAppIcon() {
+#ifdef Q_OS_WIN
+	loadAppIco();
+	reloadAppIconFromTaskBar();
+#endif
+
+	Window::OverrideApplicationIcon(currentAppLogo());
+	Core::App().refreshApplicationIcon();
+	Core::App().tray().updateIconCounters();
+	Core::App().domain().notifyUnreadBadgeChanged();
 }
 
 } // namespace RabbitAssets

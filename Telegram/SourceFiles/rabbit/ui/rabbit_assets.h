@@ -30,4 +30,6 @@ void loadAppIco();
 [[nodiscard]] QImage currentAppLogo();
 [[nodiscard]] QImage currentAppLogoNoMargin();
 
+void applyAppIcon();
+
 } // namespace RabbitAssets

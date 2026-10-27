@@ -13,7 +13,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings_menu/rabbit_context_menu.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
-#include "rabbit/ui/settings/icon_picker.h"
+#include "rabbit/ui/rabbit_assets.h"
+#include "rabbit/ui/settings/app_icon_box.h"
 #include "rabbit/ui/settings/previews.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
@@ -96,22 +97,29 @@ void AddJsonToggle(
 }
 
 void BuildAppIcon(SectionBuilder &builder) {
-	builder.addSubsectionTitle({
+	const auto controller = builder.controller();
+	builder.addButton({
 		.id = u"rabbit/appearance/app_icon"_q,
 		.title = rktr(u"rtg_settings_app_icon"_q),
+		.icon = { &st::menuIconPalette },
+		.label = rpl::combine(
+			rpl::single(
+				RabbitSettings::appIcon()
+			) | rpl::then(
+				RabbitSettings::JsonSettings::Events(u"app_icon"_q)
+				| rpl::map([] { return RabbitSettings::appIcon(); })
+			),
+			RabbitLang::Lang::Events()
+		) | rpl::map([](const QString &icon, auto) {
+			const auto name = icon.isEmpty() ? RabbitAssets::DEFAULT_ICON : icon;
+			return RabbitLang::Lang::Translate(u"rtg_settings_app_icon_"_q + name);
+		}),
+		.onClick = controller
+			? [=] {
+				controller->show(Box(AppIconBox));
+			}
+			: Fn<void()>(),
 		.keywords = { u"icon"_q, u"app"_q },
-	});
-	builder.add([](const WidgetContext &ctx) {
-		return SectionBuilder::WidgetToAdd{
-			.widget = object_ptr<IconPicker>(ctx.container),
-			.margin = { 0, st::settingsCheckboxPadding.top(), 0, st::settingsCheckboxPadding.bottom() },
-		};
-	}, [] {
-		return SearchEntry{
-			.id = u"rabbit/appearance/app_icon_picker"_q,
-			.title = ktr(u"rtg_settings_app_icon"_q),
-			.keywords = { u"icon"_q, u"app"_q },
-		};
 	});
 }
 
