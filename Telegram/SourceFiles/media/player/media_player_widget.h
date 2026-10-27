@@ -64,6 +64,9 @@ public:
 	[[nodiscard]] rpl::producer<bool> togglePlaylistRequests() const {
 		return _togglePlaylistRequests.events();
 	}
+	[[nodiscard]] rpl::producer<> openFullPlayerRequests() const {
+		return _openFullPlayerRequests.events();
+	}
 
 private:
 	void resizeEvent(QResizeEvent *e) override;
@@ -139,6 +142,7 @@ private:
 	bool _labelsOver = false;
 	bool _labelsDown = false;
 	rpl::event_stream<bool> _togglePlaylistRequests;
+	rpl::event_stream<> _openFullPlayerRequests;
 	bool _narrow = false;
 	bool _over = false;
 	bool _wontBeOver = false;

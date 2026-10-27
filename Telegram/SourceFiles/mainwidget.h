@@ -88,6 +88,10 @@ struct SeparateId;
 struct SavedChat;
 } // namespace Window
 
+namespace Rabbit::Player {
+class FullPlayerWidget;
+} // namespace Rabbit::Player
+
 namespace Calls {
 class Call;
 class GroupCall;
@@ -219,6 +223,10 @@ public:
 	using FloatDelegate::floatPlayerAreaUpdated;
 
 	void stopAndClosePlayer();
+	void showFullPlayer();
+	void hideFullPlayer();
+	void toggleFullPlayer();
+	void restoreSavedPlayerState();
 
 	bool preventsCloseSection(Fn<void()> callback) const;
 	bool preventsCloseSection(
@@ -372,6 +380,16 @@ private:
 	object_ptr<Window::TopBarWrapWidget<Media::Player::Widget>> _player
 		= { nullptr };
 	object_ptr<Media::Player::Panel> _playerPlaylist;
+	object_ptr<Rabbit::Player::FullPlayerWidget> _fullPlayer = { nullptr };
+
+	struct SavedPlayerState {
+		std::shared_ptr<Window::SectionMemento> sectionMemento;
+		base::weak_ptr<Data::Thread> thread;
+		MsgId msgId = 0;
+		PeerData *forumPeer = nullptr;
+		bool valid = false;
+	};
+	SavedPlayerState _savedPlayerState;
 
 	base::unique_qptr<Window::HistoryHider> _hider;
 	std::vector<std::unique_ptr<StackItem>> _stack;

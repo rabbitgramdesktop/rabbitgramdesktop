@@ -520,7 +520,9 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 		if (_labelsOver != downLabels) {
 			return;
 		}
-		if ((_type == AudioMsgId::Type::Voice)
+		if (_type == AudioMsgId::Type::Song) {
+			_openFullPlayerRequests.fire({});
+		} else if ((_type == AudioMsgId::Type::Voice)
 				|| _lastSongFromAnotherSession) {
 			const auto current = instance()->current(_type);
 			const auto document = current.audio();
@@ -547,11 +549,12 @@ void Widget::updateOverLabelsState(QPoint pos) {
 
 void Widget::updateOverLabelsState(bool over) {
 	_labelsOver = over;
-	const auto pressShowsItem = _labelsOver
-		&& ((_type == AudioMsgId::Type::Voice)
+	const auto clickable = _labelsOver
+		&& ((_type == AudioMsgId::Type::Song)
+			|| (_type == AudioMsgId::Type::Voice)
 			|| _lastSongFromAnotherSession);
-	setCursor(pressShowsItem ? style::cur_pointer : style::cur_default);
-	_togglePlaylistRequests.fire(over && (_type == AudioMsgId::Type::Song));
+	setCursor(clickable ? style::cur_pointer : style::cur_default);
+	_togglePlaylistRequests.fire(false);
 }
 
 void Widget::updatePlayPrevNextPositions() {

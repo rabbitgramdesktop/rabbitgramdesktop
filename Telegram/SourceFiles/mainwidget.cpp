@@ -7,11 +7,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "mainwidget.h"
 
+#include "rabbit/ui/player/full_player_widget.h"
+#include "info/saved/info_saved_music_widget.h"
+
 #include "api/api_updates.h"
 #include "api/api_views.h"
 #include "data/components/scheduled_messages.h"
 #include "data/data_document_media.h"
 #include "data/data_document_resolver.h"
+#include "data/data_forum.h"
 #include "data/data_forum_topic.h"
 #include "data/data_web_page.h"
 #include "data/data_game.h"
@@ -389,6 +393,14 @@ MainWidget::MainWidget(
 			ShowAtUnreadMsgId,
 			params);
 		controller->hideLayer();
+	}, lifetime());
+
+	_controller->activeChatChanges(
+	) | rpl::on_next([=] {
+		if (_fullPlayer && !_fullPlayer->isHidden() && !_fullPlayer->isClosing()) {
+			_savedPlayerState = {};
+			_fullPlayer->hideAnimated();
+		}
 	}, lifetime());
 
 	// MSVC BUG + REGRESSION rpl::mappers::tuple :(
@@ -933,11 +945,122 @@ void MainWidget::closeBothPlayers() {
 		_player->hide(anim::type::normal);
 	}
 	_playerPlaylist->hideIgnoringEnterEvents();
+	hideFullPlayer();
 }
 
 void MainWidget::stopAndClosePlayer() {
 	if (_player) {
 		_player->entity()->stopAndClose();
+	}
+	hideFullPlayer();
+}
+
+void MainWidget::showFullPlayer() {
+	if (!_player) {
+		return;
+	}
+	if (!_fullPlayer || _fullPlayer->isHidden()) {
+		_savedPlayerState = {};
+		if (_mainSection) {
+			_savedPlayerState.sectionMemento = _mainSection->createMemento();
+		} else if (const auto active = _controller->activeChatCurrent()) {
+			_savedPlayerState.thread = active.thread();
+			_savedPlayerState.msgId = _history->msgId();
+		} else if (const auto forum = _controller->shownForum().current()) {
+			_savedPlayerState.forumPeer = forum->channel();
+		}
+		_savedPlayerState.valid = true;
+	}
+	if (!_fullPlayer) {
+		_fullPlayer.create(this, _controller);
+		_fullPlayer->closeRequests(
+		) | rpl::on_next([=] {
+			restoreSavedPlayerState();
+		}, _fullPlayer->lifetime());
+		_fullPlayer->hideFinished(
+		) | rpl::on_next([=] {
+			if (_mainSection) {
+				_mainSection->setInnerFocus();
+			} else {
+				setInnerFocus();
+			}
+		}, _fullPlayer->lifetime());
+		_fullPlayer->setGoToItemCallback([=](not_null<const HistoryItem*> item) {
+			_savedPlayerState = {};
+			_fullPlayer->hideAnimated();
+			if (_dialogs) {
+				_dialogs->cancelSearchByMouseBack();
+				_dialogs->setInnerFocus(true);
+			}
+			if (item->isSavedMusicItem()) {
+				_controller->showSection(
+					Info::Saved::MakeMusic(item->history()->peer),
+					SectionShow(SectionShow::Way::ClearStack, anim::type::instant));
+			} else {
+				_controller->showMessage(item);
+			}
+			if (_mainSection) {
+				_mainSection->setInnerFocus();
+			} else {
+				setInnerFocus();
+			}
+		});
+	}
+	updateControlsGeometry();
+	_fullPlayer->showAnimated();
+	orderWidgets();
+}
+
+void MainWidget::hideFullPlayer() {
+	if (_fullPlayer && !_fullPlayer->isHidden() && !_fullPlayer->isClosing()) {
+		_fullPlayer->hideAnimated();
+	}
+}
+
+void MainWidget::toggleFullPlayer() {
+	if (_fullPlayer && !_fullPlayer->isHidden() && !_fullPlayer->isClosing()) {
+		hideFullPlayer();
+	} else {
+		showFullPlayer();
+	}
+}
+
+void MainWidget::restoreSavedPlayerState() {
+	if (!_savedPlayerState.valid) {
+		return;
+	}
+	const auto state = std::exchange(_savedPlayerState, {});
+	if (state.sectionMemento) {
+		_controller->showSection(
+			state.sectionMemento,
+			SectionShow(
+				SectionShow::Way::ClearStack,
+				anim::type::instant));
+	} else if (const auto thread = state.thread.get()) {
+		_controller->showThread(
+			thread,
+			state.msgId ? state.msgId : ShowAtUnreadMsgId,
+			SectionShow(
+				SectionShow::Way::ClearStack,
+				anim::type::instant));
+	} else if (state.forumPeer) {
+		if (const auto forum = state.forumPeer->forum()) {
+			_controller->showForum(
+				forum,
+				SectionShow(
+					SectionShow::Way::ClearStack,
+					anim::type::instant));
+		}
+	}
+	if (_dialogs) {
+		_dialogs->cancelSearchByMouseBack();
+		_dialogs->setInnerFocus(true);
+	}
+	updateControlsGeometry();
+	if (_mainSection) {
+		_mainSection->setInnerFocus();
+	} else {
+		setInnerFocus();
 	}
 }
 
@@ -967,6 +1090,11 @@ void MainWidget::createPlayer() {
 			}
 			_controller->showMessage(item);
 		});
+
+		_player->entity()->openFullPlayerRequests(
+		) | rpl::on_next([=] {
+			toggleFullPlayer();
+		}, _player->lifetime());
 
 		_player->entity()->togglePlaylistRequests(
 		) | rpl::on_next([=](bool shown) {
@@ -2445,6 +2573,9 @@ void MainWidget::orderWidgets() {
 	if (_player) {
 		_player->entity()->raiseDropdowns();
 	}
+	if (_fullPlayer) {
+		_fullPlayer->raise();
+	}
 	if (_hider) _hider->raise();
 }
 
@@ -2824,6 +2955,14 @@ void MainWidget::updateControlsGeometry() {
 		_mainSection->setGeometryWithTopMoved(
 			mainSectionGeometry,
 			_contentScrollAddToY);
+	}
+	if (_fullPlayer) {
+		const auto fullPlayerGeometry = QRect(
+			_history->x(),
+			_callTopBarHeight + _exportTopBarHeight,
+			_history->width(),
+			height() - (_callTopBarHeight + _exportTopBarHeight));
+		_fullPlayer->setBaseGeometry(fullPlayerGeometry);
 	}
 	refreshResizeAreas();
 	if (_player) {
