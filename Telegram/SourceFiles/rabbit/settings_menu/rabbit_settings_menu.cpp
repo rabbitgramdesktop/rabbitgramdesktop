@@ -22,6 +22,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings_menu/sections/rabbit_chats.h"
 #include "rabbit/settings_menu/sections/rabbit_general.h"
 #include "rabbit/settings_menu/sections/rabbit_other.h"
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+#include "rabbit/settings_menu/sections/rabbit_linux.h"
+#endif
 #include "settings/sections/settings_main.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
@@ -79,6 +82,14 @@ void BuildRabbitSettings(SectionBuilder &builder) {
 		.icon = { &st::menuIconShowAll },
 		.keywords = { u"other"_q, u"analytics"_q, u"telemetry"_q },
 	});
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	builder.addSectionButton({
+		.title = rktr(u"rtg_settings_linux"_q),
+		.targetSection = RabbitLinux::Id(),
+		.icon = { &st::menuIconSettings },
+		.keywords = { u"linux"_q, u"desktop"_q, u"integration"_q, u"install"_q },
+	});
+#endif
 }
 
 void BuildRabbitLinks(SectionBuilder &builder) {

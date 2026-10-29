@@ -1821,6 +1821,8 @@ PRIVATE
     rabbit/settings_menu/sections/rabbit_chats.h
     rabbit/settings_menu/sections/rabbit_general.cpp
     rabbit/settings_menu/sections/rabbit_general.h
+    rabbit/settings_menu/sections/rabbit_linux.cpp
+    rabbit/settings_menu/sections/rabbit_linux.h
     rabbit/settings_menu/sections/rabbit_other.cpp
     rabbit/settings_menu/sections/rabbit_other.h
     rabbit/settings_menu/rabbit_context_menu.cpp
@@ -1857,6 +1859,8 @@ PRIVATE
     rabbit/ui/rabbit_assets.h
     rabbit/utils/chat_utils.cpp
     rabbit/utils/chat_utils.h
+    rabbit/utils/linux_utils.cpp
+    rabbit/utils/linux_utils.h
     rabbit/utils/windows_utils.cpp
     rabbit/utils/windows_utils.h
     settings/business/settings_away_message.cpp

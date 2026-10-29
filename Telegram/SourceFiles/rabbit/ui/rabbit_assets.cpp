@@ -18,6 +18,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #ifdef Q_OS_WIN
 #include "rabbit/utils/windows_utils.h"
+#elif !defined Q_OS_MAC
+#include "rabbit/utils/linux_utils.h"
 #endif
 
 namespace RabbitAssets {
@@ -77,6 +79,8 @@ void applyAppIcon() {
 #ifdef Q_OS_WIN
 	loadAppIco();
 	reloadAppIconFromTaskBar();
+#elif !defined Q_OS_MAC
+	RabbitLinuxUtils::ApplyAppIcon();
 #endif
 
 	Window::OverrideApplicationIcon(currentAppLogo());
