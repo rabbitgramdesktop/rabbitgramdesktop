@@ -3948,21 +3948,71 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& _selected.empty()
 		&& _overElement
 		&& (_overElement->data()->isRegular()
-			|| CanReplyToEphemeral(_overElement->data()))) {
+			|| CanReplyToEphemeral(_overElement->data()))
+		&& e->button() == Qt::LeftButton) {
 		mouseActionCancel();
-		switch (CurrentQuickAction()) {
-		case DoubleClickQuickAction::Reply: {
-			bool forceReact = _overElement->data()->isPost() && _overElement->data()->author()->isChannel();
-			if (forceReact) {
-				toggleFavoriteReaction(_overElement);
+		const auto view = _overElement;
+		const auto item = view->data();
+		const auto itemId = item->fullId();
+		const auto outgoing = item->from()->isSelf();
+		const auto action = outgoing
+			? RabbitSettings::outgoingQuickAction()
+			: RabbitSettings::incomingQuickAction();
+
+		switch (action) {
+		case RabbitSettings::QuickAction::Reaction:
+			toggleFavoriteReaction(view);
+			break;
+		case RabbitSettings::QuickAction::Reply: {
+			if (CanSendReply(item)) {
+				const auto selected = view->selectedQuote(getSelectedTextSelection(item));
+				replyToMessageRequestNotify({
+					.messageId = itemId,
+					.quote = selected.highlight.quote,
+					.quoteOffset = selected.highlight.quoteOffset,
+					.todoItemId = selected.highlight.todoItemId,
+					.pollOption = selected.highlight.pollOption,
+				});
 			} else {
-				replyToMessageRequestNotify({ _overElement->data()->fullId() });
+				toggleFavoriteReaction(view);
 			}
 		} break;
-		case DoubleClickQuickAction::React: {
-			toggleFavoriteReaction(_overElement);
+		case RabbitSettings::QuickAction::Copy:
+			executeSwipeAction(RabbitSettings::SwipeAction::Copy, item, view);
+			break;
+		case RabbitSettings::QuickAction::Forward:
+			if (item->allowsForward() && controllerOrNull()) {
+				Window::ShowForwardMessagesBox(controller(), { itemId });
+			}
+			break;
+		case RabbitSettings::QuickAction::Edit: {
+			const auto t = base::unixtime::now();
+			if (item->allowsEdit(t)) {
+				editMessageRequestNotify(itemId);
+			} else {
+				toggleFavoriteReaction(view);
+			}
 		} break;
-		default: break;
+		case RabbitSettings::QuickAction::Save:
+			if (item->allowsForward() && controllerOrNull()) {
+				Window::ForwardToSelf(
+					controller()->uiShow(),
+					Data::ForwardDraft{ .ids = { 1, itemId } });
+			}
+			break;
+		case RabbitSettings::QuickAction::Delete:
+			if (item->canDelete() && controllerOrNull()) {
+				controller()->show(Box<DeleteMessagesBox>(item));
+			}
+			break;
+		case RabbitSettings::QuickAction::Repeat:
+			executeSwipeAction(RabbitSettings::SwipeAction::Repeat, item, view);
+			break;
+		case RabbitSettings::QuickAction::Translate:
+			executeSwipeAction(RabbitSettings::SwipeAction::Translate, item, view);
+			break;
+		default:
+			break;
 		}
 	}
 }
