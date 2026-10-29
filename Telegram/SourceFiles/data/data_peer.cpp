@@ -42,7 +42,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/userpic_view.h"
 #include "window/notifications_manager.h"
 #include "window/window_session_controller.h"
-#include "intro/intro_qr.h"
+#include <QtSvg/QSvgRenderer>
 #include "ui/image/image.h"
 #include "ui/chat/chat_style.h"
 #include "ui/empty_userpic.h"
@@ -430,7 +430,47 @@ void PeerData::setUserpicPhoto(const MTPPhoto &data) {
 	}
 }
 
+namespace {
+
+[[nodiscard]] bool IsServiceNotifications(not_null<const PeerData*> peer) {
+	if (peer->isNotificationsUser()) {
+		return true;
+	} else if (const auto user = peer->asUser()) {
+		const auto &phone = user->phone();
+		return (phone == u"42777"_q) || (phone == u"+42777"_q);
+	}
+	return false;
+}
+
+[[nodiscard]] QImage *TelegramUserpicImage() {
+	static const auto result = [] {
+		constexpr auto size = 320;
+		auto img = QImage(size, size, QImage::Format_ARGB32_Premultiplied);
+		img.fill(Qt::transparent);
+		{
+			auto p = QPainter(&img);
+			auto hq = PainterHighQualityEnabler(p);
+			auto bg = QLinearGradient(0, 0, 0, size);
+			bg.setStops({
+				{ 0., QColor(0x2E, 0xA6, 0xE2) },
+				{ 1., QColor(0x0A, 0x80, 0xBB) },
+			});
+			p.fillRect(QRect(0, 0, size, size), bg);
+
+			auto svg = QSvgRenderer(u":/gui/plane_white.svg"_q);
+			svg.render(&p, QRectF(0, 0, size, size));
+		}
+		return img;
+	}();
+	return const_cast<QImage*>(&result);
+}
+
+} // namespace
+
 QImage *PeerData::userpicCloudImage(Ui::PeerUserpicView &view) const {
+	if (IsServiceNotifications(this)) {
+		return TelegramUserpicImage();
+	}
 	if (!_userpic.isCurrentView(view.cloud)) {
 		if (!_userpic.empty()) {
 			view.cloud = _userpic.createView();
@@ -443,11 +483,6 @@ QImage *PeerData::userpicCloudImage(Ui::PeerUserpicView &view) const {
 	if (const auto image = view.cloud.get(); image && !image->isNull()) {
 		_userpicEmpty = nullptr;
 		return image;
-	} else if (isNotificationsUser()) {
-		static auto result = Intro::details::TelegramLogoImage().scaledToWidth(
-			kUserpicSize,
-			Qt::SmoothTransformation);
-		return &result;
 	}
 	return nullptr;
 }
@@ -480,18 +515,27 @@ void PeerData::paintUserpic(
 }
 
 void PeerData::loadUserpic() {
+	if (IsServiceNotifications(this)) {
+		return;
+	}
 	_userpic.load(&session(), userpicOrigin());
 }
 
 bool PeerData::hasUserpic() const {
-	return !_userpic.empty();
+	return !_userpic.empty() || IsServiceNotifications(this);
 }
 
 Ui::PeerUserpicView PeerData::activeUserpicView() {
+	if (IsServiceNotifications(this)) {
+		return { .cloud = std::make_shared<QImage>(*TelegramUserpicImage()) };
+	}
 	return { .cloud = _userpic.empty() ? nullptr : _userpic.activeView() };
 }
 
 Ui::PeerUserpicView PeerData::createUserpicView() {
+	if (IsServiceNotifications(this)) {
+		return { .cloud = std::make_shared<QImage>(*TelegramUserpicImage()) };
+	}
 	if (_userpic.empty()) {
 		return {};
 	}
@@ -507,6 +551,8 @@ bool PeerData::useEmptyUserpic(Ui::PeerUserpicView &view) const {
 InMemoryKey PeerData::userpicUniqueKey(Ui::PeerUserpicView &view) const {
 	if (const auto broadcast = monoforumBroadcast()) {
 		return broadcast->userpicUniqueKey(view);
+	} else if (IsServiceNotifications(this)) {
+		return InMemoryKey(0x777000, RabbitSettings::userpicRoundness() + 1);
 	}
 	return useEmptyUserpic(view)
 		? ensureEmptyUserpic()->uniqueKey()

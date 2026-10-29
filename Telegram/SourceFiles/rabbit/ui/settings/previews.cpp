@@ -152,6 +152,10 @@ void UpdatePreviewUser(not_null<UserData*> user) {
 			: FullReplyTo(),
 		.date = base::unixtime::now(),
 	}, TextWithEntities{ text }, MTP_messageMediaEmpty());
+	history->owner().registerMessage(item);
+	if (replyTo) {
+		item->resolveAdminLogReplyTo(replyTo);
+	}
 	return AdminLog::OwnedItem(delegate, item);
 }
 
@@ -180,6 +184,10 @@ void UpdatePreviewUser(not_null<UserData*> user) {
 			: FullReplyTo(),
 		.date = base::unixtime::now(),
 	}, sticker, TextWithEntities());
+	history->owner().registerMessage(item);
+	if (replyTo) {
+		item->resolveAdminLogReplyTo(replyTo);
+	}
 	return AdminLog::OwnedItem(delegate, item);
 }
 
@@ -243,7 +251,10 @@ ChatPreview::ChatPreview(
 
 	rpl::merge(
 		RabbitSettings::JsonSettings::Events(u"sticker_size"_q),
-		RabbitSettings::JsonSettings::Events(u"sticker_shape"_q)
+		RabbitSettings::JsonSettings::Events(u"sticker_shape"_q),
+		RabbitSettings::JsonSettings::Events(u"reply_colors"_q),
+		RabbitSettings::JsonSettings::Events(u"reply_emoji"_q),
+		RabbitSettings::JsonSettings::Events(u"reply_bg"_q)
 	) | rpl::on_next([=] {
 		updateItems();
 	}, lifetime());
@@ -292,6 +303,7 @@ void ChatPreview::regenerateItems() {
 }
 
 void ChatPreview::updateItems() {
+	_chatStyle = nullptr;
 	regenerateItems();
 	if (width() > 0) {
 		const auto newHeight = resizeGetHeight(width());
