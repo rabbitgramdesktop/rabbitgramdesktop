@@ -99,20 +99,33 @@ void ChannelBottomButtonBox(not_null<Ui::GenericBox *> box) {
 
 	const auto layout = box->verticalLayout();
 
-	const auto addOption = [&](rpl::producer<QString> label, int value) {
+	const auto addOption = [&](
+			rpl::producer<QString> label,
+			int value,
+			const style::icon &icon) {
 		Settings::AddButtonWithIcon(
 			layout,
 			std::move(label),
-			st::settingsButton
+			st::settingsButton,
+			{ &icon }
 		)->addClickHandler([=] {
 			RabbitSettings::setChannelBottomButton(value);
 			box->closeBox();
 		});
 	};
 
-	addOption(rktr(u"rtg_chats_channel_bottom_button_mute"_q), 0);
-	addOption(rktr(u"rtg_chats_channel_bottom_button_discuss"_q), 1);
-	addOption(rktr(u"rtg_chats_channel_bottom_button_hide"_q), 2);
+	addOption(
+		rktr(u"rtg_chats_channel_bottom_button_mute"_q),
+		0,
+		st::menuIconMute);
+	addOption(
+		rktr(u"rtg_chats_channel_bottom_button_discuss"_q),
+		1,
+		st::menuIconDiscussion);
+	addOption(
+		rktr(u"rtg_chats_channel_bottom_button_hide"_q),
+		2,
+		st::menuIconCancel);
 
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	box->setWidth(st::aboutWidth);
