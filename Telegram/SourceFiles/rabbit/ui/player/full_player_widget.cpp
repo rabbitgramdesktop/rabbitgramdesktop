@@ -28,6 +28,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/image/image.h"
 #include "ui/painter.h"
+#include "ui/controls/swipe_handler.h"
 #include "window/window_session_controller.h"
 #include "styles/style_media_player.h"
 #include "styles/style_widgets.h"
@@ -341,6 +342,7 @@ FullPlayerWidget::FullPlayerWidget(
 	setFocusPolicy(Qt::StrongFocus);
 
 	setupControls();
+	setupSwipeBack();
 
 	const auto player = Media::Player::instance();
 
@@ -545,6 +547,73 @@ void FullPlayerWidget::keyPressEvent(QKeyEvent *e) {
 		return;
 	}
 	RpWidget::keyPressEvent(e);
+}
+
+void FullPlayerWidget::mousePressEvent(QMouseEvent *e) {
+	if (e->button() == Qt::BackButton) {
+		hideAnimated();
+		e->accept();
+		return;
+	}
+	RpWidget::mousePressEvent(e);
+}
+
+void FullPlayerWidget::wheelEvent(QWheelEvent *e) {
+	const auto pixelX = e->pixelDelta().x();
+	const auto angleX = e->angleDelta().x();
+	const auto deltaX = pixelX ? pixelX : angleX;
+	if (deltaX > 0) {
+		_accumulatedDeltaX += deltaX;
+		if (_accumulatedDeltaX >= 120) {
+			_accumulatedDeltaX = 0;
+			hideAnimated();
+			e->accept();
+			return;
+		}
+	} else if (deltaX < 0) {
+		_accumulatedDeltaX = 0;
+	}
+	RpWidget::wheelEvent(e);
+}
+
+void FullPlayerWidget::setupSwipeBack() {
+	using namespace Ui::Controls;
+
+	auto swipeBackData = lifetime().make_state<SwipeBackResult>();
+
+	auto update = [=](SwipeContextData data) {
+		if (data.translation > 0) {
+			if (!swipeBackData->callback) {
+				(*swipeBackData) = SetupSwipeBack(
+					this,
+					[]() -> std::pair<QColor, QColor> {
+						return {
+							st::windowBgOver->c,
+							st::windowFg->c,
+						};
+					});
+			}
+			swipeBackData->callback(data);
+			return;
+		} else if (swipeBackData->lifetime) {
+			(*swipeBackData) = {};
+		}
+	};
+
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		return (data.direction == Qt::RightToLeft)
+			? DefaultSwipeBackHandlerFinishData([=] {
+				hideAnimated();
+			})
+			: SwipeHandlerFinishData();
+	};
+
+	SetupSwipeHandler({
+		.widget = this,
+		.scroll = v::null,
+		.update = std::move(update),
+		.init = std::move(init),
+	});
 }
 
 void FullPlayerWidget::updateSongDetails() {

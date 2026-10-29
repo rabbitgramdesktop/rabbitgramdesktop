@@ -68,9 +68,12 @@ protected:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
 	void keyPressEvent(QKeyEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void wheelEvent(QWheelEvent *e) override;
 
 private:
 	void setupControls();
+	void setupSwipeBack();
 	void updateControlsGeometry();
 	void updatePlayPauseGeometry();
 	void updateSongDetails();
@@ -125,6 +128,8 @@ private:
 	rpl::event_stream<> _closeRequests;
 	rpl::event_stream<> _hideFinished;
 	rpl::lifetime _trackLifetime;
+
+	int _accumulatedDeltaX = 0;
 
 };
 
