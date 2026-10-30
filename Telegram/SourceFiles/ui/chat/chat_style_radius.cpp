@@ -43,6 +43,16 @@ int BubbleRadiusLarge() {
 	return (base * setting + 25) / 50;
 }
 
+int BubbleCornerRadius(BubbleCornerRounding corner) {
+	switch (corner) {
+	case BubbleCornerRounding::None:
+	case BubbleCornerRounding::Tail: return 0;
+	case BubbleCornerRounding::Small: return BubbleRadiusSmall();
+	case BubbleCornerRounding::Large: return BubbleRadiusLarge();
+	}
+	Unexpected("Corner in BubbleCornerRadius.");
+}
+
 int MsgFileThumbRadiusSmall() {
 	const auto setting = std::clamp(RabbitSettings::messageRoundness(), 0, 50);
 	return (st::msgFileThumbRadiusSmall * setting + 25) / 50;

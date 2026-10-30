@@ -30,6 +30,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "ui/ui_utility.h"
 #include "lang/lang_keys.h"
 #include "core/file_utilities.h"
+#include "core/shortcuts.h"
 #include "webview/webview_embed.h"
 #include "webview/webview_dialog.h"
 #include "webview/webview_interface.h"
@@ -54,7 +55,6 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QClipboard>
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
-#include <QtGui/qpa/qplatformscreen.h>
 
 #include <algorithm>
 #include <memory>
@@ -70,7 +70,7 @@ constexpr auto kProgressOpacity = 0.3;
 constexpr auto kLightnessThreshold = 128;
 constexpr auto kLightnessDelta = 32;
 constexpr auto kExternalShellButtonIconSize = 20;
-constexpr auto kMaxNativeMessageBytes = 1024 * 1024;
+constexpr auto kMaxNativeMessageBytes = 64 * 1024 * 1024;
 constexpr auto kExternalMessageType = "tdesktop_external_bot_webapp";
 
 enum class NativeMessageSource {
@@ -172,6 +172,18 @@ void NavigateToExternalShellTop(not_null<Webview::Window*> window) {
 		&& normalizedA == normalizedB;
 }
 
+[[nodiscard]] QByteArray OriginCheckScript(const QString &origin) {
+	auto url = QUrl(origin);
+	if ((url.scheme() == u"https"_q && url.port() == 443)
+		|| (url.scheme() == u"http"_q && url.port() == 80)) {
+		url.setPort(-1);
+	}
+	const auto encoded = QJsonDocument(QJsonArray{
+		QString::fromLatin1(url.toEncoded()),
+	}).toJson(QJsonDocument::Compact);
+	return "this.location.origin === " + encoded + "[0]";
+}
+
 [[nodiscard]] RectPart ParsePosition(const QString &position) {
 	if (position == u"left"_q) {
 		return RectPart::Left;
@@ -264,10 +276,6 @@ void LogNativeMessageRejected(
 		bool externalShell,
 		const QString &shellToken) {
 	const auto byteCount = quint64(bytes.size());
-	if (bytes.size() > kMaxNativeMessageBytes) {
-		LogNativeMessageRejected(u"payload too large"_q, byteCount);
-		return std::nullopt;
-	}
 	auto error = QJsonParseError();
 	const auto document = QJsonDocument::fromJson(bytes, &error);
 	if (error.error != QJsonParseError::NoError) {
@@ -1288,11 +1296,7 @@ Panel::Panel(Args &&args)
 
 	_widget->closeRequests(
 	) | rpl::on_next([=] {
-		if (_closeNeedConfirmation) {
-			scheduleCloseWithConfirmation();
-		} else {
-			requestClose();
-		}
+		requestWindowClose();
 	}, _widget->lifetime());
 
 	_widget->closeEvents(
@@ -1344,9 +1348,12 @@ Panel::Panel(Args &&args)
 			}
 		}
 	}
+
+	toggleApplicationEventFilter(true);
 }
 
 Panel::~Panel() {
+	toggleApplicationEventFilter(false);
 	closeExternalShellPopup();
 	base::take(_webview);
 	_progress = nullptr;
@@ -1354,6 +1361,66 @@ Panel::~Panel() {
 	_externalWebviewParent = nullptr;
 	_widget = nullptr;
 	_externalPanelParent = nullptr;
+}
+
+void Panel::toggleApplicationEventFilter(bool install) {
+	if (!install) {
+		_applicationEventFilter = nullptr;
+		return;
+	} else if (_applicationEventFilter) {
+		return;
+	}
+	class Filter final : public QObject {
+	public:
+		explicit Filter(not_null<Panel*> owner) : _owner(owner) {
+		}
+
+	private:
+		bool eventFilter(QObject *obj, QEvent *e) override {
+			return obj && e && _owner->filterApplicationEvent(obj, e);
+		}
+
+		const not_null<Panel*> _owner;
+
+	};
+
+	_applicationEventFilter = std::make_unique<Filter>(this);
+	qApp->installEventFilter(_applicationEventFilter.get());
+}
+
+bool Panel::filterApplicationEvent(
+		not_null<QObject*> object,
+		not_null<QEvent*> e) {
+	if (e->type() != QEvent::ShortcutOverride) {
+		return false;
+	}
+	const auto event = static_cast<QKeyEvent*>(e.get());
+	if (!isActiveWindow()) {
+		return false;
+	} else if (Shortcuts::MatchesCommand(
+			event,
+			Shortcuts::Command::Close)) {
+		e->accept();
+		requestWindowClose();
+		return true;
+	}
+	return false;
+}
+
+void Panel::requestWindowClose() {
+	if (_closeNeedConfirmation) {
+		scheduleCloseWithConfirmation();
+	} else {
+		requestClose();
+	}
+}
+
+bool Panel::isActiveWindow() const {
+	if (_externalShell) {
+		const auto widget = _webview ? _webview->window.widget() : nullptr;
+		return widget && widget->isActiveWindow();
+	}
+	return _widget->isActiveWindow();
 }
 
 void Panel::setupDownloadsProgress(
@@ -1592,7 +1659,6 @@ bool Panel::showWebview(Args &&args, const Webview::ThemeParams &params) {
 	_externalUrl = args.url;
 	_sameOrigin = args.sameOrigin;
 	_initialOrigin = OriginFromUrl(args.url);
-	_currentOrigin = _initialOrigin;
 	if (_externalShell && !_webview) {
 		resetExternalShellIdentity();
 	}
@@ -1641,7 +1707,7 @@ bool Panel::showWebview(Args &&args, const Webview::ThemeParams &params) {
 			}
 		},
 		.terms = [=] {
-			File::OpenUrl(tr::lng_mini_apps_tos_url(tr::now));
+			_delegate->botOpenTermsOfService();
 		},
 		.privacy = [=] {
 			_delegate->botOpenPrivacyPolicy();
@@ -1961,7 +2027,7 @@ void Panel::handleExternalShellMenuAction(const QString &id) {
 			}
 		},
 		.terms = [=] {
-			File::OpenUrl(tr::lng_mini_apps_tos_url(tr::now));
+			_delegate->botOpenTermsOfService();
 		},
 		.privacy = [=] {
 			_delegate->botOpenPrivacyPolicy();
@@ -2468,15 +2534,16 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 		}
 	});
 
-	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
 		if (_delegate->botHandleLocalUri(uri, false)) {
 			return false;
 		} else if (newWindow) {
 			return true;
 		}
-		_currentOrigin = OriginFromUrl(uri);
-		showWebviewProgress();
 		return true;
+	});
+	raw->setNavigationStartHandler([=] {
+		showWebviewProgress();
 	});
 	raw->setNavigationDoneHandler([=](bool success) {
 		hideWebviewProgress();
@@ -2546,6 +2613,11 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			return Webview::DefaultDialogHandler(std::move(args));
 		});
 	}
+	raw->setPermissionHandler([=](
+			Webview::PermissionType type,
+			Fn<void(bool)> done) {
+		requestPermission(type, std::move(done));
+	});
 
 	auto initScript = QByteArray(R"(
 window.TelegramWebviewProxy = {
@@ -2621,8 +2693,7 @@ void Panel::sendContentSafeArea() {
 	} else if (const auto screen = QGuiApplication::primaryScreen()) {
 		const auto dpi = screen->logicalDotsPerInch();
 		const auto ratio = screen->devicePixelRatio();
-		const auto basePair = screen->handle()->logicalBaseDpi();
-		const auto base = (basePair.first + basePair.second) * 0.5;
+		const auto base = style::BaseDpi();
 		const auto systemScreenScale = dpi * ratio / base;
 		report = int(base::SafeRound(scaled / systemScreenScale));
 	}
@@ -2877,10 +2948,14 @@ void Panel::openExternalLink(const QJsonObject &args) {
 			File::OpenUrl(url);
 		}
 	};
+	requestOpenLink(url, open);
+}
+
+void Panel::requestOpenLink(const QString &url, Fn<void()> open) {
 	if (allowOpenLink()) {
 		open();
 	} else {
-		confirmExternalLink(url, open);
+		confirmExternalLink(url, std::move(open));
 	}
 }
 
@@ -3100,6 +3175,45 @@ void Panel::replyRequestPhone(bool shared) {
 	postEvent("phone_requested", QJsonObject{
 		{ u"status"_q, shared ? u"sent"_q : u"cancelled"_q }
 	});
+}
+
+void Panel::requestPermission(
+		Webview::PermissionType type,
+		Fn<void(bool)> done) {
+	if (_inBlockingRequest) {
+		done(false);
+		return;
+	}
+	_inBlockingRequest = true;
+	using Type = Webview::PermissionType;
+	using Button = Webview::PopupArgs::Button;
+	const auto text = [&] {
+		switch (type) {
+		case Type::Microphone:
+			return tr::lng_bot_allow_microphone(tr::now);
+		case Type::Camera:
+			return tr::lng_bot_allow_camera(tr::now);
+		case Type::CameraAndMicrophone:
+			return tr::lng_bot_allow_camera_microphone(tr::now);
+		case Type::Geolocation:
+			return tr::lng_bot_allow_location(tr::now);
+		}
+		Unexpected("Type in Panel::requestPermission.");
+	}();
+	showPopup({
+		.parent = webviewWindowForPopup(),
+		.text = text,
+		.buttons = {
+			{
+				.id = "allow",
+				.text = tr::lng_bot_allow_permission_confirm(tr::now),
+			},
+			{ .id = "cancel", .type = Button::Type::Cancel },
+		},
+	}, crl::guard(this, [=](Webview::PopupResult result) {
+		_inBlockingRequest = false;
+		done(result.id == "allow");
+	}));
 }
 
 void Panel::invokeCustomMethod(const QJsonObject &args) {
@@ -3785,16 +3899,15 @@ void Panel::postEvent(const QString &event, EventData data) {
 		}
 		return;
 	}
-	if (_sameOrigin && !OriginsMatch(_currentOrigin, _initialOrigin)) {
-		return;
-	}
+	const auto originCheck = _sameOrigin
+		? OriginCheckScript(_initialOrigin) + " && "
+		: QByteArray();
 	auto written = v::is<QString>(data)
 		? v::get<QString>(data).toUtf8()
 		: QJsonDocument(
 			v::get<QJsonObject>(data)).toJson(QJsonDocument::Compact);
-	_webview->window.eval(R"(
-if (window.TelegramGameProxy) {
-window.TelegramGameProxy.receiveEvent(
+	_webview->window.eval("if (" + originCheck + R"(this.TelegramGameProxy) {
+this.TelegramGameProxy.receiveEvent(
 		")"
 		+ event.toUtf8()
 		+ '"' + (written.isEmpty() ? QByteArray() : ", " + written)

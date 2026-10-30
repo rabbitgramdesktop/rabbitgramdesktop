@@ -51,7 +51,7 @@ struct Fixture {
 };
 
 // Ui::BoxLayerWidget::addButton is the only thing that parents a footer
-// button directly to the shell (ui/layers/box_layer_widget.cpp:327-331), and
+// button directly to the shell (ui/layers/box_layer_widget.cpp), and
 // the box content sits under that same root, so an unrestricted walk would
 // answer content buttons too. Filtering on the parent is what makes the
 // answer exactly "the shell's own button row" - the close Ui::IconButton an
@@ -164,11 +164,12 @@ BoxShellButtons ReadBoxButtons(QWidget *box, const QString &label) {
 		if (name.isEmpty()) {
 			name = u"<unnamed>"_q;
 		}
-		const auto visible = button->isVisible();
-		const auto enabled = !button->isDisabled();
-		result.labels.push_back((visible && enabled)
+		const auto own = ReadButtonState(button);
+		result.labels.push_back((own.visible && !own.disabled)
 			? name
-			: u"%1 (%2)"_q.arg(name, visible ? u"disabled"_q : u"hidden"_q));
+			: u"%1 (%2)"_q.arg(
+				name,
+				own.visible ? u"disabled"_q : u"hidden"_q));
 		if (name.compare(label, Qt::CaseInsensitive) != 0) {
 			continue;
 		}
@@ -177,11 +178,11 @@ BoxShellButtons ReadBoxButtons(QWidget *box, const QString &label) {
 		// no-op this helper exists to remove, and Test::Click would deliver
 		// it just as happily as any other, so a name that matches an
 		// unusable button is a refusal here and never a match. present /
-		// disabled / hidden are values recorded from isVisible() /
-		// isDisabled() in this walk, never derived from |match|, which
+		// disabled / hidden are values recorded from ReadButtonState
+		// (test_widgets.h) in this walk, never derived from |match|, which
 		// goes null when the shell dies.
-		if (!visible || !enabled) {
-			if (!visible) {
+		if (!own.visible || own.disabled) {
+			if (!own.visible) {
 				result.hidden = true;
 			} else {
 				result.disabled = true;
@@ -192,7 +193,7 @@ BoxShellButtons ReadBoxButtons(QWidget *box, const QString &label) {
 					.arg(
 						label,
 						WidgetDescription(root.widget.data()),
-						visible ? u"disabled"_q : u"hidden"_q);
+						own.visible ? u"disabled"_q : u"hidden"_q);
 			}
 		} else if (!result.match) {
 			result.match = button;
@@ -256,10 +257,10 @@ bool ClickBoxButton(QWidget *box, const QString &label) {
 	// call sites under Telegram/SourceFiles are a plain closeBox() lambda -
 	// and that path is synchronous inside Test::Click:
 	// AbstractButton::setDown(false) calls clicked()
-	// (abstract_button.cpp:190-191), clicked() runs _clickedCallback()
-	// (:122-131), and the callback reaches LayerStackWidget::clearLayers(),
-	// whose clearClosingLayers() erases the Ui::BoxLayerWidget out of its
-	// unique_ptr vector (layer_widget.cpp:944-977) and deletes the shell
+	// (abstract_button.cpp), clicked() runs _clickedCallback(), and the
+	// callback reaches LayerStackWidget::clearLayers(), whose
+	// clearClosingLayers() erases the Ui::BoxLayerWidget out of its
+	// unique_ptr vector (layer_widget.cpp) and deletes the shell
 	// with every button on it. A WidgetDescription taken after the click
 	// would read freed memory. The reading now reports that destruction
 	// itself: BoxShellButtons::match is a QPointer<QWidget>, so survived= is
@@ -826,8 +827,8 @@ void AppendBoxButtonClickSelfTest(not_null<Runner*> runner) {
 			// inside this same turn: closeBox() reaches
 			// LayerStackWidget::prepareAnimation, which calls
 			// clearOldWidgets() synchronously on both of its branches
-			// (layer_widget.cpp:663-671), and _closingLayers holds
-			// std::unique_ptrs (layer_widget.h:296), so the erase is a
+			// (layer_widget.cpp), and _closingLayers holds
+			// std::unique_ptrs (layer_widget.h), so the erase is a
 			// plain delete - the same fact boxAliveRightAfter=0 below
 			// already measures through a base::weak_qptr. ReadBoxButtons
 			// logs nothing, so taking it ahead of the FailureCount()
@@ -984,6 +985,76 @@ void AppendBoxButtonClickSelfTest(not_null<Runner*> runner) {
 				.arg(state->fixture.stray ? 1 : 0)
 				.arg(state->fixture.box ? 1 : 0)
 				.arg(state->fired));
+		},
+	});
+}
+
+void AppendButtonStateSelfTest(not_null<Runner*> runner) {
+	runner->add({
+		.name = u"button-state self-test: a button's own disabled flag "
+			"beside QWidget::isEnabled()"_q,
+		.run = [=] {
+			const auto window = Core::App().activePrimaryWindow();
+			auto button = base::unique_qptr<Ui::RoundButton>();
+			if (window) {
+				button = base::make_unique_q<Ui::RoundButton>(
+					window->widget().get(),
+					rpl::single(u"Harness Toggle"_q),
+					st::defaultActiveButton);
+				button->show();
+			}
+			const auto r0 = ReadButtonState(button.get());
+			const auto gate = window && r0.read() && r0.visible;
+			Check(
+				gate,
+				u"fixture gate: a real Ui::RoundButton shown on the primary "
+				"window reads as a visible button"_q,
+				window
+					? ButtonStateDetails(r0)
+					: u"Core::App().activePrimaryWindow() is null"_q);
+			if (!gate) {
+				return;
+			}
+			button->setDisabled(true);
+			const auto r1 = ReadButtonState(button.get());
+			button->setDisabled(false);
+			const auto r2 = ReadButtonState(button.get());
+			static_cast<QWidget*>(button.get())->setEnabled(false);
+			const auto r3 = ReadButtonState(button.get());
+			static_cast<QWidget*>(button.get())->setEnabled(true);
+			const auto rn = ReadButtonState(nullptr);
+			const auto rw = ReadButtonState(window->widget().get());
+			Check(
+				!r0.disabled && r0.enabled && r0.usable(),
+				u"a fresh shown button reads enabled and usable"_q,
+				ButtonStateDetails(r0));
+			Check(
+				r1.disabled && r1.enabled && !r1.usable(),
+				u"setDisabled(true) reads disabled while isEnabled(), the "
+				"control, stays true"_q,
+				ButtonStateDetails(r1));
+			Check(
+				!r2.disabled && r2.enabled && r2.usable(),
+				u"setDisabled(false) reads enabled, isEnabled() still "
+				"true"_q,
+				ButtonStateDetails(r2));
+			Check(
+				!r3.disabled && !r3.enabled && !r3.usable(),
+				u"QWidget::setEnabled(false) moves isEnabled() and leaves the "
+				"own flag clear: the two flags are read independently"_q,
+				ButtonStateDetails(r3));
+			Check(
+				!rn.read()
+					&& !rn.usable()
+					&& rn.refusal.contains(u"no widget was handed"_q)
+					&& !rw.read()
+					&& !rw.usable()
+					&& rw.refusal.contains(u"not a Ui::AbstractButton"_q)
+					&& rw.refusal.contains(rw.identity),
+				u"a null widget and a widget that is not a "
+				"Ui::AbstractButton are refused by name and never usable"_q,
+				ButtonStateDetails(rn) + u"; "_q + ButtonStateDetails(rw));
+			button = nullptr;
 		},
 	});
 }

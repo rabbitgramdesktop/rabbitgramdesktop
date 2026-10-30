@@ -38,10 +38,12 @@ struct ThemeParams;
 namespace Window {
 namespace Theme {
 
+inline constexpr auto kThemeFileSizeLimit = 5 * 1024 * 1024;
 inline constexpr auto kThemeSchemeSizeLimit = 1024 * 1024;
 inline constexpr auto kThemeBackgroundSizeLimit = 4 * 1024 * 1024;
 
 struct ParsedTheme;
+enum class EmbeddedType;
 
 [[nodiscard]] bool IsEmbeddedTheme(const QString &path);
 
@@ -103,6 +105,8 @@ void ToggleNightModeWithConfirmation(
 	Fn<void()> toggle);
 void ResetToSomeDefault();
 [[nodiscard]] bool IsNonDefaultBackground();
+// Counts a theme being applied but not kept yet.
+[[nodiscard]] std::optional<EmbeddedType> CurrentEmbeddedType();
 void Revert();
 
 [[nodiscard]] rpl::producer<bool> IsThemeDarkValue();
@@ -125,6 +129,8 @@ bool LoadFromContent(
 	const QByteArray &content,
 	not_null<Instance*> out,
 	Cached *outCache);
+[[nodiscard]] std::optional<QByteArray> ReadPaletteContent(
+	const QString &path);
 
 struct BackgroundUpdate {
 	enum class Type {

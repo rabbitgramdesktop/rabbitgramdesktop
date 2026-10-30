@@ -673,6 +673,7 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 
 	if (Platform::AutostartSupported()) {
 		const auto minimizedToggled = [=] {
+			// Starting hidden must not conceal a verified launch lock.
 			return cStartMinimized()
 				&& controller
 				&& !controller->session().domain().local().hasLocalPasscode();
@@ -731,6 +732,7 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 			) | rpl::filter([=](bool checked) {
 				return (checked != minimizedToggled());
 			}) | rpl::on_next([=](bool checked) {
+				// Refuse a verified launch lock, as the checkbox does.
 				if (controller->session().domain().local().hasLocalPasscode()) {
 					minimized->setChecked(false);
 					controller->show(Ui::MakeInformBox(
@@ -1873,6 +1875,7 @@ void SetupSystemIntegrationContent(
 
 	if (Platform::AutostartSupported() && controller) {
 		const auto minimizedToggled = [=] {
+			// This path also avoids hiding a verified launch prompt.
 			return cStartMinimized()
 				&& !controller->session().domain().local().hasLocalPasscode();
 		};
@@ -1916,6 +1919,7 @@ void SetupSystemIntegrationContent(
 		) | rpl::filter([=](bool checked) {
 			return (checked != minimizedToggled());
 		}) | rpl::on_next([=](bool checked) {
+			// Keep the verified prompt refusal in this path too.
 			if (controller->session().domain().local().hasLocalPasscode()) {
 				minimized->entity()->setChecked(false);
 				controller->show(Ui::MakeInformBox(

@@ -483,19 +483,6 @@ bool instanceChecked() {
 	return true;
 }
 
-void multipleInstances() {
-	if (LogsInMemory) {
-		Assert(LogsInMemory != DeletedLogsInMemory);
-		delete LogsInMemory;
-	}
-	LogsInMemory = DeletedLogsInMemory;
-
-	if (Logs::DebugEnabled()) {
-		LOG(("WARNING: debug logs are not written in multiple instances mode!"));
-	}
-	LogsBeforeSingleInstanceChecked.clear();
-}
-
 void closeMain() {
 	LOG(("Explicitly closing main log and finishing crash handlers."));
 	if (LogsData) {
@@ -556,6 +543,10 @@ void writeMtp(int32 dc, const QString &v) {
 			return base + "_download_update";
 		} else if (shift == MTP::kGroupCallStreamDcShift) {
 			return base + "_stream";
+		} else if (shift == MTP::kToncenterDcShift) {
+			return base + "_toncenter";
+		} else if (shift == MTP::kWalletShareDcShift) {
+			return base + "_wallet_share";
 		} else if (MTP::isDownloadDcId(dc)) {
 			const auto index = shift - MTP::kBaseDownloadDcShift;
 			return base + "_download" + QString::number(index);

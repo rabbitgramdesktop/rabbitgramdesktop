@@ -625,17 +625,19 @@ void SetupVenues(
 		found.match([&](const auto &data) {
 			data.vsend_message().match([&](
 					const MTPDbotInlineMessageMediaVenue &data) {
-				data.vgeo().match([&](const MTPDgeoPoint &geo) {
-					result.list.push_back({
-						.lat = geo.vlat().v,
-						.lon = geo.vlong().v,
-						.title = qs(data.vtitle()),
-						.address = qs(data.vaddress()),
-						.provider = qs(data.vprovider()),
-						.id = qs(data.vvenue_id()),
-						.venueType = qs(data.vvenue_type()),
-					});
-				}, [](const auto &) {});
+				const auto point = Data::LocationPoint::FromMTP(data.vgeo());
+				if (!point) {
+					return;
+				}
+				result.list.push_back({
+					.lat = point->lat(),
+					.lon = point->lon(),
+					.title = qs(data.vtitle()),
+					.address = qs(data.vaddress()),
+					.provider = qs(data.vprovider()),
+					.id = qs(data.vvenue_id()),
+					.venueType = qs(data.vvenue_type()),
+				});
 			}, [](const auto &) {});
 		});
 	}
@@ -957,7 +959,7 @@ void LocationPicker::setupWebview() {
 		raw->widget()->setGeometry(QRect(QPoint(), size));
 	}, _container->lifetime());
 
-	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
 		return true;
 	});
 	raw->setNavigationDoneHandler([=](bool success) {

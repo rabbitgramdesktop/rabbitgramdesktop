@@ -25,12 +25,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
 #include "rabbit/quick_actions/quick_action.h"
+#include "history/view/history_view_touch_scroll.h"
 
 #include <vector>
 #include <QtGui/QPainterPath>
 
 struct ClickContext;
 struct ClickHandlerContext;
+struct HistorySelectedTextParts;
 
 namespace Data {
 struct Group;
@@ -48,6 +50,7 @@ enum class ElementChatMode : char;
 class ElementOverlayHost;
 class EmptyPainter;
 class Element;
+class GramReadLine;
 class TranslateTracker;
 class ReadMetricsTracker;
 struct PinnedId;
@@ -240,6 +243,7 @@ public:
 	void elementStartEffect(
 		not_null<const Element*> view,
 		Element *replacing);
+	HistoryView::GramReadLine *elementGramReadLine();
 
 	void startEffectOnRead(not_null<HistoryItem*> item);
 	void updateBotInfo(bool recount = true);
@@ -473,6 +477,7 @@ private:
 		not_null<HistoryItem*> item) const;
 	[[nodiscard]] MessageSelection getSelectedTextSelection(
 		not_null<HistoryItem*> item) const;
+	[[nodiscard]] HistorySelectedTextParts getSelectedTextParts() const;
 	[[nodiscard]] bool isPressInSelectedText(
 		not_null<const Element*> view,
 		TextState state) const;
@@ -540,7 +545,7 @@ private:
 	void reportAsGroup(FullMsgId itemId);
 	void blockSenderItem(FullMsgId itemId);
 	void blockSenderAsGroup(FullMsgId itemId);
-	void copySelectedText();
+	void copySelectedText(bool withImageText = false);
 	void editCaptionUploadLayer(not_null<HistoryItem*> item);
 
 	[[nodiscard]] auto reactionButtonParameters(
@@ -632,6 +637,7 @@ private:
 	std::optional<Data::ReportInput> _chooseForReportReason;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
+	std::unique_ptr<HistoryView::GramReadLine> _gramReadLine;
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
 	bool _removeFromUserpics = false;
@@ -697,6 +703,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	HistoryView::TouchScroll _touchElastic;
 	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;
