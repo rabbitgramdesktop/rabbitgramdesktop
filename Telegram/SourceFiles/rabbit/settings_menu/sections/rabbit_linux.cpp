@@ -10,6 +10,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/settings_menu/sections/rabbit_linux.h"
 
 #include <rpl/rpl.h>
+#include "core/application.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings/rabbit_settings.h"
@@ -188,13 +190,18 @@ void BuildRabbitLinux(SectionBuilder &builder) {
 		.toggled = rpl::single(RabbitSettings::linuxForceXcb()),
 		.keywords = { u"xcb"_q, u"x11"_q, u"wayland"_q, u"notifications"_q },
 	})) {
+		const auto controller = builder.controller();
 		xcbButton->toggledValue()
 			| rpl::filter([=](bool enabled) {
 				return enabled != RabbitSettings::linuxForceXcb();
 			})
 			| rpl::on_next([=](bool enabled) {
 				RabbitSettings::setLinuxForceXcb(enabled);
-				Ui::Toast::Show(tr::lng_settings_restart_now(tr::now));
+				controller->show(Ui::MakeConfirmBox({
+					.text = tr::lng_settings_need_restart(),
+					.confirmed = [] { Core::Restart(); },
+					.confirmText = tr::lng_settings_restart_now(),
+				}));
 			}, xcbButton->lifetime());
 	}
 	builder.addSkip();
