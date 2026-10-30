@@ -899,11 +899,22 @@ void FoldersPreview::paintEvent(QPaintEvent *e) {
 
 				if (shouldShowBadge(tab)) {
 					unreadSt.muted = tab.muted;
-					const auto badgeWidth = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt).width();
+					const auto badgeSize = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt);
+					const auto badgeWidth = badgeSize.width();
+					const auto badgeHeight = badgeSize.height();
 					const auto badgeX = std::min(
 						(sidebarWidth - 1) / 2 + 3,
 						sidebarWidth - 1 - badgeWidth - 2);
 					const auto badgeY = y + 7;
+					const auto stroke = 2;
+					p.setPen(Qt::NoPen);
+					p.setBrush(active && foldersStyle == 0
+						? st::windowFiltersButton.textBgActive
+						: st::windowFiltersButton.textBg);
+					p.drawRoundedRect(
+						QRectF(badgeX - stroke, badgeY - stroke, badgeWidth + 2 * stroke, badgeHeight + 2 * stroke),
+						(badgeHeight + 2 * stroke) / 2.,
+						(badgeHeight + 2 * stroke) / 2.);
 					Ui::PaintUnreadBadge(p, QString::number(tab.unread), badgeX, badgeY, unreadSt);
 				}
 			} else {
@@ -939,11 +950,22 @@ void FoldersPreview::paintEvent(QPaintEvent *e) {
 
 				if (shouldShowBadge(tab)) {
 					unreadSt.muted = tab.muted;
-					const auto badgeWidth = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt).width();
+					const auto badgeSize = Ui::CountUnreadBadgeSize(QString::number(tab.unread), unreadSt);
+					const auto badgeWidth = badgeSize.width();
+					const auto badgeHeight = badgeSize.height();
 					const auto badgeX = std::min(
 						(sidebarWidth - 1) / 2 + 15,
 						sidebarWidth - 1 - badgeWidth - 2);
 					const auto badgeY = y + 1;
+					const auto stroke = 2;
+					p.setPen(Qt::NoPen);
+					p.setBrush(active && foldersStyle == 0
+						? st::windowFiltersButton.textBgActive
+						: st::windowFiltersButton.textBg);
+					p.drawRoundedRect(
+						QRectF(badgeX - stroke, badgeY - stroke, badgeWidth + 2 * stroke, badgeHeight + 2 * stroke),
+						(badgeHeight + 2 * stroke) / 2.,
+						(badgeHeight + 2 * stroke) / 2.);
 					Ui::PaintUnreadBadge(p, QString::number(tab.unread), badgeX, badgeY, unreadSt);
 				}
 			}
