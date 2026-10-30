@@ -8,6 +8,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/player/media_player_widget.h"
 
 #include "rabbit/settings/rabbit_settings.h"
+#include "rabbit/ui/player/cover_theme.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
+#include "ui/image/image.h"
 
 #include "platform/platform_specific.h"
 #include "data/data_document.h"
@@ -52,7 +56,7 @@ Widget::Widget(
 , _orderMenuParent(dropdownsParent)
 , _nameLabel(this, st::mediaPlayerName)
 , _rightControls(this, object_ptr<Ui::RpWidget>(this))
-, _timeLabel(rightControls(), st::mediaPlayerTime)
+, _timeLabel(rightControls(), st::defaultFlatLabel)
 , _playPause(this, st::mediaPlayerPlayButton)
 , _volumeToggle(rightControls(), st::mediaPlayerVolumeToggle)
 , _repeatToggle(rightControls(), st::mediaPlayerRepeatButton)
@@ -90,6 +94,16 @@ Widget::Widget(
 			QString::number(base::SafeRound(speed * 10) / 10.) + "x"));
 	}, _speedToggle->lifetime());
 	_speedToggle->finishAnimating();
+
+	Rabbit::Player::CurrentCoverThemeValue(
+	) | rpl::on_next([=](const Rabbit::Player::CoverTheme &theme) {
+		updateCoverTheme(theme);
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(u"player_cover_colors_mini"_q
+	) | rpl::on_next([=] {
+		updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
+	}, lifetime());
 
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setMouseTracking(true);
@@ -140,6 +154,12 @@ Widget::Widget(
 	Core::App().settings().playerRepeatModeValue(
 	) | rpl::on_next([=] {
 		updateRepeatToggleIcon();
+		updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
+	}, lifetime());
+
+	Core::App().settings().playerOrderModeValue(
+	) | rpl::on_next([=] {
+		updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
 	}, lifetime());
 
 	_repeatToggle->setClickedCallback([=] {
@@ -165,6 +185,7 @@ Widget::Widget(
 		Core::App().settings().audioPlaybackSpeedChanges() | rpl::to_empty
 	) | rpl::on_next([=] {
 		_speedController->reloadFromLookup();
+		updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
 	}, lifetime());
 
 	instance()->trackChanged(
@@ -282,13 +303,24 @@ void Widget::setupRightControls() {
 		auto p = QPainter(raw);
 		const auto &icon = st::mediaPlayerControlsFade;
 		const auto fade = QRect(0, 0, icon.width(), raw->height());
+		const auto theme = Rabbit::Player::CurrentCoverTheme();
+		const auto useCover = RabbitSettings::playerCoverColorsMini() && theme.valid;
+		const auto bg = useCover ? theme.backgroundTop : st::mediaPlayerBg->c;
+
 		if (fade.intersects(clip)) {
-			icon.fill(p, fade);
+			if (useCover) {
+				auto gradient = QLinearGradient(0, 0, icon.width(), 0);
+				gradient.setColorAt(0.0, QColor(bg.red(), bg.green(), bg.blue(), 0));
+				gradient.setColorAt(1.0, bg);
+				p.fillRect(fade, gradient);
+			} else {
+				icon.fill(p, fade);
+			}
 		}
 		const auto fill = clip.intersected(
 			{ icon.width(), 0, raw->width() - icon.width(), raw->height() });
 		if (!fill.isEmpty()) {
-			p.fillRect(fill, st::mediaPlayerBg);
+			p.fillRect(fill, bg);
 		}
 	}, raw->lifetime());
 	_rightControls->show(anim::type::instant);
@@ -327,6 +359,56 @@ void Widget::stopAndClose() {
 	}
 	if (_closeCallback) {
 		_closeCallback();
+	}
+}
+
+void Widget::updateCoverTheme(const Rabbit::Player::CoverTheme &theme) {
+	const auto useCover = RabbitSettings::playerCoverColorsMini() && theme.valid;
+	update();
+	rightControls()->update();
+
+	if (useCover) {
+		_playbackSlider->setColorOverrides(theme.accent, theme.buttonBg);
+		_nameLabel->setTextColorOverride(theme.text);
+		_timeLabel->setTextColorOverride(theme.textSecondary);
+		_close->setIconColorOverride(theme.textSecondary);
+		_volumeToggle->setIconColorOverride(theme.textSecondary);
+
+		const auto repeatMode = Core::App().settings().playerRepeatMode();
+		const auto repeatActive = (repeatMode == RepeatMode::One || repeatMode == RepeatMode::All);
+		_repeatToggle->setIconColorOverride(repeatActive ? theme.accent : theme.textSecondary);
+
+		const auto orderMode = Core::App().settings().playerOrderMode();
+		const auto orderActive = (orderMode == OrderMode::Shuffle || orderMode == OrderMode::Reverse);
+		_orderToggle->setIconColorOverride(orderActive ? theme.accent : theme.textSecondary);
+
+		const auto curSpeed = Core::App().settings().audioPlaybackSpeed();
+		const auto speedActive = (std::abs(curSpeed - 1.0) >= 0.05);
+		_speedToggle->setIconColorOverride(speedActive ? theme.accent : theme.textSecondary);
+
+		_playPause->setColorOverride(theme.accent);
+		if (_previousTrack) {
+			_previousTrack->setIconColorOverride(theme.accentSecondary);
+		}
+		if (_nextTrack) {
+			_nextTrack->setIconColorOverride(theme.accentSecondary);
+		}
+	} else {
+		_playbackSlider->setColorOverrides(std::nullopt, std::nullopt);
+		_nameLabel->setTextColorOverride(std::nullopt);
+		_timeLabel->setTextColorOverride(std::nullopt);
+		_close->setIconColorOverride(std::nullopt);
+		_volumeToggle->setIconColorOverride(std::nullopt);
+		_repeatToggle->setIconColorOverride(std::nullopt);
+		_orderToggle->setIconColorOverride(std::nullopt);
+		_speedToggle->setIconColorOverride(std::nullopt);
+		_playPause->setColorOverride(std::nullopt);
+		if (_previousTrack) {
+			_previousTrack->setIconColorOverride(std::nullopt);
+		}
+		if (_nextTrack) {
+			_nextTrack->setIconColorOverride(std::nullopt);
+		}
 	}
 }
 
@@ -455,7 +537,16 @@ void Widget::paintEvent(QPaintEvent *e) {
 	auto fill = e->rect().intersected(
 		QRect(0, 0, width(), st::mediaPlayerHeight + st::lineWidth));
 	if (!fill.isEmpty()) {
-		p.fillRect(fill, st::mediaPlayerBg);
+		if (RabbitSettings::playerCoverColorsMini()) {
+			const auto theme = Rabbit::Player::CurrentCoverTheme();
+			if (theme.valid) {
+				p.fillRect(fill, theme.backgroundTop);
+			} else {
+				p.fillRect(fill, st::mediaPlayerBg);
+			}
+		} else {
+			p.fillRect(fill, st::mediaPlayerBg);
+		}
 	}
 }
 
@@ -709,6 +800,15 @@ void Widget::handleSongUpdate(const TrackState &state) {
 		? tr::lng_shortcuts_media_pause(tr::now)
 		: tr::lng_shortcuts_media_play(tr::now));
 
+	if (_type == AudioMsgId::Type::Song && _currentMedia && _currentMedia->thumbnail()) {
+		const auto currentTheme = Rabbit::Player::CurrentCoverTheme();
+		if (!currentTheme.valid) {
+			const auto isDark = (st::windowBg->c.lightness() < 128);
+			Rabbit::Player::SetCurrentCoverTheme(
+				Rabbit::Player::GenerateCoverTheme(_currentMedia->thumbnail()->original(), isDark));
+		}
+	}
+
 	updateTimeText(state);
 }
 
@@ -768,6 +868,22 @@ void Widget::handleSongChange() {
 	_lastSongId = current;
 	_speedController->reloadFromLookup();
 
+	if (_type == AudioMsgId::Type::Song && document) {
+		_currentMedia = document->createMediaView();
+		if (_currentMedia) {
+			if (const auto img = _currentMedia->thumbnail()) {
+				const auto isDark = (st::windowBg->c.lightness() < 128);
+				Rabbit::Player::SetCurrentCoverTheme(
+					Rabbit::Player::GenerateCoverTheme(img->original(), isDark));
+			} else {
+				const auto item = document->owner().message(current.contextId());
+				_currentMedia->thumbnailWanted(item ? item->fullId() : Data::FileOrigin());
+			}
+		}
+	} else {
+		_currentMedia = nullptr;
+	}
+
 	auto textWithEntities = TextWithEntities();
 	if (document->isVoiceMessage() || document->isVideoMessage()) {
 		textWithEntities = Ui::Text::FormatVoiceName(
@@ -814,6 +930,15 @@ void Widget::createPrevNextButtons() {
 		_nextTrack->setAccessibleName(tr::lng_shortcuts_media_next(tr::now));
 		hidePlaylistOn(_previousTrack);
 		hidePlaylistOn(_nextTrack);
+
+		if (RabbitSettings::playerCoverColorsMini()) {
+			const auto theme = Rabbit::Player::CurrentCoverTheme();
+			if (theme.valid) {
+				_previousTrack->setIconColorOverride(theme.text);
+				_nextTrack->setIconColorOverride(theme.text);
+			}
+		}
+
 		updatePlayPrevNextPositions();
 	}
 }

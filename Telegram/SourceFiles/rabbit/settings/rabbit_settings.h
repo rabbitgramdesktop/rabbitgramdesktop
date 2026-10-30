@@ -209,6 +209,8 @@ inline bool quickSwipeTopics() { return JsonSettings::GetBool(u"quick_swipe_topi
 inline bool replyColors() { return JsonSettings::GetBool(u"reply_colors"_q); }
 inline bool replyEmoji() { return JsonSettings::GetBool(u"reply_emoji"_q); }
 inline bool replyBg() { return JsonSettings::GetBool(u"reply_bg"_q); }
+inline bool playerCoverColorsFullscreen() { return JsonSettings::GetBool(u"player_cover_colors_fullscreen"_q); }
+inline bool playerCoverColorsMini() { return JsonSettings::GetBool(u"player_cover_colors_mini"_q); }
 
 inline void setMathAutocomplete(bool value) { JsonSettings::Set(u"math_autocomplete"_q, value); }
 inline void setStreamerMode(bool value) { JsonSettings::Set(u"streamer_mode"_q, value); }
@@ -268,6 +270,8 @@ inline void setHideReactionsPrivates(bool value) { JsonSettings::Set(u"hide_reac
 inline void setReplyColors(bool value) { JsonSettings::Set(u"reply_colors"_q, value); }
 inline void setReplyEmoji(bool value) { JsonSettings::Set(u"reply_emoji"_q, value); }
 inline void setReplyBg(bool value) { JsonSettings::Set(u"reply_bg"_q, value); }
+inline void setPlayerCoverColorsFullscreen(bool value) { JsonSettings::Set(u"player_cover_colors_fullscreen"_q, value); }
+inline void setPlayerCoverColorsMini(bool value) { JsonSettings::Set(u"player_cover_colors_mini"_q, value); }
 inline void setQuickSwipeChannels(bool value) { JsonSettings::Set(u"quick_swipe_channels"_q, value); }
 inline void setQuickSwipeTopics(bool value) { JsonSettings::Set(u"quick_swipe_topics"_q, value); }
 inline bool tgWsProxyEnabled() { return JsonSettings::GetBool(u"tg_ws_proxy_enabled"_q); }

@@ -9,15 +9,16 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/rp_widget.h"
 #include "base/object_ptr.h"
+#include "base/unique_qptr.h"
 #include "data/data_audio_msg_id.h"
 #include "ui/effects/animations.h"
+#include "rabbit/ui/player/cover_theme.h"
 
 namespace Ui {
 class FlatLabel;
 class LabelSimple;
 class IconButton;
-class FilledSlider;
-class MediaSlider;
+class PopupMenu;
 } // namespace Ui
 
 namespace Window {
@@ -37,6 +38,10 @@ namespace Rabbit::Player {
 class TopPillButton;
 class CircleIconButton;
 class PlayPauseButton;
+class SpeedPillButton;
+class QueuePillButton;
+class ExpressiveSlider;
+class QueuePanel;
 
 class FullPlayerWidget final : public Ui::RpWidget {
 public:
@@ -87,20 +92,24 @@ private:
 	void applyVolumeChange(float64 volume);
 	void paintDefaultCoverIcon(QPainter &p, const QRect &rect);
 	void updateSlide();
+	void updateCoverTheme();
+	void applyCoverTheme(const CoverTheme &theme);
+	void showMoreMenu();
+	void toggleQueue();
 
 	const not_null<Window::SessionController*> _controller;
 
 	object_ptr<TopPillButton> _closeButton;
-	object_ptr<TopPillButton> _goToMessageButton;
+	object_ptr<CircleIconButton> _moreButton;
 	object_ptr<Ui::FlatLabel> _headerTitle;
 	object_ptr<Ui::FlatLabel> _headerSubtitle;
 
 	object_ptr<Ui::FlatLabel> _trackTitle;
 	object_ptr<Ui::FlatLabel> _trackPerformer;
 
-	object_ptr<Ui::FilledSlider> _progressSlider;
-	object_ptr<Ui::LabelSimple> _timePassedLabel;
-	object_ptr<Ui::LabelSimple> _timeTotalLabel;
+	object_ptr<ExpressiveSlider> _progressSlider;
+	object_ptr<Ui::FlatLabel> _timePassedLabel;
+	object_ptr<Ui::FlatLabel> _timeTotalLabel;
 
 	object_ptr<Ui::IconButton> _orderButton;
 	object_ptr<CircleIconButton> _prevButton;
@@ -108,12 +117,17 @@ private:
 	object_ptr<CircleIconButton> _nextButton;
 	object_ptr<Ui::IconButton> _repeatButton;
 
+	object_ptr<SpeedPillButton> _speedButton;
 	object_ptr<Ui::IconButton> _volumeButton;
-	object_ptr<Ui::MediaSlider> _volumeSlider;
+	object_ptr<ExpressiveSlider> _volumeSlider;
+	object_ptr<QueuePillButton> _queueButton;
+
+	object_ptr<QueuePanel> _queuePanel;
 
 	std::shared_ptr<Data::DocumentMedia> _currentMedia;
 	DocumentData *_currentDocument = nullptr;
 	FullMsgId _currentContextId;
+	QString _songTitle;
 	Fn<void(not_null<const HistoryItem*>)> _goToItemCallback;
 
 	QRect _coverRect;
@@ -123,6 +137,15 @@ private:
 	bool _playing = false;
 	bool _hiding = false;
 	bool _hasCover = false;
+
+	CoverTheme _coverTheme;
+	CoverTheme _prevCoverTheme;
+	CoverTheme _targetCoverTheme;
+	Ui::Animations::Simple _a_themeTransition;
+
+	QPointer<QWidget> _previousFocus;
+
+	base::unique_qptr<Ui::PopupMenu> _moreMenu;
 
 	Ui::Animations::Simple _a_show;
 	rpl::event_stream<> _closeRequests;

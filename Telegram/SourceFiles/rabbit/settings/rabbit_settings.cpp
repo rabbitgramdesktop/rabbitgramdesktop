@@ -586,6 +586,18 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 		}
 	},
 	{
+		u"player_cover_colors_fullscreen"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
+		u"player_cover_colors_mini"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
+	},
+	{
 		u"quick_swipe_channels"_q, {
 			.type = BoolSetting,
 			.defaultValue = true,

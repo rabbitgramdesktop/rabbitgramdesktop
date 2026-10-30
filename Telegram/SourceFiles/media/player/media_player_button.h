@@ -35,6 +35,7 @@ public:
 
 	void setState(State state);
 	void finishTransform();
+	void setColorOverride(std::optional<QColor> colorOverride);
 	void paint(QPainter &p, const QBrush &brush);
 
 private:
@@ -48,6 +49,7 @@ private:
 	State _nextState = State::Play;
 	Ui::Animations::Simple _transformProgress;
 	bool _transformBackward = false;
+	std::optional<QColor> _colorOverride;
 
 	Fn<void()> _callback;
 
@@ -61,6 +63,7 @@ public:
 
 	void setState(State state);
 	void finishTransform();
+	void setColorOverride(std::optional<QColor> colorOverride);
 
 private:
 	void paintEvent(QPaintEvent *e) override;
@@ -81,6 +84,7 @@ public:
 		float64 speed);
 
 	void setSpeed(float64 speed);
+	void setIconColorOverride(std::optional<QColor> colorOverride);
 	void paint(QPainter &p, bool over, bool active);
 
 private:
@@ -94,6 +98,7 @@ private:
 
 	QString _text;
 	float64 _textWidth = 0;
+	std::optional<QColor> _colorOverride;
 
 	Fn<void()> _callback;
 
@@ -108,6 +113,7 @@ public:
 	}
 
 	void setSpeed(float64 speed);
+	void setIconColorOverride(std::optional<QColor> colorOverride);
 
 private:
 	void paintEvent(QPaintEvent *e) override;

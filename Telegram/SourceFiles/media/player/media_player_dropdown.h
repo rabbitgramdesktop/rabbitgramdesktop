@@ -30,6 +30,13 @@ class Menu;
 
 namespace Media::Player {
 
+void FillSpeedMenu(
+	not_null<Ui::Menu::Menu*> menu,
+	const style::MediaSpeedMenu &st,
+	rpl::producer<float64> value,
+	Fn<void(float64)> callback,
+	bool onlySlider = false);
+
 class Dropdown final : public Ui::RpWidget {
 public:
 	explicit Dropdown(QWidget *parent);

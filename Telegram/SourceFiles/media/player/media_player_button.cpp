@@ -199,6 +199,13 @@ void PlayButtonLayout::finishTransform() {
 	if (_callback) _callback();
 }
 
+void PlayButtonLayout::setColorOverride(std::optional<QColor> colorOverride) {
+	if (_colorOverride != colorOverride) {
+		_colorOverride = colorOverride;
+		if (_callback) _callback();
+	}
+}
+
 void PlayButtonLayout::paint(QPainter &p, const QBrush &brush) {
 	const auto shape = [&](State state) {
 		switch (state) {
@@ -217,7 +224,7 @@ void PlayButtonLayout::paint(QPainter &p, const QBrush &brush) {
 			_transformBackward ? (1. - progress) : progress);
 
 	PainterHighQualityEnabler hq(p);
-	PaintShape(p, current, brush);
+	PaintShape(p, current, _colorOverride ? QBrush(*_colorOverride) : brush);
 }
 
 void PlayButtonLayout::animationCallback() {
@@ -253,6 +260,11 @@ void PlayButton::setState(State state) {
 
 void PlayButton::finishTransform() {
 	_layout.finishTransform();
+}
+
+void PlayButton::setColorOverride(std::optional<QColor> colorOverride) {
+	_layout.setColorOverride(colorOverride);
+	update();
 }
 
 void PlayButton::paintEvent(QPaintEvent *e) {
@@ -302,10 +314,19 @@ void SpeedButtonLayout::setSpeed(float64 speed) {
 	}
 }
 
+void SpeedButtonLayout::setIconColorOverride(std::optional<QColor> colorOverride) {
+	if (_colorOverride != colorOverride) {
+		_colorOverride = colorOverride;
+		if (_callback) _callback();
+	}
+}
+
 void SpeedButtonLayout::paint(QPainter &p, bool over, bool active) {
-	const auto &color = active ? _st.activeFg : over ? _st.overFg : _st.fg;
+	const auto color = _colorOverride.has_value()
+		? *_colorOverride
+		: (active ? _st.activeFg->c : over ? _st.overFg->c : _st.fg->c);
 	const auto inner = QRect(QPoint(), _st.size).marginsRemoved(_st.padding);
-	_st.icon.paintInCenter(p, inner, color->c);
+	_st.icon.paintInCenter(p, inner, color);
 
 	p.setPen(color);
 	p.setFont(_st.font);
@@ -328,6 +349,11 @@ SpeedButton::SpeedButton(QWidget *parent, const style::MediaSpeedButton &st)
 void SpeedButton::setSpeed(float64 speed) {
 	_isDefault = EqualSpeeds(speed, 1.);
 	_layout.setSpeed(speed);
+	update();
+}
+
+void SpeedButton::setIconColorOverride(std::optional<QColor> colorOverride) {
+	_layout.setIconColorOverride(colorOverride);
 	update();
 }
 

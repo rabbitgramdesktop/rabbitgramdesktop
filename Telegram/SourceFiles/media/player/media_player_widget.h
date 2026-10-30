@@ -35,6 +35,14 @@ namespace Window {
 class SessionController;
 } // namespace Window
 
+namespace Data {
+class DocumentMedia;
+} // namespace Data
+
+namespace Rabbit::Player {
+struct CoverTheme;
+} // namespace Rabbit::Player
+
 namespace Media::Player {
 
 class Dropdown;
@@ -120,6 +128,7 @@ private:
 	void saveOrder(OrderMode mode);
 	[[nodiscard]] float64 speedLookup(bool lastNonDefault) const;
 	void saveSpeed(float64 speed);
+	void updateCoverTheme(const Rabbit::Player::CoverTheme &theme);
 
 	const not_null<Window::SessionController*> _controller;
 	const not_null<Ui::RpWidget*> _orderMenuParent;
@@ -150,7 +159,7 @@ private:
 
 	object_ptr<Ui::FlatLabel> _nameLabel;
 	object_ptr<Ui::FadeWrap<Ui::RpWidget>> _rightControls;
-	object_ptr<Ui::LabelSimple> _timeLabel;
+	object_ptr<Ui::FlatLabel> _timeLabel;
 	object_ptr<Ui::IconButton> _previousTrack = { nullptr };
 	object_ptr<PlayButton> _playPause;
 	object_ptr<Ui::IconButton> _nextTrack = { nullptr };
@@ -165,6 +174,8 @@ private:
 	std::unique_ptr<View::PlaybackProgress> _playbackProgress;
 	std::unique_ptr<OrderController> _orderController;
 	std::unique_ptr<SpeedController> _speedController;
+
+	std::shared_ptr<Data::DocumentMedia> _currentMedia;
 
 	rpl::lifetime _playlistChangesLifetime;
 

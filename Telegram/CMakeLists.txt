@@ -1938,8 +1938,12 @@ PRIVATE
     rabbit/ui/settings/icon_picker.h
     rabbit/ui/settings/previews.cpp
     rabbit/ui/settings/previews.h
+    rabbit/ui/player/cover_theme.cpp
+    rabbit/ui/player/cover_theme.h
     rabbit/ui/player/full_player_widget.cpp
     rabbit/ui/player/full_player_widget.h
+    rabbit/ui/player/player_settings_box.cpp
+    rabbit/ui/player/player_settings_box.h
     rabbit/ui/rabbit_assets.cpp
     rabbit/ui/rabbit_assets.h
     rabbit/utils/chat_utils.cpp

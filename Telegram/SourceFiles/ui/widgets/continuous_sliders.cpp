@@ -229,6 +229,16 @@ float64 FilledSlider::getOverDuration() const {
 	return _st.duration;
 }
 
+void FilledSlider::setColorOverrides(
+		std::optional<QColor> activeFg,
+		std::optional<QColor> inactiveFg) {
+	if (_activeFgOverride != activeFg || _inactiveFgOverride != inactiveFg) {
+		_activeFgOverride = activeFg;
+		_inactiveFgOverride = inactiveFg;
+		update();
+	}
+}
+
 void FilledSlider::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	PainterHighQualityEnabler hq(p);
@@ -237,6 +247,12 @@ void FilledSlider::paintEvent(QPaintEvent *e) {
 
 	const auto masterOpacity = fadeOpacity();
 	const auto disabled = isDisabled();
+	const auto activeColor = _activeFgOverride
+		? *_activeFgOverride
+		: (disabled ? _st.disabledFg->c : _st.activeFg->c);
+	const auto inactiveColor = _inactiveFgOverride
+		? *_inactiveFgOverride
+		: _st.inactiveFg->c;
 	const auto over = getCurrentOverFactor();
 	const auto lineWidth = _st.lineWidth + ((_st.fullWidth - _st.lineWidth) * over);
 	const auto lineWidthRounded = std::floor(lineWidth);
@@ -248,18 +264,18 @@ void FilledSlider::paintEvent(QPaintEvent *e) {
 	const auto end = from + seekRect.width();
 	if (mid > from) {
 		p.setOpacity(masterOpacity);
-		p.fillRect(from, height() - lineWidthRounded, (mid - from), lineWidthRounded, disabled ? _st.disabledFg : _st.activeFg);
+		p.fillRect(from, height() - lineWidthRounded, (mid - from), lineWidthRounded, activeColor);
 		if (lineWidthPartial > 0.01) {
 			p.setOpacity(masterOpacity * lineWidthPartial);
-			p.fillRect(from, height() - lineWidthRounded - 1, (mid - from), 1, disabled ? _st.disabledFg : _st.activeFg);
+			p.fillRect(from, height() - lineWidthRounded - 1, (mid - from), 1, activeColor);
 		}
 	}
 	if (end > mid && over > 0) {
 		p.setOpacity(masterOpacity * over);
-		p.fillRect(mid, height() - lineWidthRounded, (end - mid), lineWidthRounded, _st.inactiveFg);
+		p.fillRect(mid, height() - lineWidthRounded, (end - mid), lineWidthRounded, inactiveColor);
 		if (lineWidthPartial > 0.01) {
 			p.setOpacity(masterOpacity * over * lineWidthPartial);
-			p.fillRect(mid, height() - lineWidthRounded - 1, (end - mid), 1, _st.inactiveFg);
+			p.fillRect(mid, height() - lineWidthRounded - 1, (end - mid), 1, inactiveColor);
 		}
 	}
 }

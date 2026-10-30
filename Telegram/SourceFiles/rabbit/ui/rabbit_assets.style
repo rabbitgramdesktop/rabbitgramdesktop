@@ -49,3 +49,6 @@ quickActionBoxHeight: 62px;
 
 quickActionBoxFill: windowBgOver;
 quickActionBoxStroke: historyPeerArchiveUserpicBg;
+
+rabbitMenuIconBack: icon {{ "box_button_back", menuIconColor, point(4px, 4px) }};
+

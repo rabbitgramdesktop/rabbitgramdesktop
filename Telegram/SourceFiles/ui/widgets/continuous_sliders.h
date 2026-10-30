@@ -135,6 +135,10 @@ class FilledSlider : public ContinuousSlider {
 public:
 	FilledSlider(QWidget *parent, const style::FilledSlider &st);
 
+	void setColorOverrides(
+		std::optional<QColor> activeFg,
+		std::optional<QColor> inactiveFg = std::nullopt);
+
 protected:
 	void paintEvent(QPaintEvent *e) override;
 
@@ -143,6 +147,8 @@ private:
 	float64 getOverDuration() const override;
 
 	const style::FilledSlider &_st;
+	std::optional<QColor> _activeFgOverride;
+	std::optional<QColor> _inactiveFgOverride;
 
 };
 
