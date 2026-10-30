@@ -137,6 +137,7 @@ private:
 	bool _playing = false;
 	bool _hiding = false;
 	bool _hasCover = false;
+	QImage _embeddedCover;
 
 	CoverTheme _coverTheme;
 	CoverTheme _prevCoverTheme;

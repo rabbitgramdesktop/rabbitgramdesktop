@@ -50,7 +50,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 namespace {
 
-constexpr auto kDefaultCoverThumbnailSize = 100;
+constexpr auto kDefaultCoverThumbnailSize = 600;
 constexpr auto kMaxAllowedPreloadPrefix = 6 * 1024 * 1024;
 constexpr auto kDefaultWebmEmojiSize = 100;
 constexpr auto kDefaultWebmStickerLargerSize = kStickerSideSize;

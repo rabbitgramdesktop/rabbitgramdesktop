@@ -8,7 +8,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "rabbit/ui/player/cover_theme.h"
 
 #include "ui/effects/animations.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_session.h"
+#include "main/main_session.h"
+#include "core/file_location.h"
+#include "media/audio/media_audio.h"
+#include "ui/chat/attach/attach_prepare.h"
 #include <rpl/variable.h>
+#include <QtCore/QFileInfo>
 #include <algorithm>
 #include <cmath>
 
@@ -187,6 +195,73 @@ CoverTheme CurrentCoverTheme() {
 
 rpl::producer<CoverTheme> CurrentCoverThemeValue() {
 	return CurrentThemeVariable().value();
+}
+
+void ExtractEmbeddedCover(
+		not_null<DocumentData*> document,
+		Fn<void(QImage)> callback) {
+	const auto guard = base::make_weak(&document->session());
+	const auto &loc = document->location(true);
+	if (loc.accessEnable()) {
+		const auto path = loc.name();
+		if (!path.isEmpty() && QFileInfo::exists(path)) {
+			crl::async([=, callback = std::move(callback)] {
+				auto info = Media::Player::PrepareForSending(path, QByteArray());
+				if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
+					if (!song->cover.isNull()) {
+						crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
+							callback(std::move(cover));
+						});
+						return;
+					}
+				}
+				crl::on_main(guard, [=] {
+					callback(QImage());
+				});
+			});
+			return;
+		}
+	}
+	if (const auto media = document->activeMediaView()) {
+		const auto bytes = media->bytes();
+		if (!bytes.isEmpty()) {
+			crl::async([=, callback = std::move(callback), bytes = bytes] {
+				auto info = Media::Player::PrepareForSending(QString(), bytes);
+				if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
+					if (!song->cover.isNull()) {
+						crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
+							callback(std::move(cover));
+						});
+						return;
+					}
+				}
+				crl::on_main(guard, [=] {
+					callback(QImage());
+				});
+			});
+			return;
+		}
+	}
+	document->owner().cache().get(document->cacheKey(), [=, callback = std::move(callback)](QByteArray data) {
+		if (data.isEmpty()) {
+			callback(QImage());
+			return;
+		}
+		crl::async([=, data = std::move(data), callback = std::move(callback)]() mutable {
+			auto info = Media::Player::PrepareForSending(QString(), data);
+			if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
+				if (!song->cover.isNull()) {
+					crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
+						callback(std::move(cover));
+					});
+					return;
+				}
+			}
+			crl::on_main(guard, [=] {
+				callback(QImage());
+			});
+		});
+	});
 }
 
 } // namespace Rabbit::Player

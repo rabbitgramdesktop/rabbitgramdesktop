@@ -105,6 +105,16 @@ Widget::Widget(
 		updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
 	}, lifetime());
 
+	_controller->session().downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		if (_type == AudioMsgId::Type::Song && _currentMedia && !_hasCover && _currentMedia->thumbnail()) {
+			_hasCover = true;
+			const auto isDark = (st::windowBg->c.lightness() < 128);
+			Rabbit::Player::SetCurrentCoverTheme(
+				Rabbit::Player::GenerateCoverTheme(_currentMedia->thumbnail()->original(), isDark));
+		}
+	}, lifetime());
+
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setMouseTracking(true);
 	resize(width(), st::mediaPlayerHeight + st::lineWidth);
@@ -800,13 +810,11 @@ void Widget::handleSongUpdate(const TrackState &state) {
 		? tr::lng_shortcuts_media_pause(tr::now)
 		: tr::lng_shortcuts_media_play(tr::now));
 
-	if (_type == AudioMsgId::Type::Song && _currentMedia && _currentMedia->thumbnail()) {
-		const auto currentTheme = Rabbit::Player::CurrentCoverTheme();
-		if (!currentTheme.valid) {
-			const auto isDark = (st::windowBg->c.lightness() < 128);
-			Rabbit::Player::SetCurrentCoverTheme(
-				Rabbit::Player::GenerateCoverTheme(_currentMedia->thumbnail()->original(), isDark));
-		}
+	if (_type == AudioMsgId::Type::Song && _currentMedia && _currentMedia->thumbnail() && !_hasCover) {
+		_hasCover = true;
+		const auto isDark = (st::windowBg->c.lightness() < 128);
+		Rabbit::Player::SetCurrentCoverTheme(
+			Rabbit::Player::GenerateCoverTheme(_currentMedia->thumbnail()->original(), isDark));
 	}
 
 	updateTimeText(state);
@@ -868,10 +876,12 @@ void Widget::handleSongChange() {
 	_lastSongId = current;
 	_speedController->reloadFromLookup();
 
+	_hasCover = false;
 	if (_type == AudioMsgId::Type::Song && document) {
 		_currentMedia = document->createMediaView();
 		if (_currentMedia) {
 			if (const auto img = _currentMedia->thumbnail()) {
+				_hasCover = true;
 				const auto isDark = (st::windowBg->c.lightness() < 128);
 				Rabbit::Player::SetCurrentCoverTheme(
 					Rabbit::Player::GenerateCoverTheme(img->original(), isDark));
@@ -880,6 +890,14 @@ void Widget::handleSongChange() {
 				_currentMedia->thumbnailWanted(item ? item->fullId() : Data::FileOrigin());
 			}
 		}
+		Rabbit::Player::ExtractEmbeddedCover(document, [=](QImage cover) {
+			if (!cover.isNull()) {
+				_hasCover = true;
+				const auto isDark = (st::windowBg->c.lightness() < 128);
+				Rabbit::Player::SetCurrentCoverTheme(
+					Rabbit::Player::GenerateCoverTheme(cover, isDark));
+			}
+		});
 	} else {
 		_currentMedia = nullptr;
 	}
@@ -934,8 +952,8 @@ void Widget::createPrevNextButtons() {
 		if (RabbitSettings::playerCoverColorsMini()) {
 			const auto theme = Rabbit::Player::CurrentCoverTheme();
 			if (theme.valid) {
-				_previousTrack->setIconColorOverride(theme.text);
-				_nextTrack->setIconColorOverride(theme.text);
+				_previousTrack->setIconColorOverride(theme.accentSecondary);
+				_nextTrack->setIconColorOverride(theme.accentSecondary);
 			}
 		}
 

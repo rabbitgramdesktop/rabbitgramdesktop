@@ -11,6 +11,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QImage>
 #include <rpl/producer.h>
 
+class DocumentData;
+
 namespace Rabbit::Player {
 
 struct CoverTheme {
@@ -32,5 +34,9 @@ struct CoverTheme {
 void SetCurrentCoverTheme(const CoverTheme &theme);
 [[nodiscard]] CoverTheme CurrentCoverTheme();
 [[nodiscard]] rpl::producer<CoverTheme> CurrentCoverThemeValue();
+
+void ExtractEmbeddedCover(
+	not_null<DocumentData*> document,
+	Fn<void(QImage)> callback);
 
 } // namespace Rabbit::Player

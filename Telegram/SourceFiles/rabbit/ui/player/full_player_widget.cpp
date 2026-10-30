@@ -1614,9 +1614,15 @@ void FullPlayerWidget::updateCoverTheme() {
 		return;
 	}
 
-	if (const auto img = _currentMedia->thumbnail()) {
+	const auto image = !_embeddedCover.isNull()
+		? _embeddedCover
+		: (_currentMedia && _currentMedia->thumbnail())
+		? _currentMedia->thumbnail()->original()
+		: QImage();
+
+	if (!image.isNull()) {
 		const auto isDark = (st::windowBg->c.lightness() < 128);
-		const auto newTheme = GenerateCoverTheme(img->original(), isDark);
+		const auto newTheme = GenerateCoverTheme(image, isDark);
 		if (newTheme.valid) {
 			SetCurrentCoverTheme(newTheme);
 			if (_coverTheme.valid) {
@@ -1651,6 +1657,7 @@ void FullPlayerWidget::updateSongDetails() {
 		_headerSubtitle->setText(QString());
 		_currentMedia = nullptr;
 		_hasCover = false;
+		_embeddedCover = QImage();
 		updateCoverTheme();
 		update();
 		return;
@@ -1677,6 +1684,16 @@ void FullPlayerWidget::updateSongDetails() {
 		}
 		_hasCover = (_currentMedia->thumbnail() != nullptr);
 	}
+
+	_embeddedCover = QImage();
+	Rabbit::Player::ExtractEmbeddedCover(_currentDocument, crl::guard(this, [=](QImage cover) {
+		if (!cover.isNull()) {
+			_embeddedCover = std::move(cover);
+			_hasCover = true;
+			updateCoverTheme();
+			update();
+		}
+	}));
 
 	updateCoverTheme();
 	updateTrackState(Media::Player::instance()->getState(AudioMsgId::Type::Song));
@@ -1994,8 +2011,13 @@ void FullPlayerWidget::paintEvent(QPaintEvent *e) {
 		p.setClipPath(clip);
 
 		auto drewThumbnail = false;
-		if (_currentMedia) {
+		if (!_embeddedCover.isNull()) {
+			PainterHighQualityEnabler hq(p);
+			p.drawImage(_coverRect, _embeddedCover);
+			drewThumbnail = true;
+		} else if (_currentMedia) {
 			if (const auto img = _currentMedia->thumbnail()) {
+				PainterHighQualityEnabler hq(p);
 				const auto &pixmap = img->pix(_coverRect.size());
 				p.drawPixmap(_coverRect, pixmap);
 				drewThumbnail = true;

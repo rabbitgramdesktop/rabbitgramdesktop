@@ -156,6 +156,7 @@ private:
 	bool _over = false;
 	bool _wontBeOver = false;
 	bool _volumeHidden = false;
+	bool _hasCover = false;
 
 	object_ptr<Ui::FlatLabel> _nameLabel;
 	object_ptr<Ui::FadeWrap<Ui::RpWidget>> _rightControls;
