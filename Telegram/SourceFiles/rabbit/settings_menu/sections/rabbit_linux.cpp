@@ -87,12 +87,6 @@ void BuildRabbitLinux(SectionBuilder &builder) {
 	const auto controller = builder.controller();
 	const auto isInstalled = RabbitLinuxUtils::IsInstalledToSystem();
 
-	builder.addSubsectionTitle({
-		.id = u"rabbit/linux/app"_q,
-		.title = rktr(u"rtg_linux_integration"_q),
-		.keywords = { u"linux"_q, u"install"_q, u"desktop"_q },
-	});
-
 	if (isInstalled) {
 		builder.addButton({
 			.id = u"rabbit/linux/installed_status"_q,
