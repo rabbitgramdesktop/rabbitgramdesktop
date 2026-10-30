@@ -596,6 +596,12 @@ const std::map<QString, Definition, std::greater<QString>> DefinitionMap{
 			.type = BoolSetting,
 			.defaultValue = true,
 		}
+	},
+	{
+		u"linux_force_xcb"_q, {
+			.type = BoolSetting,
+			.defaultValue = false,
+		}
 	}
 };
 

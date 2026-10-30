@@ -159,5 +159,7 @@
     "rtg_linux_desktop_removed": "Application menu entry removed",
     "rtg_linux_cmd_created": "Terminal shortcut created in ~/.local/bin",
     "rtg_linux_cmd_removed": "Terminal shortcut removed",
+    "rtg_linux_force_xcb": "Force X11/XWayland backend",
+    "rtg_linux_force_xcb_about": "Runs rabbitGram via XWayland (QT_QPA_PLATFORM=xcb). This enables embedded desktop notifications and precise corner positioning on Wayland (e.g. GNOME Mutter). Requires restart.",
     "last_string": null
 }

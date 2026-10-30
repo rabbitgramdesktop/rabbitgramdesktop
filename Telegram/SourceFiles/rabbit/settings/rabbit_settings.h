@@ -272,6 +272,8 @@ inline void setQuickSwipeChannels(bool value) { JsonSettings::Set(u"quick_swipe_
 inline void setQuickSwipeTopics(bool value) { JsonSettings::Set(u"quick_swipe_topics"_q, value); }
 inline bool tgWsProxyEnabled() { return JsonSettings::GetBool(u"tg_ws_proxy_enabled"_q); }
 void setTgWsProxyEnabled(bool value);
+inline bool linuxForceXcb() { return JsonSettings::GetBool(u"linux_force_xcb"_q); }
+inline void setLinuxForceXcb(bool value) { JsonSettings::Set(u"linux_force_xcb"_q, value); }
 
 [[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 

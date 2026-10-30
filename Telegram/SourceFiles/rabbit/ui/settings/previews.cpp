@@ -152,10 +152,6 @@ void UpdatePreviewUser(not_null<UserData*> user) {
 			: FullReplyTo(),
 		.date = base::unixtime::now(),
 	}, TextWithEntities{ text }, MTP_messageMediaEmpty());
-	history->owner().registerMessage(item);
-	if (replyTo) {
-		item->resolveAdminLogReplyTo(replyTo);
-	}
 	return AdminLog::OwnedItem(delegate, item);
 }
 
@@ -184,10 +180,6 @@ void UpdatePreviewUser(not_null<UserData*> user) {
 			: FullReplyTo(),
 		.date = base::unixtime::now(),
 	}, sticker, TextWithEntities());
-	history->owner().registerMessage(item);
-	if (replyTo) {
-		item->resolveAdminLogReplyTo(replyTo);
-	}
 	return AdminLog::OwnedItem(delegate, item);
 }
 

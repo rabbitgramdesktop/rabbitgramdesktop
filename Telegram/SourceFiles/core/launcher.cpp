@@ -90,7 +90,12 @@ FilteredCommandLineArguments::FilteredCommandLineArguments(
 		pushArgument("cocoa:fontengine=freetype");
 #endif // !Q_OS_WIN
 	}
-#endif // Q_OS_WIN || Q_OS_MAC
+#else // Q_OS_WIN || Q_OS_MAC
+	if (RabbitSettings::linuxForceXcb()) {
+		pushArgument("-platform");
+		pushArgument("xcb");
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 
 	pushArgument(nullptr);
 }
@@ -400,6 +405,12 @@ int Launcher::exec() {
 	Logs::start();
 	base::options::init(cWorkingDir() + "tdata/experimental_options.json");
 	RabbitSettings::JsonSettings::Load();
+
+#if !defined Q_OS_WIN && !defined Q_OS_MAC
+	if (RabbitSettings::linuxForceXcb()) {
+		qputenv("QT_QPA_PLATFORM", "xcb");
+	}
+#endif // !Q_OS_WIN && !Q_OS_MAC
 
 	// Must be called after options are inited.
 	initHighDpi();

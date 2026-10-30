@@ -12,6 +12,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <rpl/rpl.h>
 #include "ui/layers/generic_box.h"
 #include "rabbit/lang/rabbit_lang.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/settings_menu/rabbit_settings_menu.h"
 #include "rabbit/utils/linux_utils.h"
 #include "settings/settings_builder.h"
@@ -174,6 +175,30 @@ void BuildRabbitLinux(SectionBuilder &builder) {
 		},
 		.keywords = { u"refresh"_q, u"icon"_q, u"database"_q },
 	});
+
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+
+	if (const auto xcbButton = builder.addButton({
+		.id = u"rabbit/linux/force_xcb"_q,
+		.title = rktr(u"rtg_linux_force_xcb"_q),
+		.st = &st::settingsButton,
+		.icon = { &st::menuIconNewWindow },
+		.toggled = rpl::single(RabbitSettings::linuxForceXcb()),
+		.keywords = { u"xcb"_q, u"x11"_q, u"wayland"_q, u"notifications"_q },
+	})) {
+		xcbButton->toggledValue()
+			| rpl::filter([=](bool enabled) {
+				return enabled != RabbitSettings::linuxForceXcb();
+			})
+			| rpl::on_next([=](bool enabled) {
+				RabbitSettings::setLinuxForceXcb(enabled);
+				Ui::Toast::Show(tr::lng_settings_restart_now(tr::now));
+			}, xcbButton->lifetime());
+	}
+	builder.addSkip();
+	builder.addDividerText(rktr(u"rtg_linux_force_xcb_about"_q));
 }
 
 const auto kMeta = BuildHelper({

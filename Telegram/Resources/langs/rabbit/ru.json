@@ -159,5 +159,7 @@
     "rtg_linux_desktop_removed": "Ярлык в меню приложений удален",
     "rtg_linux_cmd_created": "Команда создана в ~/.local/bin",
     "rtg_linux_cmd_removed": "Команда удалена",
+    "rtg_linux_force_xcb": "Принудительный бэкенд X11/XWayland",
+    "rtg_linux_force_xcb_about": "Запускает rabbitGram через XWayland (QT_QPA_PLATFORM=xcb). Это возвращает встроенные всплывающие уведомления и точное позиционирование в углах экрана в Wayland (GNOME Mutter). Требуется перезапуск.",
     "last_string": null
 }
