@@ -15,6 +15,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/file_location.h"
 #include "media/audio/media_audio.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "styles/style_window.h"
+#include "styles/style_basic.h"
 #include <rpl/variable.h>
 #include <QtCore/QFileInfo>
 #include <algorithm>
@@ -140,6 +142,7 @@ CoverTheme GenerateCoverTheme(const QImage &image, bool isDark) {
 		theme.buttonBg = QColor(255, 255, 255, 36);
 		theme.buttonBgOver = QColor(255, 255, 255, 60);
 		theme.outline = QColor(255, 255, 255, 80);
+		theme.playPauseFg = QColor(255, 255, 255);
 	} else {
 		theme.backgroundTop = QColor::fromHsl(
 			h >= 0 ? h : 220,
@@ -162,25 +165,54 @@ CoverTheme GenerateCoverTheme(const QImage &image, bool isDark) {
 		theme.buttonBg = QColor(0, 0, 0, 18);
 		theme.buttonBgOver = QColor(0, 0, 0, 36);
 		theme.outline = QColor(0, 0, 0, 60);
+		theme.playPauseFg = (theme.accent.lightness() < 140) ? QColor(255, 255, 255) : QColor(20, 20, 25);
 	}
 
 	return theme;
 }
 
+CoverTheme DefaultCoverTheme() {
+	CoverTheme theme;
+	theme.valid = true;
+	theme.backgroundTop = st::windowBg->c;
+	theme.backgroundBottom = st::windowBg->c;
+	theme.text = st::windowFg->c;
+	theme.textSecondary = st::windowSubTextFg->c;
+	theme.accent = st::activeButtonBg->c;
+	theme.accentSecondary = st::windowFg->c;
+	theme.buttonBg = st::windowBgOver->c;
+	theme.buttonBgOver = anim::color(st::windowBgOver->c, st::windowFg->c, 0.10);
+	theme.outline = st::windowSubTextFg->c;
+	theme.playPauseFg = st::activeButtonFg->c;
+	return theme;
+}
+
 CoverTheme InterpolateTheme(const CoverTheme &from, const CoverTheme &to, float64 progress) {
-	if (!from.valid) return to;
-	if (!to.valid) return from;
+	if (!from.valid && !to.valid) {
+		return CoverTheme();
+	}
 	const auto p = std::clamp(progress, 0.0, 1.0);
+	if (p <= 0.0) {
+		return from;
+	} else if (p >= 1.0) {
+		return to;
+	}
+	const auto realFrom = from.valid ? from : DefaultCoverTheme();
+	const auto realTo = to.valid ? to : DefaultCoverTheme();
 	return CoverTheme{
-		.backgroundTop = anim::color(from.backgroundTop, to.backgroundTop, p),
-		.backgroundBottom = anim::color(from.backgroundBottom, to.backgroundBottom, p),
-		.text = anim::color(from.text, to.text, p),
-		.textSecondary = anim::color(from.textSecondary, to.textSecondary, p),
-		.accent = anim::color(from.accent, to.accent, p),
-		.accentSecondary = anim::color(from.accentSecondary, to.accentSecondary, p),
-		.buttonBg = anim::color(from.buttonBg, to.buttonBg, p),
-		.buttonBgOver = anim::color(from.buttonBgOver, to.buttonBgOver, p),
-		.outline = anim::color(from.outline, to.outline, p),
+		.backgroundTop = anim::color(realFrom.backgroundTop, realTo.backgroundTop, p),
+		.backgroundBottom = anim::color(realFrom.backgroundBottom, realTo.backgroundBottom, p),
+		.text = anim::color(realFrom.text, realTo.text, p),
+		.textSecondary = anim::color(realFrom.textSecondary, realTo.textSecondary, p),
+		.accent = anim::color(realFrom.accent, realTo.accent, p),
+		.accentSecondary = anim::color(realFrom.accentSecondary, realTo.accentSecondary, p),
+		.buttonBg = anim::color(realFrom.buttonBg, realTo.buttonBg, p),
+		.buttonBgOver = anim::color(realFrom.buttonBgOver, realTo.buttonBgOver, p),
+		.outline = anim::color(realFrom.outline, realTo.outline, p),
+		.playPauseFg = anim::color(
+			realFrom.playPauseFg.isValid() ? realFrom.playPauseFg : realFrom.text,
+			realTo.playPauseFg.isValid() ? realTo.playPauseFg : realTo.text,
+			p),
 		.valid = true,
 	};
 }

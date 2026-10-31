@@ -1636,7 +1636,10 @@ void FullPlayerWidget::applyCoverTheme(const CoverTheme &theme) {
 		_queueButton->setCustomColors(theme.buttonBg, theme.buttonBgOver, theme.text, theme.accent);
 		_prevButton->setCustomColors(theme.buttonBg, theme.buttonBgOver, theme.accentSecondary);
 		_nextButton->setCustomColors(theme.buttonBg, theme.buttonBgOver, theme.accentSecondary);
-		_playPauseButton->setCustomColors(theme.accent, anim::color(theme.accent, Qt::white, 0.15), theme.text);
+		_playPauseButton->setCustomColors(
+			theme.accent,
+			anim::color(theme.accent, Qt::white, 0.15),
+			theme.playPauseFg.isValid() ? theme.playPauseFg : theme.text);
 
 		_progressSlider->setCustomColors(theme.accent, theme.buttonBg, theme.accent);
 		_volumeSlider->setCustomColors(theme.accent, theme.buttonBg, theme.accent);
@@ -1679,12 +1682,31 @@ void FullPlayerWidget::applyCoverTheme(const CoverTheme &theme) {
 	update();
 }
 
+void FullPlayerWidget::transitionToTheme(const CoverTheme &targetTheme, bool animated) {
+	if (_targetCoverTheme == targetTheme && (_a_themeTransition.animating() || _coverTheme == targetTheme)) {
+		return;
+	}
+
+	_targetCoverTheme = targetTheme;
+	SetCurrentCoverTheme(targetTheme);
+
+	if (!animated || (!_coverTheme.valid && !targetTheme.valid)) {
+		_a_themeTransition.stop();
+		applyCoverTheme(targetTheme);
+		return;
+	}
+
+	_prevCoverTheme = _coverTheme;
+	_a_themeTransition.start([=] {
+		const auto p = _a_themeTransition.value(1.);
+		applyCoverTheme(InterpolateTheme(_prevCoverTheme, _targetCoverTheme, p));
+	}, 0., 1., 300);
+}
+
 void FullPlayerWidget::updateCoverTheme() {
 	const auto useCoverTheme = RabbitSettings::playerCoverColorsFullscreen();
 	if (!useCoverTheme || !_currentMedia) {
-		_coverTheme = CoverTheme();
-		SetCurrentCoverTheme(_coverTheme);
-		applyCoverTheme(_coverTheme);
+		transitionToTheme(CoverTheme());
 		return;
 	}
 
@@ -1698,24 +1720,13 @@ void FullPlayerWidget::updateCoverTheme() {
 		const auto isDark = (st::windowBg->c.lightness() < 128);
 		const auto newTheme = GenerateCoverTheme(image, isDark);
 		if (newTheme.valid) {
-			SetCurrentCoverTheme(newTheme);
-			if (_coverTheme.valid) {
-				_prevCoverTheme = _coverTheme;
-				_targetCoverTheme = newTheme;
-				_a_themeTransition.start([=] {
-					const auto p = _a_themeTransition.value(1.);
-					applyCoverTheme(InterpolateTheme(_prevCoverTheme, _targetCoverTheme, p));
-				}, 0., 1., 280);
-			} else {
-				applyCoverTheme(newTheme);
-			}
+			transitionToTheme(newTheme);
 			return;
 		}
 	}
-	if (!_hasCover) {
-		_coverTheme = CoverTheme();
-		SetCurrentCoverTheme(_coverTheme);
-		applyCoverTheme(_coverTheme);
+
+	if (!_hasCover && !_extractingCover) {
+		transitionToTheme(CoverTheme());
 	}
 }
 
@@ -1731,8 +1742,9 @@ void FullPlayerWidget::updateSongDetails() {
 		_headerSubtitle->setText(QString());
 		_currentMedia = nullptr;
 		_hasCover = false;
+		_extractingCover = false;
 		_embeddedCover = QImage();
-		updateCoverTheme();
+		transitionToTheme(CoverTheme());
 		update();
 		return;
 	}
@@ -1757,19 +1769,37 @@ void FullPlayerWidget::updateSongDetails() {
 			_currentMedia->thumbnailWanted(origin);
 		}
 		_hasCover = (_currentMedia->thumbnail() != nullptr);
+	} else {
+		_hasCover = false;
 	}
 
-	_embeddedCover = QImage();
+	const auto doc = _currentDocument;
+	const auto seq = ++_coverExtractionSeq;
+	_extractingCover = true;
+
 	Rabbit::Player::ExtractEmbeddedCover(_currentDocument, crl::guard(this, [=](QImage cover) {
+		if (_currentDocument != doc || _coverExtractionSeq != seq) {
+			return;
+		}
+		_extractingCover = false;
 		if (!cover.isNull()) {
 			_embeddedCover = std::move(cover);
 			_hasCover = true;
-			updateCoverTheme();
-			update();
+		} else {
+			_hasCover = (_currentMedia && _currentMedia->thumbnail() != nullptr);
+			if (!_hasCover) {
+				_embeddedCover = QImage();
+			}
 		}
+		updateCoverTheme();
+		update();
 	}));
 
-	updateCoverTheme();
+	if (_hasCover) {
+		_embeddedCover = QImage();
+		updateCoverTheme();
+	}
+
 	updateTrackState(Media::Player::instance()->getState(AudioMsgId::Type::Song));
 	updateControlsGeometry();
 	if (_queuePanel && !_queuePanel->isHidden()) {

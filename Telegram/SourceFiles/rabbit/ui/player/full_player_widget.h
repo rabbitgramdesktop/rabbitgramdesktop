@@ -94,6 +94,7 @@ private:
 	void updateSlide();
 	void updateCoverTheme();
 	void applyCoverTheme(const CoverTheme &theme);
+	void transitionToTheme(const CoverTheme &targetTheme, bool animated = true);
 	void showMoreMenu();
 	void toggleQueue();
 
@@ -137,6 +138,8 @@ private:
 	bool _playing = false;
 	bool _hiding = false;
 	bool _hasCover = false;
+	bool _extractingCover = false;
+	int _coverExtractionSeq = 0;
 	QImage _embeddedCover;
 
 	CoverTheme _coverTheme;

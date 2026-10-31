@@ -25,11 +25,15 @@ struct CoverTheme {
 	QColor buttonBg;
 	QColor buttonBgOver;
 	QColor outline;
+	QColor playPauseFg;
 	bool valid = false;
+
+	bool operator==(const CoverTheme &other) const = default;
 };
 
 [[nodiscard]] CoverTheme GenerateCoverTheme(const QImage &image, bool isDark);
 [[nodiscard]] CoverTheme InterpolateTheme(const CoverTheme &from, const CoverTheme &to, float64 progress);
+[[nodiscard]] CoverTheme DefaultCoverTheme();
 
 void SetCurrentCoverTheme(const CoverTheme &theme);
 [[nodiscard]] CoverTheme CurrentCoverTheme();
