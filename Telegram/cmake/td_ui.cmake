@@ -328,12 +328,6 @@ PRIVATE
     platform/linux/current_geo_location_linux.cpp
     platform/linux/current_geo_location_linux.h
     platform/linux/text_recognition_linux.h
-    platform/mac/file_bookmark_mac.h
-    platform/mac/file_bookmark_mac.mm
-    platform/mac/current_geo_location_mac.h
-    platform/mac/current_geo_location_mac.mm
-    platform/mac/text_recognition_mac.h
-    platform/mac/text_recognition_mac.mm
     platform/win/current_geo_location_win.cpp
     platform/win/current_geo_location_win.h
     platform/win/text_recognition_win.h
@@ -747,6 +741,18 @@ PRIVATE
     picker_html/picker.css
     picker_html/picker.js
 )
+
+if (APPLE)
+    nice_target_sources(td_ui ${src_loc}
+    PRIVATE
+        platform/mac/file_bookmark_mac.h
+        platform/mac/file_bookmark_mac.mm
+        platform/mac/current_geo_location_mac.h
+        platform/mac/current_geo_location_mac.mm
+        platform/mac/text_recognition_mac.h
+        platform/mac/text_recognition_mac.mm
+    )
+endif()
 
 if (WIN32 OR APPLE)
     remove_target_sources(td_ui ${src_loc}

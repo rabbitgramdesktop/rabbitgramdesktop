@@ -186,7 +186,7 @@ private:
 		const auto textWidth = font->width(_text);
 		const auto iconWidth = _icon ? _icon->width() : 0;
 		const auto spacing = (_icon && !_text.isEmpty()) ? 6 : 0;
-		const auto paddingH = 14;
+		const auto paddingH = _text.isEmpty() ? ((34 - iconWidth) / 2) : 14;
 		_naturalWidth = paddingH * 2 + iconWidth + spacing + textWidth;
 	}
 
@@ -745,15 +745,18 @@ public:
 	, _controller(controller)
 	, _scroll(base::make_unique_q<Ui::ScrollArea>(this, st::mediaPlayerScroll))
 	, _closeButton(this, st::boxTitleClose)
-	, _resizeArea(this) {
+	, _resizeArea(this)
+	, _listBg(st::windowBg->c) {
 
 		_resizeArea->setGeometry(0, 0, 8, height());
 		_resizeArea->addMoveLeftCallback([=](int globalLeft) {
-			if (!parentWidget()) return;
-			const auto right = parentWidget()->mapToGlobal(QPoint(parentWidget()->width(), 0)).x();
+			if (!parentWidget() || _isFullscreen) return;
+			const auto parentW = parentWidget()->width();
+			if (parentW < 700) return;
+			const auto right = parentWidget()->mapToGlobal(QPoint(parentW, 0)).x();
 			const auto newWidth = right - globalLeft;
 			const auto minW = 260;
-			const auto maxW = std::clamp(parentWidget()->width() - 360, minW, 600);
+			const auto maxW = std::clamp(parentW - 360, minW, 600);
 			const auto clamped = std::clamp(newWidth, minW, maxW);
 			if (_width != clamped) {
 				_width = clamped;
@@ -779,12 +782,31 @@ public:
 		ensureCreated();
 	}
 
+	void setFullscreen(bool fullscreen) {
+		if (_isFullscreen != fullscreen) {
+			_isFullscreen = fullscreen;
+			_resizeArea->setVisible(!fullscreen);
+			update();
+		}
+	}
+
+	[[nodiscard]] bool isFullscreen() const {
+		return _isFullscreen;
+	}
+
 	void setCustomColors(const CoverTheme &theme) {
 		_coverTheme = theme;
+		const auto bg = _coverTheme.valid
+			? anim::color(_coverTheme.backgroundTop, Qt::black, 0.25)
+			: st::windowBg->c;
+		_listBg.update(bg);
 		if (theme.valid) {
 			_closeButton->setIconColorOverride(theme.text);
 		} else {
 			_closeButton->setIconColorOverride(std::nullopt);
+		}
+		if (const auto widget = _scroll->widget()) {
+			widget->update();
 		}
 		update();
 	}
@@ -806,10 +828,27 @@ public:
 	}
 
 protected:
+	void keyPressEvent(QKeyEvent *e) override {
+		if (e->key() == Qt::Key_Escape) {
+			hide();
+			if (_closeCallback) {
+				_closeCallback();
+			}
+			e->accept();
+			return;
+		}
+		RpWidget::keyPressEvent(e);
+	}
+
 	void resizeEvent(QResizeEvent *e) override {
 		RpWidget::resizeEvent(e);
 		_resizeArea->setGeometry(0, 0, 8, height());
-		_resizeArea->raise();
+		if (_isFullscreen) {
+			_resizeArea->hide();
+		} else {
+			_resizeArea->show();
+			_resizeArea->raise();
+		}
 		const auto headerH = 48;
 		_closeButton->moveToRight(10, (headerH - _closeButton->height()) / 2);
 		_scroll->setGeometry(0, headerH, width(), std::max(height() - headerH, 0));
@@ -830,7 +869,9 @@ protected:
 		const auto border = _coverTheme.valid
 			? _coverTheme.outline
 			: st::shadowFg->c;
-		p.fillRect(0, 0, 1, height(), border);
+		if (!_isFullscreen) {
+			p.fillRect(0, 0, 1, height(), border);
+		}
 		p.fillRect(0, 47, width(), 1, border);
 
 		p.setFont(st::semiboldFont);
@@ -864,7 +905,11 @@ private:
 	}
 
 	style::color listBackground() const override {
-		return st::menuBg;
+		const auto bg = _coverTheme.valid
+			? anim::color(_coverTheme.backgroundTop, Qt::black, 0.25)
+			: st::windowBg->c;
+		_listBg.update(bg);
+		return _listBg.color();
 	}
 
 	[[nodiscard]] Data::ForumTopic *listTopic() const {
@@ -960,6 +1005,13 @@ private:
 
 			const auto weak = _scroll->setOwnedWidget(std::move(list));
 
+			const auto w = (_scroll->width() > 0)
+				? _scroll->width()
+				: (width() > 0)
+				? width()
+				: _width;
+			weak->resizeToWidth(w);
+
 			weak->heightValue(
 			) | rpl::on_next([this](int newHeight) {
 				if (const auto w = static_cast<RpWidget*>(_scroll->widget())) {
@@ -1005,7 +1057,9 @@ private:
 	PeerId _listSublistPeerId;
 
 	int _width = 320;
+	bool _isFullscreen = false;
 	CoverTheme _coverTheme;
+	mutable style::internal::OwnedColor _listBg;
 	Fn<void(int)> _widthChangedCallback;
 	Fn<void()> _closeCallback;
 };
@@ -1256,15 +1310,9 @@ void FullPlayerWidget::showMoreMenu() {
 		&& item->isSavedMusicItem()
 		&& item->history()->peer->isSelf();
 
-	// 1) "сохранить в..." подменю: (назад, разделитель, профиль, избранное, сохранить как)
+	// 1) "сохранить в..." подменю: (профиль, избранное, сохранить как)
 	auto saveSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 	const auto rawSaveSubmenu = saveSubmenu.get();
-
-	rawSaveSubmenu->addAction(
-		u"Назад"_q,
-		[=] { rawSaveSubmenu->hideMenu(true); },
-		&st::rabbitMenuIconBack);
-	rawSaveSubmenu->addSeparator();
 
 	rawSaveSubmenu->addAction(
 		u"Профиль"_q,
@@ -1338,15 +1386,9 @@ void FullPlayerWidget::showMoreMenu() {
 				&st::menuIconDeleteAttention));
 	}
 
-	// 6) кнопка детали в которой будет подменю: (назад, разделитель, Формат, Битрейт, размер файла, длительность, имя файла)
+	// 6) кнопка детали в которой будет подменю: (Формат, Битрейт, размер файла, длительность, имя файла)
 	auto detailsSubmenu = std::make_unique<Ui::PopupMenu>(this, st::popupMenuWithIcons);
 	const auto rawDetailsSubmenu = detailsSubmenu.get();
-
-	rawDetailsSubmenu->addAction(
-		u"Назад"_q,
-		[=] { rawDetailsSubmenu->hideMenu(true); },
-		&st::rabbitMenuIconBack);
-	rawDetailsSubmenu->addSeparator();
 
 	const auto format = [&] {
 		const auto ext = QFileInfo(_currentDocument->filename()).suffix().toUpper();
@@ -1468,6 +1510,11 @@ void FullPlayerWidget::hideAnimated() {
 
 void FullPlayerWidget::keyPressEvent(QKeyEvent *e) {
 	if (e->key() == Qt::Key_Escape) {
+		if (_queuePanel && !_queuePanel->isHidden()) {
+			toggleQueue();
+			e->accept();
+			return;
+		}
 		hideAnimated();
 		e->accept();
 		return;
@@ -1481,6 +1528,11 @@ void FullPlayerWidget::keyPressEvent(QKeyEvent *e) {
 
 void FullPlayerWidget::mousePressEvent(QMouseEvent *e) {
 	if (e->button() == Qt::BackButton) {
+		if (_queuePanel && !_queuePanel->isHidden()) {
+			toggleQueue();
+			e->accept();
+			return;
+		}
 		hideAnimated();
 		e->accept();
 		return;
@@ -1533,7 +1585,11 @@ void FullPlayerWidget::setupSwipeBack() {
 	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
 		return (data.direction == Qt::RightToLeft)
 			? DefaultSwipeBackHandlerFinishData([=] {
-				hideAnimated();
+				if (_queuePanel && !_queuePanel->isHidden()) {
+					toggleQueue();
+				} else {
+					hideAnimated();
+				}
 			})
 			: SwipeHandlerFinishData();
 	};
@@ -1835,55 +1891,95 @@ void FullPlayerWidget::updateControlsGeometry() {
 		return;
 	}
 
-	const auto queueW = (_queuePanel && !_queuePanel->isHidden()) ? _queuePanel->currentWidth() : 0;
-	const auto availableW = w - queueW;
+	const auto isNarrow = (w < 700);
+	const auto isQueueShown = (_queuePanel && !_queuePanel->isHidden());
+	const auto queueFullscreen = isQueueShown && isNarrow;
 
-	if (_queuePanel && !_queuePanel->isHidden()) {
-		_queuePanel->setGeometry(w - queueW, 0, queueW, h);
+	if (_queuePanel) {
+		_queuePanel->setFullscreen(queueFullscreen);
+		if (isQueueShown) {
+			if (queueFullscreen) {
+				_queuePanel->setGeometry(0, 0, w, h);
+				_queuePanel->raise();
+			} else {
+				const auto queueW = _queuePanel->currentWidth();
+				_queuePanel->setGeometry(w - queueW, 0, queueW, h);
+			}
+		}
 	}
+
+	const auto queueW = (isQueueShown && !queueFullscreen) ? _queuePanel->currentWidth() : 0;
+	const auto availableW = w - queueW;
 
 	const auto topBarY = 14;
 	const auto topBarHeight = 34;
 
+	if (availableW < 400) {
+		_closeButton->setText(QString());
+	} else {
+		_closeButton->setText(u"Назад"_q);
+	}
 	const auto closeW = _closeButton->naturalWidth();
 	_closeButton->setGeometry(16, topBarY, closeW, topBarHeight);
 
 	const auto moreW = 34;
 	_moreButton->setGeometry(availableW - moreW - 16, topBarY, moreW, topBarHeight);
 
-	const auto sideButtonsWidth = std::max(closeW, moreW) + 24;
-	const auto headerTextWidth = std::max(availableW - 2 * sideButtonsWidth, 80);
-	_headerTitle->resizeToNaturalWidth(headerTextWidth);
-	_headerTitle->moveToLeft((availableW - _headerTitle->width()) / 2, topBarY - 2);
+	const auto sideButtonsWidth = std::max(closeW, moreW) + 16;
+	const auto headerTextWidth = std::max(availableW - 2 * sideButtonsWidth - 16, 40);
 
-	_headerSubtitle->resizeToNaturalWidth(headerTextWidth);
-	_headerSubtitle->moveToLeft((availableW - _headerSubtitle->width()) / 2, topBarY + 18);
+	if (availableW < 300) {
+		_headerSubtitle->hide();
+		_headerTitle->resizeToNaturalWidth(headerTextWidth);
+		_headerTitle->moveToLeft((availableW - _headerTitle->width()) / 2, topBarY + (topBarHeight - _headerTitle->height()) / 2);
+	} else {
+		_headerSubtitle->show();
+		_headerTitle->resizeToNaturalWidth(headerTextWidth);
+		_headerTitle->moveToLeft((availableW - _headerTitle->width()) / 2, topBarY - 2);
+		_headerSubtitle->resizeToNaturalWidth(headerTextWidth);
+		_headerSubtitle->moveToLeft((availableW - _headerSubtitle->width()) / 2, topBarY + 18);
+	}
 
-	const auto bottomPadding = 24;
+	const auto isVeryCompactH = (h < 460);
+	const auto isCompactH = (h < 580);
+
+	const auto bottomPadding = isVeryCompactH ? 10 : (isCompactH ? 16 : 24);
 	const auto volumeY = h - bottomPadding - _volumeButton->height();
-	const auto volumeSliderWidth = std::clamp(availableW / 3, 100, 180);
-	const auto volumeTotalWidth = _volumeButton->width() + 8 + volumeSliderWidth;
-	const auto volumeLeft = (availableW - volumeTotalWidth) / 2;
 
-	_volumeButton->moveToLeft(volumeLeft, volumeY);
-	_volumeSlider->setGeometry(
-		volumeLeft + _volumeButton->width() + 8,
-		volumeY + (_volumeButton->height() - 20) / 2,
-		volumeSliderWidth,
-		20);
-
+	const auto bottomMargin = (availableW < 320) ? 12 : 24;
 	const auto bottomBtnHeight = 30;
-	const auto bottomBtnWidth = bottomBtnHeight * 2; // 2:1 ratio
+	const auto bottomBtnWidth = (availableW < 300) ? 46 : (bottomBtnHeight * 2);
 	const auto bottomBtnY = volumeY + (_volumeButton->height() - bottomBtnHeight) / 2;
 
-	_speedButton->setGeometry(24, bottomBtnY, bottomBtnWidth, bottomBtnHeight);
-	_queueButton->setGeometry(availableW - bottomBtnWidth - 24, bottomBtnY, bottomBtnWidth, bottomBtnHeight);
+	_speedButton->setGeometry(bottomMargin, bottomBtnY, bottomBtnWidth, bottomBtnHeight);
+	_queueButton->setGeometry(availableW - bottomBtnWidth - bottomMargin, bottomBtnY, bottomBtnWidth, bottomBtnHeight);
+
+	const auto roomForVolume = (availableW - bottomBtnWidth - bottomMargin) - (bottomMargin + bottomBtnWidth);
+	if (roomForVolume < 130) {
+		_volumeSlider->hide();
+		_volumeButton->moveToLeft((availableW - _volumeButton->width()) / 2, volumeY);
+	} else {
+		_volumeSlider->show();
+		const auto maxSliderW = isCompactH ? 140 : 180;
+		const auto volumeSliderWidth = std::clamp(roomForVolume - _volumeButton->width() - 24, 60, maxSliderW);
+		const auto volumeTotalWidth = _volumeButton->width() + 8 + volumeSliderWidth;
+		const auto volumeLeft = (availableW - volumeTotalWidth) / 2;
+		_volumeButton->moveToLeft(volumeLeft, volumeY);
+		_volumeSlider->setGeometry(
+			volumeLeft + _volumeButton->width() + 8,
+			volumeY + (_volumeButton->height() - 20) / 2,
+			volumeSliderWidth,
+			20);
+	}
 
 	updatePlayPauseGeometry();
 
-	const auto controlsY = volumeY - 68;
-	const auto progressY = controlsY - 48;
-	const auto progressWidth = std::clamp(availableW - 80, 220, 480);
+	const auto controlsGap = isVeryCompactH ? 48 : (isCompactH ? 56 : 68);
+	const auto controlsY = volumeY - controlsGap;
+
+	const auto progressGap = isVeryCompactH ? 38 : (isCompactH ? 44 : 48);
+	const auto progressY = controlsY - progressGap;
+	const auto progressWidth = std::clamp(availableW - 48, 140, 480);
 	const auto progressX = (availableW - progressWidth) / 2;
 	_progressSlider->setGeometry(
 		progressX,
@@ -1891,29 +1987,36 @@ void FullPlayerWidget::updateControlsGeometry() {
 		progressWidth,
 		22);
 
-	_timePassedLabel->resizeToNaturalWidth(80);
-	_timeTotalLabel->resizeToNaturalWidth(80);
-	_timePassedLabel->moveToLeft(progressX, progressY + 24);
+	_timePassedLabel->resizeToNaturalWidth(70);
+	_timeTotalLabel->resizeToNaturalWidth(70);
+	_timePassedLabel->moveToLeft(progressX, progressY + 22);
 	_timeTotalLabel->moveToLeft(
 		progressX + progressWidth - _timeTotalLabel->width(),
-		progressY + 24);
+		progressY + 22);
 
-	const auto textY = progressY - 56;
-	const auto textWidth = std::max(availableW - 60, 100);
+	const auto textGap = isVeryCompactH ? 38 : (isCompactH ? 46 : 56);
+	const auto textY = progressY - textGap;
+	const auto textWidth = std::max(availableW - 40, 80);
 	_trackTitle->resizeToNaturalWidth(textWidth);
 	_trackTitle->moveToLeft((availableW - _trackTitle->width()) / 2, textY);
 
 	_trackPerformer->resizeToNaturalWidth(textWidth);
-	_trackPerformer->moveToLeft((availableW - _trackPerformer->width()) / 2, textY + _trackTitle->height() + 4);
+	_trackPerformer->moveToLeft((availableW - _trackPerformer->width()) / 2, textY + _trackTitle->height() + 2);
 
-	const auto headerBottom = 58;
-	const auto coverAvailableHeight = textY - headerBottom - 16;
-	const auto maxCover = std::min({ availableW - 80, coverAvailableHeight, 300 });
-	const auto coverSize = std::max(maxCover, 120);
-	const auto coverX = (availableW - coverSize) / 2;
-	const auto coverY = headerBottom + (coverAvailableHeight - coverSize) / 2;
+	const auto headerBottom = topBarY + topBarHeight + 8;
+	const auto coverAvailableHeight = textY - headerBottom - 12;
+	const auto coverAvailableWidth = availableW - 48;
+	const auto maxCoverBound = isVeryCompactH ? 140 : (isCompactH ? 220 : 320);
+	const auto maxCover = std::min({ coverAvailableWidth, coverAvailableHeight, maxCoverBound });
 
-	_coverRect = QRect(coverX, coverY, coverSize, coverSize);
+	if (maxCover < 60) {
+		_coverRect = QRect();
+	} else {
+		const auto coverSize = maxCover;
+		const auto coverX = (availableW - coverSize) / 2;
+		const auto coverY = headerBottom + (coverAvailableHeight - coverSize) / 2;
+		_coverRect = QRect(coverX, coverY, coverSize, coverSize);
+	}
 }
 
 void FullPlayerWidget::updatePlayPauseGeometry() {
@@ -1923,41 +2026,72 @@ void FullPlayerWidget::updatePlayPauseGeometry() {
 		return;
 	}
 
-	const auto queueW = (_queuePanel && !_queuePanel->isHidden()) ? _queuePanel->currentWidth() : 0;
+	const auto isNarrow = (w < 700);
+	const auto isQueueShown = (_queuePanel && !_queuePanel->isHidden());
+	const auto queueFullscreen = isQueueShown && isNarrow;
+	const auto queueW = (isQueueShown && !queueFullscreen) ? _queuePanel->currentWidth() : 0;
 	const auto availableW = w - queueW;
 
-	const auto bottomPadding = 24;
+	const auto isVeryCompactH = (h < 460);
+	const auto isCompactH = (h < 580);
+	const auto bottomPadding = isVeryCompactH ? 10 : (isCompactH ? 16 : 24);
 	const auto volumeY = h - bottomPadding - _volumeButton->height();
-	const auto controlsY = volumeY - 68;
+	const auto controlsGap = isVeryCompactH ? 48 : (isCompactH ? 56 : 68);
+	const auto controlsY = volumeY - controlsGap;
+
+	const auto playBtnH = isVeryCompactH ? 48 : 60;
+	const auto playBaseW = isVeryCompactH ? 48 : 60;
+	const auto playExpandedW = isVeryCompactH ? 64 : 80;
+	const auto sideBtnSize = isVeryCompactH ? 36 : 44;
 
 	const auto progress = _playPauseButton ? _playPauseButton->playingProgress() : 0.;
-	const auto currentPlayWidth = static_cast<int>(std::round(anim::interpolate(60, 80, progress)));
+	const auto currentPlayWidth = static_cast<int>(std::round(anim::interpolate(playBaseW, playExpandedW, progress)));
 
 	const auto playX = (availableW - currentPlayWidth) / 2;
 	const auto playY = controlsY;
 	if (_playPauseButton) {
-		_playPauseButton->setGeometry(playX, playY, currentPlayWidth, 60);
+		_playPauseButton->setGeometry(playX, playY, currentPlayWidth, playBtnH);
 	}
 
-	const auto btnSpacing = 20;
-	const auto prevX = playX - btnSpacing - 44;
-	if (_prevButton) {
-		_prevButton->setGeometry(prevX, playY + (60 - 44) / 2, 44, 44);
-	}
+	if (availableW < 310) {
+		if (_orderButton) _orderButton->hide();
+		if (_repeatButton) _repeatButton->hide();
 
-	if (_orderButton) {
-		const auto orderX = prevX - btnSpacing - _orderButton->width();
-		_orderButton->moveToLeft(orderX, playY + (60 - _orderButton->height()) / 2);
-	}
+		const auto btnSpacing = std::clamp((availableW - currentPlayWidth - 2 * sideBtnSize - 24) / 2, 6, 24);
+		const auto prevX = playX - btnSpacing - sideBtnSize;
+		if (_prevButton) {
+			_prevButton->setGeometry(prevX, playY + (playBtnH - sideBtnSize) / 2, sideBtnSize, sideBtnSize);
+		}
+		const auto nextX = playX + currentPlayWidth + btnSpacing;
+		if (_nextButton) {
+			_nextButton->setGeometry(nextX, playY + (playBtnH - sideBtnSize) / 2, sideBtnSize, sideBtnSize);
+		}
+	} else {
+		if (_orderButton) _orderButton->show();
+		if (_repeatButton) _repeatButton->show();
 
-	const auto nextX = playX + currentPlayWidth + btnSpacing;
-	if (_nextButton) {
-		_nextButton->setGeometry(nextX, playY + (60 - 44) / 2, 44, 44);
-	}
+		const auto orderW = _orderButton ? _orderButton->width() : 34;
+		const auto repeatW = _repeatButton ? _repeatButton->width() : 34;
+		const auto neededButtonsW = currentPlayWidth + 2 * sideBtnSize + orderW + repeatW;
+		const auto btnSpacing = std::clamp((availableW - neededButtonsW - 24) / 4, 4, 20);
 
-	if (_repeatButton) {
-		const auto repeatX = nextX + 44 + btnSpacing;
-		_repeatButton->moveToLeft(repeatX, playY + (60 - _repeatButton->height()) / 2);
+		const auto prevX = playX - btnSpacing - sideBtnSize;
+		if (_prevButton) {
+			_prevButton->setGeometry(prevX, playY + (playBtnH - sideBtnSize) / 2, sideBtnSize, sideBtnSize);
+		}
+		if (_orderButton) {
+			const auto orderX = prevX - btnSpacing - orderW;
+			_orderButton->moveToLeft(orderX, playY + (playBtnH - _orderButton->height()) / 2);
+		}
+
+		const auto nextX = playX + currentPlayWidth + btnSpacing;
+		if (_nextButton) {
+			_nextButton->setGeometry(nextX, playY + (playBtnH - sideBtnSize) / 2, sideBtnSize, sideBtnSize);
+		}
+		if (_repeatButton) {
+			const auto repeatX = nextX + sideBtnSize + btnSpacing;
+			_repeatButton->moveToLeft(repeatX, playY + (playBtnH - _repeatButton->height()) / 2);
+		}
 	}
 }
 

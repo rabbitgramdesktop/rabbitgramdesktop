@@ -1788,57 +1788,6 @@ PRIVATE
     platform/linux/update_install_linux.cpp
     platform/linux/update_install_linux.h
     platform/linux/webauthn_linux.cpp
-    platform/mac/file_utilities_mac.mm
-    platform/mac/file_utilities_mac.h
-    platform/mac/global_menu_mac.h
-    platform/mac/global_menu_mac.mm
-    platform/mac/launcher_mac.mm
-    platform/mac/launcher_mac.h
-    platform/mac/integration_mac.mm
-    platform/mac/integration_mac.h
-    platform/mac/mac_iconv_helper.c
-    platform/mac/main_window_mac.mm
-    platform/mac/main_window_mac.h
-    platform/mac/native_event_mac.h
-    platform/mac/native_event_mac.mm
-    platform/mac/notifications_manager_mac.mm
-    platform/mac/notifications_manager_mac.h
-    platform/mac/notifications_manager_mac_tokens.mm
-    platform/mac/notifications_manager_mac_tokens.h
-    platform/mac/notifications_manager_mac_un.mm
-    platform/mac/notifications_manager_mac_un.h
-    platform/mac/overlay_widget_mac.h
-    platform/mac/overlay_widget_mac.mm
-    platform/mac/specific_mac.mm
-    platform/mac/specific_mac.h
-    platform/mac/specific_mac_p.mm
-    platform/mac/specific_mac_p.h
-    platform/mac/translate_provider_mac.h
-    platform/mac/translate_provider_mac.mm
-    platform/mac/tray_mac.h
-    platform/mac/tray_mac.mm
-    platform/mac/wallet_protection_mac.h
-    platform/mac/wallet_protection_mac.mm
-    platform/mac/webauthn_mac.mm
-    platform/mac/window_title_mac.mm
-    platform/mac/touchbar/items/mac_formatter_item.h
-    platform/mac/touchbar/items/mac_formatter_item.mm
-    platform/mac/touchbar/items/mac_pinned_chats_item.h
-    platform/mac/touchbar/items/mac_pinned_chats_item.mm
-    platform/mac/touchbar/items/mac_scrubber_item.h
-    platform/mac/touchbar/items/mac_scrubber_item.mm
-    platform/mac/touchbar/mac_touchbar_audio.h
-    platform/mac/touchbar/mac_touchbar_audio.mm
-    platform/mac/touchbar/mac_touchbar_common.h
-    platform/mac/touchbar/mac_touchbar_common.mm
-    platform/mac/touchbar/mac_touchbar_controls.h
-    platform/mac/touchbar/mac_touchbar_controls.mm
-    platform/mac/touchbar/mac_touchbar_main.h
-    platform/mac/touchbar/mac_touchbar_main.mm
-    platform/mac/touchbar/mac_touchbar_manager.h
-    platform/mac/touchbar/mac_touchbar_manager.mm
-    platform/mac/touchbar/mac_touchbar_media_view.h
-    platform/mac/touchbar/mac_touchbar_media_view.mm
     platform/win/file_utilities_win.cpp
     platform/win/file_utilities_win.h
     platform/win/launcher_win.cpp
@@ -2571,6 +2520,57 @@ PRIVATE
 if (APPLE)
     nice_target_sources(Telegram ${src_loc}
     PRIVATE
+        platform/mac/file_utilities_mac.mm
+        platform/mac/file_utilities_mac.h
+        platform/mac/global_menu_mac.h
+        platform/mac/global_menu_mac.mm
+        platform/mac/launcher_mac.mm
+        platform/mac/launcher_mac.h
+        platform/mac/integration_mac.mm
+        platform/mac/integration_mac.h
+        platform/mac/mac_iconv_helper.c
+        platform/mac/main_window_mac.mm
+        platform/mac/main_window_mac.h
+        platform/mac/native_event_mac.h
+        platform/mac/native_event_mac.mm
+        platform/mac/notifications_manager_mac.mm
+        platform/mac/notifications_manager_mac.h
+        platform/mac/notifications_manager_mac_tokens.mm
+        platform/mac/notifications_manager_mac_tokens.h
+        platform/mac/notifications_manager_mac_un.mm
+        platform/mac/notifications_manager_mac_un.h
+        platform/mac/overlay_widget_mac.h
+        platform/mac/overlay_widget_mac.mm
+        platform/mac/specific_mac.mm
+        platform/mac/specific_mac.h
+        platform/mac/specific_mac_p.mm
+        platform/mac/specific_mac_p.h
+        platform/mac/translate_provider_mac.h
+        platform/mac/translate_provider_mac.mm
+        platform/mac/tray_mac.h
+        platform/mac/tray_mac.mm
+        platform/mac/wallet_protection_mac.h
+        platform/mac/wallet_protection_mac.mm
+        platform/mac/webauthn_mac.mm
+        platform/mac/window_title_mac.mm
+        platform/mac/touchbar/items/mac_formatter_item.h
+        platform/mac/touchbar/items/mac_formatter_item.mm
+        platform/mac/touchbar/items/mac_pinned_chats_item.h
+        platform/mac/touchbar/items/mac_pinned_chats_item.mm
+        platform/mac/touchbar/items/mac_scrubber_item.h
+        platform/mac/touchbar/items/mac_scrubber_item.mm
+        platform/mac/touchbar/mac_touchbar_audio.h
+        platform/mac/touchbar/mac_touchbar_audio.mm
+        platform/mac/touchbar/mac_touchbar_common.h
+        platform/mac/touchbar/mac_touchbar_common.mm
+        platform/mac/touchbar/mac_touchbar_controls.h
+        platform/mac/touchbar/mac_touchbar_controls.mm
+        platform/mac/touchbar/mac_touchbar_main.h
+        platform/mac/touchbar/mac_touchbar_main.mm
+        platform/mac/touchbar/mac_touchbar_manager.h
+        platform/mac/touchbar/mac_touchbar_manager.mm
+        platform/mac/touchbar/mac_touchbar_media_view.h
+        platform/mac/touchbar/mac_touchbar_media_view.mm
         tray_accounts_menu.cpp
         media/view/media_view_metal_texture.mm
         media/streaming/media_streaming_native_frame_mac.mm
@@ -2936,11 +2936,16 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
 
     nice_target_sources(Updater ${src_loc}
     PRIVATE
-        _other/updater_win.cpp
-        _other/updater_linux.cpp
-        _other/updater_osx.m
         _other/updater.h
     )
+
+    if (WIN32)
+        nice_target_sources(Updater ${src_loc} PRIVATE _other/updater_win.cpp)
+    elseif (APPLE)
+        nice_target_sources(Updater ${src_loc} PRIVATE _other/updater_osx.m)
+    else()
+        nice_target_sources(Updater ${src_loc} PRIVATE _other/updater_linux.cpp)
+    endif()
 
     set_target_properties(Updater PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${output_folder}

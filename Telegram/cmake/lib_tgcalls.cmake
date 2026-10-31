@@ -140,61 +140,6 @@ PRIVATE
     platform/android/VideoCapturerInterfaceImpl.cpp
     platform/android/VideoCapturerInterfaceImpl.h
 
-    # iOS / macOS
-    platform/darwin/CustomSimulcastEncoderAdapter.cpp
-    platform/darwin/CustomSimulcastEncoderAdapter.h
-    platform/darwin/DarwinFFMpeg.h
-    platform/darwin/DarwinFFMpeg.mm
-    platform/darwin/DarwinInterface.h
-    platform/darwin/DarwinInterface.mm
-    platform/darwin/DarwinVideoSource.h
-    platform/darwin/DarwinVideoSource.mm
-    platform/darwin/DesktopSharingCapturer.h
-    platform/darwin/DesktopSharingCapturer.mm
-    platform/darwin/ExtractCVPixelBuffer.h
-    platform/darwin/ExtractCVPixelBuffer.mm
-    platform/darwin/h265_nalu_rewriter.cc
-    platform/darwin/h265_nalu_rewriter.h
-    platform/darwin/objc_video_encoder_factory.h
-    platform/darwin/objc_video_encoder_factory.mm
-    platform/darwin/objc_video_decoder_factory.h
-    platform/darwin/objc_video_decoder_factory.mm
-    platform/darwin/RTCCodecSpecificInfoH265+Private.h
-    platform/darwin/RTCCodecSpecificInfoH265.h
-    platform/darwin/RTCCodecSpecificInfoH265.mm
-    platform/darwin/RTCH265ProfileLevelId.h
-    platform/darwin/RTCH265ProfileLevelId.mm
-    platform/darwin/TGCMIOCapturer.h
-    platform/darwin/TGCMIOCapturer.m
-    platform/darwin/TGCMIODevice.h
-    platform/darwin/TGCMIODevice.mm
-    platform/darwin/TGRTCCVPixelBuffer.h
-    platform/darwin/TGRTCCVPixelBuffer.mm
-    platform/darwin/TGRTCDefaultVideoDecoderFactory.h
-    platform/darwin/TGRTCDefaultVideoDecoderFactory.mm
-    platform/darwin/TGRTCDefaultVideoEncoderFactory.h
-    platform/darwin/TGRTCDefaultVideoEncoderFactory.mm
-    platform/darwin/TGRTCVideoDecoderH264.h
-    platform/darwin/TGRTCVideoDecoderH264.mm
-    platform/darwin/TGRTCVideoDecoderH265.h
-    platform/darwin/TGRTCVideoDecoderH265.mm
-    platform/darwin/TGRTCVideoEncoderH264.h
-    platform/darwin/TGRTCVideoEncoderH264.mm
-    platform/darwin/TGRTCVideoEncoderH265.h
-    platform/darwin/TGRTCVideoEncoderH265.mm
-    platform/darwin/VideoCameraCapturer.h
-    platform/darwin/VideoCameraCapturer.mm
-    platform/darwin/VideoCameraCapturerMac.h
-    platform/darwin/VideoCameraCapturerMac.mm
-    platform/darwin/VideoCapturerInterfaceImpl.h
-    platform/darwin/VideoCapturerInterfaceImpl.mm
-    platform/darwin/VideoCMIOCapture.h
-    platform/darwin/VideoCMIOCapture.mm
-    platform/darwin/VideoMetalView.h
-    platform/darwin/VideoMetalView.mm
-    platform/darwin/VideoMetalViewMac.h
-    platform/darwin/VideoMetalViewMac.mm
-
     # POSIX
 
     # Teleram Desktop
@@ -231,6 +176,62 @@ PRIVATE
 )
 
 if (APPLE)
+    nice_target_sources(lib_tgcalls ${tgcalls_loc}
+    PRIVATE
+        platform/darwin/CustomSimulcastEncoderAdapter.cpp
+        platform/darwin/CustomSimulcastEncoderAdapter.h
+        platform/darwin/DarwinFFMpeg.h
+        platform/darwin/DarwinFFMpeg.mm
+        platform/darwin/DarwinInterface.h
+        platform/darwin/DarwinInterface.mm
+        platform/darwin/DarwinVideoSource.h
+        platform/darwin/DarwinVideoSource.mm
+        platform/darwin/DesktopSharingCapturer.h
+        platform/darwin/DesktopSharingCapturer.mm
+        platform/darwin/ExtractCVPixelBuffer.h
+        platform/darwin/ExtractCVPixelBuffer.mm
+        platform/darwin/h265_nalu_rewriter.cc
+        platform/darwin/h265_nalu_rewriter.h
+        platform/darwin/objc_video_encoder_factory.h
+        platform/darwin/objc_video_encoder_factory.mm
+        platform/darwin/objc_video_decoder_factory.h
+        platform/darwin/objc_video_decoder_factory.mm
+        platform/darwin/RTCCodecSpecificInfoH265+Private.h
+        platform/darwin/RTCCodecSpecificInfoH265.h
+        platform/darwin/RTCCodecSpecificInfoH265.mm
+        platform/darwin/RTCH265ProfileLevelId.h
+        platform/darwin/RTCH265ProfileLevelId.mm
+        platform/darwin/TGCMIOCapturer.h
+        platform/darwin/TGCMIOCapturer.m
+        platform/darwin/TGCMIODevice.h
+        platform/darwin/TGCMIODevice.mm
+        platform/darwin/TGRTCCVPixelBuffer.h
+        platform/darwin/TGRTCCVPixelBuffer.mm
+        platform/darwin/TGRTCDefaultVideoDecoderFactory.h
+        platform/darwin/TGRTCDefaultVideoDecoderFactory.mm
+        platform/darwin/TGRTCDefaultVideoEncoderFactory.h
+        platform/darwin/TGRTCDefaultVideoEncoderFactory.mm
+        platform/darwin/TGRTCVideoDecoderH264.h
+        platform/darwin/TGRTCVideoDecoderH264.mm
+        platform/darwin/TGRTCVideoDecoderH265.h
+        platform/darwin/TGRTCVideoDecoderH265.mm
+        platform/darwin/TGRTCVideoEncoderH264.h
+        platform/darwin/TGRTCVideoEncoderH264.mm
+        platform/darwin/TGRTCVideoEncoderH265.h
+        platform/darwin/TGRTCVideoEncoderH265.mm
+        platform/darwin/VideoCameraCapturer.h
+        platform/darwin/VideoCameraCapturer.mm
+        platform/darwin/VideoCameraCapturerMac.h
+        platform/darwin/VideoCameraCapturerMac.mm
+        platform/darwin/VideoCapturerInterfaceImpl.h
+        platform/darwin/VideoCapturerInterfaceImpl.mm
+        platform/darwin/VideoCMIOCapture.h
+        platform/darwin/VideoCMIOCapture.mm
+        platform/darwin/VideoMetalView.h
+        platform/darwin/VideoMetalView.mm
+        platform/darwin/VideoMetalViewMac.h
+        platform/darwin/VideoMetalViewMac.mm
+    )
     target_compile_options(lib_tgcalls
     PRIVATE
         -fobjc-arc

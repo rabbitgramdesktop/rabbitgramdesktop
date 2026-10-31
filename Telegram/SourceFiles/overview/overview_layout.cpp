@@ -1805,9 +1805,6 @@ TextState Document::getState(
 	if (songLayout()) {
 		const auto nameleft = _st.songPadding.left() + _st.songThumbSize + _st.songPadding.right();
 		const auto nameright = _st.songPadding.left();
-		const auto namewidth = std::min(
-			_width - nameleft - nameright,
-			_name.maxWidth());
 		const auto nametop = _st.songNameTop;
 
 		if (const auto state = cornerDownloadTextState(point, request); state.link) {
@@ -1832,8 +1829,8 @@ TextState Document::getState(
 		const auto namerect = style::rtlrect(
 			nameleft,
 			nametop,
-			namewidth,
-			st::semiboldFont->height,
+			_width - nameleft - nameright,
+			_height - nametop - _st.songPadding.bottom(),
 			_width);
 		if (namerect.contains(point) && !_data->loading()) {
 			return { parent(), _namel };
