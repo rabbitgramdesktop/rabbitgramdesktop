@@ -827,6 +827,15 @@ public:
 		refreshList();
 	}
 
+	void scrollPlaylistToCurrentTrack() {
+		if (const auto list = static_cast<Info::Media::ListWidget*>(_scroll->widget())) {
+			const auto rect = list->getCurrentSongGeometry();
+			if (rect.isValid() && !rect.isEmpty()) {
+				_scroll->scrollToY(rect.y() - st::infoMediaMargin.top());
+			}
+		}
+	}
+
 protected:
 	void keyPressEvent(QKeyEvent *e) override {
 		if (e->key() == Qt::Key_Escape) {
@@ -851,7 +860,12 @@ protected:
 		}
 		const auto headerH = 48;
 		_closeButton->moveToRight(10, (headerH - _closeButton->height()) / 2);
-		_scroll->setGeometry(0, headerH, width(), std::max(height() - headerH, 0));
+		const auto leftSkip = _isFullscreen ? 0 : 1;
+		_scroll->setGeometry(
+			leftSkip,
+			headerH,
+			std::max(width() - leftSkip, 0),
+			std::max(height() - headerH, 0));
 		if (const auto widget = static_cast<RpWidget*>(_scroll->widget())) {
 			widget->resizeToWidth(_scroll->width());
 		}
@@ -1012,13 +1026,6 @@ private:
 				: _width;
 			weak->resizeToWidth(w);
 
-			weak->heightValue(
-			) | rpl::on_next([this](int newHeight) {
-				if (const auto w = static_cast<RpWidget*>(_scroll->widget())) {
-					w->resizeToWidth(_scroll->width());
-				}
-			}, weak->lifetime());
-
 			weak->scrollToRequests(
 			) | rpl::on_next([this](int newScrollTop) {
 				_scroll->scrollToY(newScrollTop);
@@ -1033,15 +1040,28 @@ private:
 				weak->setVisibleTopBottom(top, bottom);
 			}, weak->lifetime());
 
-			weak->restart();
-			scrollPlaylistToCurrentTrack();
-		}
-	}
-
-	void scrollPlaylistToCurrentTrack() {
-		if (const auto list = static_cast<Info::Media::ListWidget*>(_scroll->widget())) {
-			const auto rect = list->getCurrentSongGeometry();
-			_scroll->scrollToY(rect.y() - st::infoMediaMargin.top());
+			const auto type = listMusicPeer
+				? Storage::SharedMediaType::MusicFile
+				: section().mediaType();
+			const auto topic = listTopic();
+			const auto sublist = listSublist();
+			auto musicMemento = Info::Saved::MusicMemento(peer);
+			auto mediaMemento = topic
+				? std::make_unique<Info::Media::Memento>(topic, type)
+				: sublist
+				? std::make_unique<Info::Media::Memento>(sublist, type)
+				: std::make_unique<Info::Media::Memento>(
+					peer,
+					_listMigratedPeer ? _listMigratedPeer->id : PeerId(),
+					type);
+			auto &memento = listMusicPeer
+				? musicMemento.media()
+				: *mediaMemento;
+			memento.setAroundId(contextId);
+			memento.setIdsLimit(32);
+			memento.setScrollTopItem({ contextId, peer->session().uniqueId() });
+			memento.setScrollTopShift(-st::infoMediaMargin.top());
+			weak->restoreState(&memento);
 		}
 	}
 
@@ -1288,12 +1308,16 @@ void FullPlayerWidget::toggleQueue() {
 		_queuePanel->refresh();
 		_queuePanel->show();
 		_queuePanel->raise();
+		_queuePanel->scrollPlaylistToCurrentTrack();
 		_queueButton->setActive(true);
 	} else {
 		_queuePanel->hide();
 		_queueButton->setActive(false);
 	}
 	updateControlsGeometry();
+	if (_queuePanel && !_queuePanel->isHidden()) {
+		_queuePanel->scrollPlaylistToCurrentTrack();
+	}
 	update();
 }
 
@@ -1363,13 +1387,7 @@ void FullPlayerWidget::showMoreMenu() {
 		},
 		&st::menuIconForward);
 
-	// 4) сохранить как
-	_moreMenu->addAction(
-		u"Сохранить как"_q,
-		saveAsHandler,
-		&st::menuIconDownload);
-
-	// 5) кнопка удалить из профиля красную если трек играет из профиля юзера
+	// 4) кнопка удалить из профиля красную если трек играет из профиля юзера
 	if (isFromUserProfile) {
 		_moreMenu->addAction(
 			base::make_unique_q<Ui::Menu::Action>(
@@ -1754,6 +1772,9 @@ void FullPlayerWidget::updateSongDetails() {
 	updateCoverTheme();
 	updateTrackState(Media::Player::instance()->getState(AudioMsgId::Type::Song));
 	updateControlsGeometry();
+	if (_queuePanel && !_queuePanel->isHidden()) {
+		_queuePanel->scrollPlaylistToCurrentTrack();
+	}
 	update();
 }
 
