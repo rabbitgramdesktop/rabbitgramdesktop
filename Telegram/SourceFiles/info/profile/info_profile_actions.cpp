@@ -38,6 +38,10 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/components/credits.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_saved_music.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_chat.h"
 #include "data/data_chat_filters.h"
 #include "data/data_folder.h"
@@ -73,10 +77,15 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "iv/iv_instance.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_instance.h"
 #include "menu/menu_mute.h"
+#include "rabbit/ui/player/cover_theme.h"
 #include "settings/settings_common.h"
 #include "support/support_helper.h"
 #include "ui/boxes/peer_qr_box.h"
+#include "ui/text/format_song_document_name.h"
+#include "window/themes/window_theme.h"
 #include "ui/boxes/report_box_graphics.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/credits_graphics.h"
@@ -1269,6 +1278,7 @@ public:
 	void buildSections();
 
 private:
+	[[nodiscard]] Section makeProfileMusic(not_null<UserData*> user);
 	[[nodiscard]] Section makePersonalChannel(not_null<UserData*> user);
 	[[nodiscard]] Section makeInfo();
 	[[nodiscard]] Section makeAddAsContact(not_null<UserData*> user);
@@ -1913,6 +1923,565 @@ Section DetailsFiller::makeInfo() {
 
 	return Section{
 		.widget = std::move(wrap),
+		.shown = raw->toggledValue(),
+	};
+}
+
+namespace {
+
+constexpr auto kMusicCardRadius = 18;
+constexpr auto kMusicCoverPadding = 10;
+constexpr auto kMusicCoverRadius = kMusicCardRadius - kMusicCoverPadding;
+constexpr auto kMusicMarginH = 12;
+constexpr auto kMusicMarginV = 8;
+
+class ProfileMusicCard final : public Ui::RippleButton {
+public:
+	ProfileMusicCard(
+		QWidget *parent,
+		not_null<Controller*> controller,
+		not_null<UserData*> user);
+	~ProfileMusicCard();
+
+	[[nodiscard]] rpl::producer<bool> hasMusicValue() const;
+
+protected:
+	void paintEvent(QPaintEvent *e) override;
+	int resizeGetHeight(int newWidth) override;
+	QImage prepareRippleMask() const override;
+
+private:
+	void setupMusic();
+	void setupPatternEmoji();
+	void updateMetadata(not_null<DocumentData*> document, HistoryItem *item);
+	void applyCover(const QImage &cover);
+	void updateTrackState(const ::Media::Player::TrackState &state);
+	[[nodiscard]] QRect cardRect() const;
+	[[nodiscard]] QRect coverRect(const QRect &card) const;
+	void paintCover(Painter &p, const QRect &rect);
+	void paintEmojis(Painter &p, const QRect &card);
+	void paintText(Painter &p, const QRect &card, const QRect &cover);
+	void paintDefaultCoverIcon(Painter &p, const QRect &rect);
+	void handleClick();
+
+	struct CardThemeColors {
+		QColor bgTop;
+		QColor bgBottom;
+		QColor text;
+		QColor textSecondary;
+		QColor emoji;
+	};
+	[[nodiscard]] CardThemeColors themeColors() const;
+
+	const not_null<Controller*> _controller;
+	const not_null<UserData*> _user;
+
+	DocumentData *_document = nullptr;
+	HistoryItem *_item = nullptr;
+	rpl::variable<bool> _hasMusic = false;
+
+	QString _title;
+	QString _performer;
+	QString _album;
+	Ui::Text::String _titleText;
+	Ui::Text::String _performerText;
+	Ui::Text::String _albumText;
+
+	QImage _cover;
+	bool _hasCover = false;
+	Rabbit::Player::CoverTheme _coverTheme;
+
+	std::shared_ptr<Data::DocumentMedia> _currentMedia;
+	std::unique_ptr<Ui::Text::CustomEmoji> _patternEmoji;
+	DocumentId _patternEmojiId = 0;
+	QString _patternCustomEmojiId;
+
+	bool _isPlaying = false;
+	rpl::lifetime _lifetime;
+};
+
+ProfileMusicCard::ProfileMusicCard(
+	QWidget *parent,
+	not_null<Controller*> controller,
+	not_null<UserData*> user)
+: RippleButton(parent, st::defaultRippleAnimation)
+, _controller(controller)
+, _user(user) {
+	setupMusic();
+	setupPatternEmoji();
+
+	setClickedCallback([=] {
+		handleClick();
+	});
+
+	_user->session().downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		if (!_hasCover && _currentMedia) {
+			if (const auto img = _currentMedia->thumbnail()) {
+				const auto orig = img->original();
+				if (!orig.isNull()) {
+					applyCover(orig);
+				}
+			}
+		}
+		if (_document && (!_hasCover || _album.isEmpty())) {
+			Rabbit::Player::ExtractEmbeddedMetadata(
+				_document,
+				crl::guard(this, [=](Rabbit::Player::EmbeddedMetadata meta) {
+					if (!_hasCover && !meta.cover.isNull()) {
+						applyCover(meta.cover);
+					}
+					if (!meta.album.isEmpty() && _album.isEmpty()) {
+						_album = meta.album;
+						_albumText.setText(st::defaultTextStyle, _album);
+						update();
+					}
+				}));
+		}
+	}, _lifetime);
+
+	style::PaletteChanged(
+	) | rpl::on_next([=] {
+		if (_hasCover && !_cover.isNull()) {
+			const auto isDark = (st::windowBg->c.lightness() < 128);
+			_coverTheme = Rabbit::Player::GenerateCoverTheme(_cover, isDark);
+		}
+		update();
+	}, _lifetime);
+
+	::Media::Player::instance()->updatedNotifier(
+	) | rpl::on_next([=](const ::Media::Player::TrackState &state) {
+		updateTrackState(state);
+	}, _lifetime);
+
+	_user->session().changes().peerFlagsValue(
+		_user,
+		Data::PeerUpdate::Flag::EmojiStatus | Data::PeerUpdate::Flag::FullInfo
+	) | rpl::on_next([=] {
+		setupPatternEmoji();
+	}, _lifetime);
+}
+
+ProfileMusicCard::~ProfileMusicCard() = default;
+
+rpl::producer<bool> ProfileMusicCard::hasMusicValue() const {
+	return _hasMusic.value();
+}
+
+QRect ProfileMusicCard::cardRect() const {
+	return QRect(kMusicMarginH, kMusicMarginV, width() - 2 * kMusicMarginH, height() - 2 * kMusicMarginV);
+}
+
+QRect ProfileMusicCard::coverRect(const QRect &card) const {
+	const auto coverSize = card.height() - 2 * kMusicCoverPadding;
+	return QRect(card.left() + kMusicCoverPadding, card.top() + kMusicCoverPadding, coverSize, coverSize);
+}
+
+int ProfileMusicCard::resizeGetHeight(int newWidth) {
+	const auto titleH = st::semiboldFont->height;
+	const auto subH = st::normalFont->height;
+	const auto textH = titleH + 3 + subH + 3 + subH;
+	const auto cardH = std::max(82, textH + 26);
+	return cardH + 2 * kMusicMarginV;
+}
+
+QImage ProfileMusicCard::prepareRippleMask() const {
+	const auto ratio = style::DevicePixelRatio();
+	auto mask = QImage(size() * ratio, QImage::Format_ARGB32_Premultiplied);
+	mask.setDevicePixelRatio(ratio);
+	mask.fill(Qt::transparent);
+	auto p = QPainter(&mask);
+	p.setRenderHint(QPainter::Antialiasing);
+	p.setBrush(Qt::white);
+	p.setPen(Qt::NoPen);
+	p.drawRoundedRect(cardRect(), kMusicCardRadius, kMusicCardRadius);
+	return mask;
+}
+
+void ProfileMusicCard::setupMusic() {
+	const auto savedMusic = &_user->owner().savedMusic();
+	const auto peerId = _user->id;
+
+	rpl::single(
+		peerId
+	) | rpl::then(
+		savedMusic->changed() | rpl::filter(rpl::mappers::_1 == peerId)
+	) | rpl::on_next([=] {
+		const auto &list = savedMusic->list(peerId);
+		const auto item = list.empty() ? nullptr : list.front().get();
+		const auto media = item ? item->media() : nullptr;
+		const auto doc = media ? media->document() : nullptr;
+		if (doc && (doc->isAudioFile() || doc->song())) {
+			updateMetadata(doc, item);
+			if (!_hasMusic.current()) {
+				_hasMusic = true;
+			}
+		} else {
+			_document = nullptr;
+			_item = nullptr;
+			if (_hasMusic.current()) {
+				_hasMusic = false;
+			}
+		}
+	}, _lifetime);
+
+	if (!savedMusic->countKnown(peerId)) {
+		savedMusic->loadMore(peerId);
+	}
+}
+
+void ProfileMusicCard::setupPatternEmoji() {
+	auto emojiDocId = _user->profileBackgroundEmojiId();
+	if (!emojiDocId) {
+		emojiDocId = _user->backgroundEmojiId();
+	}
+	if (emojiDocId) {
+		if (_patternEmojiId != emojiDocId) {
+			_patternEmojiId = emojiDocId;
+			_patternCustomEmojiId = QString();
+			const auto doc = _user->owner().document(emojiDocId);
+			_patternEmoji = _user->owner().customEmojiManager().create(
+				doc,
+				[=] { update(); },
+				Data::CustomEmojiSizeTag::Normal);
+		}
+	} else if (const auto statusId = _user->emojiStatusId()) {
+		const auto customId = Data::EmojiStatusCustomId(statusId);
+		if (_patternCustomEmojiId != customId) {
+			_patternCustomEmojiId = customId;
+			_patternEmojiId = 0;
+			_patternEmoji = _user->owner().customEmojiManager().create(
+				customId,
+				[=] { update(); },
+				Data::CustomEmojiSizeTag::Normal);
+		}
+	} else {
+		_patternEmoji = nullptr;
+		_patternEmojiId = 0;
+		_patternCustomEmojiId = QString();
+	}
+}
+
+void ProfileMusicCard::updateMetadata(
+		not_null<DocumentData*> document,
+		HistoryItem *item) {
+	if (_document == document && _item == item) {
+		return;
+	}
+	_document = document;
+	_item = item;
+
+	const auto song = document->song();
+	const auto formatted = Ui::Text::FormatSongNameFor(document);
+	const auto composed = formatted.composedName();
+	_title = (song && !song->title.isEmpty()) ? song->title : composed.title;
+	_performer = (song && !song->performer.isEmpty()) ? song->performer : composed.performer;
+	_album = QString();
+
+	_hasCover = false;
+	_cover = QImage();
+	_coverTheme = Rabbit::Player::CoverTheme();
+
+	_titleText.setText(st::semiboldTextStyle, _title);
+	const auto performerDisplay = _performer.trimmed().isEmpty()
+		? QString::fromUtf8("Неизвестен")
+		: _performer;
+	_performerText.setText(st::defaultTextStyle, performerDisplay);
+	_albumText.setText(st::defaultTextStyle, QString());
+
+	_currentMedia = document->createMediaView();
+	if (_currentMedia) {
+		if (const auto img = _currentMedia->thumbnail()) {
+			const auto orig = img->original();
+			if (!orig.isNull()) {
+				applyCover(orig);
+			}
+		}
+		_currentMedia->thumbnailWanted(item ? item->fullId() : Data::FileOrigin());
+	}
+
+	document->save(
+		item ? item->fullId() : Data::FileOrigin(),
+		QString());
+
+	Rabbit::Player::ExtractEmbeddedMetadata(
+		document,
+		crl::guard(this, [=](Rabbit::Player::EmbeddedMetadata meta) {
+			if (!meta.cover.isNull()) {
+				applyCover(meta.cover);
+			}
+			if (!meta.album.isEmpty()) {
+				_album = meta.album;
+				_albumText.setText(st::defaultTextStyle, _album);
+				update();
+			}
+		}));
+
+	updateTrackState(::Media::Player::instance()->getState(AudioMsgId::Type::Song));
+	resizeToWidth(width());
+	update();
+}
+
+void ProfileMusicCard::applyCover(const QImage &cover) {
+	if (cover.isNull()) {
+		return;
+	}
+	_cover = cover;
+	_hasCover = true;
+	const auto isDark = (st::windowBg->c.lightness() < 128);
+	_coverTheme = Rabbit::Player::GenerateCoverTheme(cover, isDark);
+	update();
+}
+
+void ProfileMusicCard::updateTrackState(const ::Media::Player::TrackState &state) {
+	const auto playing = (_document && state.id.audio() == _document)
+		&& !::Media::Player::IsStoppedOrStopping(state.state);
+	if (_isPlaying != playing) {
+		_isPlaying = playing;
+		update();
+	}
+}
+
+void ProfileMusicCard::handleClick() {
+	if (!_document) {
+		return;
+	}
+	const auto item = _item;
+	const auto msgId = item ? item->fullId() : FullMsgId();
+	::Media::Player::instance()->playPause({ _document, msgId });
+}
+
+void ProfileMusicCard::paintDefaultCoverIcon(Painter &p, const QRect &rect) {
+	p.save();
+	p.setRenderHint(QPainter::Antialiasing);
+
+	const auto cx = rect.center().x();
+	const auto cy = rect.center().y();
+	const auto noteW = rect.width() / 4;
+	const auto noteH = rect.height() / 3;
+
+	QPainterPath notePath;
+	const auto headRadius = noteW / 3.;
+	notePath.addEllipse(QPointF(cx - noteW / 2., cy + noteH / 3.), headRadius, headRadius * 0.75);
+	notePath.addEllipse(QPointF(cx + noteW / 2., cy + noteH / 4.), headRadius, headRadius * 0.75);
+
+	const auto iconColor = _coverTheme.valid
+		? _coverTheme.text
+		: st::windowFg->c;
+	p.fillPath(notePath, iconColor);
+
+	QPen stemPen(iconColor, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+	p.setPen(stemPen);
+	p.drawLine(QPointF(cx - noteW / 2. + headRadius, cy + noteH / 3.), QPointF(cx - noteW / 2. + headRadius, cy - noteH / 2.));
+	p.drawLine(QPointF(cx + noteW / 2. + headRadius, cy + noteH / 4.), QPointF(cx + noteW / 2. + headRadius, cy - noteH / 2. - 3));
+	p.drawLine(QPointF(cx - noteW / 2. + headRadius, cy - noteH / 2.), QPointF(cx + noteW / 2. + headRadius, cy - noteH / 2. - 3));
+
+	p.restore();
+}
+
+void ProfileMusicCard::paintCover(Painter &p, const QRect &rect) {
+	QPainterPath coverClip;
+	coverClip.addRoundedRect(rect, kMusicCoverRadius, kMusicCoverRadius);
+	p.save();
+	p.setClipPath(coverClip);
+
+	if (_hasCover && !_cover.isNull()) {
+		PainterHighQualityEnabler hq(p);
+		p.drawImage(rect, _cover.scaled(
+			rect.size() * style::DevicePixelRatio(),
+			Qt::KeepAspectRatioByExpanding,
+			Qt::SmoothTransformation));
+	} else if (_currentMedia && _currentMedia->thumbnail()) {
+		PainterHighQualityEnabler hq(p);
+		p.drawPixmap(rect, _currentMedia->thumbnail()->pix(rect.size()));
+	} else {
+		QLinearGradient grad(rect.topLeft(), rect.bottomRight());
+		if (_coverTheme.valid) {
+			grad.setColorAt(0.0, _coverTheme.buttonBg);
+			grad.setColorAt(1.0, _coverTheme.buttonBgOver);
+		} else {
+			grad.setColorAt(0.0, st::windowBgOver->c);
+			grad.setColorAt(1.0, anim::color(st::windowBgOver->c, st::windowBg->c, 0.5));
+		}
+		p.fillRect(rect, grad);
+		paintDefaultCoverIcon(p, rect);
+	}
+
+	p.restore();
+}
+
+ProfileMusicCard::CardThemeColors ProfileMusicCard::themeColors() const {
+	if (!_hasCover || !_coverTheme.valid) {
+		return {
+			.bgTop = st::windowBgOver->c,
+			.bgBottom = st::windowBgOver->c,
+			.text = st::windowFg->c,
+			.textSecondary = st::windowSubTextFg->c,
+			.emoji = st::windowSubTextFg->c,
+		};
+	}
+
+	int hue = _coverTheme.accent.hslHue();
+	if (hue < 0) {
+		hue = _coverTheme.backgroundTop.hslHue();
+	}
+	if (hue < 0) {
+		hue = 220;
+	}
+
+	const auto origSat = _coverTheme.accent.hslSaturation();
+	const auto sat = std::clamp(static_cast<int>(origSat * 1.25), 110, 190);
+
+	// Deep tinted background according to user guidance:
+	// e.g. #163A43 (H: 192, S: 129, L: 45), #312817 (H: 39, S: 92, L: 36)
+	const auto bgTop = QColor::fromHsl(hue, sat, 48);
+	const auto bgBottom = QColor::fromHsl(hue, std::clamp(static_cast<int>(sat * 0.9), 95, 175), 38);
+
+	const auto text = QColor(255, 255, 255);
+	const auto textSecondary = QColor(255, 255, 255, 175);
+	const auto emoji = QColor::fromHsl(hue, sat, 14);
+
+	return {
+		.bgTop = bgTop,
+		.bgBottom = bgBottom,
+		.text = text,
+		.textSecondary = textSecondary,
+		.emoji = emoji,
+	};
+}
+
+void ProfileMusicCard::paintEmojis(Painter &p, const QRect &card) {
+	if (!_patternEmoji || !_patternEmoji->ready()) {
+		return;
+	}
+	p.save();
+	QPainterPath cardClip;
+	cardClip.addRoundedRect(card, kMusicCardRadius, kMusicCardRadius);
+	p.setClipPath(cardClip);
+
+	const int emojiSize = 26;
+	const auto stepY = float64(card.height()) / 4.0;
+	const auto stepX = 28.0;
+	const auto centerX4 = float64(card.right());
+
+	const auto colors = themeColors();
+	const auto now = crl::now();
+
+	for (int row = 0; row < 5; ++row) {
+		const auto centerY = card.top() + row * stepY;
+		const auto emojiY = int(std::round(centerY - emojiSize / 2.0));
+
+		for (int col = 0; col < 5; ++col) {
+			// Chessboard pattern across 5 rows and 5 columns:
+			// Row 0: OXOXO (cols 1, 3)
+			// Row 1: XOXOX (cols 0, 2, 4)
+			// Row 2: OXOXO (cols 1, 3)
+			// Row 3: XOXOX (cols 0, 2, 4)
+			// Row 4: OXOXO (cols 1, 3)
+			if ((row + col) % 2 != 1) {
+				continue;
+			}
+			const auto centerX = centerX4 - (4 - col) * stepX;
+			const auto emojiX = int(std::round(centerX - emojiSize / 2.0));
+
+			const float64 opacity = 0.18 + 0.45 * (float64(col) / 4.0);
+
+			p.setOpacity(opacity);
+			_patternEmoji->paint(p, {
+				.textColor = colors.emoji,
+				.now = now,
+				.position = QPoint(emojiX, emojiY),
+			});
+		}
+	}
+	p.restore();
+}
+
+void ProfileMusicCard::paintText(Painter &p, const QRect &card, const QRect &cover) {
+	const auto textLeft = cover.right() + 16;
+	const auto textRight = card.right() - 16;
+	const auto textWidth = std::max(0, textRight - textLeft);
+	if (textWidth <= 0) {
+		return;
+	}
+
+	const auto titleH = st::semiboldFont->height;
+	const auto subH = st::normalFont->height;
+	const auto hasAlbum = !_album.trimmed().isEmpty();
+	const auto lineSpacing = 3;
+	const auto totalH = hasAlbum
+		? (titleH + lineSpacing + subH + lineSpacing + subH)
+		: (titleH + lineSpacing + subH);
+
+	int textY = card.top() + (card.height() - totalH) / 2;
+
+	const auto colors = themeColors();
+	p.setPen(colors.text);
+	_titleText.drawLeftElided(p, textLeft, textY, textWidth, width());
+	textY += titleH + lineSpacing;
+
+	p.setPen(colors.textSecondary);
+	_performerText.drawLeftElided(p, textLeft, textY, textWidth, width());
+	textY += subH + lineSpacing;
+
+	if (hasAlbum) {
+		p.setPen(colors.textSecondary);
+		_albumText.drawLeftElided(p, textLeft, textY, textWidth, width());
+	}
+}
+
+void ProfileMusicCard::paintEvent(QPaintEvent *e) {
+	Painter p(this);
+	const auto card = cardRect();
+	if (card.isEmpty()) {
+		return;
+	}
+
+	auto hq = PainterHighQualityEnabler(p);
+
+	const auto colors = themeColors();
+	if (_hasCover && _coverTheme.valid) {
+		QLinearGradient grad(card.topLeft(), card.bottomLeft());
+		grad.setColorAt(0.0, colors.bgTop);
+		grad.setColorAt(1.0, colors.bgBottom);
+		p.setBrush(grad);
+	} else {
+		p.setBrush(st::windowBgOver);
+	}
+	p.setPen(Qt::NoPen);
+	p.drawRoundedRect(card, kMusicCardRadius, kMusicCardRadius);
+
+	const auto rippleColor = (_hasCover && _coverTheme.valid)
+		? QColor(255, 255, 255, 30)
+		: st::windowBgRipple->c;
+	paintRipple(p, 0, 0, &rippleColor);
+
+	paintEmojis(p, card);
+
+	const auto cover = coverRect(card);
+	paintCover(p, cover);
+
+	paintText(p, card, cover);
+}
+
+} // namespace
+
+Section DetailsFiller::makeProfileMusic(not_null<UserData*> user) {
+	const auto parent = _stack->layout();
+	auto result = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+		parent,
+		object_ptr<Ui::VerticalLayout>(parent));
+	const auto container = result->entity();
+
+	const auto card = container->add(
+		object_ptr<ProfileMusicCard>(container, _controller, user));
+
+	result->toggleOn(card->hasMusicValue());
+	result->finishAnimating();
+
+	const auto raw = result.data();
+	return Section{
+		.widget = std::move(result),
 		.shown = raw->toggledValue(),
 	};
 }
@@ -2788,6 +3357,7 @@ void DetailsFiller::buildSections() {
 	Expects(!_topic || !_topic->creating());
 
 	if (const auto user = _sublist ? nullptr : _peer->asUser()) {
+		_stack->add(makeProfileMusic(user));
 		_stack->add(makePersonalChannel(user));
 		_stack->addPlainSeparator();
 	}

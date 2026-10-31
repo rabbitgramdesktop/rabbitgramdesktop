@@ -197,9 +197,9 @@ rpl::producer<CoverTheme> CurrentCoverThemeValue() {
 	return CurrentThemeVariable().value();
 }
 
-void ExtractEmbeddedCover(
+void ExtractEmbeddedMetadata(
 		not_null<DocumentData*> document,
-		Fn<void(QImage)> callback) {
+		Fn<void(EmbeddedMetadata)> callback) {
 	const auto guard = base::make_weak(&document->session());
 	const auto &loc = document->location(true);
 	if (loc.accessEnable()) {
@@ -208,15 +208,19 @@ void ExtractEmbeddedCover(
 			crl::async([=, callback = std::move(callback)] {
 				auto info = Media::Player::PrepareForSending(path, QByteArray());
 				if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
-					if (!song->cover.isNull()) {
-						crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
-							callback(std::move(cover));
-						});
-						return;
-					}
+					EmbeddedMetadata meta{
+						.cover = song->cover,
+						.album = song->album,
+						.title = song->title,
+						.performer = song->performer,
+					};
+					crl::on_main(guard, [=, meta = std::move(meta)]() mutable {
+						callback(std::move(meta));
+					});
+					return;
 				}
 				crl::on_main(guard, [=] {
-					callback(QImage());
+					callback(EmbeddedMetadata());
 				});
 			});
 			return;
@@ -228,15 +232,19 @@ void ExtractEmbeddedCover(
 			crl::async([=, callback = std::move(callback), bytes = bytes] {
 				auto info = Media::Player::PrepareForSending(QString(), bytes);
 				if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
-					if (!song->cover.isNull()) {
-						crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
-							callback(std::move(cover));
-						});
-						return;
-					}
+					EmbeddedMetadata meta{
+						.cover = song->cover,
+						.album = song->album,
+						.title = song->title,
+						.performer = song->performer,
+					};
+					crl::on_main(guard, [=, meta = std::move(meta)]() mutable {
+						callback(std::move(meta));
+					});
+					return;
 				}
 				crl::on_main(guard, [=] {
-					callback(QImage());
+					callback(EmbeddedMetadata());
 				});
 			});
 			return;
@@ -244,23 +252,35 @@ void ExtractEmbeddedCover(
 	}
 	document->owner().cache().get(document->cacheKey(), [=, callback = std::move(callback)](QByteArray data) {
 		if (data.isEmpty()) {
-			callback(QImage());
+			callback(EmbeddedMetadata());
 			return;
 		}
 		crl::async([=, data = std::move(data), callback = std::move(callback)]() mutable {
 			auto info = Media::Player::PrepareForSending(QString(), data);
 			if (const auto song = std::get_if<Ui::PreparedFileInformation::Song>(&info.media)) {
-				if (!song->cover.isNull()) {
-					crl::on_main(guard, [=, cover = std::move(song->cover)]() mutable {
-						callback(std::move(cover));
-					});
-					return;
-				}
+				EmbeddedMetadata meta{
+					.cover = song->cover,
+					.album = song->album,
+					.title = song->title,
+					.performer = song->performer,
+				};
+				crl::on_main(guard, [=, meta = std::move(meta)]() mutable {
+					callback(std::move(meta));
+				});
+				return;
 			}
 			crl::on_main(guard, [=] {
-				callback(QImage());
+				callback(EmbeddedMetadata());
 			});
 		});
+	});
+}
+
+void ExtractEmbeddedCover(
+		not_null<DocumentData*> document,
+		Fn<void(QImage)> callback) {
+	ExtractEmbeddedMetadata(document, [callback = std::move(callback)](EmbeddedMetadata meta) {
+		callback(std::move(meta.cover));
 	});
 }
 

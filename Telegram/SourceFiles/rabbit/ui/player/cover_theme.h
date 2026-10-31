@@ -35,6 +35,17 @@ void SetCurrentCoverTheme(const CoverTheme &theme);
 [[nodiscard]] CoverTheme CurrentCoverTheme();
 [[nodiscard]] rpl::producer<CoverTheme> CurrentCoverThemeValue();
 
+struct EmbeddedMetadata {
+	QImage cover;
+	QString album;
+	QString title;
+	QString performer;
+};
+
+void ExtractEmbeddedMetadata(
+	not_null<DocumentData*> document,
+	Fn<void(EmbeddedMetadata)> callback);
+
 void ExtractEmbeddedCover(
 	not_null<DocumentData*> document,
 	Fn<void(QImage)> callback);

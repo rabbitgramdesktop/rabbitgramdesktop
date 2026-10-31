@@ -7,14 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_pills.h"
 
-#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "history/history_item.h"
 #include "info/profile/info_profile_balance_pill.h"
 #include "info/profile/info_profile_music_button.h"
 #include "info/profile/info_profile_top_bar.h"
-#include "ui/text/format_song_document_name.h"
 #include "ui/rect.h"
 #include "wallet/wallet_card_view.h"
 
@@ -25,21 +22,6 @@ namespace Info::Profile {
 namespace {
 
 constexpr auto kFadeStart = 0.6;
-
-[[nodiscard]] rpl::producer<DocumentData*> ProfileMusicValue(
-		not_null<UserData*> user) {
-	const auto savedMusic = &user->owner().savedMusic();
-	const auto peerId = user->id;
-	return rpl::single(
-		peerId
-	) | rpl::then(
-		savedMusic->changed() | rpl::filter(rpl::mappers::_1 == peerId)
-	) | rpl::map([=]() -> DocumentData* {
-		const auto &list = savedMusic->list(peerId);
-		const auto media = list.empty() ? nullptr : list.front()->media();
-		return media ? media->document() : nullptr;
-	}) | rpl::distinct_until_changed();
-}
 
 } // namespace
 
@@ -75,24 +57,13 @@ PillsRow::PillsRow(
 		music->setOverrideBg(color);
 	}, _lifetime);
 
-	ProfileMusicValue(
-		user
-	) | rpl::on_next([=](DocumentData *document) {
-		if (document) {
-			music->updateData({ Ui::Text::FormatSongNameFor(document) });
-			music->show();
-		} else {
-			music->hide();
-		}
-	}, _lifetime);
+	// Profile music is shown as a dedicated plaque in the profile.
+	music->hide();
 
 	// Without the action buttons the row fits the gap below the status.
 	if (underButtons) {
-		_reserve = rpl::combine(
-			balance->shownValue(),
-			music->shownValue()
-		) | rpl::map([](bool hasBalance, bool hasMusic) {
-			return (hasBalance || hasMusic)
+		_reserve = balance->shownValue() | rpl::map([](bool hasBalance) {
+			return hasBalance
 				? st::infoProfileTopBarPillsReserve
 				: 0;
 		});

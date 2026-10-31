@@ -1479,6 +1479,7 @@ public:
 		trySet(_performer, dict, "artist");
 		trySet(_performer, dict, "performer");
 		trySet(_performer, dict, "album_artist");
+		trySet(_album, dict, "album");
 		//for (AVDictionaryEntry *tag = av_dict_get(dict, "", 0, AV_DICT_IGNORE_SUFFIX); tag; tag = av_dict_get(dict, "", tag, AV_DICT_IGNORE_SUFFIX)) {
 		//	const char *key = tag->key;
 		//	const char *value = tag->value;
@@ -1500,6 +1501,10 @@ public:
 
 	QString performer() {
 		return _performer;
+	}
+
+	QString album() {
+		return _album;
 	}
 
 	QImage cover() {
@@ -1524,7 +1529,7 @@ public:
 
 private:
 
-	QString _title, _performer;
+	QString _title, _performer, _album;
 	QImage _cover;
 	QByteArray _coverBytes, _coverFormat;
 
@@ -1543,6 +1548,7 @@ Ui::PreparedFileInformation PrepareForSending(
 		result.title = reader.title();
 		result.performer = reader.performer();
 		result.cover = reader.cover();
+		result.album = reader.album();
 	}
 	return { .media = result };
 }

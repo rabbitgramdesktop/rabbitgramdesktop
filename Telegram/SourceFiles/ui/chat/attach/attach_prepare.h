@@ -39,6 +39,7 @@ struct PreparedFileInformation {
 		QString title;
 		QString performer;
 		QImage cover;
+		QString album;
 	};
 	struct Video {
 		bool isGifv = false;
