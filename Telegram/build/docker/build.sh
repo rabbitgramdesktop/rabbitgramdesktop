@@ -1,55 +1,39 @@
 #!/bin/bash
-
 set -e
+
 FullExecPath=$PWD
 pushd `dirname $0` > /dev/null
 FullScriptPath=`pwd`
 popd > /dev/null
 
-if [ ! -d "$FullScriptPath/../../../../DesktopPrivate" ]; then
-  echo ""
-  echo "This script is for building the production version of Telegram Desktop."
-  echo ""
-  echo "For building custom versions please visit the build instructions page at:"
-  echo "https://github.com/telegramdesktop/tdesktop/#build-instructions"
-  exit
-fi
-
 HomePath="$FullScriptPath/../.."
-cd $HomePath
+cd "$HomePath"
 
-ProjectPath="$HomePath/../out"
-ReleasePath="$ProjectPath/Release"
-BinaryName="Telegram"
+CONFIG="${CONFIG:-Release}"
+BuildDirName="cmake-build-$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
+ProjectPath="$HomePath/../$BuildDirName"
+ReleasePath="$ProjectPath/bin"
+BinaryName="rabbitGram"
+
+if [ ! -d "$ProjectPath" ]; then
+  mkdir -p "$ProjectPath"
+fi
 
 if ! command -v cmake >/dev/null 2>&1; then
   ln -s cmake3 /usr/bin/cmake
 fi
 
-./configure.sh -DDESKTOP_APP_ENABLE_LTO=ON
-
-cd $ProjectPath
-cmake --build . --config Release --target Telegram
-cd $ReleasePath
-
-echo "$BinaryName build complete!"
+cmake --build "$ProjectPath" --config "$CONFIG" --target Telegram "$@"
 
 Error () {
-  cd $FullExecPath
+  cd "$FullExecPath"
   echo "$1"
   exit 1
 }
 
 if [ ! -f "$ReleasePath/$BinaryName" ]; then
-  Error "$BinaryName not found!"
+  Error "$BinaryName not found in $ReleasePath!"
 fi
 
-if [ ! -f "$ReleasePath/Updater" ]; then
-  Error "Updater not found!"
-fi
-
-rm -rf "$ReleasePath/root"
-mkdir "$ReleasePath/root"
-mv "$ReleasePath/$BinaryName" "$ReleasePath/root/"
-mv "$ReleasePath/Updater" "$ReleasePath/root/"
-mv "$ReleasePath/Packer" "$ReleasePath/root/"
+echo "$BinaryName build complete!"
+cd "$FullExecPath"

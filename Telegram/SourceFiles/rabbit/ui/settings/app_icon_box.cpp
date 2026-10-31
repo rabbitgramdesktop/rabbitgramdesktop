@@ -11,13 +11,28 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtGui/QPainterPath>
 #include <QtGui/QRadialGradient>
 
+#include "apiwrap.h"
+#include "core/application.h"
+#include "crl/crl_time.h"
+#include "data/data_changes.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
 #include "rabbit/lang/rabbit_lang.h"
 #include "rabbit/settings/rabbit_settings.h"
 #include "rabbit/ui/rabbit_assets.h"
 #include "ui/effects/animations.h"
+#include "ui/empty_userpic.h"
 #include "ui/painter.h"
+#include "ui/userpic_view.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
+#include "window/main_window.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
+#include "window/window_session_controller_link_info.h"
 
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
@@ -33,16 +48,16 @@ struct AppIconDescriptor {
 
 [[nodiscard]] const std::vector<AppIconDescriptor> &GetIconVariants() {
 	static const auto variants = std::vector<AppIconDescriptor>{
-		{ RabbitAssets::DEFAULT_ICON, QString(), QColor(42, 171, 238) },
-		{ RabbitAssets::ANGEL_ICON, QString(), QColor(229, 169, 60) },
-		{ RabbitAssets::BLACKOUT_ICON, QString(), QColor(100, 108, 118) },
-		{ RabbitAssets::COLOR_ICON, QString(), QColor(224, 64, 251) },
-		{ RabbitAssets::IMPOSTOR_ICON, QString(), QColor(229, 57, 53) },
-		{ RabbitAssets::MATRIX_ICON, QString(), QColor(0, 230, 118) },
-		{ RabbitAssets::MOON_ICON, QString(), QColor(92, 107, 192) },
-		{ RabbitAssets::OLD_ICON, QString(), QColor(30, 136, 229) },
-		{ RabbitAssets::SEASONAL_ICON, QString(), QColor(240, 98, 146) },
-		{ RabbitAssets::TWITCH_ICON, QString(), QColor(145, 70, 255) },
+		{ RabbitAssets::DEFAULT_ICON, u"@xmdnusr"_q, QColor(42, 171, 238) },
+		{ RabbitAssets::ANGEL_ICON, u"@MilesBlooper"_q, QColor(229, 169, 60) },
+		{ RabbitAssets::BLACKOUT_ICON, u"@xmdnusr"_q, QColor(100, 108, 118) },
+		{ RabbitAssets::COLOR_ICON, u"@MilesBlooper"_q, QColor(224, 64, 251) },
+		{ RabbitAssets::IMPOSTOR_ICON, u"@MilesBlooper"_q, QColor(229, 57, 53) },
+		{ RabbitAssets::MATRIX_ICON, u"@xmdnusr"_q, QColor(0, 230, 118) },
+		{ RabbitAssets::MOON_ICON, u"@MilesBlooper"_q, QColor(92, 107, 192) },
+		{ RabbitAssets::OLD_ICON, u"@xmdnusr"_q, QColor(30, 136, 229) },
+		{ RabbitAssets::SEASONAL_ICON, u"@MilesBlooper"_q, QColor(240, 98, 146) },
+		{ RabbitAssets::TWITCH_ICON, u"@MilesBlooper"_q, QColor(145, 70, 255) },
 	};
 	return variants;
 }
@@ -91,8 +106,16 @@ struct AppIconDescriptor {
 
 class AppIconHero final : public Ui::RpWidget {
 public:
-	AppIconHero(QWidget *parent, rpl::producer<QString> selectedId)
-		: RpWidget(parent) {
+	AppIconHero(
+		QWidget *parent,
+		Window::SessionController *controller,
+		Fn<void()> closeBox,
+		rpl::producer<QString> selectedId)
+		: RpWidget(parent)
+		, _controller(controller)
+		, _closeBox(std::move(closeBox)) {
+		setMouseTracking(true);
+
 		std::move(
 			selectedId
 		) | rpl::on_next([=](const QString &id) {
@@ -102,6 +125,10 @@ public:
 		widthValue() | rpl::on_next([=](int) {
 			updateSize();
 		}, lifetime());
+	}
+
+	~AppIconHero() {
+		cancelResolveRequest();
 	}
 
 protected:
@@ -183,29 +210,234 @@ protected:
 		}
 
 		if (!_currAuthor.isEmpty()) {
-			p.setFont(st::normalFont);
-			p.setPen(st::windowSubTextFg);
-			const auto authorY = nameY + nameHeight + 3;
-			const auto authorHeight = st::normalFont->height;
-			const auto authorRect = QRect(0, authorY, w, authorHeight);
+			const auto rect = computeAuthorRect();
+			const auto drawBadge = [&](float64 opacity) {
+				p.save();
+				if (opacity < 1.0) {
+					p.setOpacity(opacity);
+				}
+
+				if (_authorHovered) {
+					auto hoverBg = st::windowBgOver->c;
+					hoverBg.setAlphaF(0.45f);
+					p.setPen(Qt::NoPen);
+					p.setBrush(hoverBg);
+					p.drawRoundedRect(rect, rect.height() / 2.0, rect.height() / 2.0);
+				}
+
+				const auto userpicX = rect.x() + kBadgePaddingX;
+				const auto userpicY = rect.y() + (rect.height() - kUserpicSize) / 2;
+				if (_peer) {
+					_peer->paintUserpic(p, _userpicView, userpicX, userpicY, kUserpicSize);
+				} else {
+					const auto cleanUsername = _currAuthor.startsWith('@')
+						? _currAuthor.mid(1)
+						: _currAuthor;
+					const auto empty = Ui::EmptyUserpic(
+						Ui::EmptyUserpic::UserpicColor(0),
+						cleanUsername);
+					const auto radius = int(kUserpicSize * RabbitSettings::userpicRoundness() / 100.0);
+					empty.paintRounded(p, userpicX, userpicY, width(), kUserpicSize, radius);
+				}
+
+				p.setFont(st::normalFont);
+				p.setPen(_authorHovered ? st::windowFg : st::windowSubTextFg);
+				const auto textX = userpicX + kUserpicSize + kBadgeSpacing;
+				const auto textY = rect.y() + (rect.height() - st::normalFont->height) / 2;
+				const auto textWidth = rect.width() - (textX - rect.x()) - kBadgePaddingX;
+				p.drawText(
+					QRect(textX, textY, textWidth, st::normalFont->height),
+					Qt::AlignLeft | Qt::AlignVCenter,
+					_currAuthor);
+
+				p.restore();
+			};
 
 			if (_textAnim.animating()) {
-				p.save();
-				p.setOpacity(_textAnim.value(1.0));
-				p.drawText(authorRect, Qt::AlignCenter, _currAuthor);
-				p.restore();
+				drawBadge(_textAnim.value(1.0));
 			} else {
-				p.drawText(authorRect, Qt::AlignCenter, _currAuthor);
+				drawBadge(1.0);
+			}
+		}
+	}
+
+	void mouseMoveEvent(QMouseEvent *e) override {
+		const auto rect = computeAuthorRect();
+		const auto hovered = !rect.isEmpty() && rect.contains(e->pos());
+		if (hovered != _authorHovered) {
+			_authorHovered = hovered;
+			setCursor(_authorHovered ? style::cur_pointer : style::cur_default);
+			update();
+		}
+	}
+
+	void leaveEventHook(QEvent *e) override {
+		if (_authorHovered) {
+			_authorHovered = false;
+			unsetCursor();
+			update();
+		}
+	}
+
+	void mousePressEvent(QMouseEvent *e) override {
+		if (e->button() == Qt::LeftButton) {
+			const auto rect = computeAuthorRect();
+			if (!rect.isEmpty() && rect.contains(e->pos())) {
+				openProfile();
 			}
 		}
 	}
 
 private:
+	static constexpr auto kUserpicSize = 20;
+	static constexpr auto kBadgePaddingX = 8;
+	static constexpr auto kBadgeSpacing = 6;
+	static constexpr auto kBadgeHeight = 28;
+
+	[[nodiscard]] QRect computeAuthorRect() const {
+		if (_currAuthor.isEmpty()) {
+			return QRect();
+		}
+		const auto font = st::normalFont;
+		const auto textWidth = font->width(_currAuthor);
+		const auto badgeWidth = kBadgePaddingX
+			+ kUserpicSize
+			+ kBadgeSpacing
+			+ textWidth
+			+ kBadgePaddingX;
+		const auto iconSize = 84;
+		const auto iconY = 22;
+		const auto nameY = iconY + iconSize + 12;
+		const auto nameHeight = st::boxTitleFont->height;
+		const auto authorY = nameY + nameHeight + 6;
+		const auto badgeX = (width() - badgeWidth) / 2;
+		return QRect(badgeX, authorY, badgeWidth, kBadgeHeight);
+	}
+
 	void updateSize() {
 		const auto nameHeight = st::boxTitleFont->height;
-		const auto authorHeight = _currAuthor.isEmpty() ? 0 : (st::normalFont->height + 3);
+		const auto authorHeight = _currAuthor.isEmpty() ? 0 : (kBadgeHeight + 6);
 		const auto totalHeight = 22 + 84 + 12 + nameHeight + authorHeight + 20;
 		resize(width(), totalHeight);
+	}
+
+	void openProfile() {
+		const auto cleanUsername = _currAuthor.startsWith('@')
+			? _currAuthor.mid(1)
+			: _currAuthor;
+		if (cleanUsername.isEmpty()) {
+			return;
+		}
+
+		const auto controller = _controller
+			? _controller
+			: (Core::App().activeWindow() ? Core::App().activeWindow()->sessionController() : nullptr);
+		if (!controller) {
+			return;
+		}
+
+		SetPendingReopenAppIconId(_currentId);
+
+		const auto peer = _peer;
+		const auto close = _closeBox;
+		if (close) {
+			close();
+		}
+
+		if (peer) {
+			controller->showPeerInfo(peer);
+		} else {
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = cleanUsername,
+				.resolveType = Window::ResolveType::Profile,
+			});
+		}
+	}
+
+	void cancelResolveRequest() {
+		if (_resolveRequestId) {
+			const auto session = resolveSession();
+			if (session) {
+				session->api().request(base::take(_resolveRequestId)).cancel();
+			} else {
+				_resolveRequestId = 0;
+			}
+		}
+	}
+
+	[[nodiscard]] Main::Session *resolveSession() const {
+		if (_controller) {
+			return &_controller->session();
+		} else if (const auto win = Core::App().activeWindow()) {
+			if (const auto controller = win->sessionController()) {
+				return &controller->session();
+			}
+		}
+		return Core::App().domain().active().maybeSession();
+	}
+
+	void resolveAuthorPeer(const QString &author) {
+		cancelResolveRequest();
+		_peer = nullptr;
+		_peerLifetime.destroy();
+		_userpicView = Ui::PeerUserpicView();
+
+		const auto cleanUsername = author.startsWith('@') ? author.mid(1) : author;
+		if (cleanUsername.isEmpty()) {
+			update();
+			return;
+		}
+
+		const auto session = resolveSession();
+		if (!session) {
+			update();
+			return;
+		}
+
+		if (const auto peer = session->data().peerByUsername(cleanUsername)) {
+			setPeer(peer);
+		} else {
+			_resolveRequestId = session->api().request(MTPcontacts_ResolveUsername(
+				MTP_flags(0),
+				MTP_string(cleanUsername),
+				MTP_string()
+			)).done(crl::guard(this, [=](const MTPcontacts_ResolvedPeer &result) {
+				_resolveRequestId = 0;
+				const auto session = resolveSession();
+				if (!session) {
+					return;
+				}
+				session->data().processUsers(result.data().vusers());
+				session->data().processChats(result.data().vchats());
+				const auto resolved = session->data().peerLoaded(
+					peerFromMTP(result.data().vpeer()));
+				if (resolved) {
+					const auto currentAuthorClean = _currAuthor.startsWith('@')
+						? _currAuthor.mid(1)
+						: _currAuthor;
+					if (currentAuthorClean.compare(cleanUsername, Qt::CaseInsensitive) == 0) {
+						setPeer(resolved);
+					}
+				}
+			})).fail(crl::guard(this, [=] {
+				_resolveRequestId = 0;
+			})).send();
+		}
+	}
+
+	void setPeer(not_null<PeerData*> peer) {
+		_peer = peer;
+		_userpicView = Ui::PeerUserpicView();
+		_peer->loadUserpic();
+		_peerLifetime.destroy();
+		_peer->session().changes().peerFlagsValue(
+			_peer,
+			Data::PeerUpdate::Flag::Photo
+		) | rpl::on_next([=] {
+			_userpicView = Ui::PeerUserpicView();
+			update();
+		}, _peerLifetime);
+		update();
 	}
 
 	void onIdChanged(const QString &id) {
@@ -221,6 +453,7 @@ private:
 			_currName = newName;
 			_currAuthor = newAuthor;
 			_currImage = newImage;
+			resolveAuthorPeer(_currAuthor);
 			updateSize();
 			update();
 			return;
@@ -247,9 +480,13 @@ private:
 		_currName = newName;
 		_prevAuthor = _currAuthor;
 		_currAuthor = newAuthor;
+		resolveAuthorPeer(_currAuthor);
 		updateSize();
 		_textAnim.start([=] { update(); }, 0.0, 1.0, 200, anim::easeOutCubic);
 	}
+
+	Window::SessionController *_controller = nullptr;
+	Fn<void()> _closeBox;
 
 	QString _currentId;
 	QColor _accentColor;
@@ -266,6 +503,12 @@ private:
 	QString _prevAuthor;
 	QString _currAuthor;
 	Ui::Animations::Simple _textAnim;
+
+	PeerData *_peer = nullptr;
+	Ui::PeerUserpicView _userpicView;
+	rpl::lifetime _peerLifetime;
+	mtpRequestId _resolveRequestId = 0;
+	bool _authorHovered = false;
 
 };
 
@@ -504,14 +747,38 @@ private:
 
 };
 
+QString gPendingReopenAppIconId;
+crl::time gPendingReopenTime = 0;
+
 } // namespace
 
-void AppIconBox(not_null<Ui::GenericBox*> box) {
-	const auto initialId = RabbitSettings::appIcon().isEmpty()
+void SetPendingReopenAppIconId(const QString &id) {
+	gPendingReopenAppIconId = id;
+	gPendingReopenTime = crl::now();
+}
+
+QString TakePendingReopenAppIconId() {
+	if (gPendingReopenTime == 0 || crl::now() - gPendingReopenTime > 10000) {
+		gPendingReopenAppIconId = QString();
+		gPendingReopenTime = 0;
+		return QString();
+	}
+	gPendingReopenTime = 0;
+	return std::exchange(gPendingReopenAppIconId, QString());
+}
+
+void AppIconBox(
+		not_null<Ui::GenericBox*> box,
+		Window::SessionController *controller,
+		const QString &selectedId) {
+	const auto currentAppIcon = RabbitSettings::appIcon().isEmpty()
 		? RabbitAssets::DEFAULT_ICON
 		: RabbitSettings::appIcon();
+	const auto initialId = !selectedId.isEmpty()
+		? selectedId
+		: currentAppIcon;
 
-	const auto selectedId = box->lifetime().make_state<rpl::variable<QString>>(initialId);
+	const auto selectedIdVar = box->lifetime().make_state<rpl::variable<QString>>(initialId);
 
 	box->setWidth(st::boxWideWidth);
 	box->setNoContentMargin(true);
@@ -519,13 +786,17 @@ void AppIconBox(not_null<Ui::GenericBox*> box) {
 	box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 
 	const auto content = box->verticalLayout();
-	content->add(object_ptr<AppIconHero>(content, selectedId->value()));
+	content->add(object_ptr<AppIconHero>(
+		content,
+		controller,
+		[=] { box->closeBox(); },
+		selectedIdVar->value()));
 	content->add(object_ptr<Ui::RpWidget>(content), { 0, 8, 0, 8 });
 	content->add(object_ptr<AppIconGrid>(
 		content,
-		selectedId->value(),
+		selectedIdVar->value(),
 		[=](QString id) {
-			*selectedId = id;
+			*selectedIdVar = id;
 		}));
 	content->add(object_ptr<Ui::RpWidget>(content), { 0, 0, 0, 16 });
 
@@ -541,8 +812,8 @@ void AppIconBox(not_null<Ui::GenericBox*> box) {
 		- st.buttonPadding.left()
 		- st.buttonPadding.right());
 
-	selectedId->value() | rpl::on_next([=, raw = button.data()](const QString &id) {
-		const auto isChanged = (id != initialId);
+	selectedIdVar->value() | rpl::on_next([=, raw = button.data()](const QString &id) {
+		const auto isChanged = (id != currentAppIcon);
 		raw->setText(rktr(isChanged
 			? u"rtg_settings_app_icon_choose"_q
 			: u"rtg_settings_app_icon_keep"_q));
@@ -556,8 +827,8 @@ void AppIconBox(not_null<Ui::GenericBox*> box) {
 	}, button->lifetime());
 
 	button->setClickedCallback([=] {
-		if (selectedId->current() != initialId) {
-			RabbitSettings::setAppIcon(selectedId->current());
+		if (selectedIdVar->current() != currentAppIcon) {
+			RabbitSettings::setAppIcon(selectedIdVar->current());
 			RabbitAssets::applyAppIcon();
 		}
 		box->closeBox();

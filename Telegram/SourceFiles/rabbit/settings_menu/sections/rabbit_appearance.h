@@ -25,6 +25,9 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
+	void sectionSaveState(std::any &state) override;
+	void sectionRestoreState(const std::any &state) override;
+
 private:
 	void setupContent();
 

@@ -1,16 +1,18 @@
+#!/bin/bash
 set -e
 FullExecPath=$PWD
 pushd `dirname $0` > /dev/null
 FullScriptPath=`pwd`
 popd > /dev/null
 
-if [ ! -d "$FullScriptPath/../../../../../DesktopPrivate" ]; then
-  echo ""
-  echo "This script is for building the production version of Telegram Desktop."
-  echo ""
-  echo "For building custom versions please visit the build instructions page at:"
-  echo "https://github.com/telegramdesktop/tdesktop/#build-instructions"
-  exit
+RepoRoot="$(cd "$FullScriptPath/../../../.." && pwd)"
+
+# Find DesktopPrivate: check sibling of repo root first, then fallback
+DesktopPrivateDir=""
+if [ -d "$RepoRoot/../DesktopPrivate" ]; then
+  DesktopPrivateDir="$(cd "$RepoRoot/../DesktopPrivate" && pwd)"
+elif [ -d "$HOME/Telegram/DesktopPrivate" ]; then
+  DesktopPrivateDir="$HOME/Telegram/DesktopPrivate"
 fi
 
 if [ "$#" == "0" ]; then
@@ -22,4 +24,34 @@ DockerCpus=$((CpuCount > 4 ? CpuCount - 2 : CpuCount))
 MemTotalGb=$(($(grep MemTotal /proc/meminfo | awk '{print $2}') / 1048576))
 DockerMemoryGb=$((MemTotalGb > 12 ? MemTotalGb - 4 : MemTotalGb))
 
-docker run -it --rm --cpus=$DockerCpus --memory=${DockerMemoryGb}g -u $(id -u) -v $HOME/Telegram/DesktopPrivate:/usr/src/DesktopPrivate -v $HOME/Telegram/tdesktop:/usr/src/tdesktop tdesktop:centos_env "$@"
+MountArgs=(
+  -v "$RepoRoot:/tmp/rtgdesktopdev"
+  -v "$RepoRoot:/usr/src/tdesktop"
+)
+
+if [ -n "$DesktopPrivateDir" ]; then
+  MountArgs+=(
+    -v "$DesktopPrivateDir:/tmp/DesktopPrivate"
+    -v "$DesktopPrivateDir:/usr/src/DesktopPrivate"
+  )
+fi
+
+if [ -d "$HOME/.cache/ccache" ]; then
+  MountArgs+=(
+    -e CCACHE_DIR=/var/cache/ccache
+    -v "$HOME/.cache/ccache:/var/cache/ccache"
+  )
+fi
+
+TTY_ARG="-i"
+if [ -t 0 ]; then
+  TTY_ARG="-it"
+fi
+
+docker run $TTY_ARG --rm \
+  --cpus=$DockerCpus \
+  --memory=${DockerMemoryGb}g \
+  -u $(id -u) \
+  -w /tmp/rtgdesktopdev \
+  "${MountArgs[@]}" \
+  tdesktop:centos_env "$@"

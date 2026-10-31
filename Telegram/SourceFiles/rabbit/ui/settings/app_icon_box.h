@@ -9,4 +9,14 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 
 #include "ui/layers/generic_box.h"
 
-void AppIconBox(not_null<Ui::GenericBox*> box);
+namespace Window {
+class SessionController;
+} // namespace Window
+
+void AppIconBox(
+	not_null<Ui::GenericBox*> box,
+	Window::SessionController *controller = nullptr,
+	const QString &selectedId = QString());
+
+void SetPendingReopenAppIconId(const QString &id);
+[[nodiscard]] QString TakePendingReopenAppIconId();

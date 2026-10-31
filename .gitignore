@@ -56,7 +56,7 @@ __pycache__/
 /Telegram/Makefile
 *.*~
 .idea/
-cmake-build-debug/
+cmake-build-*/
 *.qsb
 
 # Local configuration files

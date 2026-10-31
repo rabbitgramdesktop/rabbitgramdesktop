@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/settings_menu/sections/rabbit_appearance.h"
 
+#include "crl/crl_on_main.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "rabbit/lang/rabbit_lang.h"
@@ -35,6 +36,10 @@ namespace Settings {
 namespace {
 
 using namespace Builder;
+
+struct AppearanceSectionState {
+	QString reopenIconId;
+};
 
 void AddToggle(
 	SectionBuilder &builder,
@@ -116,7 +121,9 @@ void BuildAppIcon(SectionBuilder &builder) {
 		}),
 		.onClick = controller
 			? [=] {
-				controller->show(Box(AppIconBox));
+				controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+					AppIconBox(box, controller);
+				}));
 			}
 			: Fn<void()>(),
 		.keywords = { u"icon"_q, u"app"_q },
@@ -296,6 +303,25 @@ void RabbitAppearance::setupContent() {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 	build(content, kRabbitAppearanceSection);
 	Ui::ResizeFitChild(this, content);
+}
+
+void RabbitAppearance::sectionSaveState(std::any &state) {
+	if (const auto iconId = TakePendingReopenAppIconId(); !iconId.isEmpty()) {
+		state = AppearanceSectionState{ iconId };
+	}
+}
+
+void RabbitAppearance::sectionRestoreState(const std::any &state) {
+	if (const auto myState = std::any_cast<AppearanceSectionState>(&state)) {
+		if (!myState->reopenIconId.isEmpty()) {
+			const auto iconId = myState->reopenIconId;
+			crl::on_main(this, [=] {
+				controller()->show(Box([=](not_null<Ui::GenericBox*> box) {
+					AppIconBox(box, controller(), iconId);
+				}));
+			});
+		}
+	}
 }
 
 } // namespace Settings

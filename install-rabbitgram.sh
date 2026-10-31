@@ -27,8 +27,9 @@ Options:
   -h, --help        Show this help message
 
 If PATH_TO_BINARY is omitted, the installer automatically checks:
-  1. ./out/Release/rabbitGram
-  2. ./rabbitGram
+  1. ./cmake-build-release/bin/rabbitGram (or cmake-build-debug)
+  2. ./out/Release/rabbitGram
+  3. ./rabbitGram
 EOF
 }
 
@@ -164,6 +165,14 @@ fi
 SRC_BIN=""
 if [[ -n "$BINARY_ARG" ]]; then
     SRC_BIN="$BINARY_ARG"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-release/bin/rabbitGram" ]]; then
+    SRC_BIN="${SCRIPT_DIR}/cmake-build-release/bin/rabbitGram"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-release/rabbitGram" ]]; then
+    SRC_BIN="${SCRIPT_DIR}/cmake-build-release/rabbitGram"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-debug/bin/rabbitGram" ]]; then
+    SRC_BIN="${SCRIPT_DIR}/cmake-build-debug/bin/rabbitGram"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-debug/rabbitGram" ]]; then
+    SRC_BIN="${SCRIPT_DIR}/cmake-build-debug/rabbitGram"
 elif [[ -f "${SCRIPT_DIR}/out/Release/rabbitGram" ]]; then
     SRC_BIN="${SCRIPT_DIR}/out/Release/rabbitGram"
 elif [[ -f "${SCRIPT_DIR}/rabbitGram" ]]; then
@@ -202,6 +211,14 @@ fi
 SRC_UPDATER=""
 if [[ -f "$(dirname "$SRC_BIN")/Updater" ]]; then
     SRC_UPDATER="$(dirname "$SRC_BIN")/Updater"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-release/bin/Updater" ]]; then
+    SRC_UPDATER="${SCRIPT_DIR}/cmake-build-release/bin/Updater"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-release/Updater" ]]; then
+    SRC_UPDATER="${SCRIPT_DIR}/cmake-build-release/Updater"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-debug/bin/Updater" ]]; then
+    SRC_UPDATER="${SCRIPT_DIR}/cmake-build-debug/bin/Updater"
+elif [[ -f "${SCRIPT_DIR}/cmake-build-debug/Updater" ]]; then
+    SRC_UPDATER="${SCRIPT_DIR}/cmake-build-debug/Updater"
 elif [[ -f "${SCRIPT_DIR}/out/Release/Updater" ]]; then
     SRC_UPDATER="${SCRIPT_DIR}/out/Release/Updater"
 elif [[ -f "${SCRIPT_DIR}/Updater" ]]; then
