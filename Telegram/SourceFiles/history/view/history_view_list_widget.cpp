@@ -606,6 +606,20 @@ ListWidget::ListWidget(
 	setAttribute(Qt::WA_AcceptTouchEvents);
 	setMouseTracking(true);
 	setAccessibleName(tr::lng_sr_message_list(tr::now));
+
+	_session->changes().peerUpdates(
+		Data::PeerUpdate::Flag::OnlineStatus
+	) | rpl::on_next([=] {
+		if (RabbitSettings::showOnlineIndicator()) {
+			update();
+		}
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"show_online_indicator"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
 	if (const auto scroll = _delegate->listScrollArea()) {
 		scroll->lockWheelDirection();
 		scroll->setCrossAxisWheelProcess([=](
@@ -3428,40 +3442,97 @@ void ListWidget::paintUserpics(
 						st::msgPhotoSize + std::abs(shift),
 						st::msgPhotoSize));
 			}
-			if (const auto from = view->displayFrom()) {
-				Dialogs::Ui::PaintUserpic(
-					p,
-					from,
-					validateVideoUserpic(from),
-					_userpics[from],
-					st::historyPhotoLeft,
-					userpicTop,
-					view->width(),
-					st::msgPhotoSize,
-					context.paused);
-			} else if (const auto info = item->displayHiddenSenderInfo()) {
-				if (info->customUserpic.empty()) {
+			const auto from = view->displayFrom();
+			const auto info = from ? nullptr : item->displayHiddenSenderInfo();
+			if (!from && !info) {
+				Unexpected("Corrupt forwarded information in message.");
+			}
+			PeerData *currentPeer = from;
+			const auto now = base::unixtime::now();
+			const auto onlineIndicator = RabbitSettings::showOnlineIndicator()
+				&& currentPeer
+				&& [&] {
+					const auto user = currentPeer->asUser();
+					if (user
+						&& !user->isBot()
+						&& !user->isServiceUser()
+						&& user->lastseen().isOnline(now)) {
+						user->owner().watchForOffline(user, now);
+						return true;
+					}
+					return false;
+				}();
+			const auto dotDiameter = 10.0;
+			const auto borderWidth = 2.0;
+			const auto totalSize = dotDiameter + borderWidth * 2;
+			const auto userpicLeft = rtl()
+				? (view->width() - st::historyPhotoLeft - st::msgPhotoSize)
+				: st::historyPhotoLeft;
+			const auto dotX = userpicLeft + st::msgPhotoSize - totalSize + borderWidth;
+			const auto dotY = userpicTop + st::msgPhotoSize - totalSize + borderWidth;
+			const auto outlineRect = QRectF(
+				dotX - borderWidth,
+				dotY - borderWidth,
+				totalSize,
+				totalSize);
+			const auto dotRect = QRectF(dotX, dotY, dotDiameter, dotDiameter);
+
+			const auto paintUserpic = [&](Painter &target, int x, int y, int outerWidth) {
+				if (from) {
+					Dialogs::Ui::PaintUserpic(
+						target,
+						from,
+						validateVideoUserpic(from),
+						_userpics[from],
+						x,
+						y,
+						outerWidth,
+						st::msgPhotoSize,
+						context.paused);
+				} else if (info->customUserpic.empty()) {
 					info->emptyUserpic.paintCircle(
-						p,
-						st::historyPhotoLeft,
-						userpicTop,
-						view->width(),
+						target,
+						x,
+						y,
+						outerWidth,
 						st::msgPhotoSize);
 				} else {
 					auto &userpic = _hiddenSenderUserpics[item->id];
 					const auto valid = info->paintCustomUserpic(
-						p,
+						target,
 						userpic,
-						st::historyPhotoLeft,
-						userpicTop,
-						view->width(),
+						x,
+						y,
+						outerWidth,
 						st::msgPhotoSize);
 					if (!valid) {
 						info->customUserpic.load(session, item->fullId());
 					}
 				}
+			};
+
+			if (onlineIndicator) {
+				const auto ratio = style::DevicePixelRatio();
+				auto image = QImage(
+					QSize(st::msgPhotoSize, st::msgPhotoSize) * ratio,
+					QImage::Format_ARGB32_Premultiplied);
+				image.setDevicePixelRatio(ratio);
+				image.fill(Qt::transparent);
+				{
+					Painter q(&image);
+					PainterHighQualityEnabler hq(q);
+					paintUserpic(q, 0, 0, st::msgPhotoSize);
+					q.setPen(Qt::NoPen);
+					q.setCompositionMode(QPainter::CompositionMode_Clear);
+					q.setBrush(Qt::transparent);
+					q.drawEllipse(outlineRect.translated(-userpicLeft, -userpicTop));
+					q.setCompositionMode(QPainter::CompositionMode_SourceOver);
+					q.setBrush(st::dialogsOnlineBadgeFg);
+					q.drawEllipse(dotRect.translated(-userpicLeft, -userpicTop));
+				}
+				p.drawImage(userpicLeft, userpicTop, image);
 			} else {
-				Unexpected("Corrupt forwarded information in message.");
+				paintUserpic(p, st::historyPhotoLeft, userpicTop, view->width());
 			}
 			if (shift) {
 				p.translate(-shift, 0);

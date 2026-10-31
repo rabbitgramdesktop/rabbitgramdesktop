@@ -7,6 +7,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "history/view/history_view_message.h"
 
+#include "rabbit/settings/rabbit_settings.h"
+
 #include "api/api_suggest_post.h"
 #include "api/api_transcribes.h"
 #include "base/options.h"
@@ -3898,7 +3900,10 @@ bool Message::hasFromPhoto() const {
 		if (item->isGuestChatBotMessage()) {
 			return true;
 		}
-		return !item->out() && !item->history()->peer->isUser();
+		return !item->out()
+			&& !item->history()->peer->isSelf()
+			&& (!item->history()->peer->isUser()
+				|| RabbitSettings::showOnlineIndicator());
 	} break;
 	case Context::ContactPreview:
 	case Context::ShortcutMessages:

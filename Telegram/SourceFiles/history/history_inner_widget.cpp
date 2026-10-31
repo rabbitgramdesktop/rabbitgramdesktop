@@ -447,6 +447,20 @@ HistoryInner::HistoryInner(
 		}
 	}, lifetime());
 
+	session().changes().peerUpdates(
+		Data::PeerUpdate::Flag::OnlineStatus
+	) | rpl::on_next([=] {
+		if (RabbitSettings::showOnlineIndicator()) {
+			update();
+		}
+	}, lifetime());
+
+	RabbitSettings::JsonSettings::Events(
+		u"show_online_indicator"_q
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
 	using PlayRequest = ChatHelpers::EmojiInteractionPlayRequest;
 	_controller->emojiInteractions().playRequests(
 	) | rpl::filter([=](const PlayRequest &request) {
@@ -1062,7 +1076,7 @@ bool HistoryInner::canHaveFromUserpics() const {
 		&& !_peer->isVerifyCodes()
 		&& !_isChatWide
 		&& !_history->hasGuestChatBotMessages()) {
-		return false;
+		return RabbitSettings::showOnlineIndicator();
 	} else if (const auto channel = _peer->asBroadcast()) {
 		return channel->signatureProfiles();
 	}
@@ -1762,10 +1776,14 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				&& currentPeer
 				&& [&] {
 					const auto user = currentPeer->asUser();
-					return user
+					if (user
 						&& !user->isBot()
 						&& !user->isServiceUser()
-						&& user->lastseen().isOnline(now);
+						&& user->lastseen().isOnline(now)) {
+						user->owner().watchForOffline(user, now);
+						return true;
+					}
+					return false;
 				}();
 			const auto dotDiameter = 10.0;
 			const auto borderWidth = 2.0;

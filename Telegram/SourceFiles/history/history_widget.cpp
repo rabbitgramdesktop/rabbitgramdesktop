@@ -823,7 +823,8 @@ HistoryWidget::HistoryWidget(
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_groups"_q),
 		RabbitSettings::JsonSettings::Events(u"hide_reactions_privates"_q),
 		RabbitSettings::JsonSettings::Events(u"replace_edited_label"_q),
-		RabbitSettings::JsonSettings::Events(u"channel_bottom_button"_q)
+		RabbitSettings::JsonSettings::Events(u"channel_bottom_button"_q),
+		RabbitSettings::JsonSettings::Events(u"show_online_indicator"_q)
 	) | rpl::on_next([=] {
 		crl::on_main(this, [=] {
 			if (_history) {

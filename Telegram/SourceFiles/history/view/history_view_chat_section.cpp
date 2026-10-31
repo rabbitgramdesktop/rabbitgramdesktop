@@ -1060,6 +1060,21 @@ ChatWidget::ChatWidget(
 		});
 	}, lifetime());
 
+	RabbitSettings::JsonSettings::Events(
+		u"show_online_indicator"_q
+	) | rpl::on_next([=] {
+		crl::on_main(this, [=] {
+			if (_history) {
+				for (const auto &block : _history->blocks) {
+					for (const auto &msg : block->messages) {
+						session().data().notifyItemDataChange(msg->data());
+					}
+				}
+			}
+			update();
+		});
+	}, lifetime());
+
 	if (_topControls) {
 		_topControls->finishAnimating();
 	}
