@@ -28,6 +28,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "data/data_media_types.h"
 #include "data/data_file_origin.h"
 #include "core/shortcuts.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "window/window_controller.h"
@@ -922,6 +923,10 @@ void Instance::play(
 		}
 		if (audioId.type() == AudioMsgId::Type::Voice) {
 			pauseSongForVoice();
+		} else if (audioId.type() == AudioMsgId::Type::Song) {
+			if (RabbitSettings::stopMediaOnPlayback()) {
+				pauseVoiceForSong();
+			}
 		}
 		playStreamed(audioId, std::move(shared));
 	}
@@ -1012,9 +1017,13 @@ void Instance::stop(AudioMsgId::Type type, bool asFinished) {
 		}
 		data->resumeOnCallEnd = false;
 		data->resumeOnVoiceEnd = false;
+		data->resumeOnRecordEnd = false;
+		data->resumeOnPlaybackEnd = false;
 		_playerStopped.fire_copy({type});
 		if (type == AudioMsgId::Type::Voice) {
 			resumeSongAfterVoice();
+		} else if (type == AudioMsgId::Type::Song) {
+			resumeVoiceAfterSong();
 		}
 	}
 	if (asFinished) {
@@ -1024,6 +1033,10 @@ void Instance::stop(AudioMsgId::Type type, bool asFinished) {
 
 void Instance::stopAndClear(not_null<Data*> data) {
 	getData(AudioMsgId::Type::Song)->resumeOnVoiceEnd = false;
+	getData(AudioMsgId::Type::Voice)->resumeOnPlaybackEnd = false;
+	data->resumeOnCallEnd = false;
+	data->resumeOnRecordEnd = false;
+	data->resumeOnPlaybackEnd = false;
 	stop(data->type);
 	*data = Data(data->type, data->overview);
 	_tracksFinished.fire_copy(data->type);
@@ -1243,6 +1256,105 @@ void Instance::resumeSongAfterVoice(bool force) {
 		return;
 	}
 	play(AudioMsgId::Type::Song);
+}
+
+void Instance::pauseVoiceForSong() {
+	const auto state = getState(AudioMsgId::Type::Voice);
+	if (!state.id
+		|| IsStopped(state.state)
+		|| IsPaused(state.state)
+		|| state.state == State::Pausing) {
+		return;
+	}
+	pause(AudioMsgId::Type::Voice);
+	if (const auto data = getData(AudioMsgId::Type::Voice)) {
+		data->resumeOnPlaybackEnd = true;
+	}
+}
+
+void Instance::resumeVoiceAfterSong() {
+	const auto data = getData(AudioMsgId::Type::Voice);
+	if (!data || !data->resumeOnPlaybackEnd) {
+		return;
+	}
+	data->resumeOnPlaybackEnd = false;
+	if (Core::App().calls().currentCall()
+		|| Core::App().calls().currentGroupCall()) {
+		return;
+	}
+	play(AudioMsgId::Type::Voice);
+}
+
+void Instance::pauseForRecord() {
+	if (!RabbitSettings::stopMediaOnRecord()) {
+		return;
+	}
+	for (const auto type : { AudioMsgId::Type::Song, AudioMsgId::Type::Voice }) {
+		const auto state = getState(type);
+		if (!state.id
+			|| IsStopped(state.state)
+			|| IsPaused(state.state)
+			|| state.state == State::Pausing) {
+			continue;
+		}
+		pause(type);
+		if (const auto data = getData(type)) {
+			data->resumeOnRecordEnd = true;
+		}
+	}
+}
+
+void Instance::resumeAfterRecord() {
+	if (!RabbitSettings::stopMediaOnRecord()) {
+		return;
+	}
+	for (const auto type : { AudioMsgId::Type::Song, AudioMsgId::Type::Voice }) {
+		if (const auto data = getData(type)) {
+			if (data->resumeOnRecordEnd) {
+				data->resumeOnRecordEnd = false;
+				if (!Core::App().calls().currentCall()
+					&& !Core::App().calls().currentGroupCall()) {
+					play(type);
+				}
+			}
+		}
+	}
+}
+
+void Instance::pauseForPlayback() {
+	if (!RabbitSettings::stopMediaOnPlayback()) {
+		return;
+	}
+	for (const auto type : { AudioMsgId::Type::Song, AudioMsgId::Type::Voice }) {
+		const auto state = getState(type);
+		if (!state.id
+			|| IsStopped(state.state)
+			|| IsPaused(state.state)
+			|| state.state == State::Pausing) {
+			continue;
+		}
+		pause(type);
+		if (const auto data = getData(type)) {
+			data->resumeOnPlaybackEnd = true;
+		}
+	}
+}
+
+void Instance::resumeAfterPlayback() {
+	if (!RabbitSettings::stopMediaOnPlayback()) {
+		return;
+	}
+	for (const auto type : { AudioMsgId::Type::Song, AudioMsgId::Type::Voice }) {
+		if (const auto data = getData(type)) {
+			if (data->resumeOnPlaybackEnd) {
+				data->resumeOnPlaybackEnd = false;
+				if (!Core::App().calls().currentCall()
+					&& !Core::App().calls().currentGroupCall()) {
+					play(type);
+				}
+			}
+		}
+	}
 }
 
 bool Instance::next(AudioMsgId::Type type) {

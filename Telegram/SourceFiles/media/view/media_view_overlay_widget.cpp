@@ -27,6 +27,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "core/crash_reports.h"
 #include "core/sandbox.h"
 #include "core/shortcuts.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/dropdown_menu.h"
@@ -1612,6 +1613,9 @@ bool OverlayWidget::opaqueContentShown() const {
 
 void OverlayWidget::clearStreaming(bool savePosition) {
 	finishSystemMediaControls();
+	if (RabbitSettings::stopMediaOnPlayback()) {
+		Player::instance()->resumeAfterPlayback();
+	}
 	if (_streamed && _document && savePosition) {
 		Media::Player::SaveLastPlaybackPosition(
 			_document,
@@ -6116,8 +6120,12 @@ void OverlayWidget::playbackPauseMusic() {
 	if (!_streamed->withSound) {
 		return;
 	}
-	Player::instance()->pause(AudioMsgId::Type::Voice);
-	Player::instance()->pause(AudioMsgId::Type::Song);
+	if (RabbitSettings::stopMediaOnPlayback()) {
+		Player::instance()->pauseForPlayback();
+	} else {
+		Player::instance()->pause(AudioMsgId::Type::Voice);
+		Player::instance()->pause(AudioMsgId::Type::Song);
+	}
 }
 
 void OverlayWidget::updatePlaybackState() {

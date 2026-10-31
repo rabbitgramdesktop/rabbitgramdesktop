@@ -278,6 +278,10 @@ inline bool tgWsProxyEnabled() { return JsonSettings::GetBool(u"tg_ws_proxy_enab
 void setTgWsProxyEnabled(bool value);
 inline bool linuxForceXcb() { return JsonSettings::GetBool(u"linux_force_xcb"_q); }
 inline void setLinuxForceXcb(bool value) { JsonSettings::Set(u"linux_force_xcb"_q, value); }
+inline bool stopMediaOnPlayback() { return JsonSettings::GetBool(u"stop_media_on_playback"_q); }
+inline void setStopMediaOnPlayback(bool value) { JsonSettings::Set(u"stop_media_on_playback"_q, value); }
+inline bool stopMediaOnRecord() { return JsonSettings::GetBool(u"stop_media_on_record"_q); }
+inline void setStopMediaOnRecord(bool value) { JsonSettings::Set(u"stop_media_on_record"_q, value); }
 
 [[nodiscard]] bool ShouldHideReactions(const PeerData *peer);
 

@@ -10,6 +10,8 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/audio/media_audio_capture_common.h"
 #include "media/audio/media_audio_ffmpeg_loader.h"
 #include "media/audio/media_audio_track.h"
+#include "media/player/media_player_instance.h"
+#include "rabbit/settings/rabbit_settings.h"
 #include "ffmpeg/ffmpeg_utility.h"
 #include "base/timer.h"
 
@@ -135,6 +137,9 @@ Instance::Instance() : _inner(std::make_unique<Inner>(&_thread)) {
 }
 
 void Instance::start(Fn<void(Chunk)> externalProcessing) {
+	if (const auto player = Player::instance()) {
+		player->pauseForRecord();
+	}
 	_updates.fire_done();
 	const auto id = Audio::Current().captureDeviceId();
 	InvokeQueued(_inner.get(), [=] {
@@ -145,6 +150,9 @@ void Instance::start(Fn<void(Chunk)> externalProcessing) {
 		}, [=] {
 			crl::on_main(this, [=] {
 				_updates.fire_error(Error::Other);
+				if (const auto player = Player::instance()) {
+					player->resumeAfterRecord();
+				}
 			});
 		}, externalProcessing);
 		crl::on_main(this, [=] {
@@ -157,13 +165,21 @@ void Instance::stop(Fn<void(Result&&)> callback) {
 	InvokeQueued(_inner.get(), [=] {
 		if (!callback) {
 			_inner->stop();
-			crl::on_main(this, [=] { _started = false; });
+			crl::on_main(this, [=] {
+				_started = false;
+				if (const auto player = Player::instance()) {
+					player->resumeAfterRecord();
+				}
+			});
 			return;
 		}
 		_inner->stop([=](Result &&result) {
 			crl::on_main([=, result = std::move(result)]() mutable {
 				callback(std::move(result));
 				_started = false;
+				if (const auto player = Player::instance()) {
+					player->resumeAfterRecord();
+				}
 			});
 		});
 	});

@@ -190,6 +190,12 @@ public:
 	}
 	void stopAndClose();
 
+	void pauseForRecord();
+	void resumeAfterRecord();
+
+	void pauseForPlayback();
+	void resumeAfterPlayback();
+
 private:
 	using SharedMediaType = Storage::SharedMediaType;
 	using SliceKey = SparseIdsMergedSlice::Key;
@@ -224,6 +230,8 @@ private:
 		bool isPlaying = false;
 		bool resumeOnCallEnd = false;
 		bool resumeOnVoiceEnd = false;
+		bool resumeOnRecordEnd = false;
+		bool resumeOnPlaybackEnd = false;
 		std::unique_ptr<Streamed> streamed;
 		std::unique_ptr<ShuffleData> shuffleData;
 		std::unique_ptr<base::PowerSaveBlocker> powerSaveBlocker;
@@ -263,6 +271,9 @@ private:
 
 	void pauseSongForVoice();
 	void resumeSongAfterVoice(bool force = false);
+
+	void pauseVoiceForSong();
+	void resumeVoiceAfterSong();
 
 	void setCurrent(const AudioMsgId &audioId);
 	void refreshPlaylist(not_null<Data*> data);

@@ -265,6 +265,32 @@ void BuildChats(
 		{ u"mention"_q, u"comma"_q });
 }
 
+void BuildMedia(SectionBuilder &builder) {
+	builder.addSubsectionTitle({
+		.id = u"rabbit/chats/media"_q,
+		.title = rktr(u"rtg_chats_media"_q),
+		.keywords = { u"media"_q, u"audio"_q, u"playback"_q, u"record"_q },
+	});
+
+	AddToggle(
+		builder,
+		u"rabbit/chats/media/stop_media_on_playback"_q,
+		rktr(u"rtg_chats_stop_media_on_playback"_q),
+		nullptr,
+		[] { return RabbitSettings::stopMediaOnPlayback(); },
+		[](bool value) { RabbitSettings::setStopMediaOnPlayback(value); },
+		{ u"stop"_q, u"media"_q, u"playback"_q });
+
+	AddToggle(
+		builder,
+		u"rabbit/chats/media/stop_media_on_record"_q,
+		rktr(u"rtg_chats_stop_media_on_record"_q),
+		nullptr,
+		[] { return RabbitSettings::stopMediaOnRecord(); },
+		[](bool value) { RabbitSettings::setStopMediaOnRecord(value); },
+		{ u"stop"_q, u"media"_q, u"record"_q });
+}
+
 void BuildMessages(SectionBuilder &builder) {
 	builder.addSubsectionTitle({
 		.id = u"rabbit/chats/messages"_q,
@@ -1491,6 +1517,11 @@ void BuildRabbitChats(
 	builder.addDivider();
 	builder.addSkip();
 	BuildChats(builder, controller);
+
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+	BuildMedia(builder);
 
 	builder.addSkip();
 	builder.addDivider();
