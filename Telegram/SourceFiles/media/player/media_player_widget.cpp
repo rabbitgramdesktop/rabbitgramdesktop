@@ -314,7 +314,9 @@ void Widget::setupRightControls() {
 		const auto &icon = st::mediaPlayerControlsFade;
 		const auto fade = QRect(0, 0, icon.width(), raw->height());
 		const auto theme = Rabbit::Player::CurrentCoverTheme();
-		const auto useCover = RabbitSettings::playerCoverColorsMini() && theme.valid;
+		const auto useCover = (_type == AudioMsgId::Type::Song)
+			&& RabbitSettings::playerCoverColorsMini()
+			&& theme.valid;
 		const auto bg = useCover ? theme.backgroundTop : st::mediaPlayerBg->c;
 
 		if (fade.intersects(clip)) {
@@ -373,7 +375,9 @@ void Widget::stopAndClose() {
 }
 
 void Widget::updateCoverTheme(const Rabbit::Player::CoverTheme &theme) {
-	const auto useCover = RabbitSettings::playerCoverColorsMini() && theme.valid;
+	const auto useCover = (_type == AudioMsgId::Type::Song)
+		&& RabbitSettings::playerCoverColorsMini()
+		&& theme.valid;
 	update();
 	rightControls()->update();
 
@@ -547,7 +551,9 @@ void Widget::paintEvent(QPaintEvent *e) {
 	auto fill = e->rect().intersected(
 		QRect(0, 0, width(), st::mediaPlayerHeight + st::lineWidth));
 	if (!fill.isEmpty()) {
-		if (RabbitSettings::playerCoverColorsMini()) {
+		const auto useCover = (_type == AudioMsgId::Type::Song)
+			&& RabbitSettings::playerCoverColorsMini();
+		if (useCover) {
 			const auto theme = Rabbit::Player::CurrentCoverTheme();
 			if (theme.valid) {
 				p.fillRect(fill, theme.backgroundTop);
@@ -901,6 +907,7 @@ void Widget::handleSongChange() {
 	} else {
 		_currentMedia = nullptr;
 	}
+	updateCoverTheme(Rabbit::Player::CurrentCoverTheme());
 
 	auto textWithEntities = TextWithEntities();
 	if (document->isVoiceMessage() || document->isVideoMessage()) {
