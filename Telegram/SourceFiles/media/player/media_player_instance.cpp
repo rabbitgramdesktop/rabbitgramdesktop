@@ -633,12 +633,17 @@ bool Instance::moveInPlaylist(
 				if (document->isAudioFile()
 					|| document->isVoiceMessage()
 					|| document->isVideoMessage()) {
+					const auto isSame = (data->current.audio() == document)
+						&& (data->current.contextId() == item->fullId());
 					play(
 						AudioMsgId(document, item->fullId()),
 						PlaylistContext{
 							data->topicRootId,
 							data->monoforumPeerId,
 						});
+					if (isSame) {
+						_trackChanged.fire_copy(data->type);
+					}
 				}
 				return true;
 			}
@@ -1593,6 +1598,7 @@ void Instance::emitUpdate(AudioMsgId::Type type, CheckCallback check) {
 		if (data->isPlaying && state.state == State::StoppedAtEnd) {
 			if (repeat(data) == RepeatMode::One) {
 				play(data->current);
+				_trackChanged.fire_copy(data->type);
 			} else if (OptionDisableAutoplayNext.value()) {
 				finished = true;
 			} else if (!moveInPlaylist(data, 1, true)) {

@@ -28,6 +28,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include "media/streaming/media_streaming_player.h"
 #include "media/system_media_controls_video.h"
 #include "ui/text/format_song_document_name.h"
+#include "rabbit/ui/player/cover_theme.h"
 
 namespace Media {
 namespace {
@@ -79,7 +80,7 @@ float64 SystemMediaControlsManager::lookupPlaybackRate() const {
 		: Core::App().settings().voicePlaybackSpeed();
 }
 
-void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
+void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType, bool force) {
 	const auto mediaPlayer = Media::Player::instance();
 	_lifetimeDownload.destroy();
 
@@ -87,11 +88,13 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 	if (!current) {
 		return;
 	}
-	if ((_lastAudioMsgId.contextId() == current.contextId())
+	if (!force
+		&& (_lastAudioMsgId.contextId() == current.contextId())
 		&& (_lastAudioMsgId.audio() == current.audio())
 		&& (_lastAudioMsgId.type() == current.type())) {
 		return;
 	}
+	_lastAudioMsgId = current;
 	const auto document = current.audio();
 
 	const auto &[title, performer] = (audioType
@@ -128,7 +131,7 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 	if (audioType == AudioMsgId::Type::Voice) {
 		if (const auto item = document->owner().message(
 				current.contextId())) {
-			constexpr auto kUserpicSize = 50;
+			constexpr auto kUserpicSize = 256;
 			const auto forwarded = item->Get<HistoryMessageForwarded>();
 			const auto peer = (forwarded && forwarded->originalSender)
 				? forwarded->originalSender
@@ -145,6 +148,9 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 			} else {
 				peer->session().downloaderTaskFinished(
 				) | rpl::on_next([=] {
+					if (_lastAudioMsgId != current) {
+						return;
+					}
 					const auto userpic = PeerData::GenerateUserpicImage(
 						peer,
 						_cachedUserpicView,
@@ -160,18 +166,40 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 		} else {
 			_controls->clearThumbnail();
 		}
-	} else if (document && document->isSongWithCover()) {
+	} else if (document && (document->isSong() || document->isAudioFile())) {
+		auto thumbnailFound = false;
 		const auto view = document->createMediaView();
 		view->thumbnailWanted(current.contextId());
 		_cachedMediaView = view;
 		if (const auto imagePtr = view->thumbnail()) {
 			_controls->setThumbnail(imagePtr->original());
-		} else {
+			thumbnailFound = true;
+		}
+		Rabbit::Player::ExtractEmbeddedCover(
+			document,
+			crl::guard(this, [=](QImage cover) {
+				if (_lastAudioMsgId == current && !cover.isNull()) {
+					_controls->setThumbnail(cover);
+				}
+			}));
+		if (!thumbnailFound) {
 			document->session().downloaderTaskFinished(
 			) | rpl::on_next([=] {
+				if (_lastAudioMsgId != current) {
+					return;
+				}
 				if (const auto imagePtr = view->thumbnail()) {
 					_controls->setThumbnail(imagePtr->original());
 					_lifetimeDownload.destroy();
+				} else {
+					Rabbit::Player::ExtractEmbeddedCover(
+						document,
+						crl::guard(this, [=](QImage cover) {
+							if (_lastAudioMsgId == current && !cover.isNull()) {
+								_controls->setThumbnail(cover);
+								_lifetimeDownload.destroy();
+							}
+						}));
 				}
 			}, _lifetimeDownload);
 			_controls->clearThumbnail();
@@ -179,8 +207,6 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 	} else {
 		_controls->clearThumbnail();
 	}
-
-	_lastAudioMsgId = current;
 }
 
 void SystemMediaControlsManager::syncPlayerStateToControls() {
@@ -254,6 +280,9 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		if (_videoDelegate) {
 			return;
 		}
+		if (status == PlaybackStatus::Stopped) {
+			_lastAudioMsgId = AudioMsgId();
+		}
 		if (_controls->seekingSupported()) {
 			const auto type = mediaPlayer->getActiveType();
 			_controls->setPosition(mediaPlayer->getState(type).position);
@@ -284,6 +313,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 			_cachedMediaView = nullptr;
 			_streamed = nullptr;
 			_controls->clearMetadata();
+			_lastAudioMsgId = AudioMsgId();
 		}
 		_lifetimeDownload.destroy();
 	}, _lifetime);
@@ -300,6 +330,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 	) | rpl::on_next([=] {
 		_cachedMediaView = nullptr;
 		_streamed = nullptr;
+		_lastAudioMsgId = AudioMsgId();
 	}, _lifetime);
 
 	auto trackChanged = mediaPlayer->trackChanged(
@@ -321,14 +352,18 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		_controls->updateDisplay();
 	});
 
-	rpl::merge(
-		std::move(trackChanged),
-		std::move(unlocked)
-	) | rpl::on_next([=](AudioMsgId::Type audioType) {
+	std::move(trackChanged) | rpl::on_next([=](AudioMsgId::Type audioType) {
 		if (_videoDelegate) {
 			return;
 		}
-		applyPlayerTrack(audioType);
+		applyPlayerTrack(audioType, true);
+	}, _lifetime);
+
+	std::move(unlocked) | rpl::on_next([=](AudioMsgId::Type audioType) {
+		if (_videoDelegate) {
+			return;
+		}
+		applyPlayerTrack(audioType, false);
 	}, _lifetime);
 
 	rpl::merge(

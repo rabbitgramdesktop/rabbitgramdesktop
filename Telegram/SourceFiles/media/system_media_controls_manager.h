@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #pragma once
 
+#include "base/weak_ptr.h"
 #include "data/data_audio_msg_id.h"
 #include "media/player/media_player_instance.h"
 #include "media/media_common.h"
@@ -31,7 +32,9 @@ class Instance;
 
 namespace Media {
 
-class SystemMediaControlsManager final : public SystemMediaControlsVideoSink {
+class SystemMediaControlsManager final
+	: public SystemMediaControlsVideoSink
+	, public base::has_weak_ptr {
 public:
 	SystemMediaControlsManager();
 	~SystemMediaControlsManager();
@@ -48,7 +51,7 @@ public:
 
 private:
 	[[nodiscard]] float64 lookupPlaybackRate() const;
-	void applyPlayerTrack(AudioMsgId::Type audioType);
+	void applyPlayerTrack(AudioMsgId::Type audioType, bool force = false);
 	void syncPlayerStateToControls();
 
 	const std::unique_ptr<base::Platform::SystemMediaControls> _controls;
