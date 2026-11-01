@@ -34,6 +34,7 @@ def get_release_xml(version, prerelease, date, changes):
         ver_str = version
     else:
         ver_str = f"{version}~{prerelease}"
+        release.set("type", "development")
     release.set("version", ver_str)
     release.set("date", date.isoformat())
     description = ET.SubElement(release, "description")
