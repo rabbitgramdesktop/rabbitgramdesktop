@@ -96,7 +96,7 @@
   </qresource>
   <qresource prefix="/misc">
     <file alias="default_shortcuts-custom.json">../../default_shortcuts-custom.json</file>
-    <file alias="org.telegram.desktop.desktop">../../../../lib/xdg/org.telegram.desktop.desktop</file>
+    <file alias="io.github.rabbitgramdesktop.rabbitGram.desktop">../../../../lib/xdg/io.github.rabbitgramdesktop.rabbitGram.desktop</file>
   </qresource>
   <qresource prefix="/rtg_lang">
     <file alias="en.json">../../langs/rabbit/en.json</file>
