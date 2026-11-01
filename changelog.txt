@@ -1,4 +1,4 @@
-7.3.4 beta (29.10.26)
+7.3.4 (29.10.26)
 
 - Search apps, channels, posts and media in the search tabs.
 - Animate sent text messages flying into their bubbles.
