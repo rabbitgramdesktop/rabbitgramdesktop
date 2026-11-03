@@ -10,6 +10,9 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 #include <QtCore/QString>
 #include <QtCore/QMap>
 #include <QtCore/QStringList>
+#include <QtCore/QMutex>
+#include <QtCore/QRandomGenerator>
+#include <algorithm>
 
 namespace Rabbit::TgWsProxy {
 
@@ -104,6 +107,62 @@ inline constexpr auto kDefaultTargetIp = "149.154.167.220";
 	}();
 	return result;
 }
+
+class Balancer final {
+public:
+	static Balancer &Instance() {
+		static Balancer instance;
+		return instance;
+	}
+
+	QStringList getDomainsForDc(int dc) {
+		const auto all = CfProxyDomains();
+		if (all.isEmpty()) {
+			return {};
+		}
+		auto locker = QMutexLocker(&_mutex);
+		auto result = QStringList();
+		const auto it = _dcToDomain.find(dc);
+		const auto current = (it != _dcToDomain.end()) ? it.value() : QString();
+		if (!current.isEmpty() && all.contains(current)) {
+			result.push_back(current);
+		}
+		auto shuffled = all;
+		std::shuffle(
+			shuffled.begin(),
+			shuffled.end(),
+			*QRandomGenerator::global());
+		for (const auto &domain : shuffled) {
+			if (domain != current) {
+				result.push_back(domain);
+			}
+		}
+		return result;
+	}
+
+	void updateDomainForDc(int dc, const QString &domain) {
+		if (domain.isEmpty()) {
+			return;
+		}
+		auto locker = QMutexLocker(&_mutex);
+		_dcToDomain[dc] = domain;
+	}
+
+private:
+	Balancer() {
+		const auto all = CfProxyDomains();
+		if (!all.isEmpty()) {
+			const auto dcs = { 1, 2, 3, 4, 5, 203 };
+			for (const auto dc : dcs) {
+				const auto idx = QRandomGenerator::global()->bounded(all.size());
+				_dcToDomain[dc] = all[idx];
+			}
+		}
+	}
+
+	QMutex _mutex;
+	QMap<int, QString> _dcToDomain;
+};
 
 } // namespace Rabbit::TgWsProxy
 

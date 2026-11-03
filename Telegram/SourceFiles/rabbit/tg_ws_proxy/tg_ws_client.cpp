@@ -69,7 +69,12 @@ void TgWsClient::connectToHost(
 	_socket.setPeerVerifyName(peerName);
 	_socket.setPeerVerifyMode(QSslSocket::VerifyNone);
 	_socket.ignoreSslErrors();
-	_socket.connectToHostEncrypted(targetIp, 443, peerName);
+	_socket.connectToHostEncrypted(
+		targetIp,
+		443,
+		peerName,
+		QIODevice::ReadWrite,
+		QAbstractSocket::IPv4Protocol);
 }
 
 void TgWsClient::abort() {
@@ -84,7 +89,13 @@ void TgWsClient::close() {
 	if (_state == State::Closed) {
 		return;
 	}
-	_state = State::Closing;
+	const auto wasConnected = (_state == State::Connected);
+	_state = State::Closed;
+	_readBuffer.clear();
+	_fragmentBuffer.clear();
+	if (wasConnected) {
+		sendClose();
+	}
 	_socket.disconnectFromHost();
 }
 
@@ -100,8 +111,6 @@ void TgWsClient::handleEncrypted() {
 
 	const auto request = u"GET %1 HTTP/1.1\r\n"_q.arg(_path)
 		+ u"Host: %1\r\n"_q.arg(_domain)
-		+ u"User-Agent: Mozilla/5.0\r\n"_q
-		+ u"Origin: https://web.telegram.org\r\n"_q
 		+ u"Upgrade: websocket\r\n"_q
 		+ u"Connection: Upgrade\r\n"_q
 		+ u"Sec-WebSocket-Key: %1\r\n"_q.arg(QString::fromLatin1(wsKey))
@@ -201,6 +210,19 @@ void TgWsClient::sendPong(const QByteArray &data) {
 		payloadData[i] ^= maskData[i % 4];
 	}
 	frame.append(masked);
+	_socket.write(frame);
+}
+
+void TgWsClient::sendClose() {
+	auto frame = QByteArray();
+	frame.reserve(6);
+	frame.append(char(0x80 | kOpClose));
+	frame.append(char(0x80 | 0));
+
+	auto mask = QByteArray(4, Qt::Uninitialized);
+	RAND_bytes(reinterpret_cast<uchar*>(mask.data()), 4);
+	frame.append(mask);
+
 	_socket.write(frame);
 }
 

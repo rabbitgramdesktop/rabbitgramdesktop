@@ -54,6 +54,7 @@ private:
 	void processHttpHandshake();
 	void processFrames();
 	void sendPong(const QByteArray &data);
+	void sendClose();
 
 	QSslSocket _socket;
 	State _state = State::Closed;

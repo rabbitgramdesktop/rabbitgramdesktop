@@ -38,15 +38,18 @@ bool Controller::start() {
 	data.type = MTP::ProxyData::Type::Mtproto;
 	data.host = u"127.0.0.1"_q;
 	data.port = _server.port();
-	data.password = _server.secretHex();
+	data.password = u"dd"_q + _server.secretHex();
 	_currentProxy = data;
 
 	if (Core::IsAppLaunched()) {
 		auto &proxySettings = Core::App().settings().proxy();
 		if (!_hasSavedState) {
-			if (proxySettings.selected().host != u"127.0.0.1"_q) {
+			const auto &selected = proxySettings.selected();
+			if (selected.valid()
+				&& selected != data
+				&& (selected.host != data.host || selected.port != data.port)) {
 				_savedSettings = proxySettings.settings();
-				_savedProxy = proxySettings.selected();
+				_savedProxy = selected;
 			} else {
 				_savedSettings = MTP::ProxyData::Settings::Disabled;
 				_savedProxy = MTP::ProxyData();
@@ -66,6 +69,7 @@ bool Controller::start() {
 		proxySettings.setList(std::move(list));
 
 		Core::App().setCurrentProxy(data, MTP::ProxyData::Settings::Enabled);
+		Core::App().saveSettingsDelayed();
 		if (Core::App().domain().started()) {
 			for (const auto &[index, account] : Core::App().domain().accounts()) {
 				account->mtp().restart();
@@ -83,20 +87,37 @@ void Controller::stop() {
 		return;
 	}
 
+	const auto proxyToRemove = _currentProxy;
 	_server.stop();
 	_currentProxy = MTP::ProxyData();
 
 	if (Core::IsAppLaunched()) {
+		auto &proxySettings = Core::App().settings().proxy();
+		if (proxyToRemove.valid()) {
+			while (true) {
+				const auto &list = proxySettings.list();
+				const auto it = std::find_if(list.begin(), list.end(), [&](const MTP::ProxyData &p) {
+					return (p.host == proxyToRemove.host) && (p.port == proxyToRemove.port);
+				});
+				if (it == list.end() || !proxySettings.removeFromList(*it)) {
+					break;
+				}
+			}
+		}
+
 		if (_hasSavedState) {
 			const auto savedProxy = _savedProxy;
 			const auto savedSettings = _savedSettings;
 			_hasSavedState = false;
+			_savedProxy = MTP::ProxyData();
+			_savedSettings = MTP::ProxyData::Settings::Disabled;
 			Core::App().setCurrentProxy(savedProxy, savedSettings);
 		} else {
 			Core::App().setCurrentProxy(
 				MTP::ProxyData(),
 				MTP::ProxyData::Settings::Disabled);
 		}
+		Core::App().saveSettingsDelayed();
 		if (Core::App().domain().started()) {
 			for (const auto &[index, account] : Core::App().domain().accounts()) {
 				account->mtp().restart();

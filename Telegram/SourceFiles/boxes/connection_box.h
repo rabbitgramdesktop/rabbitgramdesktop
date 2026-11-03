@@ -82,6 +82,7 @@ public:
 	};
 
 	void deleteItem(int id);
+	void deleteProxy(const ProxyData &proxy);
 	void deleteItems();
 	void restoreItem(int id);
 	void shareItem(int id, bool qr);

@@ -1322,6 +1322,12 @@ void ProxiesBox::setupContent() {
 	});
 	tgWsProxy->checkedChanges(
 	) | rpl::on_next([=](bool checked) {
+		if (!checked) {
+			const auto current = Rabbit::TgWsProxy::Controller::Instance().proxyData();
+			if (current.valid()) {
+				_controller->deleteProxy(current);
+			}
+		}
 		RabbitSettings::setTgWsProxyEnabled(checked);
 		rest->toggle(!checked, anim::type::normal);
 	}, tgWsProxy->lifetime());
@@ -2290,6 +2296,13 @@ auto ProxiesBoxController::findByProxy(const ProxyData &proxy)
 
 void ProxiesBoxController::deleteItem(int id) {
 	setDeleted(id, true);
+}
+
+void ProxiesBoxController::deleteProxy(const ProxyData &proxy) {
+	const auto i = findByProxy(proxy);
+	if (i != end(_list)) {
+		deleteItem(i->id);
+	}
 }
 
 void ProxiesBoxController::deleteItems() {

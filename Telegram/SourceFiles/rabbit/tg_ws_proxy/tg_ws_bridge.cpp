@@ -7,6 +7,7 @@ https://github.com/rabbitgramdesktop/rabbitgramdesktop/blob/dev/LEGAL
 */
 #include "rabbit/tg_ws_proxy/tg_ws_bridge.h"
 #include "rabbit/tg_ws_proxy/tg_ws_proxy_constants.h"
+#include "logs.h"
 
 #include <QtCore/QRandomGenerator>
 #include <algorithm>
@@ -15,7 +16,9 @@ namespace Rabbit::TgWsProxy {
 namespace {
 
 constexpr auto kAttemptTimeoutMs = 7000;
-constexpr auto kMaxCfAttempts = 4;
+constexpr auto kMaxCfAttempts = 8;
+constexpr auto kBadHandshakeDrainLimit = 64 * 1024;
+constexpr auto kBadHandshakeDrainTimeoutMs = 10000;
 
 } // namespace
 
@@ -29,6 +32,11 @@ TgWsBridge::TgWsBridge(
 	_attemptTimer.setSingleShot(true);
 	connect(&_attemptTimer, &QTimer::timeout, this, [=] {
 		handleUpstreamFailed();
+	});
+
+	_drainTimer.setSingleShot(true);
+	connect(&_drainTimer, &QTimer::timeout, this, [=] {
+		closeBoth();
 	});
 
 	connect(_client.get(), &QTcpSocket::readyRead, this, &TgWsBridge::handleClientReadyRead);
@@ -59,6 +67,7 @@ void TgWsBridge::closeBoth() {
 	}
 	_closing = true;
 	_attemptTimer.stop();
+	_drainTimer.stop();
 	if (_client) {
 		_client->disconnect(this);
 		_client->disconnectFromHost();
@@ -82,7 +91,8 @@ void TgWsBridge::handleWsDisconnected() {
 	handleUpstreamFailed();
 }
 
-void TgWsBridge::handleWsError(const QString &) {
+void TgWsBridge::handleWsError(const QString &error) {
+	LOG(("TgWsProxy: WebSocket error: %1").arg(error));
 	handleUpstreamFailed();
 }
 
@@ -91,12 +101,14 @@ void TgWsBridge::handleUpstreamFailed() {
 		return;
 	}
 	if (_upstreamReady) {
+		LOG(("TgWsProxy: Upstream connection broke after ready, closing"));
 		closeBoth();
 		return;
 	}
 	if (!_attemptActive) {
 		return;
 	}
+	LOG(("TgWsProxy: Upstream attempt failed, trying next"));
 	_attemptActive = false;
 	_attemptTimer.stop();
 	abortUpstream();
@@ -115,26 +127,9 @@ void TgWsBridge::buildAttempts(int dc, bool isMedia, bool isTestDc) {
 	_attempts.clear();
 	_attemptIndex = 0;
 
-	const auto path = QString::fromLatin1(isTestDc ? kWsPathTest : kWsPath);
-	if (dc == 2 || dc == 4) {
-		const auto ip = QString::fromLatin1(kDefaultTargetIp);
-		for (const auto &domain : WsDomains(dc, isMedia)) {
-			_attempts.push_back({ Kind::Ws, ip, domain, path, domain });
-			_attempts.push_back({
-				Kind::Ws,
-				ip,
-				domain,
-				path,
-				QString::fromLatin1(kFrontingSni) });
-		}
-	}
-
+	// CF proxy domains first, ordered by active balancer domain
 	if (!isTestDc) {
-		auto domains = CfProxyDomains();
-		std::shuffle(
-			domains.begin(),
-			domains.end(),
-			*QRandomGenerator::global());
+		const auto domains = Balancer::Instance().getDomainsForDc(dc);
 		const auto count = std::min(int(domains.size()), kMaxCfAttempts);
 		for (auto i = 0; i != count; ++i) {
 			const auto domain = u"kws%1.%2"_q.arg(dc).arg(domains[i]);
@@ -147,6 +142,22 @@ void TgWsBridge::buildAttempts(int dc, bool isMedia, bool isTestDc) {
 		}
 	}
 
+	// Direct Telegram WS endpoints
+	const auto path = QString::fromLatin1(isTestDc ? kWsPathTest : kWsPath);
+	if (dc == 2 || dc == 4) {
+		const auto ip = QString::fromLatin1(kDefaultTargetIp);
+		for (const auto &domain : WsDomains(dc, isMedia)) {
+			_attempts.push_back({
+				Kind::Ws,
+				ip,
+				domain,
+				path,
+				QString::fromLatin1(kFrontingSni) });
+			_attempts.push_back({ Kind::Ws, ip, domain, path, domain });
+		}
+	}
+
+	// TCP fallback
 	const auto knownDc = (dc >= 1 && dc <= 5) || (dc == 203);
 	if (knownDc) {
 		_attempts.push_back({
@@ -181,12 +192,36 @@ void TgWsBridge::startNextAttempt() {
 	}
 }
 
+void TgWsBridge::handleBadHandshake() {
+	if (_closing || _drainingBadHandshake) {
+		return;
+	}
+	_drainingBadHandshake = true;
+	_drainedBytes = 0;
+	_drainTimer.start(kBadHandshakeDrainTimeoutMs);
+	if (_client && _client->bytesAvailable() > 0) {
+		const auto extra = _client->readAll();
+		_drainedBytes += extra.size();
+		if (_drainedBytes >= kBadHandshakeDrainLimit) {
+			closeBoth();
+		}
+	}
+}
+
 void TgWsBridge::handleClientReadyRead() {
 	if (!_client) {
 		return;
 	}
 	const auto available = _client->readAll();
 	if (available.isEmpty()) {
+		return;
+	}
+
+	if (_drainingBadHandshake) {
+		_drainedBytes += available.size();
+		if (_drainedBytes >= kBadHandshakeDrainLimit) {
+			closeBoth();
+		}
 		return;
 	}
 
@@ -202,7 +237,7 @@ void TgWsBridge::handleClientReadyRead() {
 
 		const auto result = TryHandshake(handshake, _secret);
 		if (!result) {
-			closeBoth();
+			handleBadHandshake();
 			return;
 		}
 
@@ -211,6 +246,7 @@ void TgWsBridge::handleClientReadyRead() {
 		if (isTestDc) {
 			dc -= 10000;
 		}
+		_targetDc = dc;
 		const auto isMedia = result->isMedia;
 		const auto dcIdx = int16(isMedia ? -dc : dc);
 
@@ -268,6 +304,18 @@ void TgWsBridge::handleWsConnected() {
 	_attemptActive = false;
 	_attemptTimer.stop();
 	_upstreamReady = true;
+
+	if (_attemptIndex > 0 && _attemptIndex <= int(_attempts.size())) {
+		const auto &attempt = _attempts[_attemptIndex - 1];
+		for (const auto &baseDomain : CfProxyDomains()) {
+			if (attempt.domain.endsWith(baseDomain)) {
+				Balancer::Instance().updateDomainForDc(_targetDc, baseDomain);
+				LOG(("TgWsProxy: Connected via CF domain %1 for DC%2").arg(baseDomain).arg(_targetDc));
+				break;
+			}
+		}
+	}
+
 	_ws.sendBinary(_relayInit);
 
 	if (!_pendingClientBuffer.isEmpty()) {

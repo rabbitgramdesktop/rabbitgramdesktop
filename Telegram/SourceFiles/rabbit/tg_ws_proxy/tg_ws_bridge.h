@@ -48,6 +48,7 @@ private:
 
 	void handleClientReadyRead();
 	void handleClientDisconnected();
+	void handleBadHandshake();
 	void handleWsConnected();
 	void handleWsBinaryMessage(const QByteArray &data);
 	void handleWsDisconnected();
@@ -66,6 +67,7 @@ private:
 	TgWsClient _ws;
 	QTcpSocket _tcp;
 	QTimer _attemptTimer;
+	QTimer _drainTimer;
 	QByteArray _secret;
 	QByteArray _clientInitBuffer;
 	QByteArray _pendingClientBuffer;
@@ -73,10 +75,13 @@ private:
 
 	std::vector<Attempt> _attempts;
 	int _attemptIndex = 0;
+	int _targetDc = 0;
 	Kind _activeKind = Kind::Ws;
 	std::unique_ptr<CryptoCtx> _crypto;
 	std::unique_ptr<MsgSplitter> _splitter;
 	bool _handshakeDone = false;
+	bool _drainingBadHandshake = false;
+	int _drainedBytes = 0;
 	bool _attemptActive = false;
 	bool _upstreamReady = false;
 	bool _closing = false;
